@@ -17,6 +17,7 @@ That's it. Kiro now knows about Link in every project, and your wiki lives at `~
 |------|---------|----------------|
 | Kiro | `bash integrations/kiro/install.sh` | `~/.kiro/steering/link.md` |
 | Claude Code | `bash integrations/claude-code/install.sh` | `~/.claude/CLAUDE.md` |
+| Antigravity | `bash integrations/antigravity/install.sh` | `~/.gemini/GEMINI.md` |
 | Codex | `bash integrations/codex/install.sh` | `~/AGENTS.md` |
 | Cursor | `bash integrations/cursor/install.sh` | `~/.cursor/rules/link.mdc` |
 | Copilot | `bash integrations/copilot/install.sh` | `.github/copilot-instructions.md` |

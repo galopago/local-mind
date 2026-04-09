@@ -26,6 +26,7 @@ Run the install script for your tool:
 git clone https://github.com/gowtham0992/link.git
 bash link/integrations/kiro/install.sh          # Kiro
 bash link/integrations/claude-code/install.sh   # Claude Code
+bash link/integrations/antigravity/install.sh   # Google Antigravity
 bash link/integrations/codex/install.sh         # Codex
 bash link/integrations/cursor/install.sh        # Cursor
 bash link/integrations/copilot/install.sh       # Copilot
