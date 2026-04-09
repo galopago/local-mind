@@ -1,0 +1,5 @@
+# Files and patterns to skip during ingest
+.git/
+.DS_Store
+*.tmp
+node_modules/
