@@ -37,6 +37,15 @@ fi
 if [ "$MODE" = "--global" ]; then
     echo "Scaffolding central wiki at ~/link/..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
+
+    # Install auto-ingest rule
+    RULE_DIR="$HOME/.gemini/rules"
+    mkdir -p "$RULE_DIR"
+    if [ ! -f "$RULE_DIR/link-auto-ingest.md" ]; then
+        cp "$SCRIPT_DIR/hooks/auto-ingest-rule.md" "$RULE_DIR/link-auto-ingest.md"
+        echo "Auto-ingest rule installed → $RULE_DIR/link-auto-ingest.md"
+    fi
+
     echo ""
     echo "Done. Antigravity will know about Link in every project."
     echo "Drop sources into ~/link/raw/ and tell the agent to ingest them."
@@ -44,6 +53,15 @@ if [ "$MODE" = "--global" ]; then
 else
     echo "Scaffolding project wiki..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
+
+    # Install auto-ingest rule locally
+    RULE_DIR=".agent/rules"
+    mkdir -p "$RULE_DIR"
+    if [ ! -f "$RULE_DIR/link-auto-ingest.md" ]; then
+        cp "$SCRIPT_DIR/hooks/auto-ingest-rule.md" "$RULE_DIR/link-auto-ingest.md"
+        echo "Auto-ingest rule installed → $RULE_DIR/link-auto-ingest.md"
+    fi
+
     echo ""
     echo "Done. Drop sources into raw/ and tell the agent to ingest them."
 fi
