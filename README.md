@@ -75,6 +75,15 @@ link/
 | "what is X?" | Query the wiki, optionally file the answer back |
 | "lint the wiki" | Health check: orphans, contradictions, stale claims |
 
+## Auto-ingest
+
+Link can watch for new files and trigger ingestion automatically:
+
+- **Kiro:** `fileCreated` hook fires when files land in `raw/` (installed automatically)
+- **All tools:** `bash watch.sh` runs a file watcher that notifies you when new sources arrive
+- **Copilot/VS Code:** `SessionStart` hook checks for unprocessed files at session start
+- **Cursor:** `beforeSubmitPrompt` hook checks for unprocessed files before each prompt
+
 ## Design principles
 
 - Every claim links to its source. No orphan claims.
