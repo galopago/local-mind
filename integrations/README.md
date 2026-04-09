@@ -40,3 +40,9 @@ That's it. Kiro now knows about Link in every project, and your wiki lives at `~
 ## Uninstall
 
 Each folder has an `uninstall.sh`. Same `--project` flag applies.
+
+## Auto-ingest hooks
+
+The Kiro and Claude Code integrations include auto-ingest hooks that trigger when new files land in `raw/`. The agent automatically runs the ingest protocol — no manual "ingest this" needed.
+
+Note: file-trigger hooks only fire when the wiki folder is part of the open workspace. For the global wiki at `~/link/`, you can add it as a workspace folder in your IDE, or just use manual ingest from any project.

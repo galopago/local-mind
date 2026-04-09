@@ -1,0 +1,13 @@
+{
+  "name": "Link Auto-Ingest",
+  "version": "1.0.0",
+  "description": "Automatically ingests new files dropped into ~/link/raw/ into the Link wiki",
+  "when": {
+    "type": "fileCreated",
+    "patterns": ["*.md", "*.txt", "*.pdf", "*.png", "*.jpg", "*.jpeg", "*.webp", "*.rst"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A new file was just added. Read ~/link/LINK.md for the ingest protocol, then ingest this new file into the wiki at ~/link/wiki/. Follow the full ingest workflow: create source page, create/update concept and entity pages, update index.md and log.md. Tag all claims with confidence levels."
+  }
+}

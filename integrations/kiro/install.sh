@@ -18,7 +18,18 @@ if [ "$MODE" = "--global" ]; then
         echo "Link already configured in $TARGET"
     else
         echo "$INSTRUCTIONS" > "$TARGET"
-        echo "Link installed → $TARGET"
+        echo "Link installed globally → $TARGET"
+    fi
+
+    # Install auto-ingest hook
+    HOOK_DIR="$HOME/.kiro/hooks"
+    HOOK_FILE="$HOOK_DIR/link-auto-ingest.json"
+    mkdir -p "$HOOK_DIR"
+    if [ ! -f "$HOOK_FILE" ]; then
+        cp "$SCRIPT_DIR/hooks/auto-ingest.json" "$HOOK_FILE"
+        echo "Auto-ingest hook installed → $HOOK_FILE"
+    else
+        echo "Auto-ingest hook already installed"
     fi
 
     echo "Scaffolding central wiki at ~/link/..."
@@ -26,6 +37,9 @@ if [ "$MODE" = "--global" ]; then
     echo ""
     echo "Done. Kiro will know about Link in every project."
     echo "Drop sources into ~/link/raw/ and tell Kiro to ingest them."
+    echo ""
+    echo "Auto-ingest hook: fires when new files appear in raw/"
+    echo "  (works when ~/link/ is open as workspace or part of a multi-root workspace)"
     echo "View wiki: python ~/link/serve.py"
 
 elif [ "$MODE" = "--project" ]; then
