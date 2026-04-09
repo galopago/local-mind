@@ -2,12 +2,11 @@
 # Remove Link from Kiro
 #
 # Usage:
-#   bash uninstall.sh --global    → removes ~/.kiro/steering/link.md
-#   bash uninstall.sh --project   → removes .kiro/steering/link.md
-#   bash uninstall.sh             → defaults to --project
+#   bash uninstall.sh             → removes global ~/.kiro/steering/link.md
+#   bash uninstall.sh --project   → removes project .kiro/steering/link.md
 set -e
 
-MODE="${1:---project}"
+MODE="${1:---global}"
 
 if [ "$MODE" = "--global" ]; then
     TARGET="$HOME/.kiro/steering/link.md"

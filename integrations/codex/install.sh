@@ -2,22 +2,22 @@
 # Link integration for Codex
 #
 # Usage:
-#   bash install.sh --global    → ~/AGENTS.md (global)
-#   bash install.sh --project   → ./AGENTS.md + scaffold wiki here
-#   bash install.sh             → defaults to --project
+#   bash install.sh             → global: ~/AGENTS.md + central wiki at ~/link/
+#   bash install.sh --project   → project-local: ./AGENTS.md + wiki in current dir
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MARKER="## Link — Personal Knowledge Wiki"
-INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
-MODE="${1:---project}"
+MODE="${1:---global}"
 
 if [ "$MODE" = "--global" ]; then
+    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
     TARGET="$HOME/AGENTS.md"
 elif [ "$MODE" = "--project" ]; then
+    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
     TARGET="AGENTS.md"
 else
-    echo "Usage: bash install.sh [--global|--project]"
+    echo "Usage: bash install.sh [--project]"
     exit 1
 fi
 
@@ -34,13 +34,14 @@ else
 fi
 
 if [ "$MODE" = "--global" ]; then
-    echo "Codex will include Link context in every project."
-    echo ""
-    echo "To scaffold a wiki in a project, cd into it and run:"
-    echo "  bash $SCRIPT_DIR/install.sh --project"
-elif [ "$MODE" = "--project" ]; then
-    echo "Scaffolding wiki structure..."
+    echo "Scaffolding central wiki at ~/link/..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
+    echo ""
+    echo "Done. Codex will know about Link in every project."
+    echo "Drop sources into ~/link/raw/ and tell Codex to ingest them."
+else
+    echo "Scaffolding project wiki..."
+    bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
     echo ""
     echo "Done. Drop sources into raw/ and tell Codex to ingest them."
 fi

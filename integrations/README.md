@@ -1,45 +1,42 @@
 # Integrations
 
-One-step setup for your AI tool. Two modes:
-
-- `--global` — install once, Link is available in every project you open
-- `--project` — install into the current project + scaffold the wiki structure
+One-step setup for your AI tool. Default is global — one central wiki at `~/link/` that works across all projects.
 
 ## Quick start
 
 ```bash
-# Clone Link
 git clone https://github.com/gowtham0992/link.git
-
-# Global install (every project gets Link context automatically)
-bash link/integrations/kiro/install.sh --global
-
-# Then in any project, scaffold the wiki
-cd my-project
-bash /path/to/link/integrations/kiro/install.sh --project
+bash link/integrations/kiro/install.sh
 ```
+
+That's it. Kiro now knows about Link in every project, and your wiki lives at `~/link/`.
 
 ## All integrations
 
-| Tool | Global | Project | What it writes |
-|------|--------|---------|----------------|
-| Claude Code | `--global` → `~/.claude/CLAUDE.md` | `--project` → `./CLAUDE.md` + wiki | Persistent instructions |
-| Codex | `--global` → `~/AGENTS.md` | `--project` → `./AGENTS.md` + wiki | Persistent instructions |
-| Cursor | `--global` → `~/.cursor/rules/link.mdc` | `--project` → `.cursor/rules/link.mdc` + wiki | Always-apply rule |
-| Kiro | `--global` → `~/.kiro/steering/link.md` | `--project` → `.kiro/steering/link.md` + wiki | Always-on steering |
-| Copilot | — | `--project` → `.github/copilot-instructions.md` + wiki | Project instructions |
-| VS Code | — | `--project` → `.vscode/settings.json` + wiki | Copilot chat instructions |
+| Tool | Command | Global location |
+|------|---------|----------------|
+| Kiro | `bash integrations/kiro/install.sh` | `~/.kiro/steering/link.md` |
+| Claude Code | `bash integrations/claude-code/install.sh` | `~/.claude/CLAUDE.md` |
+| Codex | `bash integrations/codex/install.sh` | `~/AGENTS.md` |
+| Cursor | `bash integrations/cursor/install.sh` | `~/.cursor/rules/link.mdc` |
+| Copilot | `bash integrations/copilot/install.sh` | `.github/copilot-instructions.md` |
+| VS Code | `bash integrations/vscode/install.sh` | `.vscode/settings.json` |
 
-`--project` is the default if you don't specify a mode.
+## Two modes
 
-Every script is idempotent — safe to re-run. Each folder has an `uninstall.sh` too.
+- **Default (global):** `bash install.sh` — installs tool instructions globally + scaffolds central wiki at `~/link/`. One wiki for everything. Knowledge compounds across all your projects.
 
-## What `--project` does
+- **Project-local:** `bash install.sh --project` — installs instructions in current project + scaffolds wiki here. Use this when a specific project needs its own isolated wiki (e.g. team projects).
 
-1. Writes the tool-specific instruction file
-2. Copies `LINK.md` (the schema) into your project
-3. Copies `serve.py` (the web viewer)
-4. Creates `raw/`, `wiki/sources/`, `wiki/concepts/`, `wiki/entities/`, etc.
-5. Creates empty `wiki/index.md` and `wiki/log.md`
+## What the install does
 
-After that, drop sources into `raw/` and tell your agent to ingest them.
+1. Writes tool-specific instruction file (so the agent always knows about Link)
+2. Scaffolds wiki structure at `~/link/` (or current dir with `--project`):
+   - `LINK.md` — the schema
+   - `serve.py` — web viewer
+   - `raw/` — for your source documents
+   - `wiki/` — where the LLM writes articles
+
+## Uninstall
+
+Each folder has an `uninstall.sh`. Same `--project` flag applies.

@@ -2,7 +2,7 @@
 # Remove Link from Codex
 set -e
 
-MODE="${1:---project}"
+MODE="${1:---global}"
 
 if [ "$MODE" = "--global" ]; then
     TARGET="$HOME/AGENTS.md"

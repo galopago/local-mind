@@ -2,23 +2,23 @@
 # Link integration for Claude Code
 #
 # Usage:
-#   bash install.sh --global    → ~/.claude/CLAUDE.md (every project)
-#   bash install.sh --project   → ./CLAUDE.md + scaffold wiki here
-#   bash install.sh             → defaults to --project
+#   bash install.sh             → global: ~/.claude/CLAUDE.md + central wiki at ~/link/
+#   bash install.sh --project   → project-local: ./CLAUDE.md + wiki in current dir
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MARKER="## Link — Personal Knowledge Wiki"
-INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
-MODE="${1:---project}"
+MODE="${1:---global}"
 
 if [ "$MODE" = "--global" ]; then
+    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
     TARGET="$HOME/.claude/CLAUDE.md"
     mkdir -p "$HOME/.claude"
 elif [ "$MODE" = "--project" ]; then
+    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
     TARGET="CLAUDE.md"
 else
-    echo "Usage: bash install.sh [--global|--project]"
+    echo "Usage: bash install.sh [--project]"
     exit 1
 fi
 
@@ -35,13 +35,14 @@ else
 fi
 
 if [ "$MODE" = "--global" ]; then
-    echo "Claude Code will include Link context in every project."
-    echo ""
-    echo "To scaffold a wiki in a project, cd into it and run:"
-    echo "  bash $SCRIPT_DIR/install.sh --project"
-elif [ "$MODE" = "--project" ]; then
-    echo "Scaffolding wiki structure..."
+    echo "Scaffolding central wiki at ~/link/..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
+    echo ""
+    echo "Done. Claude Code will know about Link in every project."
+    echo "Drop sources into ~/link/raw/ and tell Claude to ingest them."
+else
+    echo "Scaffolding project wiki..."
+    bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
     echo ""
     echo "Done. Drop sources into raw/ and tell Claude to ingest them."
 fi

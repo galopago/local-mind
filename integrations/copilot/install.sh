@@ -2,15 +2,22 @@
 # Link integration for GitHub Copilot
 #
 # Usage:
-#   bash install.sh --project   → .github/copilot-instructions.md + scaffold wiki
-#   bash install.sh             → defaults to --project
+#   bash install.sh             → .github/copilot-instructions.md + central wiki at ~/link/
+#   bash install.sh --project   → .github/copilot-instructions.md + wiki in current dir
 #
-# Note: Copilot doesn't have a global instructions file — project-level only.
+# Note: Copilot instructions are always project-level. The wiki location differs.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MARKER="## Link — Personal Knowledge Wiki"
-INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
+MODE="${1:---global}"
+
+if [ "$MODE" = "--project" ]; then
+    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
+else
+    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
+fi
+
 TARGET=".github/copilot-instructions.md"
 mkdir -p .github
 
@@ -26,7 +33,12 @@ else
     fi
 fi
 
-echo "Scaffolding wiki structure..."
-bash "$SCRIPT_DIR/../_shared/scaffold.sh"
+if [ "$MODE" = "--project" ]; then
+    echo "Scaffolding project wiki..."
+    bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
+else
+    echo "Scaffolding central wiki at ~/link/..."
+    bash "$SCRIPT_DIR/../_shared/scaffold.sh"
+fi
 echo ""
-echo "Done. Drop sources into raw/ and tell Copilot to ingest them."
+echo "Done. Drop sources and tell Copilot to ingest them."

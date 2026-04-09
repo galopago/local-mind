@@ -1,13 +1,8 @@
 #!/bin/bash
 # Remove Link from Claude Code
-#
-# Usage:
-#   bash uninstall.sh --global    → removes from ~/.claude/CLAUDE.md
-#   bash uninstall.sh --project   → removes from ./CLAUDE.md
-#   bash uninstall.sh             → defaults to --project
 set -e
 
-MODE="${1:---project}"
+MODE="${1:---global}"
 
 if [ "$MODE" = "--global" ]; then
     TARGET="$HOME/.claude/CLAUDE.md"

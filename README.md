@@ -20,18 +20,21 @@ You never write the wiki yourself. The LLM writes and maintains all of it. You c
 
 ## Setup
 
-Run the install script for your tool — it wires Link into your agent's "always remember" mechanism:
+Run the install script for your tool:
 
 ```bash
-bash integrations/claude-code/install.sh   # Claude Code → CLAUDE.md
-bash integrations/codex/install.sh         # Codex → AGENTS.md
-bash integrations/cursor/install.sh        # Cursor → .cursor/rules/link.mdc
-bash integrations/kiro/install.sh          # Kiro → .kiro/steering/link.md
-bash integrations/copilot/install.sh       # Copilot → .github/copilot-instructions.md
-bash integrations/vscode/install.sh        # VS Code → .vscode/settings.json
+git clone https://github.com/gowtham0992/link.git
+bash link/integrations/kiro/install.sh          # Kiro
+bash link/integrations/claude-code/install.sh   # Claude Code
+bash link/integrations/codex/install.sh         # Codex
+bash link/integrations/cursor/install.sh        # Cursor
+bash link/integrations/copilot/install.sh       # Copilot
+bash link/integrations/vscode/install.sh        # VS Code
 ```
 
-That's it. Your agent will know about Link on every session. See [integrations/](integrations/) for details.
+This does two things: (1) makes your agent aware of Link in every session, and (2) scaffolds a central wiki at `~/link/`.
+
+For project-specific wikis instead, add `--project`. See [integrations/](integrations/) for details.
 
 ## Viewing the wiki
 

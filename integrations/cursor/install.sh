@@ -2,51 +2,49 @@
 # Link integration for Cursor
 #
 # Usage:
-#   bash install.sh --global    → ~/.cursor/rules/link.mdc (every project)
-#   bash install.sh --project   → .cursor/rules/link.mdc + scaffold wiki here
-#   bash install.sh             → defaults to --project
+#   bash install.sh             → global: ~/.cursor/rules/link.mdc + central wiki at ~/link/
+#   bash install.sh --project   → project-local: .cursor/rules/link.mdc + wiki in current dir
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
-MODE="${1:---project}"
+MODE="${1:---global}"
 
 if [ "$MODE" = "--global" ]; then
+    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
     TARGET="$HOME/.cursor/rules/link.mdc"
     mkdir -p "$HOME/.cursor/rules"
 elif [ "$MODE" = "--project" ]; then
+    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
     TARGET=".cursor/rules/link.mdc"
     mkdir -p .cursor/rules
 else
-    echo "Usage: bash install.sh [--global|--project]"
+    echo "Usage: bash install.sh [--project]"
     exit 1
 fi
 
 if [ -f "$TARGET" ]; then
     echo "Link already configured in $TARGET"
-    [ "$MODE" = "--project" ] && bash "$SCRIPT_DIR/../_shared/scaffold.sh"
-    exit 0
-fi
-
-cat > "$TARGET" << 'FRONTMATTER'
+else
+    cat > "$TARGET" << 'FRONTMATTER'
 ---
 description: Link knowledge wiki context
 alwaysApply: true
 ---
 
 FRONTMATTER
-
-echo "$INSTRUCTIONS" >> "$TARGET"
-echo "Link installed → $TARGET"
+    echo "$INSTRUCTIONS" >> "$TARGET"
+    echo "Link installed → $TARGET"
+fi
 
 if [ "$MODE" = "--global" ]; then
-    echo "Cursor will include Link context in every project."
-    echo ""
-    echo "To scaffold a wiki in a project, cd into it and run:"
-    echo "  bash $SCRIPT_DIR/install.sh --project"
-elif [ "$MODE" = "--project" ]; then
-    echo "Scaffolding wiki structure..."
+    echo "Scaffolding central wiki at ~/link/..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
+    echo ""
+    echo "Done. Cursor will know about Link in every project."
+    echo "Drop sources into ~/link/raw/ and tell Cursor to ingest them."
+else
+    echo "Scaffolding project wiki..."
+    bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
     echo ""
     echo "Done. Drop sources into raw/ and tell Cursor to ingest them."
 fi

@@ -2,20 +2,23 @@
 # Link integration for VS Code (Copilot Chat)
 #
 # Usage:
-#   bash install.sh --project   → .vscode/settings.json + scaffold wiki
-#   bash install.sh             → defaults to --project
-#
-# Note: VS Code settings are project-level only.
+#   bash install.sh             → .vscode/settings.json + central wiki at ~/link/
+#   bash install.sh --project   → .vscode/settings.json + wiki in current dir
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MODE="${1:---global}"
 TARGET=".vscode/settings.json"
 mkdir -p .vscode
 
-INSTRUCTIONS="This project uses Link, an LLM-maintained knowledge wiki. Read LINK.md for the full schema. When the user says ingest/query/lint, follow the Link protocol. Never modify raw/. The wiki is in wiki/."
+if [ "$MODE" = "--project" ]; then
+    INSTRUCTIONS="This project has its own Link wiki. Read LINK.md for the full schema. When the user says ingest/query/lint, follow the Link protocol. Never modify raw/. The wiki is in wiki/."
+else
+    INSTRUCTIONS="This project uses Link, an LLM-maintained knowledge wiki at ~/link/. Read ~/link/LINK.md for the full schema. When the user says ingest/query/lint, follow the Link protocol. Wiki is at ~/link/wiki/, raw sources at ~/link/raw/."
+fi
 
 if [ -f "$TARGET" ]; then
-    if grep -q "Link, an LLM-maintained knowledge wiki" "$TARGET"; then
+    if grep -q "Link, an LLM-maintained knowledge wiki\|Link wiki" "$TARGET"; then
         echo "Link already configured in $TARGET"
     else
         python3 -c "
@@ -37,7 +40,12 @@ print('Link installed → $TARGET')
 "
 fi
 
-echo "Scaffolding wiki structure..."
-bash "$SCRIPT_DIR/../_shared/scaffold.sh"
+if [ "$MODE" = "--project" ]; then
+    echo "Scaffolding project wiki..."
+    bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
+else
+    echo "Scaffolding central wiki at ~/link/..."
+    bash "$SCRIPT_DIR/../_shared/scaffold.sh"
+fi
 echo ""
-echo "Done. Drop sources into raw/ and tell your agent to ingest them."
+echo "Done. Drop sources and tell your agent to ingest them."
