@@ -2,7 +2,7 @@
   "hooks": {
     "beforeSubmitPrompt": [
       {
-        "command": "bash ~/link-repo/integrations/_shared/check-raw.sh"
+        "command": "bash ~/link/check-raw.sh"
       }
     ]
   }

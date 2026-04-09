@@ -63,4 +63,19 @@ if [ ! -f "$TARGET_DIR/wiki/log.md" ]; then
     echo "  Created $TARGET_DIR/wiki/log.md"
 fi
 
+# Copy utility scripts
+for script in watch.sh; do
+    if [ ! -f "$TARGET_DIR/$script" ] && [ -f "$LINK_ROOT/$script" ]; then
+        cp "$LINK_ROOT/$script" "$TARGET_DIR/$script"
+        chmod +x "$TARGET_DIR/$script"
+        echo "  Created $TARGET_DIR/$script"
+    fi
+done
+
+# Copy check-raw helper (used by hooks)
+if [ ! -f "$TARGET_DIR/check-raw.sh" ] && [ -f "$LINK_ROOT/integrations/_shared/check-raw.sh" ]; then
+    cp "$LINK_ROOT/integrations/_shared/check-raw.sh" "$TARGET_DIR/check-raw.sh"
+    chmod +x "$TARGET_DIR/check-raw.sh"
+fi
+
 echo "  Wiki structure ready at $TARGET_DIR"
