@@ -10,10 +10,8 @@ MODE="${1:---global}"
 
 if [ "$MODE" = "--global" ]; then
     TARGET="$HOME/.kiro/steering/link.md"
-    HOOK="$HOME/.kiro/hooks/link-auto-ingest.json"
 else
     TARGET=".kiro/steering/link.md"
-    HOOK=".kiro/hooks/link-auto-ingest.json"
 fi
 
 if [ -f "$TARGET" ]; then
@@ -21,9 +19,4 @@ if [ -f "$TARGET" ]; then
     echo "Removed $TARGET"
 else
     echo "No Link steering found at $TARGET"
-fi
-
-if [ -f "$HOOK" ]; then
-    rm "$HOOK"
-    echo "Removed auto-ingest hook"
 fi

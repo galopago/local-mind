@@ -4,8 +4,6 @@
 # Usage:
 #   bash install.sh             → .github/copilot-instructions.md + central wiki at ~/link/
 #   bash install.sh --project   → .github/copilot-instructions.md + wiki in current dir
-#
-# Note: Copilot instructions are always project-level. The wiki location differs.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -34,23 +32,8 @@ else
 fi
 
 if [ "$MODE" = "--project" ]; then
-    echo "Scaffolding project wiki..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
 else
-    echo "Scaffolding central wiki at ~/link/..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
 fi
-
-# Install session-start hook
-HOOK_DIR=".github/hooks"
-HOOK_FILE="$HOOK_DIR/link-session-start.json"
-mkdir -p "$HOOK_DIR"
-if [ ! -f "$HOOK_FILE" ]; then
-    cp "$SCRIPT_DIR/hooks/session-start.json" "$HOOK_FILE"
-    echo "Session-start hook installed → $HOOK_FILE"
-else
-    echo "Session-start hook already installed"
-fi
-
-echo ""
-echo "Done. Drop sources and tell Copilot to ingest them."
+echo "Done. Drop sources into raw/ and say 'ingest' to process them."

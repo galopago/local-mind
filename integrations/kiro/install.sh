@@ -18,28 +18,14 @@ if [ "$MODE" = "--global" ]; then
         echo "Link already configured in $TARGET"
     else
         echo "$INSTRUCTIONS" > "$TARGET"
-        echo "Link installed globally → $TARGET"
-    fi
-
-    # Install auto-ingest hook
-    HOOK_DIR="$HOME/.kiro/hooks"
-    HOOK_FILE="$HOOK_DIR/link-auto-ingest.json"
-    mkdir -p "$HOOK_DIR"
-    if [ ! -f "$HOOK_FILE" ]; then
-        cp "$SCRIPT_DIR/hooks/auto-ingest.json" "$HOOK_FILE"
-        echo "Auto-ingest hook installed → $HOOK_FILE"
-    else
-        echo "Auto-ingest hook already installed"
+        echo "Link installed → $TARGET"
     fi
 
     echo "Scaffolding central wiki at ~/link/..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
     echo ""
     echo "Done. Kiro will know about Link in every project."
-    echo "Drop sources into ~/link/raw/ and tell Kiro to ingest them."
-    echo ""
-    echo "Auto-ingest hook: fires when new files appear in raw/"
-    echo "  (works when ~/link/ is open as workspace or part of a multi-root workspace)"
+    echo "Drop sources into ~/link/raw/ and say 'ingest' to process them."
     echo "View wiki: python ~/link/serve.py"
 
 elif [ "$MODE" = "--project" ]; then
@@ -57,7 +43,7 @@ elif [ "$MODE" = "--project" ]; then
     echo "Scaffolding project wiki..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
     echo ""
-    echo "Done. Drop sources into raw/ and tell Kiro to ingest them."
+    echo "Done. Drop sources into raw/ and say 'ingest' to process them."
 else
     echo "Usage: bash install.sh [--project]"
     exit 1

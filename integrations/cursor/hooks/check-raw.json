@@ -1,9 +1,0 @@
-{
-  "hooks": {
-    "beforeSubmitPrompt": [
-      {
-        "command": "bash ~/link/check-raw.sh"
-      }
-    ]
-  }
-}

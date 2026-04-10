@@ -36,13 +36,11 @@ fi
 # Copy logo if not present
 if [ ! -f "$TARGET_DIR/logo.png" ] && [ -f "$LINK_ROOT/logo.png" ]; then
     cp "$LINK_ROOT/logo.png" "$TARGET_DIR/logo.png"
-    echo "  Created $TARGET_DIR/logo.png"
 fi
 
 # Copy .linkignore if not present
 if [ ! -f "$TARGET_DIR/.linkignore" ]; then
     cp "$LINK_ROOT/.linkignore" "$TARGET_DIR/.linkignore"
-    echo "  Created $TARGET_DIR/.linkignore"
 fi
 
 # Create directory structure
@@ -54,28 +52,11 @@ done
 # Create index.md if not present
 if [ ! -f "$TARGET_DIR/wiki/index.md" ]; then
     cp "$LINK_ROOT/wiki/index.md" "$TARGET_DIR/wiki/index.md"
-    echo "  Created $TARGET_DIR/wiki/index.md"
 fi
 
 # Create log.md if not present
 if [ ! -f "$TARGET_DIR/wiki/log.md" ]; then
     cp "$LINK_ROOT/wiki/log.md" "$TARGET_DIR/wiki/log.md"
-    echo "  Created $TARGET_DIR/wiki/log.md"
 fi
 
-# Copy utility scripts
-for script in watch.sh; do
-    if [ ! -f "$TARGET_DIR/$script" ] && [ -f "$LINK_ROOT/$script" ]; then
-        cp "$LINK_ROOT/$script" "$TARGET_DIR/$script"
-        chmod +x "$TARGET_DIR/$script"
-        echo "  Created $TARGET_DIR/$script"
-    fi
-done
-
-# Copy check-raw helper (used by hooks)
-if [ ! -f "$TARGET_DIR/check-raw.sh" ] && [ -f "$LINK_ROOT/integrations/_shared/check-raw.sh" ]; then
-    cp "$LINK_ROOT/integrations/_shared/check-raw.sh" "$TARGET_DIR/check-raw.sh"
-    chmod +x "$TARGET_DIR/check-raw.sh"
-fi
-
-echo "  Wiki structure ready at $TARGET_DIR"
+echo "  Wiki ready at $TARGET_DIR"

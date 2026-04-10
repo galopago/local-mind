@@ -37,34 +37,8 @@ FRONTMATTER
 fi
 
 if [ "$MODE" = "--global" ]; then
-    echo "Scaffolding central wiki at ~/link/..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
-
-    # Install check-raw hook
-    HOOK_DIR="$HOME/.cursor/hooks"
-    HOOK_FILE="$HOOK_DIR/link-check-raw.json"
-    mkdir -p "$HOOK_DIR"
-    if [ ! -f "$HOOK_FILE" ]; then
-        cp "$SCRIPT_DIR/hooks/check-raw.json" "$HOOK_FILE"
-        echo "Check-raw hook installed → $HOOK_FILE"
-    fi
-
-    echo ""
-    echo "Done. Cursor will know about Link in every project."
-    echo "Drop sources into ~/link/raw/ and tell Cursor to ingest them."
 else
-    echo "Scaffolding project wiki..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
-
-    # Install check-raw hook locally
-    HOOK_DIR=".cursor/hooks"
-    HOOK_FILE="$HOOK_DIR/link-check-raw.json"
-    mkdir -p "$HOOK_DIR"
-    if [ ! -f "$HOOK_FILE" ]; then
-        cp "$SCRIPT_DIR/hooks/check-raw.json" "$HOOK_FILE"
-        echo "Check-raw hook installed → $HOOK_FILE"
-    fi
-
-    echo ""
-    echo "Done. Drop sources into raw/ and tell Cursor to ingest them."
 fi
+echo "Done. Drop sources into raw/ and say 'ingest' to process them."
