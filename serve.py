@@ -203,16 +203,17 @@ def _layout(title, body):
 
 def _render_home():
     pages = _all_pages()
-    sources = sum(1 for p in pages if p["type"]=="source")
-    concepts = sum(1 for p in pages if p["type"]=="concept")
-    entities = sum(1 for p in pages if p["type"]=="entity")
+    counts = {}
+    for p in pages:
+        t = p["type"] or "other"
+        counts[t] = counts.get(t, 0) + 1
 
-    stats = f"""<div class="home-stats">
-  <div class="stat"><span class="num">{len(pages)}</span><span class="label">pages</span></div>
-  <div class="stat"><span class="num">{sources}</span><span class="label">sources</span></div>
-  <div class="stat"><span class="num">{concepts}</span><span class="label">concepts</span></div>
-  <div class="stat"><span class="num">{entities}</span><span class="label">entities</span></div>
-</div>"""
+    stats_items = f'<div class="stat"><span class="num">{len(pages)}</span><span class="label">pages</span></div>'
+    for t in ["source", "concept", "entity", "comparison", "exploration"]:
+        if counts.get(t, 0) > 0:
+            label = t + "s" if not t.endswith("s") else t
+            stats_items += f'<div class="stat"><span class="num">{counts[t]}</span><span class="label">{label}</span></div>'
+    stats = f'<div class="home-stats">{stats_items}</div>'
 
     # Group by category
     cats = {}
