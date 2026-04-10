@@ -30,7 +30,7 @@ link/
 
 ## Page Templates
 
-Every wiki page uses YAML frontmatter + consistent markdown structure. Follow these templates exactly.
+Every wiki page uses YAML frontmatter + consistent markdown structure. Use these templates as your starting point.
 
 ### Source Page (`wiki/sources/`)
 
