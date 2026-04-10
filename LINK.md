@@ -11,7 +11,6 @@ link/
 ├── wiki/                ← your domain — structured markdown articles
 │   ├── index.md         ← master catalog by category
 │   ├── log.md           ← chronological record of all operations
-│   ├── _categories/     ← category index pages
 │   ├── sources/         ← one summary page per ingested source
 │   ├── concepts/        ← concept/topic articles
 │   ├── entities/        ← people, orgs, projects, tools
@@ -27,7 +26,7 @@ link/
 
 2. **wiki/** — Your domain. You create pages, update them, maintain cross-references, and keep everything consistent. The human reads it; you write it. Every page follows the templates below.
 
-3. **LINK.md** — This file. The schema that tells you how the wiki works. You and the human co-evolve this over time.
+3. **LINK.md** — This file. The schema that tells you how the wiki works. You and the human co-evolve this over time. The templates and conventions below are starting points — adjust them as you figure out what works for your domain. If a template doesn't fit a particular page, adapt it. The goal is useful knowledge, not rigid compliance.
 
 ## Page Templates
 
@@ -297,11 +296,11 @@ Append lint results to `wiki/log.md`.
 ## Categories
 
 ### Machine Learning
-- [[attention-mechanisms]] — mature · 6 sources
-- [[transformer-architecture]] — growing · 3 sources
+- [[attention-mechanisms]] — How transformers process sequences in parallel. mature · 6 sources
+- [[transformer-architecture]] — The encoder-decoder model behind modern LLMs. growing · 3 sources
 
 ### People
-- [[andrej-karpathy]] — growing · 4 sources
+- [[andrej-karpathy]] — AI researcher, proposed the LLM Wiki pattern. growing · 4 sources
 
 ### Projects
 - [[nanogpt]] — seed · 1 source

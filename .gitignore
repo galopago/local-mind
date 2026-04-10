@@ -17,9 +17,6 @@ wiki/comparisons/*
 wiki/explorations/*
 !wiki/explorations/.gitkeep
 
-wiki/_categories/*
-!wiki/_categories/.gitkeep
-
 # Keep index and log templates but ignore personal content
 # (we ship empty versions in the repo)
 

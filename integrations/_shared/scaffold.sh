@@ -46,7 +46,7 @@ if [ ! -f "$TARGET_DIR/.linkignore" ]; then
 fi
 
 # Create directory structure
-for dir in raw wiki/sources wiki/concepts wiki/entities wiki/comparisons wiki/explorations wiki/_categories; do
+for dir in raw wiki/sources wiki/concepts wiki/entities wiki/comparisons wiki/explorations; do
     mkdir -p "$TARGET_DIR/$dir"
     touch "$TARGET_DIR/$dir/.gitkeep"
 done
