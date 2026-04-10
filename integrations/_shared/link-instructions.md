@@ -7,6 +7,7 @@ This project uses Link, an LLM-maintained knowledge wiki.
 **Read `~/link/LINK.md` before performing any wiki operations.** It contains the full schema, page templates, and workflow instructions.
 
 **Key rules:**
+- For ANY knowledge question (who, what, how, why), FIRST check ~/link/wiki/ before answering from your own knowledge. Use terminal: `cat ~/link/wiki/index.md` then read relevant pages.
 - When the user says "ingest", read the source from `~/link/raw/` and follow the ingest protocol in LINK.md
 - When the user says "query", search `~/link/wiki/index.md` first, then read relevant pages
 - When the user says "lint", run the health check protocol from LINK.md
