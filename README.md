@@ -75,6 +75,7 @@ link/
 | "ingest this" | Process a source from raw/ into wiki pages |
 | "what is X?" | Query the wiki, optionally file the answer back |
 | "lint the wiki" | Health check: orphans, contradictions, stale claims |
+| "research X" | Find sources on the web, capture a chat, or analyze wiki gaps |
 
 ## Design principles
 

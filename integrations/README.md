@@ -34,7 +34,7 @@ That's it. Kiro now knows about Link in every project, and your wiki lives at `~
 1. Writes a small instruction file for your tool (so it knows Link exists)
 2. Scaffolds wiki structure at `~/link/` (or current dir with `--project`)
 
-The instruction file is minimal — it just tells the agent that Link exists and to read `LINK.md` when you say "ingest", "query", or "lint". It doesn't interfere with normal coding work.
+The instruction file is minimal — it just tells the agent that Link exists and to read `LINK.md` when you say "ingest", "query", "lint", or "research". It doesn't interfere with normal coding work.
 
 ## Uninstall
 

@@ -10,6 +10,7 @@ link/
 ├── raw/                 ← immutable source documents (human adds these)
 ├── wiki/                ← your domain — structured markdown articles
 │   ├── index.md         ← master catalog by category
+│   ├── _backlinks.json  ← reverse link index (auto-generated)
 │   ├── log.md           ← chronological record of all operations
 │   ├── sources/         ← one summary page per ingested source
 │   ├── concepts/        ← concept/topic articles
@@ -26,11 +27,11 @@ link/
 
 2. **wiki/** — Your domain. You create pages, update them, maintain cross-references, and keep everything consistent. The human reads it; you write it. Every page follows the templates below.
 
-3. **LINK.md** — This file. The schema that tells you how the wiki works. You and the human co-evolve this over time. The templates and conventions below are starting points — adjust them as you figure out what works for your domain. If a template doesn't fit a particular page, adapt it. The goal is useful knowledge, not rigid compliance.
+3. **LINK.md** — This file. The schema that tells you how the wiki works. You and the human co-evolve this over time.
 
 ## Page Templates
 
-Every wiki page uses YAML frontmatter + consistent markdown structure. Use these templates as your starting point.
+Every wiki page uses YAML frontmatter + consistent markdown structure. Follow these templates exactly.
 
 ### Source Page (`wiki/sources/`)
 
@@ -44,6 +45,7 @@ date_ingested: "2026-04-09"
 source_url: "https://..."
 tags: [machine-learning, attention]
 confidence: high
+aliases: ["short name", "abbreviation"]
 ---
 
 # Article Title
@@ -125,9 +127,12 @@ Technical explanation if applicable. Use code blocks, diagrams (mermaid), or ste
 type: entity
 title: "Entity Name"
 entity_type: person | organization | project | tool | dataset
+aliases: ["alternate name", "abbreviation"]
 date_created: "2026-04-09"
 date_updated: "2026-04-09"
 tags: [relevant-tags]
+source_count: 1
+maturity: seed | growing | mature | established
 ---
 
 # Entity Name
@@ -163,7 +168,10 @@ title: "X vs Y"
 date_created: "2026-04-09"
 date_updated: "2026-04-09"
 subjects: ["X", "Y"]
+aliases: ["alternate name"]
 tags: [relevant-tags]
+source_count: 1
+maturity: seed | growing | mature | established
 ---
 
 # X vs Y
@@ -202,6 +210,7 @@ type: exploration
 title: "Question or Analysis Title"
 date_created: "2026-04-09"
 query: "The original question asked"
+aliases: ["alternate phrasing"]
 tags: [relevant-tags]
 ---
 
@@ -244,6 +253,10 @@ When the human adds a new source to `raw/` and asks you to process it:
 - Tag confidence on claims: `high` (explicitly stated), `medium` (reasonable inference), `low` (speculative)
 - Prefer updating existing pages over creating new ones. A concept page that grows from 3 sources is more valuable than 3 thin pages.
 - Update the `maturity` field: seed (1 source) → growing (2-3 sources) → mature (4-6 sources) → established (7+ sources)
+- After updating a page, re-read it as a whole. If it no longer reads as a coherent article, restructure it before moving on.
+- Watch for page bloat: if a sub-topic is growing past 2-3 paragraphs within an article, it likely deserves its own page. Split proactively.
+- Conversely, a new page must have enough substance to stand alone. If you cannot write at least a meaningful TLDR + Overview, fold the information into an existing page instead.
+- After ingest completes, rebuild `wiki/_backlinks.json` by scanning all `[[wikilinks]]` across the wiki.
 
 **Image ingest rules:**
 - Images in `raw/` (png, jpg, webp, gif, svg) are valid sources. Use vision to understand what the image IS.
@@ -260,12 +273,13 @@ When the human adds a new source to `raw/` and asks you to process it:
 
 When the human asks a question:
 
-1. Read `wiki/index.md` to find relevant pages
-2. Read those pages and synthesize an answer
-3. Cite your sources with [[wiki-links]]
-4. Ask the human: "Want me to file this as an exploration page?"
-5. If yes, create a page in `wiki/explorations/` following the template
-6. Append to `wiki/log.md`
+1. Read `wiki/index.md` to find relevant pages (check `also:` aliases for matches)
+2. Check `wiki/_backlinks.json` to find pages that reference the topic
+3. Read those pages and synthesize an answer
+4. Cite your sources with [[wiki-links]]
+5. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
+6. If yes, create a page in the appropriate directory following its template
+7. Append to `wiki/log.md`
 
 ### 3. Lint
 
@@ -281,10 +295,61 @@ Run these checks and report findings:
 - **Missing pages** — concepts frequently mentioned but lacking their own page
 - **Index drift** — pages that exist but aren't listed in index.md
 - **Confidence gaps** — claims without confidence tags
+- **Bloated pages** — articles over 100 lines that should be split into focused sub-pages
+- **Misclassified pages** — pages in the wrong directory (e.g., a person in concepts/, a tool in entities/)
+- **Unlinked references** — entities or concepts mentioned repeatedly across articles but never given a `[[wikilink]]`
+- **Backlink orphans** — pages that link out but are never linked to by anything else
 
 For each finding, suggest a specific action. Then ask the human which ones to execute.
 
-Append lint results to `wiki/log.md`.
+Rebuild `wiki/_backlinks.json` after executing fixes. Append lint results to `wiki/log.md`.
+
+
+### 4. Research
+
+When the human wants to find or capture new source material for the wiki. Research has three modes based on where the material comes from.
+
+**`research <topic>`** — Web discovery
+
+1. Search the web for the given topic
+2. Find 5-8 candidate sources (articles, docs, papers, posts)
+3. Present each with: title, URL, 2-3 sentence summary, and relevance to existing wiki pages
+4. The human picks which ones to keep
+5. For each approved source, save to `raw/` as a markdown file with the content and metadata (title, author, URL, date)
+6. Do NOT auto-ingest. The human decides when to run ingest on the new material.
+
+**`research chat`** — Conversation capture
+
+1. Review the current conversation for key insights, decisions, ideas, or knowledge worth preserving
+2. Present a summary of what would be captured (bullet points)
+3. If the human approves, save as `raw/conversation-{topic}-{date}.md` with frontmatter:
+   - `title`: descriptive name for the conversation topic
+   - `source_type: conversation`
+   - `date_captured`: today's date
+   - `participants`: human + AI
+4. The file should synthesize the conversation's substance, not dump raw chat logs. Extract the knowledge, not the back-and-forth.
+5. Do NOT auto-ingest. Tell the human the file is ready for ingest when they want.
+
+**`research wiki`** — Gap analysis
+
+1. Read `wiki/index.md` and `wiki/_backlinks.json`
+2. Identify:
+   - Thin pages (maturity: seed) that need more sources
+   - Concepts mentioned across multiple pages but lacking depth
+   - Topics adjacent to existing pages that the wiki doesn't cover yet
+   - Open Questions from existing pages that could be answered with more research
+3. Present a prioritized list of suggested research topics, each with:
+   - The topic
+   - Why it matters (which pages would benefit)
+   - Suggested search terms for `research <topic>`
+4. The human picks which ones to pursue. Then use `research <topic>` for each.
+
+**Research rules:**
+- Research proposes, the human approves. Nothing enters `raw/` without human confirmation.
+- Every file saved to `raw/` must have clear attribution: where it came from, when, who wrote it.
+- Conversation captures should be substantive. If a chat was just "fix this bug," there's nothing to capture.
+- Web sources must include the original URL. No orphan sources.
+- Append research operations to `wiki/log.md`.
 
 ## Index Structure (`wiki/index.md`)
 
@@ -295,47 +360,47 @@ Append lint results to `wiki/log.md`.
 
 ## Categories
 
-### Machine Learning
-- [[attention-mechanisms]] — How transformers process sequences in parallel. mature · 6 sources
-- [[transformer-architecture]] — The encoder-decoder model behind modern LLMs. growing · 3 sources
+### Category A
+- [[example-concept]] — One-line summary of the concept. mature · 6 sources · also: alt-name, abbreviation
+- [[another-concept]] — One-line summary. growing · 3 sources · also: alt-name
 
-### People
-- [[andrej-karpathy]] — AI researcher, proposed the LLM Wiki pattern. growing · 4 sources
+### Category B
+- [[example-person]] — One-line description. growing · 4 sources
 
-### Projects
-- [[nanogpt]] — seed · 1 source
+### Category C
+- [[example-project]] — One-line description. seed · 1 source
 
 ## Recent
 
 | Date | Operation | Pages Touched |
 |------|-----------|---------------|
-| 2026-04-09 | ingest: "Attention Is All You Need" | 8 pages |
-| 2026-04-08 | query: "How does attention scale?" | 1 page |
+| 2026-04-09 | ingest: "Example Source Title" | 8 pages |
+| 2026-04-08 | query: "Example question?" | 1 page |
 ```
 
-Organize by tags/categories. Keep one-line summaries with maturity and source count. Include a Recent table showing the last 10 operations.
+Organize by tags/categories. Each entry gets a one-line summary (from the page's TLDR), maturity, and source count. Include `also:` values populated from each page's `aliases` frontmatter field so queries can match alternate names. Include a Recent table showing the last 10 operations.
 
 ## Log Structure (`wiki/log.md`)
 
-Append-only. Never rewrite history.
+Append-only. Never rewrite history. Each entry starts with `## [timestamp] operation | description` so the log is parseable with simple tools like `grep "^## \[" log.md | tail -5`.
 
 ```markdown
-## [2026-04-09T14:30:00Z] ingest | "Attention Is All You Need"
+## [2026-04-09T14:30:00Z] ingest | "Example Source Title"
 
-- Source: raw/attention-is-all-you-need.md
-- Created: sources/attention-is-all-you-need.md
-- Created: concepts/attention-mechanisms.md
-- Updated: concepts/transformer-architecture.md (added multi-head attention section)
-- Updated: entities/google-brain.md (added paper to contributions)
+- Source: raw/example-source.md
+- Created: sources/example-source.md
+- Created: concepts/example-concept.md
+- Updated: concepts/another-concept.md (added new section from source)
+- Updated: entities/example-entity.md (added contribution from source)
 - Updated: index.md
 - Pages touched: 6
 
 ---
 
-## [2026-04-09T15:00:00Z] query | "How does attention scale with sequence length?"
+## [2026-04-09T15:00:00Z] query | "Example question about a concept?"
 
-- Pages consulted: concepts/attention-mechanisms.md, sources/attention-is-all-you-need.md
-- Filed as: explorations/attention-scaling.md
+- Pages consulted: concepts/example-concept.md, sources/example-source.md
+- Filed as: explorations/example-exploration.md
 
 ---
 
@@ -349,15 +414,59 @@ Append-only. Never rewrite history.
 
 ## Conventions
 
-- **File naming:** lowercase, hyphens, no spaces. `attention-mechanisms.md` not `Attention Mechanisms.md`
+- **File naming:** lowercase, hyphens, no spaces. `example-concept.md` not `Example Concept.md`
 - **Wiki links:** use `[[page-name]]` syntax (Obsidian-compatible). Link to the filename without extension.
 - **Confidence tags:** `[confidence: high]`, `[confidence: medium]`, `[confidence: low]` — inline after claims
 - **Maturity:** tracked in frontmatter. seed → growing → mature → established
 - **Dates:** ISO 8601 format. `2026-04-09` for dates, `2026-04-09T14:30:00Z` for timestamps
 - **TLDR:** Every page starts with a one-sentence TLDR after the title. This helps both humans scanning and LLMs doing index scans.
-- **Tone:** Wikipedia-neutral. Informative, not opinionated. Let the sources speak.
+- **Aliases:** all page types should include an `aliases` field in frontmatter for alternate names, abbreviations, or common phrasings. These power index matching and query resolution.
 - **No hallucination:** If you don't have a source for a claim, don't write it. Use Open Questions for gaps.
 - **Idempotent ingest:** Ingesting the same source twice should not duplicate content or corrupt the wiki.
+- **Obsidian-compatible:** the wiki is designed to be browsable in Obsidian. `[[wikilinks]]`, YAML frontmatter, and the directory structure all work natively. Graph view shows connections; Dataview can query frontmatter fields. The wiki is also just a git repo of markdown files — version history comes free.
+
+## Writing Standards
+
+Articles should serve understanding, not archival. Write to explain, not to file.
+
+**Voice:**
+- Wikipedia-neutral. Flat, factual, encyclopedic. Let the sources carry the weight.
+- Paraphrase over block quotes. Use direct quotes only when the original phrasing is the point.
+- Concrete language over abstract. "Reduces latency by 40%" over "significantly improves performance."
+- Short sentences for claims. Longer sentences for context and connections.
+- Active voice. "The system extracts metrics" not "metrics are extracted by the system."
+
+**Avoid:**
+- Peacock words: "legendary," "groundbreaking," "visionary," "revolutionary"
+- Editorial voice: "interestingly," "importantly," "it should be noted," "notably"
+- Rhetorical questions as structure
+- Qualifiers that add nothing: "truly," "genuinely," "really," "deeply"
+- Progressive narrative: "would go on to," "embarked on a journey," "set out to"
+- Hedging without reason: "it seems like," "one could argue" — either state the claim with a confidence tag or put it in Open Questions
+
+**Page balance:**
+- A page should be dense enough to be worth reading, but focused enough to have a clear subject. If a page tries to cover two distinct ideas, split it.
+- Seed pages are fine — but even a seed should have a real TLDR and a meaningful Overview, not just a stub sentence.
+- If a sub-topic within a page grows past 2-3 paragraphs, it probably deserves its own page.
+- If you can't write more than a TLDR for something, fold it into the parent page as a mention and create the page later when more material arrives.
+
+## Backlinks (`wiki/_backlinks.json`)
+
+A reverse link index mapping each page to the set of pages that link to it. Auto-generated after every ingest and lint operation by scanning all `[[wikilinks]]` across the wiki.
+
+Structure:
+```json
+{
+  "example-concept": ["another-concept", "example-entity", "example-source"],
+  "example-person": ["example-project", "another-source"]
+}
+```
+
+Used during query to find related pages, and during lint to detect orphans and backlink imbalances.
+
+## Scaling
+
+At moderate scale (~100 sources, hundreds of pages), the index file is enough for navigation. As the wiki grows larger, consider adding a proper search tool — a local markdown search engine or an MCP server — so the LLM can find relevant pages without reading the entire index. Build that when you need it, not before.
 
 ## Getting Started
 
@@ -366,6 +475,6 @@ If the wiki is empty, start here:
 1. Human drops first source into `raw/`
 2. Human says: "ingest this"
 3. You read it, create source page + concept/entity pages, build initial index and log
-4. Wiki grows from there
+4. Wiki grows from there — use **query** to ask questions, **lint** to health-check, **research** to find new sources
 
 If the wiki already exists, read `wiki/index.md` and `wiki/log.md` first to understand current state before doing anything.
