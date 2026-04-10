@@ -16,3 +16,4 @@ This project uses Link, an LLM-maintained knowledge wiki.
 - The wiki is in `~/link/wiki/` — you own this directory entirely
 - To view the wiki: `python ~/link/serve.py`
 - At the start of each session, check ~/link/raw/ for any files not yet in wiki/sources/. If found, offer to ingest them.
+- IMPORTANT: ~/link/ is outside the workspace. Always use terminal commands (ls, cat) to read files there, not workspace search.
