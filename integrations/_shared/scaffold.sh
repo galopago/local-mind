@@ -49,6 +49,12 @@ for dir in raw wiki/sources wiki/concepts wiki/entities wiki/comparisons wiki/ex
     touch "$TARGET_DIR/$dir/.gitkeep"
 done
 
+# Create _backlinks.json if not present
+if [ ! -f "$TARGET_DIR/wiki/_backlinks.json" ]; then
+    echo '{}' > "$TARGET_DIR/wiki/_backlinks.json"
+    echo "  Created $TARGET_DIR/wiki/_backlinks.json"
+fi
+
 # Create index.md if not present
 if [ ! -f "$TARGET_DIR/wiki/index.md" ]; then
     cp "$LINK_ROOT/wiki/index.md" "$TARGET_DIR/wiki/index.md"
