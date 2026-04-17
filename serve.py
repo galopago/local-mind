@@ -14,7 +14,6 @@ PORT = 3000
 _pages_cache: list | None = None
 _pages_cache_mtime: float = 0.0
 _page_index: dict[str, Path] = {}  # stem.lower() → path
-_page_index_mtime: float = 0.0
 
 
 def _wiki_mtime() -> float:
@@ -42,11 +41,12 @@ def _wiki_mtime() -> float:
 
 
 def _get_all_pages() -> list:
-    global _pages_cache, _pages_cache_mtime
+    global _pages_cache, _pages_cache_mtime, _page_index
     mtime = _wiki_mtime()
     if _pages_cache is not None and mtime == _pages_cache_mtime:
         return _pages_cache
     pages = []
+    index: dict[str, Path] = {}
     for md in sorted(WIKI_DIR.rglob("*.md")):
         if md.name.startswith("."): continue
         rel = md.relative_to(WIKI_DIR)
@@ -58,17 +58,16 @@ def _get_all_pages() -> list:
             title = m.group(1) if m else md.stem
         cat = rel.parts[0] if len(rel.parts) > 1 else "root"
         pages.append({"name": md.stem, "title": title, "category": cat, "type": meta.get("type", "")})
+        index[md.stem.lower()] = md
     _pages_cache = pages
     _pages_cache_mtime = mtime
+    _page_index = index  # share the same scan — no second mtime check needed
     return pages
 
 
 def _find_page(name: str) -> Path | None:
-    global _page_index, _page_index_mtime
-    mtime = _wiki_mtime()
-    if mtime != _page_index_mtime:
-        _page_index = {md.stem.lower(): md for md in WIKI_DIR.rglob("*.md")}
-        _page_index_mtime = mtime
+    # Ensure cache is warm — _get_all_pages populates _page_index as a side effect
+    _get_all_pages()
     return _page_index.get(name.strip().lower())
 
 
@@ -411,6 +410,54 @@ def _render_search(query):
 
 
 # ---------------------------------------------------------------------------
+# Graph helpers
+# ---------------------------------------------------------------------------
+
+def _build_backlinks() -> dict[str, list[str]]:
+    """Scan all wiki pages for [[wikilinks]] and build a reverse index.
+    Returns {target_stem: [source_stem, ...]} mapping.
+    """
+    backlinks: dict[str, list[str]] = {}
+    wikilink_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
+    for md in WIKI_DIR.rglob("*.md"):
+        if md.name.startswith("."): continue
+        text = md.read_text(encoding="utf-8", errors="replace")
+        _, body = _parse_frontmatter(text)
+        source = md.stem.lower()
+        for m in wikilink_re.finditer(body):
+            target = m.group(1).strip().lower()
+            if target != source:
+                backlinks.setdefault(target, [])
+                if source not in backlinks[target]:
+                    backlinks[target].append(source)
+    return backlinks
+
+
+def _get_graph_data() -> dict:
+    """Return graph nodes and edges for visualization.
+    Nodes: all wiki pages with id, title, category, type.
+    Edges: all [[wikilinks]] as {source, target} pairs.
+    """
+    pages = _get_all_pages()
+    page_set = {p["name"].lower() for p in pages}
+    nodes = [{"id": p["name"], "title": p["title"], "category": p["category"], "type": p["type"]} for p in pages]
+
+    edges = []
+    wikilink_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
+    for md in WIKI_DIR.rglob("*.md"):
+        if md.name.startswith("."): continue
+        text = md.read_text(encoding="utf-8", errors="replace")
+        _, body = _parse_frontmatter(text)
+        source = md.stem
+        for m in wikilink_re.finditer(body):
+            target = m.group(1).strip()
+            if target.lower() in page_set and target.lower() != source.lower():
+                edges.append({"source": source, "target": target})
+
+    return {"nodes": nodes, "edges": edges}
+
+
+# ---------------------------------------------------------------------------
 # HTTP handler
 # ---------------------------------------------------------------------------
 
@@ -450,6 +497,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             bl_path = WIKI_DIR / "_backlinks.json"
             data = json.loads(bl_path.read_text(encoding="utf-8")) if bl_path.exists() else {}
             self._json(data)
+        elif path == "/api/rebuild-backlinks":
+            backlinks = _build_backlinks()
+            bl_path = WIKI_DIR / "_backlinks.json"
+            bl_path.write_text(json.dumps(backlinks, indent=2), encoding="utf-8")
+            # Invalidate pages cache so next request picks up the new backlinks mtime
+            global _pages_cache, _pages_cache_mtime
+            _pages_cache = None
+            _pages_cache_mtime = 0.0
+            self._json({"rebuilt": True, "pages": len(backlinks)})
+        elif path == "/api/graph":
+            self._json(_get_graph_data())
         else:
             self._err("page")
 
