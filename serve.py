@@ -57,8 +57,41 @@ def _get_all_pages() -> list:
             m = re.search(r"^#\s+(.+)", body, re.MULTILINE)
             title = m.group(1) if m else md.stem
         cat = rel.parts[0] if len(rel.parts) > 1 else "root"
-        pages.append({"name": md.stem, "title": title, "category": cat, "type": meta.get("type", "")})
+
+        # Extract TLDR for quick summaries
+        tldr = ""
+        tldr_m = re.search(r">\s*\*\*TLDR:\*\*\s*(.+)", body)
+        if tldr_m:
+            tldr = tldr_m.group(1).strip()
+
+        # Normalize aliases to list
+        aliases_raw = meta.get("aliases", [])
+        if isinstance(aliases_raw, str):
+            aliases_raw = [a.strip() for a in aliases_raw.split(",") if a.strip()]
+        aliases = [a.lower() for a in aliases_raw]
+
+        # Normalize tags to list
+        tags_raw = meta.get("tags", [])
+        if isinstance(tags_raw, str):
+            tags_raw = [t.strip() for t in tags_raw.split(",") if t.strip()]
+
+        pages.append({
+            "name": md.stem,
+            "title": title,
+            "category": cat,
+            "type": meta.get("type", ""),
+            "tags": tags_raw,
+            "aliases": aliases,
+            "maturity": meta.get("maturity", ""),
+            "source_count": meta.get("source_count", ""),
+            "tldr": tldr,
+            "date_updated": meta.get("date_updated", ""),
+        })
         index[md.stem.lower()] = md
+        # Also index by alias so _find_page works with alternate names
+        for alias in aliases:
+            if alias not in index:
+                index[alias] = md
     _pages_cache = pages
     _pages_cache_mtime = mtime
     _page_index = index  # share the same scan — no second mtime check needed
@@ -382,31 +415,162 @@ def _render_search(query):
         return _layout("Search",
             f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
             f'<h1>Search</h1><p>Enter a search term above.</p>')
-    # Build a title lookup from the cache to avoid re-parsing frontmatter
-    title_map = {p["name"]: p["title"] for p in _get_all_pages()}
-    results = []
-    for md in WIKI_DIR.rglob("*.md"):
-        if md.name.startswith("."): continue
-        text = md.read_text(encoding="utf-8", errors="replace")
-        if q in text.lower():
-            title = title_map.get(md.stem, md.stem)
-            idx = text.lower().find(q)
-            snippet = text[max(0, idx-60):idx+len(query)+60].replace("\n", " ").strip()
-            results.append((md.stem, title, snippet))
-    results.sort(key=lambda x: x[1].lower())
+    results = _search_pages(q, limit=30)
     total = len(results)
-    shown = results[:30]
     cap_note = f" (showing 30 of {total})" if total > 30 else ""
     items = "".join(
-        f'<li><a href="/page/{urllib.parse.quote(n)}">{html.escape(t)}</a>'
-        f'<br><small style="color:#888">...{html.escape(s)}...</small></li>'
-        for n, t, s in shown
+        f'<li><a href="/page/{urllib.parse.quote(r["name"])}">{html.escape(r["title"])}</a>'
+        f'<br><small style="color:#888">...{html.escape(r.get("snippet",""))}...</small></li>'
+        for r in results[:30]
     )
     return _layout(f"Search: {query}",
         f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
         f'<h1>Search: {html.escape(query)}</h1>'
         f'<p>{total} result{"s" if total != 1 else ""}{cap_note}</p>'
         f'<ul class="page-list">{items}</ul>')
+
+
+# ---------------------------------------------------------------------------
+# Agent search helpers
+# ---------------------------------------------------------------------------
+
+def _search_pages(q: str, limit: int = 20) -> list:
+    """Search pages by title, alias, tag, and full-text body.
+    Returns ranked results with snippet. Uses pages cache for metadata;
+    reads file content only for pages that pass the metadata filter first.
+    """
+    q_lower = q.lower()
+    pages = _get_all_pages()
+    scored: list[tuple[int, dict]] = []
+
+    for p in pages:
+        score = 0
+        snippet = ""
+
+        # Title match (highest priority)
+        if q_lower in p["title"].lower():
+            score += 10
+        # Exact name match
+        if q_lower == p["name"].lower():
+            score += 20
+        # Alias match
+        if any(q_lower in a for a in p.get("aliases", [])):
+            score += 8
+        # Tag match
+        if any(q_lower in str(t).lower() for t in p.get("tags", [])):
+            score += 5
+        # TLDR match
+        if q_lower in p.get("tldr", "").lower():
+            score += 3
+
+        # Full-text match (only read file if metadata didn't already score high)
+        path = _page_index.get(p["name"].lower())
+        if path and path.exists():
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if q_lower in text.lower():
+                score += 2
+                idx = text.lower().find(q_lower)
+                snippet = text[max(0, idx-60):idx+len(q)+60].replace("\n", " ").strip()
+
+        if score > 0:
+            result = {**p, "score": score, "snippet": snippet}
+            scored.append((score, result))
+
+    scored.sort(key=lambda x: (-x[0], x[1]["title"].lower()))
+    return [r for _, r in scored[:limit]]
+
+
+def _get_context(topic: str) -> dict:
+    """Return everything an agent needs to answer a question about a topic.
+    Finds the best matching page, then returns:
+    - The page's full content
+    - Its backlinks (pages that reference it)
+    - Its forward links (pages it references)
+    - Related pages (shared tags or backlink overlap)
+    """
+    q = topic.lower().strip()
+    pages = _get_all_pages()
+
+    # Find best matching page
+    matches = _search_pages(q, limit=5)
+    if not matches:
+        return {"topic": topic, "found": False, "pages": []}
+
+    primary = matches[0]
+    primary_name = primary["name"].lower()
+
+    # Load backlinks
+    bl_path = WIKI_DIR / "_backlinks.json"
+    backlinks_data: dict = {}
+    if bl_path.exists():
+        try:
+            backlinks_data = json.loads(bl_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    inbound = backlinks_data.get(primary_name, [])
+
+    # Load forward links (pages this page links to)
+    forward: list[str] = []
+    path = _page_index.get(primary_name)
+    if path and path.exists():
+        text = path.read_text(encoding="utf-8", errors="replace")
+        _, body = _parse_frontmatter(text)
+        wl_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
+        page_set = {p["name"].lower() for p in pages}
+        for m in wl_re.finditer(body):
+            target = m.group(1).strip().lower()
+            if target in page_set and target != primary_name:
+                forward.append(target)
+
+    # Build context pages list: primary + inbound + forward (deduplicated)
+    seen = {primary_name}
+    context_names = [primary_name]
+    for name in (inbound + forward):
+        if name not in seen:
+            seen.add(name)
+            context_names.append(name)
+
+    # Load page summaries for context
+    context_pages = []
+    for name in context_names[:10]:  # cap at 10 to keep context lean
+        p_path = _page_index.get(name)
+        if not p_path or not p_path.exists():
+            continue
+        text = p_path.read_text(encoding="utf-8", errors="replace")
+        meta, body = _parse_frontmatter(text)
+        # Include full content for primary, TLDR+summary for related
+        is_primary = name == primary_name
+        if is_primary:
+            content = body
+        else:
+            # Extract just TLDR + first paragraph
+            lines = body.split("\n")
+            summary_lines = []
+            for line in lines[:20]:
+                summary_lines.append(line)
+                if line.startswith("## ") and len(summary_lines) > 3:
+                    break
+            content = "\n".join(summary_lines)
+
+        page_meta = next((p for p in pages if p["name"].lower() == name), {})
+        context_pages.append({
+            "name": name,
+            "title": meta.get("title", name),
+            "type": meta.get("type", ""),
+            "is_primary": is_primary,
+            "relationship": "primary" if is_primary else ("inbound" if name in inbound else "forward"),
+            "content": content,
+        })
+
+    return {
+        "topic": topic,
+        "found": True,
+        "primary": primary["name"],
+        "inbound_count": len(inbound),
+        "forward_count": len(forward),
+        "pages": context_pages,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -418,6 +582,7 @@ def _build_backlinks() -> dict[str, list[str]]:
     Returns {target_stem: [source_stem, ...]} mapping.
     """
     backlinks: dict[str, list[str]] = {}
+    forward_links: dict[str, list[str]] = {}
     wikilink_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
     for md in WIKI_DIR.rglob("*.md"):
         if md.name.startswith("."): continue
@@ -427,10 +592,15 @@ def _build_backlinks() -> dict[str, list[str]]:
         for m in wikilink_re.finditer(body):
             target = m.group(1).strip().lower()
             if target != source:
+                # Reverse index
                 backlinks.setdefault(target, [])
                 if source not in backlinks[target]:
                     backlinks[target].append(source)
-    return backlinks
+                # Forward index
+                forward_links.setdefault(source, [])
+                if target not in forward_links[source]:
+                    forward_links[source].append(target)
+    return {"backlinks": backlinks, "forward": forward_links}
 
 
 def _get_graph_data() -> dict:
@@ -495,19 +665,40 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(_all_pages())
         elif path == "/api/backlinks":
             bl_path = WIKI_DIR / "_backlinks.json"
-            data = json.loads(bl_path.read_text(encoding="utf-8")) if bl_path.exists() else {}
-            self._json(data)
+            if bl_path.exists():
+                data = json.loads(bl_path.read_text(encoding="utf-8"))
+                # Support both old format (flat dict) and new format (with backlinks/forward keys)
+                if "backlinks" in data:
+                    self._json(data["backlinks"])
+                else:
+                    self._json(data)
+            else:
+                self._json({})
         elif path == "/api/rebuild-backlinks":
-            backlinks = _build_backlinks()
+            result = _build_backlinks()
             bl_path = WIKI_DIR / "_backlinks.json"
-            bl_path.write_text(json.dumps(backlinks, indent=2), encoding="utf-8")
+            bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
             # Invalidate pages cache so next request picks up the new backlinks mtime
             global _pages_cache, _pages_cache_mtime
             _pages_cache = None
             _pages_cache_mtime = 0.0
-            self._json({"rebuilt": True, "pages": len(backlinks)})
+            self._json({"rebuilt": True, "pages": len(result.get("backlinks", {}))})
         elif path == "/api/graph":
             self._json(_get_graph_data())
+        elif path == "/api/search":
+            q = query.get("q", [""])[0].strip()
+            limit = int(query.get("limit", ["20"])[0])
+            if not q:
+                self._json({"error": "q parameter required", "results": []})
+            else:
+                results = _search_pages(q, limit=min(limit, 50))
+                self._json({"query": q, "count": len(results), "results": results})
+        elif path == "/api/context":
+            topic = query.get("topic", [""])[0].strip() or query.get("q", [""])[0].strip()
+            if not topic:
+                self._json({"error": "topic parameter required"})
+            else:
+                self._json(_get_context(topic))
         else:
             self._err("page")
 
