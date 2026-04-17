@@ -452,17 +452,38 @@ Articles should serve understanding, not archival. Write to explain, not to file
 
 ## Backlinks (`wiki/_backlinks.json`)
 
-A reverse link index mapping each page to the set of pages that link to it. Auto-generated after every ingest and lint operation by scanning all `[[wikilinks]]` across the wiki.
+A reverse link index mapping each page to the set of pages that link to it. Also includes forward links. Auto-generated after every ingest and lint operation by scanning all `[[wikilinks]]` across the wiki.
 
-Structure:
+Structure (current format):
 ```json
 {
-  "example-concept": ["another-concept", "example-entity", "example-source"],
-  "example-person": ["example-project", "another-source"]
+  "backlinks": {
+    "example-concept": ["another-concept", "example-entity", "example-source"]
+  },
+  "forward": {
+    "another-concept": ["example-concept", "related-concept"]
+  }
 }
 ```
 
 Used during query to find related pages, and during lint to detect orphans and backlink imbalances.
+
+**Rebuilding:** Call `GET /api/rebuild-backlinks` on the local server (if running), or scan all `[[wikilinks]]` manually and write the file. Always rebuild after ingest and lint.
+
+## Local Server API
+
+`serve.py` exposes a local HTTP API at `http://localhost:3000`:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
+| `GET /api/search?q=<query>` | Ranked search — title, alias, tag, fulltext. Returns scores + snippets |
+| `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call |
+| `GET /api/graph` | All nodes + edges for graph visualization |
+| `GET /api/backlinks` | Reverse link index |
+| `GET /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning all wikilinks |
+
+During query operations, prefer `/api/context?topic=X` over reading files manually — it returns the primary page plus all related pages via graph traversal in one call.
 
 ## Scaling
 
