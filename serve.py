@@ -15,7 +15,10 @@ _pages_cache: list | None = None
 _pages_cache_mtime: float = 0.0
 _page_index: dict[str, Path] = {}  # stem.lower() → path
 _fulltext_index: dict[str, str] = {}  # stem.lower() → full text (for search)
+_snippet_index: dict[str, str] = {}  # stem.lower() → pre-extracted first snippet
 _token_index: dict[str, set[str]] = {}  # token → set of page stems that contain it
+_page_map: dict[str, dict] = {}  # stem.lower() → page dict (for O(1) lookup in search)
+_meta_token_index: dict[str, set[str]] = {}  # token → stems with that token in title/alias/tag/tldr
 
 
 def _wiki_mtime() -> float:
@@ -43,14 +46,16 @@ def _wiki_mtime() -> float:
 
 
 def _get_all_pages() -> list:
-    global _pages_cache, _pages_cache_mtime, _page_index, _fulltext_index, _token_index
+    global _pages_cache, _pages_cache_mtime, _page_index, _fulltext_index, _snippet_index, _token_index, _page_map, _meta_token_index
     mtime = _wiki_mtime()
     if _pages_cache is not None and mtime == _pages_cache_mtime:
         return _pages_cache
     pages = []
     index: dict[str, Path] = {}
     fulltext: dict[str, str] = {}
+    snippets: dict[str, str] = {}
     token_idx: dict[str, set[str]] = {}
+    meta_idx: dict[str, set[str]] = {}
     for md in sorted(WIKI_DIR.rglob("*.md")):
         if md.name.startswith("."): continue
         rel = md.relative_to(WIKI_DIR)
@@ -96,21 +101,44 @@ def _get_all_pages() -> list:
         # Store full text in memory for zero-IO search
         text_lower = text.lower()
         fulltext[stem] = text_lower
+        # Pre-extract snippet: first non-empty body line after frontmatter
+        body_lines = [l.strip() for l in body.split("\n") if l.strip() and not l.startswith("#") and not l.startswith(">")]
+        snippets[stem] = body_lines[0][:200] if body_lines else ""
         # Build inverted token index: token → set of page stems
         for token in re.split(r"\W+", text_lower):
             if len(token) >= 3:
                 if token not in token_idx:
                     token_idx[token] = set()
                 token_idx[token].add(stem)
+        # Build meta token index: tokens from title/aliases/tags/tldr → stems
+        meta_tokens = set()
+        for word in re.split(r"\W+", title.lower()):
+            if len(word) >= 3: meta_tokens.add(word)
+        for alias in aliases:
+            for word in re.split(r"\W+", alias):
+                if len(word) >= 3: meta_tokens.add(word)
+        for tag in tags_raw:
+            for word in re.split(r"\W+", str(tag).lower()):
+                if len(word) >= 3: meta_tokens.add(word)
+        if tldr:
+            for word in re.split(r"\W+", tldr.lower()):
+                if len(word) >= 3: meta_tokens.add(word)
+        for token in meta_tokens:
+            if token not in meta_idx:
+                meta_idx[token] = set()
+            meta_idx[token].add(stem)
         # Also index by alias so _find_page works with alternate names
         for alias in aliases:
             if alias not in index:
                 index[alias] = md
     _pages_cache = pages
     _pages_cache_mtime = mtime
-    _page_index = index  # share the same scan — no second mtime check needed
-    _fulltext_index = fulltext  # in-memory full-text for fast search
-    _token_index = token_idx  # inverted index for O(1) token lookup
+    _page_index = index
+    _fulltext_index = fulltext
+    _snippet_index = snippets
+    _token_index = token_idx
+    _meta_token_index = meta_idx
+    _page_map = {p["name"].lower(): p for p in pages}
     return pages
 
 
@@ -452,18 +480,33 @@ def _render_search(query):
 
 def _search_pages(q: str, limit: int = 20) -> list:
     """Search pages by title, alias, tag, and full-text body.
-    Returns ranked results with snippet. Uses in-memory fulltext index — zero file I/O.
+    Uses token index to pre-filter candidates, snippet index for zero file I/O.
     """
     q_lower = q.lower()
-    pages = _get_all_pages()  # also populates _fulltext_index
+    pages = _get_all_pages()
+    # Use pre-built page_map — no dict comprehension per call
     scored: list[tuple[int, dict]] = []
 
-    for p in pages:
-        score = 0
-        snippet = ""
-        stem = p["name"].lower()
+    # Build candidate set: pages that could possibly match
+    # For single-word queries: use token index (O(1)) to get exact candidate set
+    # For multi-word/substring: fall back to all pages
+    is_single_token = bool(re.match(r"^\w+$", q_lower))
+    if is_single_token and q_lower in _token_index:
+        # Fast path: union of fulltext candidates + meta candidates — both O(1)
+        token_candidates = _token_index[q_lower]
+        meta_candidates = _meta_token_index.get(q_lower, set())
+        candidates = token_candidates | meta_candidates
+    else:
+        # Substring query — must check all pages
+        candidates = {p["name"].lower() for p in pages}
 
-        # Title match (highest priority)
+    for stem in candidates:
+        p = _page_map.get(stem)
+        if not p:
+            continue
+        score = 0
+
+        # Title match
         if q_lower in p["title"].lower():
             score += 10
         # Exact name match
@@ -478,28 +521,14 @@ def _search_pages(q: str, limit: int = 20) -> list:
         # TLDR match
         if q_lower in p.get("tldr", "").lower():
             score += 3
-
-        # Full-text match — use inverted token index for O(1) lookup, then get snippet
+        # Fulltext match
         text_lower = _fulltext_index.get(stem, "")
-        in_fulltext = False
-        # Check token index first (fast path for single-word queries)
-        if q_lower in _token_index:
-            in_fulltext = stem in _token_index[q_lower]
-        elif text_lower and q_lower in text_lower:
-            # Multi-word or substring query — fall back to string search in memory
-            in_fulltext = True
-        if in_fulltext:
+        if text_lower and q_lower in text_lower:
             score += 2
-            if text_lower:
-                idx = text_lower.find(q_lower)
-                if idx >= 0:
-                    # Get snippet from original text for display
-                    path = _page_index.get(stem)
-                    if path and path.exists():
-                        orig = path.read_text(encoding="utf-8", errors="replace")
-                        snippet = orig[max(0, idx-60):idx+len(q)+60].replace("\n", " ").strip()
 
         if score > 0:
+            # Use pre-extracted snippet — zero file I/O
+            snippet = _snippet_index.get(stem, "")
             result = {**p, "score": score, "snippet": snippet}
             scored.append((score, result))
 
