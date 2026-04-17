@@ -14,6 +14,8 @@ PORT = 3000
 _pages_cache: list | None = None
 _pages_cache_mtime: float = 0.0
 _page_index: dict[str, Path] = {}  # stem.lower() → path
+_fulltext_index: dict[str, str] = {}  # stem.lower() → full text (for search)
+_token_index: dict[str, set[str]] = {}  # token → set of page stems that contain it
 
 
 def _wiki_mtime() -> float:
@@ -41,12 +43,14 @@ def _wiki_mtime() -> float:
 
 
 def _get_all_pages() -> list:
-    global _pages_cache, _pages_cache_mtime, _page_index
+    global _pages_cache, _pages_cache_mtime, _page_index, _fulltext_index, _token_index
     mtime = _wiki_mtime()
     if _pages_cache is not None and mtime == _pages_cache_mtime:
         return _pages_cache
     pages = []
     index: dict[str, Path] = {}
+    fulltext: dict[str, str] = {}
+    token_idx: dict[str, set[str]] = {}
     for md in sorted(WIKI_DIR.rglob("*.md")):
         if md.name.startswith("."): continue
         rel = md.relative_to(WIKI_DIR)
@@ -75,6 +79,7 @@ def _get_all_pages() -> list:
         if isinstance(tags_raw, str):
             tags_raw = [t.strip() for t in tags_raw.split(",") if t.strip()]
 
+        stem = md.stem.lower()
         pages.append({
             "name": md.stem,
             "title": title,
@@ -87,7 +92,16 @@ def _get_all_pages() -> list:
             "tldr": tldr,
             "date_updated": meta.get("date_updated", ""),
         })
-        index[md.stem.lower()] = md
+        index[stem] = md
+        # Store full text in memory for zero-IO search
+        text_lower = text.lower()
+        fulltext[stem] = text_lower
+        # Build inverted token index: token → set of page stems
+        for token in re.split(r"\W+", text_lower):
+            if len(token) >= 3:
+                if token not in token_idx:
+                    token_idx[token] = set()
+                token_idx[token].add(stem)
         # Also index by alias so _find_page works with alternate names
         for alias in aliases:
             if alias not in index:
@@ -95,6 +109,8 @@ def _get_all_pages() -> list:
     _pages_cache = pages
     _pages_cache_mtime = mtime
     _page_index = index  # share the same scan — no second mtime check needed
+    _fulltext_index = fulltext  # in-memory full-text for fast search
+    _token_index = token_idx  # inverted index for O(1) token lookup
     return pages
 
 
@@ -436,22 +452,22 @@ def _render_search(query):
 
 def _search_pages(q: str, limit: int = 20) -> list:
     """Search pages by title, alias, tag, and full-text body.
-    Returns ranked results with snippet. Uses pages cache for metadata;
-    reads file content only for pages that pass the metadata filter first.
+    Returns ranked results with snippet. Uses in-memory fulltext index — zero file I/O.
     """
     q_lower = q.lower()
-    pages = _get_all_pages()
+    pages = _get_all_pages()  # also populates _fulltext_index
     scored: list[tuple[int, dict]] = []
 
     for p in pages:
         score = 0
         snippet = ""
+        stem = p["name"].lower()
 
         # Title match (highest priority)
         if q_lower in p["title"].lower():
             score += 10
         # Exact name match
-        if q_lower == p["name"].lower():
+        if q_lower == stem:
             score += 20
         # Alias match
         if any(q_lower in a for a in p.get("aliases", [])):
@@ -463,14 +479,25 @@ def _search_pages(q: str, limit: int = 20) -> list:
         if q_lower in p.get("tldr", "").lower():
             score += 3
 
-        # Full-text match (only read file if metadata didn't already score high)
-        path = _page_index.get(p["name"].lower())
-        if path and path.exists():
-            text = path.read_text(encoding="utf-8", errors="replace")
-            if q_lower in text.lower():
-                score += 2
-                idx = text.lower().find(q_lower)
-                snippet = text[max(0, idx-60):idx+len(q)+60].replace("\n", " ").strip()
+        # Full-text match — use inverted token index for O(1) lookup, then get snippet
+        text_lower = _fulltext_index.get(stem, "")
+        in_fulltext = False
+        # Check token index first (fast path for single-word queries)
+        if q_lower in _token_index:
+            in_fulltext = stem in _token_index[q_lower]
+        elif text_lower and q_lower in text_lower:
+            # Multi-word or substring query — fall back to string search in memory
+            in_fulltext = True
+        if in_fulltext:
+            score += 2
+            if text_lower:
+                idx = text_lower.find(q_lower)
+                if idx >= 0:
+                    # Get snippet from original text for display
+                    path = _page_index.get(stem)
+                    if path and path.exists():
+                        orig = path.read_text(encoding="utf-8", errors="replace")
+                        snippet = orig[max(0, idx-60):idx+len(q)+60].replace("\n", " ").strip()
 
         if score > 0:
             result = {**p, "score": score, "snippet": snippet}
@@ -605,8 +632,7 @@ def _build_backlinks() -> dict[str, list[str]]:
 
 def _get_graph_data() -> dict:
     """Return graph nodes and edges for visualization.
-    Nodes: all wiki pages with id, title, category, type.
-    Edges: all [[wikilinks]] as {source, target} pairs.
+    Uses in-memory fulltext index — no separate rglob scan.
     """
     pages = _get_all_pages()
     page_set = {p["name"].lower() for p in pages}
@@ -614,11 +640,17 @@ def _get_graph_data() -> dict:
 
     edges = []
     wikilink_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
-    for md in WIKI_DIR.rglob("*.md"):
-        if md.name.startswith("."): continue
-        text = md.read_text(encoding="utf-8", errors="replace")
-        _, body = _parse_frontmatter(text)
-        source = md.stem
+    for p in pages:
+        source = p["name"]
+        text_lower = _fulltext_index.get(source.lower(), "")
+        if not text_lower:
+            continue
+        # Use original text for wikilink extraction (case-sensitive targets)
+        path = _page_index.get(source.lower())
+        if not path or not path.exists():
+            continue
+        orig = path.read_text(encoding="utf-8", errors="replace")
+        _, body = _parse_frontmatter(orig)
         for m in wikilink_re.finditer(body):
             target = m.group(1).strip()
             if target.lower() in page_set and target.lower() != source.lower():
