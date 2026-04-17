@@ -49,6 +49,21 @@ python serve.py
 
 Wikipedia-style local viewer with search, navigation, dark mode. No dependencies beyond Python 3.10+.
 
+## API
+
+`serve.py` exposes a local HTTP API for agents and tools:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
+| `GET /api/search?q=<query>` | Ranked full-text search — title, alias, tag, body. Returns scores + snippets |
+| `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call. Agent-optimized |
+| `GET /api/graph` | All nodes + edges for graph visualization |
+| `GET /api/backlinks` | Reverse link index `{page: [pages that link to it]}` |
+| `GET /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning all wikilinks |
+
+Search is O(1) via in-memory inverted index — sub-millisecond at any wiki size. `/api/context` is the primary agent endpoint: one call returns the primary page + all related pages via graph traversal.
+
 ## Structure
 
 ```
