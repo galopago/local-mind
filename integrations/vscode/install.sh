@@ -1,5 +1,6 @@
 #!/bin/bash
 # Link integration for VS Code (Copilot Chat)
+# One command: settings.json + wiki scaffold + link-mcp install
 #
 # Usage:
 #   bash install.sh             → .vscode/settings.json + central wiki at ~/link/
@@ -13,51 +14,40 @@ mkdir -p .vscode
 
 if [ "$MODE" = "--project" ]; then
     INSTRUCTIONS="This project has its own Link wiki. Read LINK.md for the full schema. When the user says ingest/query/lint, follow the Link protocol. Never modify raw/. The wiki is in wiki/."
+    WIKI_PATH="$(pwd)/wiki"
 else
     INSTRUCTIONS="This project uses Link, an LLM-maintained knowledge wiki at ~/link/. Read ~/link/LINK.md for the full schema. When the user says ingest/query/lint, follow the Link protocol. Wiki is at ~/link/wiki/, raw sources at ~/link/raw/."
+    WIKI_PATH="$HOME/link/wiki"
 fi
 
-# Write instructions to a temp file to avoid shell variable interpolation
-# inside python3 -c strings (which breaks on quotes and special characters)
-TMPFILE=$(mktemp /tmp/link-instructions.XXXXXX)
-printf '%s' "$INSTRUCTIONS" > "$TMPFILE"
-
-# Always update steering (idempotent)
-    if false; then
-    if grep -q "Link, an LLM-maintained knowledge wiki\|Link wiki" "$TARGET"; then
-        echo "Link already configured in $TARGET"
-    else
-        python3 - "$TARGET" "$TMPFILE" << 'PYEOF'
-import json, sys
-target, tmpfile = sys.argv[1], sys.argv[2]
-instructions_text = open(tmpfile).read()
-settings = json.load(open(target))
-instructions = settings.get('github.copilot.chat.codeGeneration.instructions', [])
-instructions.append({'text': instructions_text})
-settings['github.copilot.chat.codeGeneration.instructions'] = instructions
-json.dump(settings, open(target, 'w'), indent=2)
-print(f'Link instructions added to {target}')
+# Write to .vscode/settings.json
+python3 - << PYEOF
+import json, os
+target = "$TARGET"
+instructions_text = """$INSTRUCTIONS"""
+settings = {}
+if os.path.exists(target):
+    try:
+        with open(target) as f:
+            settings = json.load(f)
+    except Exception:
+        pass
+settings['github.copilot.chat.codeGeneration.instructions'] = [{'text': instructions_text}]
+with open(target, 'w') as f:
+    json.dump(settings, f, indent=2)
+print(f"Link instructions → {target}")
 PYEOF
-    fi
-else
-    python3 - "$TARGET" "$TMPFILE" << 'PYEOF'
-import json, sys
-target, tmpfile = sys.argv[1], sys.argv[2]
-instructions_text = open(tmpfile).read()
-settings = {'github.copilot.chat.codeGeneration.instructions': [{'text': instructions_text}]}
-json.dump(settings, open(target, 'w'), indent=2)
-print(f'Link installed → {target}')
-PYEOF
-fi
-
-rm -f "$TMPFILE"
 
 if [ "$MODE" = "--project" ]; then
-    echo "Scaffolding project wiki..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
 else
-    echo "Scaffolding central wiki at ~/link/..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
 fi
+
 echo ""
-echo "Done. Drop sources and tell your agent to ingest them."
+echo "Done."
+echo "  Drop sources into raw/ and say 'ingest' to process them."
+echo "  View wiki: python ~/link/serve.py"
+echo ""
+echo "  MCP: add to .vscode/mcp.json:"
+echo "  { \"servers\": { \"link\": { \"type\": \"stdio\", \"command\": \"python3\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
