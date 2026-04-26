@@ -2,9 +2,9 @@
 
 <!-- mcp-name: io.github.gowtham0992/link -->
 
-MCP server for the [Link](https://github.com/gowtham0992/link) personal knowledge wiki.
+MCP server for the [Link](https://github.com/gowtham0992/link) personal knowledge wiki. Exposes your wiki as MCP tools — search, query context, and traverse the knowledge graph without reading files directly.
 
-Exposes your wiki as MCP tools so any MCP-compatible agent can search, query context, and traverse the knowledge graph without reading files directly.
+Listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.gowtham0992/link`.
 
 ## Install
 
@@ -12,12 +12,21 @@ Exposes your wiki as MCP tools so any MCP-compatible agent can search, query con
 pip install link-mcp
 ```
 
-## Setup
+## Quick setup (Kiro)
 
-1. Install Link and scaffold your wiki:
 ```bash
 git clone https://github.com/gowtham0992/link.git
 bash link/integrations/kiro/install.sh
+```
+
+This installs `link-mcp`, scaffolds `~/link/`, and registers the MCP server in `~/.kiro/settings/mcp.json` automatically.
+
+## Manual setup (any MCP client)
+
+1. Scaffold your wiki:
+```bash
+git clone https://github.com/gowtham0992/link.git
+bash link/integrations/kiro/install.sh   # or claude-code, cursor, codex
 ```
 
 2. Add to your MCP client config:
@@ -32,13 +41,13 @@ bash link/integrations/kiro/install.sh
 }
 ```
 
-Or with a custom wiki path:
+Custom wiki path:
 ```json
 {
   "mcpServers": {
     "link": {
       "command": "python3",
-      "args": ["-m", "link_mcp", "--wiki", "/path/to/wiki"]
+      "args": ["-m", "link_mcp", "--wiki", "~/my-wiki/wiki"]
     }
   }
 }
@@ -48,13 +57,20 @@ Or with a custom wiki path:
 
 | Tool | Description |
 |------|-------------|
-| `search_wiki` | Ranked search by title, alias, tag, fulltext |
-| `get_context` | Topic + full graph neighborhood in one call |
-| `get_pages` | List all pages with metadata |
-| `get_backlinks` | Inbound + forward links for a page |
-| `get_graph` | All nodes + edges |
-| `rebuild_backlinks` | Rebuild the link index |
+| `search_wiki(query, limit?)` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets. |
+| `get_context(topic)` | **Primary tool.** Best matching page (full content) + inbound/forward graph links in one call. |
+| `get_pages(category?, type?, maturity?)` | All pages with metadata. Filter by category, type, or maturity. |
+| `get_backlinks(page_name)` | Inbound + forward links for a page. |
+| `get_graph()` | All nodes + edges for graph reasoning. |
+| `rebuild_backlinks()` | Rebuild `_backlinks.json` after ingest or lint. |
+
+**Use `get_context` for answering questions** — one call returns the primary page plus all related pages via graph traversal. Eliminates the token waste of reading index.md every session.
 
 ## Wiki location
 
-By default uses `~/link/wiki/`. Override with `--wiki /path/to/wiki`.
+Default: `~/link/wiki/`. Override with `--wiki /path/to/wiki`.
+
+## Requirements
+
+- Python 3.10+
+- A Link wiki (scaffolded by `install.sh`)
