@@ -349,8 +349,30 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
 
 
 def _header_html():
-    return """<header>
-  <div class="logo"><a href="/"><img src="/logo.png" alt="Link" style="height:28px;vertical-align:middle;margin-right:8px">Link</a><small>knowledge wiki</small></div>
+    logo_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="28" height="28" style="vertical-align:middle;margin-right:8px">
+  <defs><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <rect width="100" height="100" rx="16" fill="#0d1b2a"/>
+  <g stroke="#2dd4bf" stroke-width="2" filter="url(#glow)" opacity="0.8">
+    <line x1="30" y1="15" x2="30" y2="75"/>
+    <line x1="30" y1="75" x2="70" y2="75"/>
+    <line x1="30" y1="15" x2="55" y2="15"/>
+    <line x1="30" y1="45" x2="55" y2="45"/>
+    <line x1="30" y1="15" x2="55" y2="45"/>
+    <line x1="55" y1="15" x2="55" y2="45"/>
+    <line x1="30" y1="45" x2="55" y2="75"/>
+  </g>
+  <g fill="#2dd4bf" filter="url(#glow)">
+    <circle cx="30" cy="15" r="4.5"/>
+    <circle cx="55" cy="15" r="3.5"/>
+    <circle cx="30" cy="45" r="5"/>
+    <circle cx="55" cy="45" r="3.5"/>
+    <circle cx="30" cy="75" r="4"/>
+    <circle cx="55" cy="75" r="4"/>
+    <circle cx="70" cy="75" r="4.5"/>
+  </g>
+</svg>'''
+    return f"""<header>
+  <div class="logo"><a href="/">{logo_svg}Link</a><small>knowledge wiki</small></div>
   <nav>
     <a href="/">home</a>
     <a href="/page/log">log</a>
@@ -518,14 +540,21 @@ def _render_graph():
   var tooltip = document.getElementById('graph-tooltip');
   var W, H;
 
-  // Node positions and velocities (force-directed)
+  // Fixed small node radius — Obsidian style, not scaled by connections
+  var NODE_R = 6;
+  var LABEL_FONT = '11px -apple-system, sans-serif';
+
+  // Spread nodes in a circle initially so physics starts well-separated
   var pos = {{}}, vel = {{}}, pinned = {{}};
-  nodes.forEach(function(n) {{
-    pos[n.id] = {{ x: Math.random() * 800 + 100, y: Math.random() * 500 + 50 }};
+  var angleStep = (2 * Math.PI) / Math.max(nodes.length, 1);
+  var initR = Math.max(80, nodes.length * 18);
+  nodes.forEach(function(n, i) {{
+    var a = i * angleStep;
+    pos[n.id] = {{ x: Math.cos(a) * initR, y: Math.sin(a) * initR }};
     vel[n.id] = {{ x: 0, y: 0 }};
   }});
 
-  // Build adjacency for force calc
+  // Adjacency
   var adj = {{}};
   nodes.forEach(function(n) {{ adj[n.id] = []; }});
   edges.forEach(function(e) {{
@@ -534,9 +563,10 @@ def _render_graph():
   }});
 
   var dragging = null, dragOffX = 0, dragOffY = 0;
-  var panX = 0, panY = 0, panStartX = 0, panStartY = 0, panning = false;
+  var panX = 0, panY = 0, panStartX = 0, panStartY = 0, panning = false, didPan = false;
   var zoom = 1;
   var frame = 0;
+  var SETTLE = 200; // frames of physics
 
   function resize() {{
     W = canvas.clientWidth; H = canvas.clientHeight;
@@ -544,8 +574,7 @@ def _render_graph():
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   }}
 
-  function nodeColor(n) {{ return catColors[n.category] || '#999'; }}
-  function nodeRadius(n) {{ return Math.max(5, Math.min(14, 5 + (adj[n.id] || []).length)); }}
+  function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
 
   function toScreen(x, y) {{
     return {{ x: (x + panX) * zoom + W/2, y: (y + panY) * zoom + H/2 }};
@@ -555,28 +584,32 @@ def _render_graph():
   }}
 
   function simulate() {{
-    var k = 80, repel = 3000, damp = 0.85;
+    // Tuned for Obsidian-like spread: strong repulsion, moderate spring, weak gravity
+    var springLen = 120, springK = 0.04, repel = 8000, gravity = 0.008, damp = 0.82;
     nodes.forEach(function(n) {{
       if (pinned[n.id]) return;
       var fx = 0, fy = 0;
       var p = pos[n.id];
-      // Repulsion
+      // Repulsion between all pairs
       nodes.forEach(function(m) {{
         if (m.id === n.id) return;
         var q = pos[m.id];
         var dx = p.x - q.x, dy = p.y - q.y;
-        var d2 = dx*dx + dy*dy + 1;
-        fx += repel * dx / d2; fy += repel * dy / d2;
+        var d2 = Math.max(dx*dx + dy*dy, 100);
+        var f = repel / d2;
+        fx += f * dx / Math.sqrt(d2);
+        fy += f * dy / Math.sqrt(d2);
       }});
-      // Attraction along edges
+      // Spring attraction along edges (toward natural length)
       (adj[n.id] || []).forEach(function(mid) {{
         var q = pos[mid];
         var dx = q.x - p.x, dy = q.y - p.y;
         var d = Math.sqrt(dx*dx + dy*dy) + 0.01;
-        fx += k * dx / d; fy += k * dy / d;
+        var f = springK * (d - springLen);
+        fx += f * dx / d; fy += f * dy / d;
       }});
-      // Center gravity
-      fx -= p.x * 0.01; fy -= p.y * 0.01;
+      // Weak center gravity
+      fx -= p.x * gravity; fy -= p.y * gravity;
       vel[n.id].x = (vel[n.id].x + fx * 0.016) * damp;
       vel[n.id].y = (vel[n.id].y + fy * 0.016) * damp;
       pos[n.id].x += vel[n.id].x;
@@ -584,33 +617,102 @@ def _render_graph():
     }});
   }}
 
+  // Auto-fit: after physics settles, zoom/pan so all nodes are visible and centered
+  function autoFit() {{
+    if (nodes.length === 0) return;
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(function(n) {{
+      minX = Math.min(minX, pos[n.id].x); maxX = Math.max(maxX, pos[n.id].x);
+      minY = Math.min(minY, pos[n.id].y); maxY = Math.max(maxY, pos[n.id].y);
+    }});
+    var pad = 60;
+    var gw = maxX - minX + pad*2, gh = maxY - minY + pad*2;
+    zoom = Math.min(W / gw, H / gh, 2);
+    panX = -(minX + maxX) / 2;
+    panY = -(minY + maxY) / 2;
+  }}
+
+  var fitted = false;
+
   function draw() {{
     ctx.clearRect(0, 0, W, H);
-    // Edges
-    ctx.strokeStyle = 'rgba(150,150,150,0.3)'; ctx.lineWidth = 1;
+    var time = frame * 0.018;
+
+    // Edges — double draw: blurred glow + sharp line + flow particle
     edges.forEach(function(e) {{
       var a = toScreen(pos[e.source].x, pos[e.source].y);
       var b = toScreen(pos[e.target].x, pos[e.target].y);
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+
+      // Glow layer
+      ctx.save();
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = 'rgba(88,166,255,0.12)';
+      ctx.lineWidth = 3;
+      ctx.filter = 'blur(2px)';
+      ctx.stroke();
+      ctx.restore();
+
+      // Sharp line
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = 'rgba(139,148,158,0.2)';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      // Flow particle
+      var flowT = ((time * 0.5 + (a.x + b.y) * 0.001) % 2) / 2;
+      var px = a.x + (b.x - a.x) * flowT;
+      var py = a.y + (b.y - a.y) * flowT;
+      var pa = Math.sin(flowT * Math.PI) * 0.5;
+      ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(45,212,191,' + pa + ')';
+      ctx.fill();
     }});
+
     // Nodes
     nodes.forEach(function(n) {{
       var s = toScreen(pos[n.id].x, pos[n.id].y);
-      var r = nodeRadius(n) * zoom;
+      var r = NODE_R * Math.max(0.5, zoom);
+      var color = nodeColor(n);
+      var pulse = Math.sin(time * 1.2 + (pos[n.id].x + pos[n.id].y) * 0.01) * 0.12 + 0.88;
+
+      // Radial glow
+      var glowR = r * 3.5 * pulse;
+      var grad = ctx.createRadialGradient(s.x, s.y, r * 0.3, s.x, s.y, glowR);
+      grad.addColorStop(0, color + '30');
+      grad.addColorStop(1, color + '00');
+      ctx.beginPath(); ctx.arc(s.x, s.y, glowR, 0, Math.PI*2);
+      ctx.fillStyle = grad; ctx.fill();
+
+      // Node body
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
-      ctx.fillStyle = nodeColor(n); ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
-      // Label for larger nodes
-      if (r > 8) {{
-        ctx.fillStyle = '#333'; ctx.font = Math.min(11, r) + 'px sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(n.title.slice(0, 20), s.x, s.y + r + 8);
-      }}
+      ctx.fillStyle = color + '40'; ctx.fill();
+
+      // Node border
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1;
+
+      // Inner bright core
+      ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.35, 0, Math.PI*2);
+      ctx.fillStyle = color + 'cc'; ctx.fill();
+
+      // Label — always visible
+      var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
+      ctx.font = LABEL_FONT;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
+      ctx.fillStyle = '#c9d1d9';
+      ctx.fillText(label, s.x, s.y + r + 5);
+      ctx.shadowBlur = 0;
     }});
   }}
 
   function loop() {{
-    if (frame < 300) simulate(); // settle for 300 frames then stop physics
+    if (frame < SETTLE) {{
+      simulate();
+      // Auto-fit once physics has mostly settled
+      if (frame === SETTLE - 1) {{ autoFit(); fitted = true; }}
+    }}
     frame++;
     draw();
     requestAnimationFrame(loop);
@@ -621,7 +723,7 @@ def _render_graph():
     for (var i = nodes.length - 1; i >= 0; i--) {{
       var n = nodes[i];
       var p = pos[n.id];
-      var r = nodeRadius(n);
+      var r = NODE_R + 4; // slightly larger hit area
       var dx = w.x - p.x, dy = w.y - p.y;
       if (dx*dx + dy*dy <= r*r) return n;
     }}
@@ -637,7 +739,8 @@ def _render_graph():
       var w = toWorld(sx, sy);
       dragOffX = pos[hit.id].x - w.x; dragOffY = pos[hit.id].y - w.y;
     }} else {{
-      panning = true; panStartX = sx - panX * zoom; panStartY = sy - panY * zoom;
+      panning = true; didPan = false;
+      panStartX = sx - panX * zoom; panStartY = sy - panY * zoom;
     }}
   }});
 
@@ -649,39 +752,41 @@ def _render_graph():
       pos[dragging.id].x = w.x + dragOffX; pos[dragging.id].y = w.y + dragOffY;
     }} else if (panning) {{
       panX = (sx - panStartX) / zoom; panY = (sy - panStartY) / zoom;
+      didPan = true;
     }} else {{
       var hit = hitTest(sx, sy);
       if (hit) {{
         tooltip.style.display = 'block';
-        tooltip.style.left = (e.clientX + 12) + 'px';
-        tooltip.style.top = (e.clientY - 8) + 'px';
-        tooltip.textContent = hit.title + ' (' + hit.category + ')';
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top = (e.clientY - 10) + 'px';
+        tooltip.textContent = hit.title + ' · ' + hit.category;
         canvas.style.cursor = 'pointer';
       }} else {{
         tooltip.style.display = 'none';
-        canvas.style.cursor = panning ? 'grabbing' : 'grab';
+        canvas.style.cursor = 'grab';
       }}
     }}
   }});
 
-  canvas.addEventListener('mouseup', function(e) {{
+  canvas.addEventListener('mouseup', function() {{
     if (dragging) {{ pinned[dragging.id] = false; dragging = null; }}
     panning = false;
   }});
 
   canvas.addEventListener('click', function(e) {{
+    if (didPan) {{ didPan = false; return; }}
     var rect = canvas.getBoundingClientRect();
     var hit = hitTest(e.clientX - rect.left, e.clientY - rect.top);
-    if (hit && !panning) window.location.href = '/page/' + encodeURIComponent(hit.id);
+    if (hit) window.location.href = '/page/' + encodeURIComponent(hit.id);
   }});
 
   canvas.addEventListener('wheel', function(e) {{
     e.preventDefault();
-    var factor = e.deltaY < 0 ? 1.1 : 0.9;
-    zoom = Math.max(0.2, Math.min(5, zoom * factor));
+    var factor = e.deltaY < 0 ? 1.12 : 0.9;
+    zoom = Math.max(0.15, Math.min(6, zoom * factor));
   }}, {{ passive: false }});
 
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', function() {{ resize(); if (fitted) autoFit(); }});
   resize();
   loop();
 }})();
