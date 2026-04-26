@@ -52,11 +52,41 @@ Wikipedia-style local viewer. No dependencies beyond Python 3.10+. Features:
 - Interactive knowledge graph at `/graph` — force-directed, click to navigate
 - Dark mode, keyboard navigation (`j`/`k` to move, `Escape` to blur)
 
-## API
+## MCP Server
 
-`serve.py` exposes a local HTTP API for agents and tools. **No external dependencies — pure Python stdlib.**
+Link exposes its search and graph capabilities as MCP tools, so any MCP-compatible agent can use them natively without HTTP.
 
-| Endpoint | Description |
+**Install the MCP dependency:**
+```bash
+pip install mcp
+```
+
+**Add to your MCP client config** (e.g. `~/.kiro/settings/mcp.json`, `~/.claude/mcp.json`, or Cursor settings):
+```json
+{
+  "mcpServers": {
+    "link": {
+      "command": "python3",
+      "args": ["~/link/mcp_server.py"]
+    }
+  }
+}
+```
+
+**Available tools:**
+
+| Tool | Description |
+|------|-------------|
+| `search_wiki` | Ranked search by title, alias, tag, fulltext. Returns scores + snippets. |
+| `get_context` | **Primary tool.** Topic + full graph neighborhood in one call. |
+| `get_pages` | List all pages with metadata. Filter by category, type, maturity. |
+| `get_backlinks` | Inbound + forward links for a page. |
+| `get_graph` | All nodes + edges for graph reasoning. |
+| `rebuild_backlinks` | Rebuild `_backlinks.json` after ingest or lint. |
+
+## API (HTTP)
+
+`serve.py` also exposes a local HTTP API. Same capabilities as the MCP tools, accessible over HTTP when the server is running.
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
 | `GET /api/search?q=<query>` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets |
