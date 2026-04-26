@@ -87,6 +87,8 @@ pip install mcp
 ## API (HTTP)
 
 `serve.py` also exposes a local HTTP API. Same capabilities as the MCP tools, accessible over HTTP when the server is running.
+
+> **⚠️ Local use only.** `serve.py` binds to `127.0.0.1` and has no authentication. Do not expose it to the internet (no ngrok, no port forwarding, no public servers) without adding auth — your wiki would be publicly readable.
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
 | `GET /api/search?q=<query>` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets |
