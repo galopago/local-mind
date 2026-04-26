@@ -313,6 +313,18 @@ hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
 .page-list li:last-child { border-bottom: none; }
 .page-list .type { font-size: 11px; color: #888; font-family: sans-serif; margin-left: 6px; }
 
+mark { background: #fff3cd; color: inherit; border-radius: 2px; padding: 0 1px; }
+
+#graph-canvas { width: 100%; height: 600px; border: 1px solid #eee; border-radius: 4px;
+                cursor: grab; display: block; margin: 12px 0; }
+#graph-canvas:active { cursor: grabbing; }
+.graph-tooltip { position: fixed; background: #fff; border: 1px solid #ccc; border-radius: 4px;
+                 padding: 6px 10px; font-size: 13px; pointer-events: none; display: none;
+                 box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 100; }
+.graph-legend { font-size: 12px; color: #888; font-family: sans-serif; margin-top: 8px; }
+.graph-legend span { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+                     margin-right: 4px; vertical-align: middle; }
+
 footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
          font-size: 12px; color: #aaa; font-family: sans-serif; }
 
@@ -343,8 +355,9 @@ def _header_html():
     <a href="/">home</a>
     <a href="/page/log">log</a>
     <a href="/all">all pages</a>
+    <a href="/graph">graph</a>
     <form action="/search" method="get">
-      <input type="text" name="q" placeholder="search..." autocomplete="off">
+      <input type="text" name="q" placeholder="search... (/)" autocomplete="off" id="search-input">
     </form>
   </nav>
 </header>"""
@@ -368,6 +381,35 @@ def _layout(title, body):
 {_header_html()}
 {body}
 {_footer_html()}
+<div class="graph-tooltip" id="graph-tooltip"></div>
+<script>
+// Keyboard navigation
+document.addEventListener('keydown', function(e) {{
+  var tag = document.activeElement.tagName;
+  var inInput = tag === 'INPUT' || tag === 'TEXTAREA';
+  // / → focus search
+  if (e.key === '/' && !inInput) {{
+    e.preventDefault();
+    var inp = document.getElementById('search-input');
+    if (inp) {{ inp.focus(); inp.select(); }}
+  }}
+  // Escape → blur search
+  if (e.key === 'Escape' && inInput) {{
+    document.activeElement.blur();
+  }}
+  // j/k → navigate focusable links in page-list
+  if ((e.key === 'j' || e.key === 'k') && !inInput) {{
+    var links = Array.from(document.querySelectorAll('.page-list a, .search-results a'));
+    if (!links.length) return;
+    var cur = document.activeElement;
+    var idx = links.indexOf(cur);
+    if (e.key === 'j') idx = idx < links.length - 1 ? idx + 1 : 0;
+    else idx = idx > 0 ? idx - 1 : links.length - 1;
+    links[idx].focus();
+    e.preventDefault();
+  }}
+}});
+</script>
 </body>
 </html>"""
 
@@ -453,6 +495,215 @@ def _render_all():
                    f"<h1>All Pages ({len(pages)})</h1><ul class='page-list'>{items}</ul>")
 
 
+def _render_graph():
+    graph = _get_graph_data()
+    nodes_json = json.dumps(graph["nodes"])
+    edges_json = json.dumps(graph["edges"])
+    node_count = len(graph["nodes"])
+    edge_count = len(graph["edges"])
+
+    # Category → color mapping
+    cat_colors = {"concepts": "#4e79a7", "entities": "#f28e2b", "sources": "#59a14f",
+                  "comparisons": "#e15759", "explorations": "#76b7b2", "root": "#bab0ac"}
+
+    graph_js = f"""
+<script>
+(function() {{
+  var nodes = {nodes_json};
+  var edges = {edges_json};
+  var catColors = {json.dumps(cat_colors)};
+
+  var canvas = document.getElementById('graph-canvas');
+  var ctx = canvas.getContext('2d');
+  var tooltip = document.getElementById('graph-tooltip');
+  var W, H;
+
+  // Node positions and velocities (force-directed)
+  var pos = {{}}, vel = {{}}, pinned = {{}};
+  nodes.forEach(function(n) {{
+    pos[n.id] = {{ x: Math.random() * 800 + 100, y: Math.random() * 500 + 50 }};
+    vel[n.id] = {{ x: 0, y: 0 }};
+  }});
+
+  // Build adjacency for force calc
+  var adj = {{}};
+  nodes.forEach(function(n) {{ adj[n.id] = []; }});
+  edges.forEach(function(e) {{
+    if (adj[e.source]) adj[e.source].push(e.target);
+    if (adj[e.target]) adj[e.target].push(e.source);
+  }});
+
+  var dragging = null, dragOffX = 0, dragOffY = 0;
+  var panX = 0, panY = 0, panStartX = 0, panStartY = 0, panning = false;
+  var zoom = 1;
+  var frame = 0;
+
+  function resize() {{
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = W * devicePixelRatio; canvas.height = H * devicePixelRatio;
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  }}
+
+  function nodeColor(n) {{ return catColors[n.category] || '#999'; }}
+  function nodeRadius(n) {{ return Math.max(5, Math.min(14, 5 + (adj[n.id] || []).length)); }}
+
+  function toScreen(x, y) {{
+    return {{ x: (x + panX) * zoom + W/2, y: (y + panY) * zoom + H/2 }};
+  }}
+  function toWorld(sx, sy) {{
+    return {{ x: (sx - W/2) / zoom - panX, y: (sy - H/2) / zoom - panY }};
+  }}
+
+  function simulate() {{
+    var k = 80, repel = 3000, damp = 0.85;
+    nodes.forEach(function(n) {{
+      if (pinned[n.id]) return;
+      var fx = 0, fy = 0;
+      var p = pos[n.id];
+      // Repulsion
+      nodes.forEach(function(m) {{
+        if (m.id === n.id) return;
+        var q = pos[m.id];
+        var dx = p.x - q.x, dy = p.y - q.y;
+        var d2 = dx*dx + dy*dy + 1;
+        fx += repel * dx / d2; fy += repel * dy / d2;
+      }});
+      // Attraction along edges
+      (adj[n.id] || []).forEach(function(mid) {{
+        var q = pos[mid];
+        var dx = q.x - p.x, dy = q.y - p.y;
+        var d = Math.sqrt(dx*dx + dy*dy) + 0.01;
+        fx += k * dx / d; fy += k * dy / d;
+      }});
+      // Center gravity
+      fx -= p.x * 0.01; fy -= p.y * 0.01;
+      vel[n.id].x = (vel[n.id].x + fx * 0.016) * damp;
+      vel[n.id].y = (vel[n.id].y + fy * 0.016) * damp;
+      pos[n.id].x += vel[n.id].x;
+      pos[n.id].y += vel[n.id].y;
+    }});
+  }}
+
+  function draw() {{
+    ctx.clearRect(0, 0, W, H);
+    // Edges
+    ctx.strokeStyle = 'rgba(150,150,150,0.3)'; ctx.lineWidth = 1;
+    edges.forEach(function(e) {{
+      var a = toScreen(pos[e.source].x, pos[e.source].y);
+      var b = toScreen(pos[e.target].x, pos[e.target].y);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }});
+    // Nodes
+    nodes.forEach(function(n) {{
+      var s = toScreen(pos[n.id].x, pos[n.id].y);
+      var r = nodeRadius(n) * zoom;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
+      ctx.fillStyle = nodeColor(n); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+      // Label for larger nodes
+      if (r > 8) {{
+        ctx.fillStyle = '#333'; ctx.font = Math.min(11, r) + 'px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(n.title.slice(0, 20), s.x, s.y + r + 8);
+      }}
+    }});
+  }}
+
+  function loop() {{
+    if (frame < 300) simulate(); // settle for 300 frames then stop physics
+    frame++;
+    draw();
+    requestAnimationFrame(loop);
+  }}
+
+  function hitTest(sx, sy) {{
+    var w = toWorld(sx, sy);
+    for (var i = nodes.length - 1; i >= 0; i--) {{
+      var n = nodes[i];
+      var p = pos[n.id];
+      var r = nodeRadius(n);
+      var dx = w.x - p.x, dy = w.y - p.y;
+      if (dx*dx + dy*dy <= r*r) return n;
+    }}
+    return null;
+  }}
+
+  canvas.addEventListener('mousedown', function(e) {{
+    var rect = canvas.getBoundingClientRect();
+    var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    var hit = hitTest(sx, sy);
+    if (hit) {{
+      dragging = hit; pinned[hit.id] = true;
+      var w = toWorld(sx, sy);
+      dragOffX = pos[hit.id].x - w.x; dragOffY = pos[hit.id].y - w.y;
+    }} else {{
+      panning = true; panStartX = sx - panX * zoom; panStartY = sy - panY * zoom;
+    }}
+  }});
+
+  canvas.addEventListener('mousemove', function(e) {{
+    var rect = canvas.getBoundingClientRect();
+    var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    if (dragging) {{
+      var w = toWorld(sx, sy);
+      pos[dragging.id].x = w.x + dragOffX; pos[dragging.id].y = w.y + dragOffY;
+    }} else if (panning) {{
+      panX = (sx - panStartX) / zoom; panY = (sy - panStartY) / zoom;
+    }} else {{
+      var hit = hitTest(sx, sy);
+      if (hit) {{
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX + 12) + 'px';
+        tooltip.style.top = (e.clientY - 8) + 'px';
+        tooltip.textContent = hit.title + ' (' + hit.category + ')';
+        canvas.style.cursor = 'pointer';
+      }} else {{
+        tooltip.style.display = 'none';
+        canvas.style.cursor = panning ? 'grabbing' : 'grab';
+      }}
+    }}
+  }});
+
+  canvas.addEventListener('mouseup', function(e) {{
+    if (dragging) {{ pinned[dragging.id] = false; dragging = null; }}
+    panning = false;
+  }});
+
+  canvas.addEventListener('click', function(e) {{
+    var rect = canvas.getBoundingClientRect();
+    var hit = hitTest(e.clientX - rect.left, e.clientY - rect.top);
+    if (hit && !panning) window.location.href = '/page/' + encodeURIComponent(hit.id);
+  }});
+
+  canvas.addEventListener('wheel', function(e) {{
+    e.preventDefault();
+    var factor = e.deltaY < 0 ? 1.1 : 0.9;
+    zoom = Math.max(0.2, Math.min(5, zoom * factor));
+  }}, {{ passive: false }});
+
+  window.addEventListener('resize', resize);
+  resize();
+  loop();
+}})();
+</script>"""
+
+    legend_items = "".join(
+        f'<span style="background:{c}"></span>{cat} '
+        for cat, c in cat_colors.items() if cat != "root"
+    )
+
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
+        f'<h1>Knowledge Graph</h1>'
+        f'<p style="color:#888;font-size:13px;font-family:sans-serif">'
+        f'{node_count} nodes · {edge_count} edges · drag to move · scroll to zoom · click to open</p>'
+        f'<canvas id="graph-canvas"></canvas>'
+        f'<div class="graph-legend">{legend_items}</div>'
+        f'{graph_js}'
+    )
+    return _layout("Knowledge Graph", body)
+
+
 def _render_search(query):
     q = query.lower().strip()
     if not q:
@@ -462,16 +713,26 @@ def _render_search(query):
     results = _search_pages(q, limit=30)
     total = len(results)
     cap_note = f" (showing 30 of {total})" if total > 30 else ""
+
+    def _highlight(text: str, term: str) -> str:
+        """Wrap all occurrences of term in <mark> tags (case-insensitive)."""
+        if not term or not text: return html.escape(text)
+        parts = re.split(f"({re.escape(term)})", text, flags=re.IGNORECASE)
+        return "".join(
+            f"<mark>{html.escape(p)}</mark>" if p.lower() == term.lower() else html.escape(p)
+            for p in parts
+        )
+
     items = "".join(
-        f'<li><a href="/page/{urllib.parse.quote(r["name"])}">{html.escape(r["title"])}</a>'
-        f'<br><small style="color:#888">...{html.escape(r.get("snippet",""))}...</small></li>'
+        f'<li><a href="/page/{urllib.parse.quote(r["name"])}">{_highlight(r["title"], query)}</a>'
+        f'<br><small style="color:#888">...{_highlight(r.get("snippet",""), query)}...</small></li>'
         for r in results[:30]
     )
     return _layout(f"Search: {query}",
         f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
         f'<h1>Search: {html.escape(query)}</h1>'
         f'<p>{total} result{"s" if total != 1 else ""}{cap_note}</p>'
-        f'<ul class="page-list">{items}</ul>')
+        f'<ul class="page-list search-results">{items}</ul>')
 
 
 # ---------------------------------------------------------------------------
@@ -716,6 +977,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._ok(_render_home())
         elif path == "/all":
             self._ok(_render_all())
+        elif path == "/graph":
+            self._ok(_render_graph())
         elif path == "/search":
             self._ok(_render_search(query.get("q", [""])[0]))
         elif path.startswith("/page/"):
