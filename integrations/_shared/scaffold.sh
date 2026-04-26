@@ -87,8 +87,8 @@ echo "  Setting up MCP server..."
 
 # Install mcp package if not present
 if ! python3 -c "from mcp.server.fastmcp import FastMCP" 2>/dev/null; then
-    echo "  Installing mcp package..."
-    pip3 install mcp --break-system-packages -q 2>/dev/null || pip3 install mcp -q 2>/dev/null || true
+    echo "  Installing link-mcp package..."
+    pip3 install link-mcp --break-system-packages -q 2>/dev/null || pip3 install link-mcp -q 2>/dev/null || true
 fi
 
 MCP_SERVER="$TARGET_DIR/mcp_server.py"

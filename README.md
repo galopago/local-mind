@@ -9,6 +9,8 @@ A personal knowledge wiki maintained by LLMs. Knowledge compounds — every sour
 Implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) with a production-ready local server, agent-optimized search API, and interactive graph visualization.
 
 [![GitHub](https://img.shields.io/github/stars/gowtham0992/link?style=flat)](https://github.com/gowtham0992/link)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.gowtham0992%2Flink-blue)](https://registry.modelcontextprotocol.io)
+[![PyPI](https://img.shields.io/pypi/v/link-mcp)](https://pypi.org/project/link-mcp/)
 
 ## How it works
 
@@ -54,24 +56,28 @@ Wikipedia-style local viewer. No dependencies beyond Python 3.10+. Features:
 
 ## MCP Server
 
-Link exposes its search and graph capabilities as MCP tools, so any MCP-compatible agent can use them natively without HTTP.
+Link is listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.gowtham0992/link`.
 
-**Install the MCP dependency:**
+**Install:**
 ```bash
-pip install mcp
+pip install link-mcp
 ```
 
-**Add to your MCP client config** (e.g. `~/.kiro/settings/mcp.json`, `~/.claude/mcp.json`, or Cursor settings):
+**Add to your MCP client config** (e.g. `~/.kiro/settings/mcp.json`, `~/.claude/mcp.json`, Cursor settings):
 ```json
 {
   "mcpServers": {
     "link": {
       "command": "python3",
-      "args": ["~/link/mcp_server.py"]
+      "args": ["-m", "link_mcp"]
     }
   }
 }
 ```
+
+Custom wiki path: `"args": ["-m", "link_mcp", "--wiki", "~/my-wiki/wiki"]`
+
+> **Kiro users:** `bash link/integrations/kiro/install.sh` handles everything — installs `link-mcp`, registers it in `~/.kiro/settings/mcp.json`, scaffolds the wiki.
 
 **Available tools:**
 

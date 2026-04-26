@@ -1,16 +1,17 @@
 {
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.gowtham0992/link",
-  "description": "Personal knowledge wiki as MCP tools. Search, query context, and traverse the knowledge graph of your Link wiki. Tools: search_wiki, get_context, get_pages, get_backlinks, get_graph, rebuild_backlinks.",
+  "description": "Personal knowledge wiki as MCP tools \u2014 search, context, graph traversal.",
   "repository": {
     "url": "https://github.com/gowtham0992/link",
     "source": "github"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "link-mcp",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "transport": {
         "type": "stdio"
       }

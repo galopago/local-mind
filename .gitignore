@@ -46,3 +46,10 @@ GEMINI.md
 .kiro/
 .github/copilot-instructions.md
 .vscode/settings.json
+
+# PyPI build artifacts
+mcp_package/dist/
+mcp_package/*.egg-info/
+
+# MCP registry auth tokens (personal credentials)
+mcp_package/.mcpregistry_*

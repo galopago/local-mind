@@ -1,5 +1,7 @@
 # link-mcp
 
+<!-- mcp-name: io.github.gowtham0992/link -->
+
 MCP server for the [Link](https://github.com/gowtham0992/link) personal knowledge wiki.
 
 Exposes your wiki as MCP tools so any MCP-compatible agent can search, query context, and traverse the knowledge graph without reading files directly.

@@ -37,7 +37,7 @@ try:
         config = json.load(f)
     config.setdefault("mcpServers", {})["link"] = {
         "command": "python3",
-        "args": [server_path],
+        "args": ["-m", "link_mcp"],
         "disabled": False
     }
     with open(config_path, "w") as f:
