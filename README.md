@@ -9,7 +9,7 @@ A personal knowledge wiki maintained by LLMs. Knowledge compounds — every sour
 Implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) with a production-ready local server, agent-optimized search API, and interactive graph visualization.
 
 [![GitHub](https://img.shields.io/github/stars/gowtham0992/link?style=flat)](https://github.com/gowtham0992/link)
-[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.gowtham0992%2Flink-blue)](https://registry.modelcontextprotocol.io)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.gowtham0992%2Flink-blue)](https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink)
 [![PyPI](https://img.shields.io/pypi/v/link-mcp)](https://pypi.org/project/link-mcp/)
 
 ## How it works
@@ -56,7 +56,7 @@ Wikipedia-style local viewer. No dependencies beyond Python 3.10+. Features:
 
 ## MCP Server
 
-Link is listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.gowtham0992/link`.
+Link is listed on the [official MCP Registry](https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink) as `io.github.gowtham0992/link`.
 
 ```bash
 pip install link-mcp
