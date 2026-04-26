@@ -1,56 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
   <defs>
     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feGaussianBlur stdDeviation="3" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+    <radialGradient id="bg" cx="40%" cy="40%" r="60%">
       <stop offset="0%" stop-color="#0d2137"/>
       <stop offset="100%" stop-color="#060d18"/>
     </radialGradient>
   </defs>
 
-  <!-- Background -->
   <rect width="200" height="200" rx="32" fill="url(#bg)"/>
 
-  <!-- Edges of the L -->
-  <g stroke="#2dd4bf" stroke-width="2.5" filter="url(#glow)" opacity="0.85" stroke-linecap="round">
-    <!-- Vertical stroke of L -->
-    <line x1="68" y1="38" x2="68" y2="148"/>
-    <!-- Horizontal stroke of L -->
-    <line x1="68" y1="148" x2="148" y2="148"/>
-    <!-- Top cap -->
-    <line x1="68" y1="38" x2="110" y2="38"/>
-    <!-- Mid horizontal cross -->
-    <line x1="68" y1="93" x2="110" y2="93"/>
-    <!-- Diagonal top-left to mid-right -->
-    <line x1="68" y1="38" x2="110" y2="93"/>
-    <!-- Right vertical (top section) -->
-    <line x1="110" y1="38" x2="110" y2="93"/>
-    <!-- Diagonal mid to bottom-right -->
-    <line x1="68" y1="93" x2="110" y2="148"/>
+  <!-- Pure L: vertical down, then horizontal right. No diagonals. -->
+  <g stroke="#2dd4bf" stroke-width="3.5" filter="url(#glow)" opacity="0.9" stroke-linecap="round">
+    <!-- Vertical stroke -->
+    <line x1="62" y1="32" x2="62" y2="152"/>
+    <!-- Horizontal stroke -->
+    <line x1="62" y1="152" x2="152" y2="152"/>
   </g>
 
-  <!-- Nodes -->
+  <!-- Nodes evenly spaced along the L -->
   <g filter="url(#glow)">
-    <!-- Top-left -->
-    <circle cx="68" cy="38" r="7" fill="#2dd4bf" opacity="0.95"/>
-    <!-- Top-right -->
-    <circle cx="110" cy="38" r="5.5" fill="#2dd4bf" opacity="0.85"/>
-    <!-- Mid-left (junction) -->
-    <circle cx="68" cy="93" r="8" fill="#2dd4bf" opacity="1"/>
-    <!-- Mid-right -->
-    <circle cx="110" cy="93" r="5.5" fill="#2dd4bf" opacity="0.85"/>
-    <!-- Bottom-left -->
-    <circle cx="68" cy="148" r="6" fill="#2dd4bf" opacity="0.9"/>
-    <!-- Bottom-mid -->
-    <circle cx="110" cy="148" r="6" fill="#2dd4bf" opacity="0.9"/>
-    <!-- Bottom-right (end of L) -->
-    <circle cx="148" cy="148" r="7" fill="#2dd4bf" opacity="0.95"/>
+    <circle cx="62"  cy="32"  r="7"   fill="#2dd4bf" opacity="0.95"/>
+    <circle cx="62"  cy="72"  r="5.5" fill="#2dd4bf" opacity="0.8"/>
+    <circle cx="62"  cy="112" r="5.5" fill="#2dd4bf" opacity="0.8"/>
+    <circle cx="62"  cy="152" r="8.5" fill="#2dd4bf" opacity="1"/>
+    <circle cx="107" cy="152" r="5.5" fill="#2dd4bf" opacity="0.8"/>
+    <circle cx="152" cy="152" r="7"   fill="#2dd4bf" opacity="0.95"/>
   </g>
 
-  <!-- "Link" text -->
-  <text x="100" y="182" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="22" font-weight="300" letter-spacing="6" fill="#2dd4bf" opacity="0.7"
-        text-anchor="middle">LINK</text>
+  <text x="100" y="185"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="19" font-weight="300" letter-spacing="8"
+        fill="#2dd4bf" opacity="0.6" text-anchor="middle">LINK</text>
 </svg>
