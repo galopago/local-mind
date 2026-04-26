@@ -94,18 +94,18 @@ Custom wiki path: `"args": ["-m", "link_mcp", "--wiki", "~/my-wiki/wiki"]`
 
 `serve.py` also exposes a local HTTP API. Same capabilities as the MCP tools, accessible over HTTP when the server is running.
 
-> **⚠️ Local use only.** `serve.py` binds to `127.0.0.1` and has no authentication. Do not expose it to the internet (no ngrok, no port forwarding, no public servers) without adding auth — your wiki would be publicly readable.
+> **⚠️ Local use only.** `serve.py` binds to `127.0.0.1` and has no authentication. Do not expose it to the internet without adding auth.
+
+| Endpoint | Description |
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
-| `GET /api/search?q=<query>` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets |
-| `GET /api/context?topic=<topic>` | **Primary agent endpoint.** Best matching page + inbound/forward graph links in one call |
+| `GET /api/search?q=<query>` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts) |
+| `GET /api/context?topic=<topic>` | **Primary endpoint.** Best matching page + inbound/forward graph links |
 | `GET /api/graph` | All nodes + edges for graph visualization |
 | `GET /api/backlinks` | Reverse + forward link index |
 | `GET /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning all wikilinks |
 
-**Search performance:** O(1) via in-memory inverted token index. Sub-millisecond at any wiki size. No external search engine needed.
-
-**For agents:** use `/api/context?topic=X` instead of reading files manually. One call returns the primary page + all related pages via graph traversal — eliminates the token waste of re-reading index.md every session.
+Search is O(1) via in-memory inverted token index — sub-millisecond at any wiki size. Use `/api/context?topic=X` over reading files manually — one call returns the primary page + all related pages via graph traversal.
 
 ## Structure
 
