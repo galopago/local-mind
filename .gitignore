@@ -51,5 +51,6 @@ GEMINI.md
 mcp_package/dist/
 mcp_package/*.egg-info/
 
-# MCP registry auth tokens (personal credentials)
+# MCP registry auth tokens (personal credentials — never commit)
+.mcpregistry_*
 mcp_package/.mcpregistry_*
