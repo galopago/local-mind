@@ -35,7 +35,7 @@ This does two things: (1) makes your agent aware of Link in every session, and (
 
 For project-specific wikis, add `--project`. See [integrations/](integrations/) for details.
 
-**Updating after a git pull:** run `install.sh` again — it detects existing wikis and only updates code files, never your wiki data.
+**Updating after a git pull:** run `install.sh` again — it detects existing wikis and only updates code files (`serve.py`, `LINK.md`, integrations), never your wiki data (`wiki/index.md`, `wiki/log.md`, your pages). Safe to run anytime.
 
 ## Viewing the wiki
 
