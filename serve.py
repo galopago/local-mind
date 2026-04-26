@@ -349,26 +349,23 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
 
 
 def _header_html():
-    logo_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="28" height="28" style="vertical-align:middle;margin-right:8px">
-  <defs><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-  <rect width="100" height="100" rx="16" fill="#0d1b2a"/>
-  <g stroke="#2dd4bf" stroke-width="2" filter="url(#glow)" opacity="0.8">
-    <line x1="30" y1="15" x2="30" y2="75"/>
-    <line x1="30" y1="75" x2="70" y2="75"/>
-    <line x1="30" y1="15" x2="55" y2="15"/>
-    <line x1="30" y1="45" x2="55" y2="45"/>
-    <line x1="30" y1="15" x2="55" y2="45"/>
-    <line x1="55" y1="15" x2="55" y2="45"/>
-    <line x1="30" y1="45" x2="55" y2="75"/>
+    logo_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="28" height="28" style="vertical-align:middle;margin-right:8px">
+  <defs>
+    <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <radialGradient id="bg" cx="40%" cy="40%" r="60%"><stop offset="0%" stop-color="#0d2137"/><stop offset="100%" stop-color="#060d18"/></radialGradient>
+  </defs>
+  <rect width="200" height="200" rx="32" fill="url(#bg)"/>
+  <g stroke="#2dd4bf" stroke-width="3.5" filter="url(#glow)" opacity="0.9" stroke-linecap="round">
+    <line x1="62" y1="32" x2="62" y2="152"/>
+    <line x1="62" y1="152" x2="152" y2="152"/>
   </g>
-  <g fill="#2dd4bf" filter="url(#glow)">
-    <circle cx="30" cy="15" r="4.5"/>
-    <circle cx="55" cy="15" r="3.5"/>
-    <circle cx="30" cy="45" r="5"/>
-    <circle cx="55" cy="45" r="3.5"/>
-    <circle cx="30" cy="75" r="4"/>
-    <circle cx="55" cy="75" r="4"/>
-    <circle cx="70" cy="75" r="4.5"/>
+  <g filter="url(#glow)">
+    <circle cx="62"  cy="32"  r="7"   fill="#2dd4bf" opacity="0.95"/>
+    <circle cx="62"  cy="72"  r="5.5" fill="#2dd4bf" opacity="0.8"/>
+    <circle cx="62"  cy="112" r="5.5" fill="#2dd4bf" opacity="0.8"/>
+    <circle cx="62"  cy="152" r="8.5" fill="#2dd4bf" opacity="1"/>
+    <circle cx="107" cy="152" r="5.5" fill="#2dd4bf" opacity="0.8"/>
+    <circle cx="152" cy="152" r="7"   fill="#2dd4bf" opacity="0.95"/>
   </g>
 </svg>'''
     return f"""<header>
