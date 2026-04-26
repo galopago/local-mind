@@ -35,12 +35,14 @@ else
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
 fi
 
-# Auto-register MCP server in ~/.claude/mcp.json
-MCP_CONFIG="$HOME/.claude/mcp.json"
-if [ -f "$MCP_CONFIG" ] && ! grep -q '"link"' "$MCP_CONFIG"; then
-    python3 - << 'PYEOF'
-import json, os, sys
-config_path = os.path.expanduser("~/.claude/mcp.json")
+# Auto-register MCP server in Claude Code's config
+# Claude Code uses ~/.claude.json for global MCP config
+MCP_CONFIG="$HOME/.claude.json"
+if [ -f "$MCP_CONFIG" ]; then
+    if ! python3 -c "import json; d=json.load(open('$HOME/.claude.json')); exit(0 if 'link' in d.get('mcpServers',{}) else 1)" 2>/dev/null; then
+        python3 - << 'PYEOF'
+import json, os
+config_path = os.path.expanduser("~/.claude.json")
 wiki_path = os.path.expanduser("~/link/wiki")
 try:
     with open(config_path) as f:
@@ -51,13 +53,16 @@ try:
     }
     with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
-    print("  ✓ Link MCP registered in ~/.claude/mcp.json")
+    print("  ✓ Link MCP registered in ~/.claude.json")
 except Exception as e:
     print(f"  · Could not auto-register MCP: {e}")
 PYEOF
-elif [ ! -f "$MCP_CONFIG" ]; then
+    else
+        echo "  · Link MCP already registered in ~/.claude.json"
+    fi
+else
     echo ""
-    echo "  Add to ~/.claude/mcp.json:"
+    echo "  MCP config: add to ~/.claude.json or .mcp.json at project root:"
     echo "  { \"mcpServers\": { \"link\": { \"command\": \"python3\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
 fi
 

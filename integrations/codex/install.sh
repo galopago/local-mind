@@ -39,5 +39,20 @@ echo "Done."
 echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
 echo "  View wiki: python ~/link/serve.py"
 echo ""
-echo "  MCP (if your Codex client supports it):"
-echo "  { \"mcpServers\": { \"link\": { \"command\": \"python3\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
+
+# Auto-register MCP in ~/.codex/config.toml
+CODEX_CONFIG="$HOME/.codex/config.toml"
+if [ -f "$CODEX_CONFIG" ] && ! grep -q '\[mcp_servers.link\]' "$CODEX_CONFIG"; then
+    cat >> "$CODEX_CONFIG" << TOML
+
+[mcp_servers.link]
+command = "python3"
+args = ["-m", "link_mcp", "--wiki", "$WIKI_PATH"]
+TOML
+    echo "  ✓ Link MCP registered in ~/.codex/config.toml"
+elif [ ! -f "$CODEX_CONFIG" ]; then
+    echo "  MCP config: add to ~/.codex/config.toml:"
+    echo "  [mcp_servers.link]"
+    echo "  command = \"python3\""
+    echo "  args = [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"]"
+fi
