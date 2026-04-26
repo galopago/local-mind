@@ -58,26 +58,26 @@ Wikipedia-style local viewer. No dependencies beyond Python 3.10+. Features:
 
 Link is listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.gowtham0992/link`.
 
-**Install:**
 ```bash
 pip install link-mcp
 ```
 
-**Add to your MCP client config** (e.g. `~/.kiro/settings/mcp.json`, `~/.claude/mcp.json`, Cursor settings):
+Point it at your wiki and add to your MCP client config:
+
 ```json
 {
   "mcpServers": {
     "link": {
       "command": "python3",
-      "args": ["-m", "link_mcp"]
+      "args": ["-m", "link_mcp", "--wiki", "~/link/wiki"]
     }
   }
 }
 ```
 
-Custom wiki path: `"args": ["-m", "link_mcp", "--wiki", "~/my-wiki/wiki"]`
+That's it. No cloning required if you already have a wiki.
 
-> **Kiro users:** `bash link/integrations/kiro/install.sh` handles everything — installs `link-mcp`, registers it in `~/.kiro/settings/mcp.json`, scaffolds the wiki.
+> **Don't have a wiki yet?** Run `bash link/integrations/kiro/install.sh` after cloning — it scaffolds `~/link/`, installs `link-mcp`, and registers it in your MCP config automatically.
 
 **Available tools:**
 
