@@ -1,0 +1,19 @@
+{
+  "name": "io.github.gowtham0992/link",
+  "description": "Personal knowledge wiki as MCP tools. Search, query context, and traverse the knowledge graph of your Link wiki. Tools: search_wiki, get_context, get_pages, get_backlinks, get_graph, rebuild_backlinks.",
+  "repository": {
+    "url": "https://github.com/gowtham0992/link",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "link-mcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
