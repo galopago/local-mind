@@ -4,9 +4,9 @@
 
 # Link
 
-A personal knowledge wiki maintained by LLMs. 
+A personal knowledge wiki maintained by LLMs. Knowledge compounds — every source you add makes the wiki richer, every question you ask gets filed back.
 
-Based on [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+Implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) with a production-ready local server, agent-optimized search API, and interactive graph visualization.
 
 [![GitHub](https://img.shields.io/github/stars/gowtham0992/link?style=flat)](https://github.com/gowtham0992/link)
 
@@ -19,8 +19,6 @@ Based on [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/4
 You never write the wiki yourself. The LLM writes and maintains all of it. You curate sources and ask questions.
 
 ## Setup
-
-Run the install script for your tool:
 
 ```bash
 git clone https://github.com/gowtham0992/link.git
@@ -35,7 +33,9 @@ bash link/integrations/vscode/install.sh        # VS Code
 
 This does two things: (1) makes your agent aware of Link in every session, and (2) scaffolds a central wiki at `~/link/`.
 
-For project-specific wikis instead, add `--project`. See [integrations/](integrations/) for details.
+For project-specific wikis, add `--project`. See [integrations/](integrations/) for details.
+
+**Updating after a git pull:** run `install.sh` again — it detects existing wikis and only updates code files, never your wiki data.
 
 ## Viewing the wiki
 
@@ -47,22 +47,27 @@ python serve.py
 # → http://localhost:3000
 ```
 
-Wikipedia-style local viewer with search, navigation, dark mode. No dependencies beyond Python 3.10+.
+Wikipedia-style local viewer. No dependencies beyond Python 3.10+. Features:
+- Full-text search with result highlighting (`/` to focus)
+- Interactive knowledge graph at `/graph` — force-directed, click to navigate
+- Dark mode, keyboard navigation (`j`/`k` to move, `Escape` to blur)
 
 ## API
 
-`serve.py` exposes a local HTTP API for agents and tools:
+`serve.py` exposes a local HTTP API for agents and tools. **No external dependencies — pure Python stdlib.**
 
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
-| `GET /api/search?q=<query>` | Ranked full-text search — title, alias, tag, body. Returns scores + snippets |
-| `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call. Agent-optimized |
+| `GET /api/search?q=<query>` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets |
+| `GET /api/context?topic=<topic>` | **Primary agent endpoint.** Best matching page + inbound/forward graph links in one call |
 | `GET /api/graph` | All nodes + edges for graph visualization |
-| `GET /api/backlinks` | Reverse link index `{page: [pages that link to it]}` |
+| `GET /api/backlinks` | Reverse + forward link index |
 | `GET /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning all wikilinks |
 
-Search is O(1) via in-memory inverted index — sub-millisecond at any wiki size. `/api/context` is the primary agent endpoint: one call returns the primary page + all related pages via graph traversal.
+**Search performance:** O(1) via in-memory inverted token index. Sub-millisecond at any wiki size. No external search engine needed.
+
+**For agents:** use `/api/context?topic=X` instead of reading files manually. One call returns the primary page + all related pages via graph traversal — eliminates the token waste of re-reading index.md every session.
 
 ## Structure
 
@@ -72,14 +77,15 @@ link/
 ├── raw/                 ← your source documents (immutable)
 ├── wiki/                ← compiled knowledge (LLM-maintained)
 │   ├── index.md         ← master catalog
-│   ├── log.md           ← operation history
+│   ├── _backlinks.json  ← reverse + forward link index (auto-generated)
+│   ├── log.md           ← append-only operation history
 │   ├── sources/         ← one page per ingested source
 │   ├── concepts/        ← topic articles
 │   ├── entities/        ← people, orgs, projects
 │   ├── comparisons/     ← side-by-side analyses
 │   └── explorations/    ← filed query results
 ├── integrations/        ← one-step setup per AI tool
-├── serve.py             ← local web viewer
+├── serve.py             ← local web viewer + API server
 └── .linkignore          ← files to skip
 ```
 
@@ -89,12 +95,14 @@ link/
 |---------|-------------|
 | "ingest this" | Process a source from raw/ into wiki pages |
 | "what is X?" | Query the wiki, optionally file the answer back |
-| "lint the wiki" | Health check: orphans, contradictions, stale claims |
+| "lint the wiki" | Health check: orphans, dead links, stale claims, confidence gaps |
 | "research X" | Find sources on the web, capture a chat, or analyze wiki gaps |
 
 ## Design principles
 
-- Every claim links to its source. No orphan claims.
-- Confidence tags on facts: high, medium, low.
-- Pages mature over time: seed → growing → mature → established.
-- The wiki is just markdown files in a git repo. Version history for free.
+- **Every claim links to its source.** No orphan claims. Confidence tags on every fact: `[confidence: high/medium/low]`.
+- **Audit trail built-in.** `log.md` is append-only — every ingest, query, and lint is recorded. `_backlinks.json` tracks the full graph.
+- **Pages mature over time.** seed → growing → mature → established. The wiki gets richer, not just bigger.
+- **Agent-optimized.** `/api/context` returns a page + its graph neighborhood in one call. Agents don't re-derive context from scratch every session.
+- **No external dependencies.** Pure Python stdlib. No vector databases, no embedding APIs, no npm.
+- **The wiki is just markdown files in a git repo.** Version history, branching, and collaboration for free.

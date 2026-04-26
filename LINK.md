@@ -273,13 +273,13 @@ When the human adds a new source to `raw/` and asks you to process it:
 
 When the human asks a question:
 
-1. Read `wiki/index.md` to find relevant pages (check `also:` aliases for matches)
-2. Check `wiki/_backlinks.json` to find pages that reference the topic
-3. Read those pages and synthesize an answer
-4. Cite your sources with [[wiki-links]]
+1. **If `serve.py` is running:** call `GET /api/context?topic=<question>` — returns the best matching page plus all related pages via graph traversal in one call. This is faster and uses fewer tokens than reading index.md manually.
+2. **If server is not running:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
+3. Read the relevant pages and synthesize an answer.
+4. Cite your sources with [[wiki-links]].
 5. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
-6. If yes, create a page in the appropriate directory following its template
-7. Append to `wiki/log.md`
+6. If yes, create a page in the appropriate directory following its template.
+7. Append to `wiki/log.md`.
 
 ### 3. Lint
 
@@ -289,12 +289,12 @@ Run these checks and report findings:
 
 - **Orphan pages** — pages with no inbound links from other pages
 - **Dead links** — [[links]] that point to pages that don't exist
-- **Stale claims** — claims from old sources that newer sources may have superseded
-- **Contradictions** — pages that disagree with each other (check Open Questions sections)
+- **Stale claims** — claims citing sources with `date_published` more than 2 years old; flag for review
+- **Contradictions** — pages that disagree with each other (check Open Questions sections for flagged contradictions)
 - **Thin pages** — concept pages with only 1 source (maturity: seed) that could be enriched
 - **Missing pages** — concepts frequently mentioned but lacking their own page
 - **Index drift** — pages that exist but aren't listed in index.md
-- **Confidence gaps** — claims without confidence tags
+- **Confidence gaps** — claims without `[confidence: high/medium/low]` tags
 - **Bloated pages** — articles over 100 lines that should be split into focused sub-pages
 - **Misclassified pages** — pages in the wrong directory (e.g., a person in concepts/, a tool in entities/)
 - **Unlinked references** — entities or concepts mentioned repeatedly across articles but never given a `[[wikilink]]`
@@ -487,7 +487,13 @@ During query operations, prefer `/api/context?topic=X` over reading files manual
 
 ## Scaling
 
-At moderate scale (~100 sources, hundreds of pages), the index file is enough for navigation. As the wiki grows larger, consider adding a proper search tool — a local markdown search engine or an MCP server — so the LLM can find relevant pages without reading the entire index. Build that when you need it, not before.
+The search and graph infrastructure is built-in and scales without external tools:
+
+- **Search:** in-memory inverted token index built at server startup. O(1) per query. Sub-millisecond at any wiki size. Use `/api/search?q=<query>` instead of reading index.md.
+- **Graph traversal:** `/api/context?topic=X` returns a page + its full graph neighborhood in one call. Agents don't need to read the entire index.
+- **Backlinks:** `_backlinks.json` stores both reverse and forward links. Rebuilt automatically after ingest and lint.
+
+At very large scale (1000+ pages), consider adding an MCP server wrapper around the API endpoints so agents can call them as native tools without HTTP.
 
 ## Getting Started
 
