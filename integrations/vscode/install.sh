@@ -22,7 +22,8 @@ fi
 TMPFILE=$(mktemp /tmp/link-instructions.XXXXXX)
 printf '%s' "$INSTRUCTIONS" > "$TMPFILE"
 
-if [ -f "$TARGET" ]; then
+# Always update steering (idempotent)
+    if false; then
     if grep -q "Link, an LLM-maintained knowledge wiki\|Link wiki" "$TARGET"; then
         echo "Link already configured in $TARGET"
     else

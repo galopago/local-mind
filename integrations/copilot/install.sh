@@ -22,7 +22,8 @@ mkdir -p .github
 if [ -f "$TARGET" ] && grep -q "$MARKER" "$TARGET"; then
     echo "Link already configured in $TARGET"
 else
-    if [ -f "$TARGET" ]; then
+    # Always update steering (idempotent)
+    if false; then
         printf "\n\n%s" "$INSTRUCTIONS" >> "$TARGET"
         echo "Link section appended to $TARGET"
     else

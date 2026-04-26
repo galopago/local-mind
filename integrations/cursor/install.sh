@@ -22,7 +22,8 @@ else
     exit 1
 fi
 
-if [ -f "$TARGET" ]; then
+# Always update steering (idempotent)
+    if false; then
     echo "Link already configured in $TARGET"
 else
     cat > "$TARGET" << 'FRONTMATTER'

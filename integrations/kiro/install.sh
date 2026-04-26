@@ -1,6 +1,9 @@
 #!/bin/bash
 # Link integration for Kiro
 #
+# Fresh install: sets up steering + scaffolds wiki at ~/link/
+# Update (re-run after git pull): updates steering + code files, never touches wiki data
+#
 # Usage:
 #   bash install.sh             → global: ~/.kiro/steering + central wiki at ~/link/
 #   bash install.sh --project   → project-local: .kiro/steering + wiki in current dir
@@ -14,33 +17,24 @@ if [ "$MODE" = "--global" ]; then
     TARGET="$HOME/.kiro/steering/link.md"
     mkdir -p "$HOME/.kiro/steering"
 
-    if [ -f "$TARGET" ]; then
-        echo "Link already configured in $TARGET"
-    else
-        echo "$INSTRUCTIONS" > "$TARGET"
-        echo "Link installed → $TARGET"
-    fi
+    # Always update steering — it may have changed
+    echo "$INSTRUCTIONS" > "$TARGET"
+    echo "Link steering → $TARGET"
 
-    echo "Scaffolding central wiki at ~/link/..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
     echo ""
-    echo "Done. Kiro will know about Link in every project."
-    echo "Drop sources into ~/link/raw/ and say 'ingest' to process them."
-    echo "View wiki: python ~/link/serve.py"
+    echo "Done."
+    echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
+    echo "  View wiki: python ~/link/serve.py"
 
 elif [ "$MODE" = "--project" ]; then
     INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
     TARGET=".kiro/steering/link.md"
     mkdir -p .kiro/steering
 
-    if [ -f "$TARGET" ]; then
-        echo "Link already configured in $TARGET"
-    else
-        echo "$INSTRUCTIONS" > "$TARGET"
-        echo "Link installed → $TARGET"
-    fi
+    echo "$INSTRUCTIONS" > "$TARGET"
+    echo "Link steering → $TARGET"
 
-    echo "Scaffolding project wiki..."
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
     echo ""
     echo "Done. Drop sources into raw/ and say 'ingest' to process them."
