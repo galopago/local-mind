@@ -91,19 +91,29 @@ if ! python3 -c "from mcp.server.fastmcp import FastMCP" 2>/dev/null; then
     pip3 install link-mcp --break-system-packages -q 2>/dev/null || pip3 install link-mcp -q 2>/dev/null || true
 fi
 
-MCP_SERVER="$TARGET_DIR/mcp_server.py"
-if [ ! -f "$MCP_SERVER" ]; then
-    echo "  mcp_server.py not found at $MCP_SERVER — skipping MCP config"
-else
-    echo "  mcp_server.py found at $MCP_SERVER"
+# ── MCP server: install link-mcp package ─────────────────────────────
+echo ""
+echo "  Setting up MCP server..."
+
+# Install link-mcp if not present (includes the mcp SDK)
+if ! python3 -c "import link_mcp" 2>/dev/null; then
+    echo "  Installing link-mcp..."
+    pip3 install link-mcp --break-system-packages -q 2>/dev/null || pip3 install link-mcp -q 2>/dev/null || true
+fi
+
+# Verify installation
+if python3 -c "import link_mcp" 2>/dev/null; then
+    echo "  ✓ link-mcp installed"
     echo ""
     echo "  Add to your MCP client config:"
     echo '  {'
     echo '    "mcpServers": {'
     echo '      "link": {'
-    echo "        \"command\": \"python3\","
-    echo "        \"args\": [\"$MCP_SERVER\"]"
+    echo '        "command": "python3",'
+    echo "        \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$TARGET_DIR/wiki\"]"
     echo '      }'
     echo '    }'
     echo '  }'
+else
+    echo "  · Could not install link-mcp. Install manually: pip install link-mcp"
 fi

@@ -25,19 +25,18 @@ if [ "$MODE" = "--global" ]; then
 
     # Auto-register Link MCP server in Kiro's mcp.json
     MCP_CONFIG="$HOME/.kiro/settings/mcp.json"
-    MCP_SERVER="$HOME/link/mcp_server.py"
-    if [ -f "$MCP_CONFIG" ] && [ -f "$MCP_SERVER" ]; then
+    if [ -f "$MCP_CONFIG" ]; then
         if ! grep -q '"link"' "$MCP_CONFIG"; then
-            python3 - << PYEOF
-import json
-config_path = "$MCP_CONFIG"
-server_path = "$MCP_SERVER"
+            python3 - << 'PYEOF'
+import json, pathlib, os
+config_path = os.path.expanduser("~/.kiro/settings/mcp.json")
+wiki_path = str(pathlib.Path.home() / "link" / "wiki")
 try:
     with open(config_path) as f:
         config = json.load(f)
     config.setdefault("mcpServers", {})["link"] = {
         "command": "python3",
-        "args": ["-m", "link_mcp"],
+        "args": ["-m", "link_mcp", "--wiki", wiki_path],
         "disabled": False
     }
     with open(config_path, "w") as f:
@@ -45,7 +44,7 @@ try:
     print("  ✓ Link MCP server registered in ~/.kiro/settings/mcp.json")
 except Exception as e:
     print(f"  · Could not auto-register MCP: {e}")
-    print(f"    Add manually: python3 {server_path}")
+    print(f"    Add manually: python3 -m link_mcp --wiki {wiki_path}")
 PYEOF
         else
             echo "  · Link MCP already registered in ~/.kiro/settings/mcp.json"
