@@ -45,11 +45,11 @@ fi
 
 # Auto-register MCP server in ~/.cursor/mcp.json
 MCP_CONFIG="$HOME/.cursor/mcp.json"
-if [ -f "$MCP_CONFIG" ] && ! grep -q '"link"' "$MCP_CONFIG"; then
-    python3 - << 'PYEOF'
+if [ -f "$MCP_CONFIG" ]; then
+    LINK_WIKI_PATH="$WIKI_PATH" python3 - << 'PYEOF'
 import json, os
 config_path = os.path.expanduser("~/.cursor/mcp.json")
-wiki_path = os.path.expanduser("~/link/wiki")
+wiki_path = os.environ["LINK_WIKI_PATH"]
 try:
     with open(config_path) as f:
         config = json.load(f)

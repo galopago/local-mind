@@ -67,13 +67,12 @@ _cache_mtime: float = 0.0
 def _wiki_mtime() -> float:
     try:
         t = WIKI_DIR.stat().st_mtime
-        for child in WIKI_DIR.iterdir():
-            if child.is_dir():
-                t = max(t, child.stat().st_mtime)
-        for name in ("index.md", "log.md", "_backlinks.json"):
-            p = WIKI_DIR / name
-            if p.exists():
-                t = max(t, p.stat().st_mtime)
+        for path in WIKI_DIR.rglob("*"):
+            try:
+                if path.is_dir() or path.suffix == ".md" or path.name == "_backlinks.json":
+                    t = max(t, path.stat().st_mtime)
+            except OSError:
+                continue
         return t
     except Exception:
         return 0.0

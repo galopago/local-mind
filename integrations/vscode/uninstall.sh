@@ -9,7 +9,11 @@ python3 -c "
 import json
 settings = json.load(open('$TARGET'))
 instructions = settings.get('github.copilot.chat.codeGeneration.instructions', [])
-filtered = [i for i in instructions if 'Link, an LLM-maintained knowledge wiki' not in i.get('text', '')]
+filtered = [
+    i for i in instructions
+    if '## Link — Personal Knowledge Wiki' not in i.get('text', '')
+    and 'Link, an LLM-maintained knowledge wiki' not in i.get('text', '')
+]
 if len(filtered) < len(instructions):
     if filtered:
         settings['github.copilot.chat.codeGeneration.instructions'] = filtered

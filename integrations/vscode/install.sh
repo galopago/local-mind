@@ -13,18 +13,18 @@ TARGET=".vscode/settings.json"
 mkdir -p .vscode
 
 if [ "$MODE" = "--project" ]; then
-    INSTRUCTIONS="This project has its own Link wiki. Read LINK.md for the full schema. When the user says ingest/query/lint, follow the Link protocol. Never modify raw/. The wiki is in wiki/."
+    INSTRUCTIONS_FILE="$SCRIPT_DIR/../_shared/link-instructions-project.md"
     WIKI_PATH="$(pwd)/wiki"
 else
-    INSTRUCTIONS="This project uses Link, an LLM-maintained knowledge wiki at ~/link/. Read ~/link/LINK.md for the full schema. When the user says ingest/query/lint, follow the Link protocol. Wiki is at ~/link/wiki/, raw sources at ~/link/raw/."
+    INSTRUCTIONS_FILE="$SCRIPT_DIR/../_shared/link-instructions.md"
     WIKI_PATH="$HOME/link/wiki"
 fi
 
 # Write to .vscode/settings.json
-python3 - << PYEOF
+LINK_INSTRUCTIONS_FILE="$INSTRUCTIONS_FILE" python3 - << 'PYEOF'
 import json, os
-target = "$TARGET"
-instructions_text = """$INSTRUCTIONS"""
+target = ".vscode/settings.json"
+instructions_text = open(os.environ["LINK_INSTRUCTIONS_FILE"], encoding="utf-8").read()
 settings = {}
 if os.path.exists(target):
     try:
@@ -32,7 +32,17 @@ if os.path.exists(target):
             settings = json.load(f)
     except Exception:
         pass
-settings['github.copilot.chat.codeGeneration.instructions'] = [{'text': instructions_text}]
+key = 'github.copilot.chat.codeGeneration.instructions'
+instructions = settings.get(key, [])
+if not isinstance(instructions, list):
+    instructions = []
+instructions = [
+    i for i in instructions
+    if '## Link — Personal Knowledge Wiki' not in i.get('text', '')
+    and 'Link, an LLM-maintained knowledge wiki' not in i.get('text', '')
+]
+instructions.append({'text': instructions_text})
+settings[key] = instructions
 with open(target, 'w') as f:
     json.dump(settings, f, indent=2)
 print(f"Link instructions → {target}")

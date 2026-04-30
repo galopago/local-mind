@@ -22,24 +22,18 @@ _meta_token_index: dict[str, set[str]] = {}  # token → stems with that token i
 
 
 def _wiki_mtime() -> float:
-    """Return a cheap mtime signal for the wiki directory tree.
-    Checks the wiki dir and each of its immediate subdirectories (O(subdirs), not O(files)).
-    On macOS/Linux, a directory's mtime updates when files inside it are added, removed,
-    or renamed — but NOT when file contents change. We also spot-check the key top-level
-    files (index.md, log.md, _backlinks.json) which are written on every wiki operation,
-    covering the content-change case for the most frequently updated files.
+    """Return an mtime signal for all files that affect wiki indexes.
+    Directory mtimes catch added/removed files; file mtimes catch normal edits
+    made from Obsidian, an editor, or an agent without touching index.md/log.md.
     """
     try:
         t = WIKI_DIR.stat().st_mtime
-        # Check each immediate subdirectory (sources, concepts, entities, comparisons, explorations)
-        for child in WIKI_DIR.iterdir():
-            if child.is_dir():
-                t = max(t, child.stat().st_mtime)
-        # Spot-check key top-level files that change on every wiki write
-        for name in ("index.md", "log.md", "_backlinks.json"):
-            p = WIKI_DIR / name
-            if p.exists():
-                t = max(t, p.stat().st_mtime)
+        for path in WIKI_DIR.rglob("*"):
+            try:
+                if path.is_dir() or path.suffix == ".md" or path.name == "_backlinks.json":
+                    t = max(t, path.stat().st_mtime)
+            except OSError:
+                continue
         return t
     except Exception:
         return 0.0
@@ -153,6 +147,36 @@ def _all_pages() -> list:
     return _get_all_pages()
 
 
+def _load_backlinks_index() -> tuple[dict, str | None]:
+    bl_path = WIKI_DIR / "_backlinks.json"
+    empty = {"backlinks": {}, "forward": {}}
+    if not bl_path.exists():
+        return empty, None
+    try:
+        data = json.loads(bl_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return empty, f"invalid backlinks index: {e}"
+    if not isinstance(data, dict):
+        return empty, "invalid backlinks index: root must be an object"
+    if "backlinks" not in data:
+        return {"backlinks": data, "forward": {}}, None
+    backlinks = data.get("backlinks", {})
+    forward = data.get("forward", {})
+    if not isinstance(backlinks, dict) or not isinstance(forward, dict):
+        return empty, "invalid backlinks index: backlinks and forward must be objects"
+    return {"backlinks": backlinks, "forward": forward}, None
+
+
+def _parse_search_limit(raw: str) -> tuple[int | None, str | None]:
+    try:
+        limit = int(raw)
+    except ValueError:
+        return None, "limit must be an integer"
+    if limit < 1:
+        return None, "limit must be at least 1"
+    return min(limit, 50), None
+
+
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
@@ -173,26 +197,42 @@ def _parse_frontmatter(text):
 
 
 def _inline(text):
+    def _stash(rendered: str) -> str:
+        html_spans.append(rendered)
+        return f"\x00HTML{len(html_spans)-1}\x00"
+
+    def _safe_href(href: str) -> str:
+        href = html.unescape(href).strip()
+        parsed = urllib.parse.urlparse(href)
+        if href.startswith("//") or (parsed.scheme and parsed.scheme.lower() not in {"http", "https", "mailto"}):
+            return "#"
+        return html.escape(href, quote=True)
+
     def _wl(m):
-        inner = m.group(1)
+        inner = html.unescape(m.group(1))
         t, d = (inner.split("|", 1) if "|" in inner else (inner, inner))
-        return f'<a href="/page/{urllib.parse.quote(t.strip())}">{html.escape(d.strip())}</a>'
-    # Process backtick code spans FIRST to protect their content from further substitution
-    # Replace backtick spans with placeholders, process other markup, then restore
-    code_spans: list[str] = []
+        href = "/page/" + urllib.parse.quote(t.strip())
+        return _stash(f'<a href="{href}">{html.escape(d.strip())}</a>')
+
+    def _md_link(m):
+        label = html.unescape(m.group(1))
+        href = _safe_href(m.group(2))
+        return _stash(f'<a href="{href}">{html.escape(label)}</a>')
+
+    html_spans: list[str] = []
+    text = html.escape(text, quote=False)
+
     def _save_code(m):
-        code_spans.append(f"<code>{html.escape(m.group(1))}</code>")
-        return f"\x00CODE{len(code_spans)-1}\x00"
+        return _stash(f"<code>{m.group(1)}</code>")
+
     text = re.sub(r"`([^`]+)`", _save_code, text)
-    # Now process remaining inline markup (wikilinks, md links, bold, italic)
     text = re.sub(r"\[\[([^\]]+)\]\]", _wl, text)
-    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
+    text = re.sub(r"(?<!!)\[([^\]]+)\]\(([^)]+)\)", _md_link, text)
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
     # Guard: only match single * that are not part of **
     text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", text)
-    # Restore code spans
-    for i, span in enumerate(code_spans):
-        text = text.replace(f"\x00CODE{i}\x00", span)
+    for i, span in enumerate(html_spans):
+        text = text.replace(f"\x00HTML{i}\x00", span)
     return text
 
 
@@ -923,7 +963,8 @@ def _get_context(topic: str) -> dict:
     backlinks_data: dict = {}
     if bl_path.exists():
         try:
-            backlinks_data = json.loads(bl_path.read_text(encoding="utf-8"))
+            raw = json.loads(bl_path.read_text(encoding="utf-8"))
+            backlinks_data = raw.get("backlinks", raw)
         except Exception:
             pass
 
@@ -1090,16 +1131,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/pages":
             self._json(_all_pages())
         elif path == "/api/backlinks":
-            bl_path = WIKI_DIR / "_backlinks.json"
-            if bl_path.exists():
-                data = json.loads(bl_path.read_text(encoding="utf-8"))
-                # Support both old format (flat dict) and new format (with backlinks/forward keys)
-                if "backlinks" in data:
-                    self._json(data["backlinks"])
-                else:
-                    self._json(data)
+            data, error = _load_backlinks_index()
+            if error:
+                self._json({"error": error}, status=500)
             else:
-                self._json({})
+                self._json(data)
         elif path == "/api/rebuild-backlinks":
             result = _build_backlinks()
             bl_path = WIKI_DIR / "_backlinks.json"
@@ -1113,11 +1149,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(_get_graph_data())
         elif path == "/api/search":
             q = query.get("q", [""])[0].strip()
-            limit = int(query.get("limit", ["20"])[0])
+            limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
+            if error:
+                self._json({"error": error, "results": []}, status=400)
+                return
             if not q:
-                self._json({"error": "q parameter required", "results": []})
+                self._json({"error": "q parameter required", "results": []}, status=400)
             else:
-                results = _search_pages(q, limit=min(limit, 50))
+                results = _search_pages(q, limit=limit)
                 self._json({"query": q, "count": len(results), "results": results})
         elif path == "/api/context":
             topic = query.get("topic", [""])[0].strip() or query.get("q", [""])[0].strip()
@@ -1148,9 +1187,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
 
-    def _json(self, data):
+    def _json(self, data, status: int = 200):
         encoded = json.dumps(data).encode()
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
@@ -1185,7 +1224,7 @@ def main():
     for i, a in enumerate(sys.argv[1:]):
         if a == "--port" and i + 1 < len(sys.argv) - 1: PORT = int(sys.argv[i+2])
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), Handler) as s:
+    with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as s:
         print(f"  Link → http://localhost:{PORT}")
         try: s.serve_forever()
         except KeyboardInterrupt: print("\n  stopped.")

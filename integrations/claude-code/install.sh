@@ -9,14 +9,14 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MODE="${1:---global}"
+. "$SCRIPT_DIR/../_shared/instructions.sh"
 
 if [ "$MODE" = "--global" ]; then
-    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
+    INSTRUCTIONS_FILE="$SCRIPT_DIR/../_shared/link-instructions.md"
     TARGET="$HOME/.claude/CLAUDE.md"
-    mkdir -p "$HOME/.claude"
     WIKI_PATH="$HOME/link/wiki"
 elif [ "$MODE" = "--project" ]; then
-    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
+    INSTRUCTIONS_FILE="$SCRIPT_DIR/../_shared/link-instructions-project.md"
     TARGET="CLAUDE.md"
     WIKI_PATH="$(pwd)/wiki"
 else
@@ -25,8 +25,7 @@ else
 fi
 
 # Steering
-echo "$INSTRUCTIONS" > "$TARGET"
-echo "Link steering → $TARGET"
+link_upsert_instructions "$TARGET" "$INSTRUCTIONS_FILE" "Link steering"
 
 # Wiki scaffold + link-mcp install
 if [ "$MODE" = "--global" ]; then
@@ -39,11 +38,10 @@ fi
 # Claude Code uses ~/.claude.json for global MCP config
 MCP_CONFIG="$HOME/.claude.json"
 if [ -f "$MCP_CONFIG" ]; then
-    if ! python3 -c "import json; d=json.load(open('$HOME/.claude.json')); exit(0 if 'link' in d.get('mcpServers',{}) else 1)" 2>/dev/null; then
-        python3 - << 'PYEOF'
+    LINK_WIKI_PATH="$WIKI_PATH" python3 - << 'PYEOF'
 import json, os
 config_path = os.path.expanduser("~/.claude.json")
-wiki_path = os.path.expanduser("~/link/wiki")
+wiki_path = os.environ["LINK_WIKI_PATH"]
 try:
     with open(config_path) as f:
         config = json.load(f)
@@ -57,9 +55,6 @@ try:
 except Exception as e:
     print(f"  · Could not auto-register MCP: {e}")
 PYEOF
-    else
-        echo "  · Link MCP already registered in ~/.claude.json"
-    fi
 else
     echo ""
     echo "  MCP config: add to ~/.claude.json or .mcp.json at project root:"

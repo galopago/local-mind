@@ -81,24 +81,20 @@ fi
 
 echo "  Wiki ready at $TARGET_DIR"
 
-# ── MCP server: install dependency + register in agent config ─────────
-echo ""
-echo "  Setting up MCP server..."
-
-# Install mcp package if not present
-if ! python3 -c "from mcp.server.fastmcp import FastMCP" 2>/dev/null; then
-    echo "  Installing link-mcp package..."
-    pip3 install link-mcp --break-system-packages -q 2>/dev/null || pip3 install link-mcp -q 2>/dev/null || true
-fi
-
 # ── MCP server: install link-mcp package ─────────────────────────────
 echo ""
 echo "  Setting up MCP server..."
 
-# Install link-mcp if not present (includes the mcp SDK)
-if ! python3 -c "import link_mcp" 2>/dev/null; then
-    echo "  Installing link-mcp..."
-    pip3 install link-mcp --break-system-packages -q 2>/dev/null || pip3 install link-mcp -q 2>/dev/null || true
+if [ -d "$LINK_ROOT/mcp_package" ]; then
+    echo "  Installing/upgrading link-mcp from local checkout..."
+    pip3 install --upgrade "$LINK_ROOT/mcp_package" --break-system-packages -q 2>/dev/null \
+        || pip3 install --upgrade "$LINK_ROOT/mcp_package" -q 2>/dev/null \
+        || true
+else
+    echo "  Installing/upgrading link-mcp from PyPI..."
+    pip3 install --upgrade link-mcp --break-system-packages -q 2>/dev/null \
+        || pip3 install --upgrade link-mcp -q 2>/dev/null \
+        || true
 fi
 
 # Verify installation

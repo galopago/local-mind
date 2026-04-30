@@ -107,6 +107,17 @@ That's it. No cloning required if you already have a wiki.
 
 Search is O(1) via in-memory inverted token index — sub-millisecond at any wiki size. Use `/api/context?topic=X` over reading files manually — one call returns the primary page + all related pages via graph traversal.
 
+## Privacy and release safety
+
+Link is local-first:
+- No telemetry.
+- No hosted backend.
+- No external API calls from `serve.py` or `link-mcp`.
+- Raw sources and generated wiki pages are ignored by git by default.
+- Registry token files (`.mcpregistry_*`, `*.token`) are ignored and excluded from PyPI source distributions.
+
+If you publish or share Link, use `git push`, `git archive`, or a clean release artifact. Do not zip an entire working directory, because local-only files such as `.git/`, ignored raw sources, ignored wiki pages, build outputs, and editor caches can be included by accident.
+
 ## Structure
 
 ```

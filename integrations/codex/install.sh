@@ -9,13 +9,14 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MODE="${1:---global}"
+. "$SCRIPT_DIR/../_shared/instructions.sh"
 
 if [ "$MODE" = "--global" ]; then
-    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
+    INSTRUCTIONS_FILE="$SCRIPT_DIR/../_shared/link-instructions.md"
     TARGET="$HOME/AGENTS.md"
     WIKI_PATH="$HOME/link/wiki"
 elif [ "$MODE" = "--project" ]; then
-    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
+    INSTRUCTIONS_FILE="$SCRIPT_DIR/../_shared/link-instructions-project.md"
     TARGET="AGENTS.md"
     WIKI_PATH="$(pwd)/wiki"
 else
@@ -24,8 +25,7 @@ else
 fi
 
 # Instructions
-echo "$INSTRUCTIONS" > "$TARGET"
-echo "Link instructions → $TARGET"
+link_upsert_instructions "$TARGET" "$INSTRUCTIONS_FILE" "Link instructions"
 
 # Wiki scaffold + link-mcp install
 if [ "$MODE" = "--global" ]; then

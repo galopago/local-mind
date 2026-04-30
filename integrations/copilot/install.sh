@@ -9,20 +9,19 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MODE="${1:---global}"
+. "$SCRIPT_DIR/../_shared/instructions.sh"
 
 if [ "$MODE" = "--project" ]; then
-    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
+    INSTRUCTIONS_FILE="$SCRIPT_DIR/../_shared/link-instructions-project.md"
     WIKI_PATH="$(pwd)/wiki"
 else
-    INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
+    INSTRUCTIONS_FILE="$SCRIPT_DIR/../_shared/link-instructions.md"
     WIKI_PATH="$HOME/link/wiki"
 fi
 
 TARGET=".github/copilot-instructions.md"
-mkdir -p .github
 
-echo "$INSTRUCTIONS" > "$TARGET"
-echo "Link instructions → $TARGET"
+link_upsert_instructions "$TARGET" "$INSTRUCTIONS_FILE" "Link instructions"
 
 if [ "$MODE" = "--project" ]; then
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
