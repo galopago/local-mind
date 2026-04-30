@@ -355,7 +355,8 @@ hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
 
 mark { background: #fff3cd; color: inherit; border-radius: 2px; padding: 0 1px; }
 
-#graph-canvas { width: 100%; height: 600px; border: 1px solid #eee; border-radius: 4px;
+#graph-canvas { width: 100%; height: min(64vh, 620px); min-height: 420px;
+                border: 1px solid #eee; border-radius: 4px; background: #101418;
                 cursor: grab; display: block; margin: 12px 0; }
 #graph-canvas:active { cursor: grabbing; }
 .graph-tooltip { position: fixed; background: #fff; border: 1px solid #ccc; border-radius: 4px;
@@ -438,9 +439,9 @@ def _layout(title, body):
 </head>
 <body>
 {_header_html()}
+<div class="graph-tooltip" id="graph-tooltip"></div>
 {body}
 {_footer_html()}
-<div class="graph-tooltip" id="graph-tooltip"></div>
 <script>
 // Keyboard navigation
 document.addEventListener('keydown', function(e) {{
@@ -556,10 +557,16 @@ def _render_all():
 
 def _render_graph():
     graph = _get_graph_data()
-    nodes_json = json.dumps(graph["nodes"])
-    edges_json = json.dumps(graph["edges"])
-    node_count = len(graph["nodes"])
-    edge_count = len(graph["edges"])
+    visible_nodes = [n for n in graph["nodes"] if n["category"] != "root"]
+    visible_ids = {n["id"] for n in visible_nodes}
+    visible_edges = [
+        e for e in graph["edges"]
+        if e["source"] in visible_ids and e["target"] in visible_ids
+    ]
+    nodes_json = json.dumps(visible_nodes)
+    edges_json = json.dumps(visible_edges)
+    node_count = len(visible_nodes)
+    edge_count = len(visible_edges)
 
     # Category → color mapping
     cat_colors = {"concepts": "#4e79a7", "entities": "#f28e2b", "sources": "#59a14f",
@@ -577,30 +584,46 @@ def _render_graph():
   var tooltip = document.getElementById('graph-tooltip');
   var W, H;
 
-  // Fixed small node radius — Obsidian style, not scaled by connections
+  // Compact neural-map sizing: concepts lead, sources recede.
   var NODE_R = 6;
   var LABEL_FONT = '11px -apple-system, sans-serif';
+  var nodeById = {{}};
+  nodes.forEach(function(n) {{ nodeById[n.id] = n; }});
 
-  // Spread nodes in a circle initially so physics starts well-separated
+  function stableNoise(id, salt) {{
+    var h = salt * 2166136261;
+    for (var i = 0; i < id.length; i++) {{
+      h ^= id.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }}
+    return ((h >>> 0) % 1000) / 1000;
+  }}
+
+  // Start in a loose two-lobe silhouette. Physics keeps it organic after load.
   var pos = {{}}, vel = {{}}, pinned = {{}};
-  var angleStep = (2 * Math.PI) / Math.max(nodes.length, 1);
-  var initR = Math.max(80, nodes.length * 18);
   nodes.forEach(function(n, i) {{
-    var a = i * angleStep;
-    pos[n.id] = {{ x: Math.cos(a) * initR, y: Math.sin(a) * initR }};
+    var lobe = i % 2 === 0 ? -1 : 1;
+    var a = i * 2.399963 + stableNoise(n.id, 7) * 0.7;
+    var r = 50 + Math.sqrt((i + 1) / Math.max(nodes.length, 1)) * 155;
+    var categoryDrop = n.category === 'sources' ? 58 : (n.category === 'entities' ? 24 : -6);
+    pos[n.id] = {{
+      x: lobe * 78 + Math.cos(a) * r * 0.78,
+      y: Math.sin(a) * r * 0.58 + categoryDrop
+    }};
     vel[n.id] = {{ x: 0, y: 0 }};
   }});
 
   // Adjacency
-  var adj = {{}};
-  nodes.forEach(function(n) {{ adj[n.id] = []; }});
+  var adj = {{}}, degree = {{}};
+  nodes.forEach(function(n) {{ adj[n.id] = []; degree[n.id] = 0; }});
   edges.forEach(function(e) {{
-    if (adj[e.source]) adj[e.source].push(e.target);
-    if (adj[e.target]) adj[e.target].push(e.source);
+    if (adj[e.source]) {{ adj[e.source].push(e.target); degree[e.source]++; }}
+    if (adj[e.target]) {{ adj[e.target].push(e.source); degree[e.target]++; }}
   }});
 
-  var dragging = null, dragOffX = 0, dragOffY = 0;
+  var dragging = null, dragOffX = 0, dragOffY = 0, hoverNode = null;
   var panX = 0, panY = 0, panStartX = 0, panStartY = 0, panning = false, didPan = false;
+  var downX = 0, downY = 0, didDrag = false, suppressClick = false;
   var zoom = 1;
   var frame = 0;
   var SETTLE = 200; // frames of physics
@@ -612,6 +635,17 @@ def _render_graph():
   }}
 
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
+  function nodeRadius(n) {{
+    if (n.category === 'sources') return 4.5;
+    if (n.category === 'entities') return 6.8;
+    return NODE_R;
+  }}
+  function isNeighbor(a, b) {{
+    return (adj[a] || []).indexOf(b) !== -1;
+  }}
+  function isActiveNode(n) {{
+    return !hoverNode || n.id === hoverNode.id || isNeighbor(hoverNode.id, n.id);
+  }}
 
   function toScreen(x, y) {{
     return {{ x: (x + panX) * zoom + W/2, y: (y + panY) * zoom + H/2 }};
@@ -621,8 +655,8 @@ def _render_graph():
   }}
 
   function simulate() {{
-    // Tuned for Obsidian-like spread: strong repulsion, moderate spring, weak gravity
-    var springLen = 120, springK = 0.04, repel = 8000, gravity = 0.008, damp = 0.82;
+    // Tuned for a brain-like neural map: broad lobes, readable spacing, gentle drift.
+    var springLen = 135, springK = 0.032, repel = 13500, gravity = 0.005, damp = 0.84;
     nodes.forEach(function(n) {{
       if (pinned[n.id]) return;
       var fx = 0, fy = 0;
@@ -645,8 +679,11 @@ def _render_graph():
         var f = springK * (d - springLen);
         fx += f * dx / d; fy += f * dy / d;
       }});
-      // Weak center gravity
+      // Weak center gravity plus a two-lobe bias so the map feels organic.
       fx -= p.x * gravity; fy -= p.y * gravity;
+      var lobeX = p.x < 0 ? -95 : 95;
+      fx += (lobeX - p.x) * 0.0018;
+      fy += ((n.category === 'sources' ? 40 : -8) - p.y) * 0.0012;
       vel[n.id].x = (vel[n.id].x + fx * 0.016) * damp;
       vel[n.id].y = (vel[n.id].y + fy * 0.016) * damp;
       pos[n.id].x += vel[n.id].x;
@@ -679,11 +716,13 @@ def _render_graph():
     edges.forEach(function(e) {{
       var a = toScreen(pos[e.source].x, pos[e.source].y);
       var b = toScreen(pos[e.target].x, pos[e.target].y);
+      var activeEdge = !hoverNode || e.source === hoverNode.id || e.target === hoverNode.id;
+      var alpha = hoverNode ? (activeEdge ? 0.42 : 0.035) : 0.14;
 
       // Glow layer
       ctx.save();
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.strokeStyle = 'rgba(88,166,255,0.12)';
+      ctx.strokeStyle = 'rgba(88,166,255,' + (alpha * 0.55) + ')';
       ctx.lineWidth = 3;
       ctx.filter = 'blur(2px)';
       ctx.stroke();
@@ -691,26 +730,31 @@ def _render_graph():
 
       // Sharp line
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.strokeStyle = 'rgba(139,148,158,0.2)';
+      ctx.strokeStyle = 'rgba(139,148,158,' + alpha + ')';
       ctx.lineWidth = 0.8;
       ctx.stroke();
 
       // Flow particle
-      var flowT = ((time * 0.5 + (a.x + b.y) * 0.001) % 2) / 2;
-      var px = a.x + (b.x - a.x) * flowT;
-      var py = a.y + (b.y - a.y) * flowT;
-      var pa = Math.sin(flowT * Math.PI) * 0.5;
-      ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI*2);
-      ctx.fillStyle = 'rgba(45,212,191,' + pa + ')';
-      ctx.fill();
+      if (activeEdge) {{
+        var flowT = ((time * 0.5 + (a.x + b.y) * 0.001) % 2) / 2;
+        var px = a.x + (b.x - a.x) * flowT;
+        var py = a.y + (b.y - a.y) * flowT;
+        var pa = Math.sin(flowT * Math.PI) * (hoverNode ? 0.6 : 0.32);
+        ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(45,212,191,' + pa + ')';
+        ctx.fill();
+      }}
     }});
 
     // Nodes
     nodes.forEach(function(n) {{
       var s = toScreen(pos[n.id].x, pos[n.id].y);
-      var r = NODE_R * Math.max(0.5, zoom);
+      var r = nodeRadius(n) * Math.max(0.65, Math.min(1.2, zoom));
       var color = nodeColor(n);
       var pulse = Math.sin(time * 1.2 + (pos[n.id].x + pos[n.id].y) * 0.01) * 0.12 + 0.88;
+      var activeNode = isActiveNode(n);
+      ctx.save();
+      ctx.globalAlpha = hoverNode && !activeNode ? 0.28 : 1;
 
       // Radial glow
       var glowR = r * 3.5 * pulse;
@@ -733,14 +777,18 @@ def _render_graph():
       ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.35, 0, Math.PI*2);
       ctx.fillStyle = color + 'cc'; ctx.fill();
 
-      // Label — always visible
+      // Labels stay sparse until a node is hovered.
       var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
-      ctx.font = LABEL_FONT;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
-      ctx.fillStyle = '#c9d1d9';
-      ctx.fillText(label, s.x, s.y + r + 5);
-      ctx.shadowBlur = 0;
+      var showLabel = hoverNode ? activeNode : (n.category !== 'sources' && degree[n.id] >= 2);
+      if (showLabel) {{
+        ctx.font = LABEL_FONT;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
+        ctx.fillStyle = '#dce7f2';
+        ctx.fillText(label, s.x, s.y + r + 5);
+        ctx.shadowBlur = 0;
+      }}
+      ctx.restore();
     }});
   }}
 
@@ -760,16 +808,22 @@ def _render_graph():
     for (var i = nodes.length - 1; i >= 0; i--) {{
       var n = nodes[i];
       var p = pos[n.id];
-      var r = NODE_R + 4; // slightly larger hit area
+      var r = nodeRadius(n) + 6; // slightly larger hit area
       var dx = w.x - p.x, dy = w.y - p.y;
       if (dx*dx + dy*dy <= r*r) return n;
     }}
     return null;
   }}
 
+  function movedPastThreshold(sx, sy) {{
+    var dx = sx - downX, dy = sy - downY;
+    return dx * dx + dy * dy > 25;
+  }}
+
   canvas.addEventListener('mousedown', function(e) {{
     var rect = canvas.getBoundingClientRect();
     var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    downX = sx; downY = sy; didDrag = false; didPan = false; suppressClick = false;
     var hit = hitTest(sx, sy);
     if (hit) {{
       dragging = hit; pinned[hit.id] = true;
@@ -785,13 +839,15 @@ def _render_graph():
     var rect = canvas.getBoundingClientRect();
     var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
     if (dragging) {{
+      if (movedPastThreshold(sx, sy)) didDrag = true;
       var w = toWorld(sx, sy);
       pos[dragging.id].x = w.x + dragOffX; pos[dragging.id].y = w.y + dragOffY;
     }} else if (panning) {{
       panX = (sx - panStartX) / zoom; panY = (sy - panStartY) / zoom;
-      didPan = true;
+      if (movedPastThreshold(sx, sy)) didPan = true;
     }} else {{
       var hit = hitTest(sx, sy);
+      hoverNode = hit;
       if (hit) {{
         tooltip.style.display = 'block';
         tooltip.style.left = (e.clientX + 14) + 'px';
@@ -806,12 +862,18 @@ def _render_graph():
   }});
 
   canvas.addEventListener('mouseup', function() {{
-    if (dragging) {{ pinned[dragging.id] = false; dragging = null; }}
+    if (dragging) {{ pinned[dragging.id] = false; dragging = null; suppressClick = didDrag; }}
+    if (panning) {{ suppressClick = didPan; }}
     panning = false;
   }});
 
+  canvas.addEventListener('mouseleave', function() {{
+    hoverNode = null;
+    if (tooltip) tooltip.style.display = 'none';
+  }});
+
   canvas.addEventListener('click', function(e) {{
-    if (didPan) {{ didPan = false; return; }}
+    if (suppressClick) {{ suppressClick = false; return; }}
     var rect = canvas.getBoundingClientRect();
     var hit = hitTest(e.clientX - rect.left, e.clientY - rect.top);
     if (hit) window.location.href = '/page/' + encodeURIComponent(hit.id);
@@ -838,7 +900,7 @@ def _render_graph():
         f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
         f'<h1>Knowledge Graph</h1>'
         f'<p style="color:#888;font-size:13px;font-family:sans-serif">'
-        f'{node_count} nodes · {edge_count} edges · drag to move · scroll to zoom · click to open</p>'
+        f'{node_count} nodes · {edge_count} edges · click opens · drag moves · scroll zooms</p>'
         f'<canvas id="graph-canvas"></canvas>'
         f'<div class="graph-legend">{legend_items}</div>'
         f'{graph_js}'
@@ -1068,10 +1130,11 @@ def _get_graph_data() -> dict:
     Uses in-memory fulltext index — no separate rglob scan.
     """
     pages = _get_all_pages()
-    page_set = {p["name"].lower() for p in pages}
+    page_ids = {p["name"].lower(): p["name"] for p in pages}
     nodes = [{"id": p["name"], "title": p["title"], "category": p["category"], "type": p["type"]} for p in pages]
 
     edges = []
+    seen_edges: set[tuple[str, str]] = set()
     wikilink_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
     for p in pages:
         source = p["name"]
@@ -1085,9 +1148,15 @@ def _get_graph_data() -> dict:
         orig = path.read_text(encoding="utf-8", errors="replace")
         _, body = _parse_frontmatter(orig)
         for m in wikilink_re.finditer(body):
-            target = m.group(1).strip()
-            if target.lower() in page_set and target.lower() != source.lower():
-                edges.append({"source": source, "target": target})
+            target_key = m.group(1).strip().lower()
+            target = page_ids.get(target_key)
+            if not target or target_key == source.lower():
+                continue
+            edge_key = (source, target)
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+            edges.append({"source": source, "target": target})
 
     return {"nodes": nodes, "edges": edges}
 

@@ -116,6 +116,45 @@ class ServeTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(data, {"backlinks": {"a": ["b"]}, "forward": {}})
 
+    def test_graph_data_uses_canonical_node_ids(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/transformers.md",
+            "---\ntype: concept\ntitle: Transformers\n---\n# Transformers\n",
+        )
+        write_page(
+            wiki,
+            "concepts/ai-evolution.md",
+            (
+                "---\ntype: concept\ntitle: AI evolution\n---\n"
+                "# AI evolution\n\n"
+                "[[Transformers]] and [[transformers]] and [[missing-page]]\n"
+            ),
+        )
+
+        graph = serve._get_graph_data()
+
+        self.assertIn({"source": "ai-evolution", "target": "transformers"}, graph["edges"])
+        self.assertNotIn({"source": "ai-evolution", "target": "Transformers"}, graph["edges"])
+        self.assertFalse(any(edge["target"] == "missing-page" for edge in graph["edges"]))
+        self.assertEqual(
+            sum(1 for edge in graph["edges"] if edge == {"source": "ai-evolution", "target": "transformers"}),
+            1,
+        )
+
+    def test_graph_tooltip_exists_before_graph_script(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n",
+        )
+
+        html = serve._render_graph()
+
+        self.assertLess(html.index('id="graph-tooltip"'), html.index("var tooltip ="))
+
     def test_search_limit_validation(self):
         self.assertEqual(serve._parse_search_limit("3"), (3, None))
         self.assertEqual(serve._parse_search_limit("500"), (50, None))

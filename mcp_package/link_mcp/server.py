@@ -424,10 +424,11 @@ def get_graph() -> str:
     """
     c = _build_cache()
     pages = c["pages"]
-    page_set = {p["name"].lower() for p in pages}
+    page_ids = {p["name"].lower(): p["name"] for p in pages}
     nodes = [{"id": p["name"], "title": p["title"], "category": p["category"], "type": p["type"]} for p in pages]
 
     edges = []
+    seen_edges: set[tuple[str, str]] = set()
     wl_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
     for p in pages:
         source = p["name"]
@@ -437,9 +438,15 @@ def get_graph() -> str:
         text = path.read_text(encoding="utf-8", errors="replace")
         _, body = _parse_frontmatter(text)
         for m in wl_re.finditer(body):
-            target = m.group(1).strip()
-            if target.lower() in page_set and target.lower() != source.lower():
-                edges.append({"source": source, "target": target})
+            target_key = m.group(1).strip().lower()
+            target = page_ids.get(target_key)
+            if not target or target_key == source.lower():
+                continue
+            edge_key = (source, target)
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+            edges.append({"source": source, "target": target})
 
     return json.dumps({"nodes": nodes, "edges": edges}, ensure_ascii=False)
 
