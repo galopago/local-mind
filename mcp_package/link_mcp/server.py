@@ -261,6 +261,7 @@ def _get_context(topic: str) -> dict:
     inbound = backlinks_data.get(primary_name, [])
 
     forward: list[str] = []
+    forward_seen: set[str] = set()
     path = c["page_index"].get(primary_name)
     if path and path.exists():
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -268,7 +269,8 @@ def _get_context(topic: str) -> dict:
         page_set = {p["name"].lower() for p in c["pages"]}
         for m in re.finditer(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", body):
             target = m.group(1).strip().lower()
-            if target in page_set and target != primary_name:
+            if target in page_set and target != primary_name and target not in forward_seen:
+                forward_seen.add(target)
                 forward.append(target)
 
     seen = {primary_name}

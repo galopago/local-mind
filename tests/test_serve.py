@@ -61,6 +61,29 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(ctx["inbound_count"], 1)
         self.assertEqual([page["name"] for page in ctx["pages"]], ["a", "b"])
 
+    def test_context_deduplicates_forward_links(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n\n[[b]] [[b]] [[c]] [[b]]\n",
+        )
+        write_page(
+            wiki,
+            "concepts/b.md",
+            "---\ntype: concept\ntitle: B\n---\n# B\n",
+        )
+        write_page(
+            wiki,
+            "concepts/c.md",
+            "---\ntype: concept\ntitle: C\n---\n# C\n",
+        )
+
+        ctx = serve._get_context("A")
+
+        self.assertEqual(ctx["forward_count"], 2)
+        self.assertEqual([page["name"] for page in ctx["pages"]], ["a", "b", "c"])
+
     def test_inline_markdown_sanitizes_html_and_links(self):
         rendered = serve._md_to_html(
             "Hello <script>alert(1)</script> "

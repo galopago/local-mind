@@ -42,6 +42,11 @@ echo "  Updated serve.py"
 cp "$LINK_ROOT/LINK.md" "$TARGET_DIR/LINK.md"
 echo "  Updated LINK.md"
 
+if [ -f "$LINK_ROOT/link.py" ]; then
+    cp "$LINK_ROOT/link.py" "$TARGET_DIR/link.py"
+    echo "  Updated link.py"
+fi
+
 if [ -f "$LINK_ROOT/logo.png" ]; then
     cp "$LINK_ROOT/logo.png" "$TARGET_DIR/logo.png"
 fi
@@ -112,4 +117,12 @@ if python3 -c "import link_mcp" 2>/dev/null; then
     echo '  }'
 else
     echo "  · Could not install link-mcp. Install manually: pip install link-mcp"
+fi
+
+if [ -f "$TARGET_DIR/link.py" ]; then
+    echo ""
+    echo "  Check wiki health:"
+    echo "    python3 \"$TARGET_DIR/link.py\" doctor \"$TARGET_DIR\""
+    echo "  Repair stale graph index:"
+    echo "    python3 \"$TARGET_DIR/link.py\" rebuild-backlinks \"$TARGET_DIR\""
 fi

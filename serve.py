@@ -1034,6 +1034,7 @@ def _get_context(topic: str) -> dict:
 
     # Load forward links (pages this page links to)
     forward: list[str] = []
+    forward_seen: set[str] = set()
     path = _page_index.get(primary_name)
     if path and path.exists():
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -1042,7 +1043,8 @@ def _get_context(topic: str) -> dict:
         page_set = {p["name"].lower() for p in pages}
         for m in wl_re.finditer(body):
             target = m.group(1).strip().lower()
-            if target in page_set and target != primary_name:
+            if target in page_set and target != primary_name and target not in forward_seen:
+                forward_seen.add(target)
                 forward.append(target)
 
     # Build context pages list: primary + inbound + forward (deduplicated)

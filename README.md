@@ -9,6 +9,7 @@ A personal knowledge wiki maintained by LLMs. Knowledge compounds — every sour
 Implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) with a production-ready local server, agent-optimized search API, and interactive graph visualization.
 
 [![GitHub](https://img.shields.io/github/stars/gowtham0992/link?style=flat)](https://github.com/gowtham0992/link)
+[![CI](https://github.com/gowtham0992/link/actions/workflows/ci.yml/badge.svg)](https://github.com/gowtham0992/link/actions/workflows/ci.yml)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.gowtham0992%2Flink-blue)](https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink)
 [![PyPI](https://img.shields.io/pypi/v/link-mcp)](https://pypi.org/project/link-mcp/)
 
@@ -19,6 +20,33 @@ Implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914
 3. The wiki grows over time. Ask questions, get answers filed back. Knowledge compounds.
 
 You never write the wiki yourself. The LLM writes and maintains all of it. You curate sources and ask questions.
+
+## Try the demo
+
+Create a pre-ingested sample wiki before touching your own data:
+
+```bash
+git clone https://github.com/gowtham0992/link.git
+cd link
+python3 link.py demo
+cd link-demo
+python3 serve.py
+```
+
+Then open:
+
+- `http://localhost:3000`
+- `http://localhost:3000/graph`
+
+The demo shows raw notes, compiled pages, backlinks, MCP-friendly context, and the graph view working together.
+
+Check the demo wiki:
+
+```bash
+python3 link.py doctor .
+```
+
+`doctor` verifies the wiki structure, dead links, stale backlinks, index drift, page summaries, source sections, `source_count` metadata, isolated graph nodes, raw-source coverage, and secret-looking filenames or file contents.
 
 ## Setup
 
@@ -118,6 +146,48 @@ Link is local-first:
 
 If you publish or share Link, use `git push`, `git archive`, or a clean release artifact. Do not zip an entire working directory, because local-only files such as `.git/`, ignored raw sources, ignored wiki pages, build outputs, and editor caches can be included by accident.
 
+Before sharing a wiki or demo, run:
+
+```bash
+python3 link.py doctor .
+```
+
+Treat errors as release blockers. Warnings are usually quality work: missing summaries, missing source sections, stale source counts, or isolated pages.
+
+If the only error is stale backlinks, repair the graph index locally:
+
+```bash
+python3 link.py rebuild-backlinks .
+```
+
+## Release flow
+
+Use branches and CI for public releases:
+
+1. Create a branch such as `codex/ci-trust-gates`.
+2. Make the release changes and bump the MCP package version in `mcp_package/pyproject.toml`, `mcp_package/server.json`, and `mcp_package/link_mcp/__init__.py`.
+3. Open a PR into `main`.
+4. Merge only after CI passes.
+5. Tag the exact merged release commit on `main`.
+6. Publish `link-mcp` to PyPI, then publish the MCP registry entry.
+
+For a patch release:
+
+```bash
+git switch main
+git pull --ff-only
+git tag -a v1.0.5 -m "v1.0.5"
+git push origin v1.0.5
+cd mcp_package
+rm -rf dist ./*.egg-info
+python3 -m build
+python3 -m twine check dist/*
+TWINE_USERNAME=__token__ python3 -m twine upload dist/*
+mcp-publisher publish
+```
+
+Never reuse a published PyPI version or move a public release tag. If a release needs another fix, bump to the next version.
+
 ## Structure
 
 ```
@@ -146,6 +216,14 @@ link/
 | "what is X?" | Query the wiki, optionally file the answer back |
 | "lint the wiki" | Health check: orphans, dead links, stale claims, confidence gaps |
 | "research X" | Find sources on the web, capture a chat, or analyze wiki gaps |
+
+Local utility commands:
+
+```bash
+python3 link.py demo              # create ./link-demo with a pre-ingested sample wiki
+python3 link.py doctor link-demo  # check structure, graph health, source hygiene, and secret-looking content
+python3 link.py rebuild-backlinks link-demo  # regenerate wiki/_backlinks.json without starting the server
+```
 
 ## Design principles
 

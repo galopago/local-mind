@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Check tracked files for release-blocking credential leaks."""
+from __future__ import annotations
+
+import fnmatch
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+SECRET_NAME_PATTERNS = (
+    ".env",
+    ".env.*",
+    "*.token",
+    ".mcpregistry_*",
+    "*.key",
+    "*.pem",
+    "*.p8",
+    "*.p12",
+    "id_rsa",
+    "id_ed25519",
+)
+
+SECRET_VALUE_PATTERNS = (
+    ("Anthropic API key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b")),
+    ("OpenAI API key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
+    ("GitHub token", re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")),
+    ("AWS access key", re.compile(r"\bA[SK]IA[0-9A-Z]{16}\b")),
+    ("PyPI token", re.compile(r"\bpypi-[A-Za-z0-9_-]{20,}\b")),
+)
+
+BINARY_SUFFIXES = {
+    ".gif",
+    ".gz",
+    ".ico",
+    ".jpeg",
+    ".jpg",
+    ".pdf",
+    ".png",
+    ".pyc",
+    ".tar",
+    ".webp",
+    ".whl",
+    ".zip",
+}
+
+
+def tracked_files() -> list[Path]:
+    result = subprocess.run(
+        ["git", "ls-files", "-z"],
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+    names = result.stdout.decode("utf-8").split("\0")
+    return [Path(name) for name in names if name]
+
+
+def read_pyproject_version(path: Path) -> str | None:
+    match = re.search(r'^version\s*=\s*"([^"]+)"', path.read_text(encoding="utf-8"), flags=re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def read_init_version(path: Path) -> str | None:
+    match = re.search(r'^__version__\s*=\s*"([^"]+)"', path.read_text(encoding="utf-8"), flags=re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def check_version_consistency(findings: list[str]) -> None:
+    pyproject_version = read_pyproject_version(Path("mcp_package/pyproject.toml"))
+    init_version = read_init_version(Path("mcp_package/link_mcp/__init__.py"))
+    server = json.loads(Path("mcp_package/server.json").read_text(encoding="utf-8"))
+    server_version = server.get("version")
+    package_versions = {
+        package.get("version")
+        for package in server.get("packages", [])
+        if package.get("identifier") == "link-mcp"
+    }
+    versions = {
+        "mcp_package/pyproject.toml": pyproject_version,
+        "mcp_package/link_mcp/__init__.py": init_version,
+        "mcp_package/server.json": server_version,
+    }
+    if len(set(versions.values()) | package_versions) != 1:
+        for label, version in versions.items():
+            findings.append(f"version mismatch: {label} is {version!r}")
+        findings.append(f"version mismatch: server.json package versions are {sorted(package_versions)!r}")
+
+
+def main() -> int:
+    findings: list[str] = []
+    check_version_consistency(findings)
+
+    for path in tracked_files():
+        name = path.name
+        if any(fnmatch.fnmatch(name, pattern) for pattern in SECRET_NAME_PATTERNS):
+            findings.append(f"sensitive-looking tracked filename: {path}")
+            continue
+
+        if path.suffix.lower() in BINARY_SUFFIXES:
+            continue
+
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            findings.append(f"could not read tracked file {path}: {exc}")
+            continue
+
+        for label, pattern in SECRET_VALUE_PATTERNS:
+            if pattern.search(text):
+                findings.append(f"sensitive-looking content in {path}: {label}")
+                break
+
+    if findings:
+        print("Release hygiene check failed:")
+        for finding in findings:
+            print(f"- {finding}")
+        return 1
+
+    print("Release hygiene check passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
