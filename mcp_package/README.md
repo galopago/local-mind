@@ -9,8 +9,30 @@ Listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) 
 ## Install
 
 ```bash
-pip install link-mcp
+python3 -m pip install --upgrade link-mcp
 ```
+
+If macOS/Homebrew Python reports `externally-managed-environment`, install into a dedicated venv:
+
+```bash
+python3 -m venv ~/.link-mcp-venv
+~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp
+```
+
+Then use the venv Python in your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "link": {
+      "command": "/Users/YOU/.link-mcp-venv/bin/python",
+      "args": ["-m", "link_mcp", "--wiki", "/Users/YOU/link/wiki"]
+    }
+  }
+}
+```
+
+Replace `/Users/YOU` with your absolute home path.
 
 ## Quick setup (Kiro)
 
