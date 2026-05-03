@@ -285,6 +285,14 @@ When the human asks a question:
 
 When the human asks you to health-check the wiki (or periodically on your own):
 
+Start with the built-in checker when `link.py` is available:
+
+```bash
+python3 link.py doctor .
+```
+
+Treat doctor errors as blockers. Doctor warnings are quality issues to triage with the human. It checks required structure, dead links, stale backlinks, index drift, TLDR/query summaries, Sources sections, `source_count` consistency, isolated graph pages, raw-source coverage, and secret-looking filenames or file contents.
+
 Run these checks and report findings:
 
 - **Orphan pages** — pages with no inbound links from other pages
@@ -302,7 +310,7 @@ Run these checks and report findings:
 
 For each finding, suggest a specific action. Then ask the human which ones to execute.
 
-Rebuild `wiki/_backlinks.json` after executing fixes. Append lint results to `wiki/log.md`.
+Rebuild `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `GET /api/rebuild-backlinks` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
 
 
 ### 4. Research
@@ -468,7 +476,7 @@ Structure (current format):
 
 Used during query to find related pages, and during lint to detect orphans and backlink imbalances.
 
-**Rebuilding:** Call `GET /api/rebuild-backlinks` on the local server (if running), or scan all `[[wikilinks]]` manually and write the file. Always rebuild after ingest and lint.
+**Rebuilding:** Run `python3 link.py rebuild-backlinks .` when `link.py` is available. Otherwise call `GET /api/rebuild-backlinks` on the local server (if running), or scan all `[[wikilinks]]` manually and write the file. Always rebuild after ingest and lint.
 
 ## Local Server API
 

@@ -35,6 +35,14 @@ packages = ["link_mcp"]
 [tool.hatch.build.targets.sdist]
 exclude = [
     ".mcpregistry_*",
+    ".env",
+    ".env.*",
     "*.token",
+    "*.key",
+    "*.pem",
+    "*.p8",
+    "*.p12",
+    "id_rsa",
+    "id_ed25519",
     "dist/",
 ]

@@ -20,6 +20,33 @@ Implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914
 
 You never write the wiki yourself. The LLM writes and maintains all of it. You curate sources and ask questions.
 
+## Try the demo
+
+Create a pre-ingested sample wiki before touching your own data:
+
+```bash
+git clone https://github.com/gowtham0992/link.git
+cd link
+python3 link.py demo
+cd link-demo
+python3 serve.py
+```
+
+Then open:
+
+- `http://localhost:3000`
+- `http://localhost:3000/graph`
+
+The demo shows raw notes, compiled pages, backlinks, MCP-friendly context, and the graph view working together.
+
+Check the demo wiki:
+
+```bash
+python3 link.py doctor .
+```
+
+`doctor` verifies the wiki structure, dead links, stale backlinks, index drift, page summaries, source sections, `source_count` metadata, isolated graph nodes, raw-source coverage, and secret-looking filenames or file contents.
+
 ## Setup
 
 ```bash
@@ -118,6 +145,20 @@ Link is local-first:
 
 If you publish or share Link, use `git push`, `git archive`, or a clean release artifact. Do not zip an entire working directory, because local-only files such as `.git/`, ignored raw sources, ignored wiki pages, build outputs, and editor caches can be included by accident.
 
+Before sharing a wiki or demo, run:
+
+```bash
+python3 link.py doctor .
+```
+
+Treat errors as release blockers. Warnings are usually quality work: missing summaries, missing source sections, stale source counts, or isolated pages.
+
+If the only error is stale backlinks, repair the graph index locally:
+
+```bash
+python3 link.py rebuild-backlinks .
+```
+
 ## Structure
 
 ```
@@ -146,6 +187,14 @@ link/
 | "what is X?" | Query the wiki, optionally file the answer back |
 | "lint the wiki" | Health check: orphans, dead links, stale claims, confidence gaps |
 | "research X" | Find sources on the web, capture a chat, or analyze wiki gaps |
+
+Local utility commands:
+
+```bash
+python3 link.py demo              # create ./link-demo with a pre-ingested sample wiki
+python3 link.py doctor link-demo  # check structure, graph health, source hygiene, and secret-looking content
+python3 link.py rebuild-backlinks link-demo  # regenerate wiki/_backlinks.json without starting the server
+```
 
 ## Design principles
 
