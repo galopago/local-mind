@@ -315,7 +315,8 @@ a:hover { text-decoration: underline; }
 header { border-bottom: 1px solid #ccc; padding-bottom: 12px; margin-bottom: 24px;
          display: flex; align-items: center; justify-content: space-between; }
 header .logo { font-size: 24px; font-weight: bold; letter-spacing: -0.5px; }
-header .logo a { color: #222; text-decoration: none; }
+header .logo a { color: #222; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+header .logo img { width: 28px; height: 28px; border-radius: 7px; flex: none; }
 header .logo small { font-weight: normal; font-size: 13px; color: #888; margin-left: 8px; }
 header nav { display: flex; gap: 16px; font-size: 14px; font-family: sans-serif; }
 header form { display: inline; }
@@ -390,27 +391,8 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
 
 
 def _header_html():
-    logo_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="28" height="28" style="vertical-align:middle;margin-right:8px">
-  <defs>
-    <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <radialGradient id="bg" cx="40%" cy="40%" r="60%"><stop offset="0%" stop-color="#0d2137"/><stop offset="100%" stop-color="#060d18"/></radialGradient>
-  </defs>
-  <rect width="200" height="200" rx="32" fill="url(#bg)"/>
-  <g stroke="#2dd4bf" stroke-width="3.5" filter="url(#glow)" opacity="0.9" stroke-linecap="round">
-    <line x1="62" y1="32" x2="62" y2="152"/>
-    <line x1="62" y1="152" x2="152" y2="152"/>
-  </g>
-  <g filter="url(#glow)">
-    <circle cx="62"  cy="32"  r="7"   fill="#2dd4bf" opacity="0.95"/>
-    <circle cx="62"  cy="72"  r="5.5" fill="#2dd4bf" opacity="0.8"/>
-    <circle cx="62"  cy="112" r="5.5" fill="#2dd4bf" opacity="0.8"/>
-    <circle cx="62"  cy="152" r="8.5" fill="#2dd4bf" opacity="1"/>
-    <circle cx="107" cy="152" r="5.5" fill="#2dd4bf" opacity="0.8"/>
-    <circle cx="152" cy="152" r="7"   fill="#2dd4bf" opacity="0.95"/>
-  </g>
-</svg>'''
     return f"""<header>
-  <div class="logo"><a href="/">{logo_svg}Link</a><small>knowledge wiki</small></div>
+  <div class="logo"><a href="/"><img src="/logo.svg" alt="">Link</a><small>agent memory</small></div>
   <nav>
     <a href="/">home</a>
     <a href="/page/log">log</a>
@@ -434,7 +416,7 @@ def _layout(title, body):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{html.escape(title)} — Link</title>
-<link rel="icon" href="/logo.png" type="image/png">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
 <style>{CSS}</style>
 </head>
 <body>
@@ -1178,7 +1160,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._head_only = getattr(self, '_head_only', False)
         parsed = urllib.parse.urlparse(self.path)
         path, query = parsed.path, urllib.parse.parse_qs(parsed.query)
-        if path == "/logo.png":
+        if path == "/logo.svg":
+            self._file(Path(__file__).parent / "logo.svg", "image/svg+xml")
+        elif path == "/logo.png":
             self._file(Path(__file__).parent / "logo.png", "image/png")
         elif path.startswith("/raw/"):
             raw_path = Path(__file__).parent / "raw" / urllib.parse.unquote(path[5:])
@@ -1272,8 +1256,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # Ensure the resolved path is within the expected parent directory
         # (prevents path traversal via /raw/../../sensitive-file)
         raw_resolved = RAW_DIR.resolve()
-        logo_resolved = (Path(__file__).parent / "logo.png").resolve()
-        if fpath != logo_resolved and not str(fpath).startswith(str(raw_resolved) + "/") and fpath != raw_resolved:
+        root = Path(__file__).parent
+        allowed_root_files = {
+            (root / "logo.svg").resolve(),
+            (root / "logo.png").resolve(),
+        }
+        if fpath not in allowed_root_files and not str(fpath).startswith(str(raw_resolved) + "/") and fpath != raw_resolved:
             self._err("forbidden")
             return
         if fpath.exists() and fpath.is_file():

@@ -51,6 +51,10 @@ if [ -f "$LINK_ROOT/logo.png" ]; then
     cp "$LINK_ROOT/logo.png" "$TARGET_DIR/logo.png"
 fi
 
+if [ -f "$LINK_ROOT/logo.svg" ]; then
+    cp "$LINK_ROOT/logo.svg" "$TARGET_DIR/logo.svg"
+fi
+
 cp "$LINK_ROOT/.linkignore" "$TARGET_DIR/.linkignore"
 
 # ── Wiki structure: only on fresh install ────────────────────────────
