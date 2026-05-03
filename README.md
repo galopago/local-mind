@@ -9,6 +9,7 @@ A personal knowledge wiki maintained by LLMs. Knowledge compounds — every sour
 Implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) with a production-ready local server, agent-optimized search API, and interactive graph visualization.
 
 [![GitHub](https://img.shields.io/github/stars/gowtham0992/link?style=flat)](https://github.com/gowtham0992/link)
+[![CI](https://github.com/gowtham0992/link/actions/workflows/ci.yml/badge.svg)](https://github.com/gowtham0992/link/actions/workflows/ci.yml)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.gowtham0992%2Flink-blue)](https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink)
 [![PyPI](https://img.shields.io/pypi/v/link-mcp)](https://pypi.org/project/link-mcp/)
 
@@ -158,6 +159,34 @@ If the only error is stale backlinks, repair the graph index locally:
 ```bash
 python3 link.py rebuild-backlinks .
 ```
+
+## Release flow
+
+Use branches and CI for public releases:
+
+1. Create a branch such as `codex/ci-trust-gates`.
+2. Make the release changes and bump the MCP package version in `mcp_package/pyproject.toml`, `mcp_package/server.json`, and `mcp_package/link_mcp/__init__.py`.
+3. Open a PR into `main`.
+4. Merge only after CI passes.
+5. Tag the exact merged release commit on `main`.
+6. Publish `link-mcp` to PyPI, then publish the MCP registry entry.
+
+For a patch release:
+
+```bash
+git switch main
+git pull --ff-only
+git tag -a v1.0.5 -m "v1.0.5"
+git push origin v1.0.5
+cd mcp_package
+rm -rf dist ./*.egg-info
+python3 -m build
+python3 -m twine check dist/*
+TWINE_USERNAME=__token__ python3 -m twine upload dist/*
+mcp-publisher publish
+```
+
+Never reuse a published PyPI version or move a public release tag. If a release needs another fix, bump to the next version.
 
 ## Structure
 

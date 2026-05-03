@@ -4,17 +4,72 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ matrix.python-version }}
+
       - name: Compile Python
-        run: python -m py_compile serve.py mcp_package/link_mcp/server.py mcp_package/link_mcp/__main__.py mcp_package/link_mcp/__init__.py
-      - name: Check shell syntax
-        run: bash -n integrations/*/install.sh integrations/*/uninstall.sh integrations/_shared/*.sh
+        run: python -m py_compile serve.py link.py mcp_package/link_mcp/server.py mcp_package/link_mcp/__main__.py mcp_package/link_mcp/__init__.py
+
       - name: Run tests
         run: python -m unittest discover -s tests
+
+      - name: Demo health smoke test
+        run: |
+          python link.py demo /tmp/link-demo-ci --force
+          python /tmp/link-demo-ci/link.py doctor /tmp/link-demo-ci
+          python /tmp/link-demo-ci/link.py rebuild-backlinks /tmp/link-demo-ci
+          python /tmp/link-demo-ci/link.py doctor /tmp/link-demo-ci
+
+  installer-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check shell syntax
+        run: bash -n integrations/*/install.sh integrations/*/uninstall.sh integrations/_shared/*.sh
+
+  release-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check tracked files for secret-looking data
+        run: python scripts/check_release_hygiene.py
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install --upgrade build twine
+
+      - name: Build link-mcp
+        working-directory: mcp_package
+        run: python -m build
+
+      - name: Check package metadata
+        working-directory: mcp_package
+        run: python -m twine check dist/*
