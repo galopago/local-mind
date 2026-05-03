@@ -116,7 +116,12 @@ if python3 -c "import link_mcp" 2>/dev/null; then
     echo '    }'
     echo '  }'
 else
-    echo "  · Could not install link-mcp. Install manually: pip install link-mcp"
+    echo "  · Could not install link-mcp automatically."
+    echo "  Manual options:"
+    echo "    python3 -m pip install --upgrade --break-system-packages link-mcp"
+    echo "    python3 -m venv ~/.link-mcp-venv"
+    echo "    ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp"
+    echo "  If using the venv, set your MCP command to ~/.link-mcp-venv/bin/python."
 fi
 
 if [ -f "$TARGET_DIR/link.py" ]; then
