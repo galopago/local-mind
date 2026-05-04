@@ -145,6 +145,8 @@ For project-specific memory instead of global `~/link`, add `--project`.
 
 To update after `git pull`, rerun the same installer. It refreshes code and instructions without replacing your wiki pages.
 
+The installers try the current `python3` first. If that Python is externally managed, they install `link-mcp` into `~/.link-mcp-venv` and register MCP with that venv Python.
+
 ### I want MCP only
 
 Install `link-mcp` and point it at a wiki:

@@ -34,19 +34,26 @@ else
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
 fi
 
+MCP_PYTHON="python3"
+MCP_MARKER="${WIKI_PATH%/wiki}/.link-mcp-python"
+if [ -f "$MCP_MARKER" ]; then
+    MCP_PYTHON="$(cat "$MCP_MARKER")"
+fi
+
 # Auto-register MCP server in Claude Code's config
 # Claude Code uses ~/.claude.json for global MCP config
 MCP_CONFIG="$HOME/.claude.json"
 if [ -f "$MCP_CONFIG" ]; then
-    LINK_WIKI_PATH="$WIKI_PATH" python3 - << 'PYEOF'
+    LINK_WIKI_PATH="$WIKI_PATH" LINK_MCP_PYTHON="$MCP_PYTHON" python3 - << 'PYEOF'
 import json, os
 config_path = os.path.expanduser("~/.claude.json")
 wiki_path = os.environ["LINK_WIKI_PATH"]
+mcp_python = os.environ["LINK_MCP_PYTHON"]
 try:
     with open(config_path) as f:
         config = json.load(f)
     config.setdefault("mcpServers", {})["link"] = {
-        "command": "python3",
+        "command": mcp_python,
         "args": ["-m", "link_mcp", "--wiki", wiki_path]
     }
     with open(config_path, "w") as f:
@@ -58,7 +65,7 @@ PYEOF
 else
     echo ""
     echo "  MCP config: add to ~/.claude.json or .mcp.json at project root:"
-    echo "  { \"mcpServers\": { \"link\": { \"command\": \"python3\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
+    echo "  { \"mcpServers\": { \"link\": { \"command\": \"$MCP_PYTHON\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
 fi
 
 echo ""

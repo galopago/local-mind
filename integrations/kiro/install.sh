@@ -15,6 +15,7 @@ MODE="${1:---global}"
 if [ "$MODE" = "--global" ]; then
     INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
     TARGET="$HOME/.kiro/steering/link.md"
+    WIKI_PATH="$HOME/link/wiki"
     mkdir -p "$HOME/.kiro/steering"
 
     # Always update steering — it may have changed
@@ -23,19 +24,24 @@ if [ "$MODE" = "--global" ]; then
 
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
 
+    MCP_PYTHON="python3"
+    if [ -f "$HOME/link/.link-mcp-python" ]; then
+        MCP_PYTHON="$(cat "$HOME/link/.link-mcp-python")"
+    fi
+
     # Auto-register Link MCP server in Kiro's mcp.json
     MCP_CONFIG="$HOME/.kiro/settings/mcp.json"
     if [ -f "$MCP_CONFIG" ]; then
-        if ! grep -q '"link"' "$MCP_CONFIG"; then
-            python3 - << 'PYEOF'
-import json, pathlib, os
+        LINK_MCP_PYTHON="$MCP_PYTHON" LINK_WIKI_PATH="$WIKI_PATH" python3 - << 'PYEOF'
+import json, os
 config_path = os.path.expanduser("~/.kiro/settings/mcp.json")
-wiki_path = str(pathlib.Path.home() / "link" / "wiki")
+wiki_path = os.environ["LINK_WIKI_PATH"]
+mcp_python = os.environ["LINK_MCP_PYTHON"]
 try:
     with open(config_path) as f:
         config = json.load(f)
     config.setdefault("mcpServers", {})["link"] = {
-        "command": "python3",
+        "command": mcp_python,
         "args": ["-m", "link_mcp", "--wiki", wiki_path],
         "disabled": False
     }
@@ -44,11 +50,8 @@ try:
     print("  ✓ Link MCP server registered in ~/.kiro/settings/mcp.json")
 except Exception as e:
     print(f"  · Could not auto-register MCP: {e}")
-    print(f"    Add manually: python3 -m link_mcp --wiki {wiki_path}")
+    print(f"    Add manually: {mcp_python} -m link_mcp --wiki {wiki_path}")
 PYEOF
-        else
-            echo "  · Link MCP already registered in ~/.kiro/settings/mcp.json"
-        fi
     fi
 
     echo ""
