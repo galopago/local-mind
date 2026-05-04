@@ -49,6 +49,91 @@ python3 link.py doctor .
 
 `doctor` verifies the wiki structure, dead links, stale backlinks, index drift, page summaries, source sections, `source_count` metadata, isolated graph nodes, raw-source coverage, and secret-looking filenames or file contents.
 
+## First 10 minutes
+
+Use this path when you want to try Link, then turn one real note into local agent memory.
+
+### 1. See the finished shape
+
+```bash
+git clone https://github.com/gowtham0992/link.git
+cd link
+python3 link.py demo
+cd link-demo
+python3 serve.py
+```
+
+Open `http://localhost:3000/graph`. The demo shows what a healthy Link memory looks like: raw notes, source pages, concept pages, backlinks, graph context, and MCP-ready retrieval.
+
+### 2. Create your own wiki
+
+In a separate terminal:
+
+```bash
+cd link
+bash integrations/kiro/install.sh
+```
+
+Use the installer for your agent if it is not Kiro:
+
+- `integrations/codex/install.sh`
+- `integrations/claude-code/install.sh`
+- `integrations/cursor/install.sh`
+- `integrations/copilot/install.sh`
+- `integrations/vscode/install.sh`
+- `integrations/antigravity/install.sh`
+
+This creates `~/link/`, installs `link-mcp`, and writes lightweight agent instructions.
+
+### 3. Add one real source
+
+```bash
+cat > ~/link/raw/first-memory.md <<'EOF'
+---
+title: "First Link memory"
+source_type: note
+date_captured: 2026-05-03
+---
+
+# First Link memory
+
+I am testing Link as local personal memory for agents.
+The important idea is that raw notes stay local, and the agent turns them into source-cited wiki pages.
+EOF
+```
+
+Check what is pending:
+
+```bash
+python3 ~/link/link.py ingest-status ~/link
+```
+
+### 4. Ask your agent to ingest it
+
+In your agent chat, say:
+
+```text
+ingest raw/first-memory.md into Link
+```
+
+The agent should read `~/link/LINK.md`, create a source page under `wiki/sources/`, create or update related concept/entity pages, update `wiki/index.md`, append `wiki/log.md`, and rebuild backlinks.
+
+### 5. Verify the memory
+
+```bash
+python3 ~/link/link.py doctor ~/link --fix
+python3 ~/link/link.py ingest-status ~/link
+python3 ~/link/link.py verify-mcp ~/link
+```
+
+Then ask your MCP-enabled agent:
+
+```text
+query Link for first Link memory
+```
+
+If the agent can answer from Link, the local memory loop is working.
+
 ## Setup
 
 ```bash
