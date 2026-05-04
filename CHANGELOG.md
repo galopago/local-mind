@@ -8,6 +8,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ### Added
 
+- Added `scripts/prepare_release.py` to bump MCP release versions, cut changelog notes, and print publish commands without uploading anything automatically.
 - Added versioned changelog tracking for repo, PyPI, and MCP Registry releases.
 - Added `link.py ingest-status` to show pending raw sources and stale graph indexes.
 - Added `link.py doctor --fix` for safe structure creation and backlink repair.
