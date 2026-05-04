@@ -54,10 +54,16 @@ else
     bash "$SCRIPT_DIR/../_shared/scaffold.sh"
 fi
 
+MCP_PYTHON="python3"
+MCP_MARKER="${WIKI_PATH%/wiki}/.link-mcp-python"
+if [ -f "$MCP_MARKER" ]; then
+    MCP_PYTHON="$(cat "$MCP_MARKER")"
+fi
+
 echo ""
 echo "Done."
 echo "  Drop sources into raw/ and say 'ingest' to process them."
 echo "  View wiki: python ~/link/serve.py"
 echo ""
 echo "  MCP: add to .vscode/mcp.json:"
-echo "  { \"servers\": { \"link\": { \"type\": \"stdio\", \"command\": \"python3\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
+echo "  { \"servers\": { \"link\": { \"type\": \"stdio\", \"command\": \"$MCP_PYTHON\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"

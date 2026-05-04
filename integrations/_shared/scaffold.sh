@@ -96,25 +96,36 @@ echo "  Setting up MCP server..."
 
 if [ -d "$LINK_ROOT/mcp_package" ]; then
     echo "  Installing/upgrading link-mcp from local checkout..."
-    pip3 install --upgrade "$LINK_ROOT/mcp_package" --break-system-packages -q 2>/dev/null \
-        || pip3 install --upgrade "$LINK_ROOT/mcp_package" -q 2>/dev/null \
-        || true
+    LINK_MCP_PACKAGE="$LINK_ROOT/mcp_package"
 else
     echo "  Installing/upgrading link-mcp from PyPI..."
-    pip3 install --upgrade link-mcp --break-system-packages -q 2>/dev/null \
-        || pip3 install --upgrade link-mcp -q 2>/dev/null \
-        || true
+    LINK_MCP_PACKAGE="link-mcp"
 fi
 
-# Verify installation
-if python3 -c "import link_mcp" 2>/dev/null; then
+LINK_MCP_PYTHON="python3"
+LINK_MCP_VENV="${LINK_MCP_VENV:-$HOME/.link-mcp-venv}"
+LINK_MCP_VENV_PYTHON="$LINK_MCP_VENV/bin/python"
+
+if python3 -m pip install --upgrade "$LINK_MCP_PACKAGE" -q 2>/dev/null; then
+    LINK_MCP_PYTHON="python3"
+elif python3 -m venv "$LINK_MCP_VENV" 2>/dev/null \
+    && "$LINK_MCP_VENV_PYTHON" -m pip install --upgrade pip -q 2>/dev/null \
+    && "$LINK_MCP_VENV_PYTHON" -m pip install --upgrade "$LINK_MCP_PACKAGE" -q 2>/dev/null; then
+    LINK_MCP_PYTHON="$LINK_MCP_VENV_PYTHON"
+fi
+
+if "$LINK_MCP_PYTHON" -c "import link_mcp" 2>/dev/null; then
+    printf '%s\n' "$LINK_MCP_PYTHON" > "$TARGET_DIR/.link-mcp-python"
     echo "  ✓ link-mcp installed"
+    if [ "$LINK_MCP_PYTHON" != "python3" ]; then
+        echo "  ✓ MCP Python: $LINK_MCP_PYTHON"
+    fi
     echo ""
     echo "  Add to your MCP client config:"
     echo '  {'
     echo '    "mcpServers": {'
     echo '      "link": {'
-    echo '        "command": "python3",'
+    echo "        \"command\": \"$LINK_MCP_PYTHON\","
     echo "        \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$TARGET_DIR/wiki\"]"
     echo '      }'
     echo '    }'
@@ -122,7 +133,7 @@ if python3 -c "import link_mcp" 2>/dev/null; then
 else
     echo "  · Could not install link-mcp automatically."
     echo "  Manual options:"
-    echo "    python3 -m pip install --upgrade --break-system-packages link-mcp"
+    echo "    python3 -m pip install --upgrade link-mcp"
     echo "    python3 -m venv ~/.link-mcp-venv"
     echo "    ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp"
     echo "  If using the venv, set your MCP command to ~/.link-mcp-venv/bin/python."

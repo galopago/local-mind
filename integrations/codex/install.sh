@@ -34,6 +34,12 @@ else
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
 fi
 
+MCP_PYTHON="python3"
+MCP_MARKER="${WIKI_PATH%/wiki}/.link-mcp-python"
+if [ -f "$MCP_MARKER" ]; then
+    MCP_PYTHON="$(cat "$MCP_MARKER")"
+fi
+
 echo ""
 echo "Done."
 echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
@@ -42,17 +48,33 @@ echo ""
 
 # Auto-register MCP in ~/.codex/config.toml
 CODEX_CONFIG="$HOME/.codex/config.toml"
-if [ -f "$CODEX_CONFIG" ] && ! grep -q '\[mcp_servers.link\]' "$CODEX_CONFIG"; then
-    cat >> "$CODEX_CONFIG" << TOML
+if [ -f "$CODEX_CONFIG" ]; then
+    LINK_CODEX_CONFIG="$CODEX_CONFIG" LINK_MCP_PYTHON="$MCP_PYTHON" LINK_WIKI_PATH="$WIKI_PATH" python3 - << 'PYEOF'
+import json, os, re
+from pathlib import Path
 
-[mcp_servers.link]
-command = "python3"
-args = ["-m", "link_mcp", "--wiki", "$WIKI_PATH"]
-TOML
+path = Path(os.environ["LINK_CODEX_CONFIG"])
+mcp_python = os.environ["LINK_MCP_PYTHON"]
+wiki_path = os.environ["LINK_WIKI_PATH"]
+block = (
+    "[mcp_servers.link]\n"
+    f"command = {json.dumps(mcp_python)}\n"
+    f"args = [\"-m\", \"link_mcp\", \"--wiki\", {json.dumps(wiki_path)}]\n"
+)
+text = path.read_text(encoding="utf-8", errors="replace")
+pattern = re.compile(r"(?ms)^\\[mcp_servers\\.link\\]\n.*?(?=^\\[|\\Z)")
+if pattern.search(text):
+    text = pattern.sub(block, text)
+    if not text.endswith("\n"):
+        text += "\n"
+else:
+    text = text.rstrip() + "\n\n" + block
+path.write_text(text, encoding="utf-8")
+PYEOF
     echo "  ✓ Link MCP registered in ~/.codex/config.toml"
 elif [ ! -f "$CODEX_CONFIG" ]; then
     echo "  MCP config: add to ~/.codex/config.toml:"
     echo "  [mcp_servers.link]"
-    echo "  command = \"python3\""
+    echo "  command = \"$MCP_PYTHON\""
     echo "  args = [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"]"
 fi

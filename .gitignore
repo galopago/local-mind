@@ -49,6 +49,7 @@ GEMINI.md
 .kiro/
 .github/copilot-instructions.md
 .vscode/settings.json
+.link-mcp-python
 
 # PyPI build artifacts
 mcp_package/dist/

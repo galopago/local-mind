@@ -32,10 +32,16 @@ else
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
 fi
 
+MCP_PYTHON="python3"
+MCP_MARKER="${WIKI_PATH%/wiki}/.link-mcp-python"
+if [ -f "$MCP_MARKER" ]; then
+    MCP_PYTHON="$(cat "$MCP_MARKER")"
+fi
+
 echo ""
 echo "Done."
 echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
 echo "  View wiki: python ~/link/serve.py"
 echo ""
 echo "  MCP: add to ~/.gemini/settings.json:"
-echo "  { \"mcpServers\": { \"link\": { \"command\": \"python3\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
+echo "  { \"mcpServers\": { \"link\": { \"command\": \"$MCP_PYTHON\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
