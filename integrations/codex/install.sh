@@ -62,7 +62,7 @@ block = (
     f"args = [\"-m\", \"link_mcp\", \"--wiki\", {json.dumps(wiki_path)}]\n"
 )
 text = path.read_text(encoding="utf-8", errors="replace")
-pattern = re.compile(r"(?ms)^\\[mcp_servers\\.link\\]\n.*?(?=^\\[|\\Z)")
+pattern = re.compile(r"(?ms)^\[mcp_servers\.link\]\n.*?(?=^\[|\Z)")
 if pattern.search(text):
     text = pattern.sub(block, text)
     if not text.endswith("\n"):

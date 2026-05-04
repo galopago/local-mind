@@ -6,6 +6,10 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Codex MCP auto-registration after the venv installer fallback so existing `~/.codex/config.toml` files are updated without a regex crash.
+
 ## [1.0.6] - 2026-05-04
 
 ### Added
