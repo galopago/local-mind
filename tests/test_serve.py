@@ -39,6 +39,17 @@ class ServeTests(unittest.TestCase):
         reset_wiki(wiki)
         return wiki
 
+    def test_plural_type_label_handles_entities(self):
+        self.assertEqual(serve._plural_type_label("source"), "sources")
+        self.assertEqual(serve._plural_type_label("concept"), "concepts")
+        self.assertEqual(serve._plural_type_label("entity"), "entities")
+
+    def test_layout_handles_search_enter_key(self):
+        html = serve._layout("Test", "<p>Body</p>")
+
+        self.assertIn("document.activeElement.id === 'search-input'", html)
+        self.assertIn("window.location.href = '/search?q=' + encodeURIComponent(q);", html)
+
     def test_context_reads_current_backlinks_shape(self):
         wiki = self.make_wiki()
         write_page(

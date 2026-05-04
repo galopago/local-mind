@@ -1191,6 +1191,20 @@ def _mcp_config(python_cmd: str, wiki_dir: Path) -> dict[str, object]:
     }
 
 
+def _resolve_mcp_python(target: Path, wiki_dir: Path, python_cmd: str | None) -> str:
+    if python_cmd:
+        return str(Path(python_cmd).expanduser())
+
+    root = wiki_dir.parent if wiki_dir.name == "wiki" else target
+    marker = root / ".link-mcp-python"
+    if marker.exists():
+        configured = marker.read_text(encoding="utf-8", errors="replace").strip()
+        if configured:
+            return str(Path(configured).expanduser())
+
+    return sys.executable
+
+
 def verify_mcp(
     target: Path,
     json_output: bool = False,
@@ -1199,7 +1213,7 @@ def verify_mcp(
 ) -> int:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
-    python_cmd = str(Path(python_cmd).expanduser()) if python_cmd else sys.executable
+    python_cmd = _resolve_mcp_python(target, wiki_dir, python_cmd)
     import_status = import_check(python_cmd)
     wiki_exists = wiki_dir.exists() and wiki_dir.is_dir()
     config = _mcp_config(python_cmd, wiki_dir)

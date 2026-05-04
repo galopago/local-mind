@@ -156,6 +156,43 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn('"command": "/tmp/python"', out.getvalue())
         self.assertIn("Result: ready", out.getvalue())
 
+    def test_verify_mcp_uses_installer_python_marker(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / ".link-mcp-python").write_text("/tmp/link-mcp-venv/bin/python\n", encoding="utf-8")
+        checked = []
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                import_check=lambda cmd: checked.append(cmd) or {"installed": True, "version": "9.9.9", "error": None},
+            )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(checked, ["/tmp/link-mcp-venv/bin/python"])
+        self.assertIn('"command": "/tmp/link-mcp-venv/bin/python"', out.getvalue())
+
+    def test_verify_mcp_explicit_python_overrides_marker(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / ".link-mcp-python").write_text("/tmp/link-mcp-venv/bin/python\n", encoding="utf-8")
+        checked = []
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                python_cmd="/tmp/explicit-python",
+                json_output=True,
+                import_check=lambda cmd: checked.append(cmd) or {"installed": True, "version": "9.9.9", "error": None},
+            )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(checked, ["/tmp/explicit-python"])
+
     def test_verify_mcp_json(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
         target = tmp / "demo"

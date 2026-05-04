@@ -181,6 +181,13 @@ def _page_href(name: str) -> str:
     return "/page/" + urllib.parse.quote(name.strip(), safe="")
 
 
+def _plural_type_label(page_type: str) -> str:
+    irregular = {"entity": "entities"}
+    if page_type in irregular:
+        return irregular[page_type]
+    return page_type if page_type.endswith("s") else page_type + "s"
+
+
 def _json_for_script(data) -> str:
     """Serialize JSON for direct embedding inside a <script> tag."""
     return (
@@ -494,6 +501,13 @@ document.addEventListener('keydown', function(e) {{
   if (e.key === 'Escape' && inInput) {{
     document.activeElement.blur();
   }}
+  if (e.key === 'Enter' && document.activeElement.id === 'search-input') {{
+    var q = document.activeElement.value.trim();
+    if (q) {{
+      e.preventDefault();
+      window.location.href = '/search?q=' + encodeURIComponent(q);
+    }}
+  }}
   // j/k → navigate focusable links in page-list
   if ((e.key === 'j' || e.key === 'k') && !inInput) {{
     var links = Array.from(document.querySelectorAll('.page-list a, .search-results a'));
@@ -525,7 +539,7 @@ def _render_home():
     stats_items = f'<div class="stat"><span class="num">{len(pages)}</span><span class="label">pages</span></div>'
     for t in ["source", "concept", "entity", "comparison", "exploration"]:
         if counts.get(t, 0) > 0:
-            label = t + "s" if not t.endswith("s") else t
+            label = _plural_type_label(t)
             stats_items += f'<div class="stat"><span class="num">{counts[t]}</span><span class="label">{label}</span></div>'
     stats = f'<div class="home-stats">{stats_items}</div>'
 
