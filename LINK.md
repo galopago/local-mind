@@ -238,6 +238,7 @@ How the answer was derived. Which pages were consulted. What connections were ma
 
 When the human adds a new source to `raw/` and asks you to process it:
 
+0. Run `python3 link.py ingest-status .` when `link.py` is available to see pending raw files and current graph state
 1. Read the source completely
 2. Discuss key takeaways with the human (brief, 3-5 bullet points)
 3. Create a source page in `wiki/sources/` following the template

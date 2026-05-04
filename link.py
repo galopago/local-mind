@@ -4,6 +4,7 @@
 Usage:
   python link.py demo [target]
   python link.py doctor [target]
+  python link.py ingest-status [target]
   python link.py rebuild-backlinks [target]
 """
 from __future__ import annotations
@@ -684,22 +685,91 @@ def _find_unindexed_pages(wiki_dir: Path) -> list[str]:
 
 
 def _find_uningested_raw(target: Path) -> list[str]:
+    target = target.expanduser().resolve()
+    status = _collect_ingest_status(target)
+    return [item["raw"].removeprefix("raw/") for item in status["pending_raw"]]
+
+
+def _raw_source_files(raw_dir: Path) -> list[Path]:
+    if not raw_dir.exists():
+        return []
+    files: list[Path] = []
+    for path in sorted(raw_dir.rglob("*")):
+        if not path.is_file() or path.name.startswith("."):
+            continue
+        if any(part in SKIP_SCAN_DIRS for part in path.relative_to(raw_dir).parts):
+            continue
+        files.append(path)
+    return files
+
+
+def _source_page_texts(wiki_dir: Path) -> dict[str, str]:
+    sources_dir = wiki_dir / "sources"
+    if not sources_dir.exists():
+        return {}
+    texts: dict[str, str] = {}
+    for page in sorted(sources_dir.rglob("*.md")):
+        if page.name.startswith("."):
+            continue
+        texts[page.stem.lower()] = page.read_text(encoding="utf-8", errors="replace")
+    return texts
+
+
+def _backlinks_health(wiki_dir: Path) -> tuple[str, str]:
+    current, load_error = _load_backlinks(wiki_dir / "_backlinks.json")
+    if load_error:
+        return "missing" if "missing" in load_error else "invalid", load_error
+    expected = _build_backlinks(wiki_dir)
+    if current is not None and _normalize_link_index(current) == _normalize_link_index(expected):
+        return "current", "wiki/_backlinks.json is current"
+    return "stale", "wiki/_backlinks.json is stale"
+
+
+def _collect_ingest_status(target: Path) -> dict[str, object]:
+    target = target.expanduser().resolve()
     raw_dir = target / "raw"
     wiki_dir = target / "wiki"
-    if not raw_dir.exists() or not wiki_dir.exists():
-        return []
-    wiki_text = "\n".join(
-        md.read_text(encoding="utf-8", errors="replace")
-        for md in _wiki_pages(wiki_dir)
+    raw_files = _raw_source_files(raw_dir)
+    source_texts = _source_page_texts(wiki_dir)
+
+    represented_raw: list[dict[str, object]] = []
+    pending_raw: list[dict[str, object]] = []
+    for raw_path in raw_files:
+        rel = raw_path.relative_to(target).as_posix()
+        matches = [
+            source_name
+            for source_name, source_text in source_texts.items()
+            if rel in source_text
+        ]
+        item = {
+            "raw": rel,
+            "size_bytes": raw_path.stat().st_size,
+            "source_pages": matches,
+        }
+        if matches:
+            represented_raw.append(item)
+        else:
+            pending_raw.append(item)
+
+    backlinks_status, backlinks_message = (
+        _backlinks_health(wiki_dir)
+        if wiki_dir.exists()
+        else ("missing", "missing wiki directory")
     )
-    missing: list[str] = []
-    for raw in sorted(raw_dir.iterdir()):
-        if raw.name.startswith(".") or not raw.is_file():
-            continue
-        marker = f"raw/{raw.name}"
-        if marker not in wiki_text:
-            missing.append(raw.name)
-    return missing
+
+    return {
+        "target": str(target),
+        "raw_count": len(raw_files),
+        "source_page_count": len(source_texts),
+        "represented_count": len(represented_raw),
+        "pending_count": len(pending_raw),
+        "represented_raw": represented_raw,
+        "pending_raw": pending_raw,
+        "backlinks_status": backlinks_status,
+        "backlinks_message": backlinks_message,
+        "has_raw_dir": raw_dir.exists(),
+        "has_wiki_dir": wiki_dir.exists(),
+    }
 
 
 def _find_pages_missing_summaries(wiki_dir: Path) -> list[str]:
@@ -935,6 +1005,57 @@ def doctor(target: Path) -> int:
     return 0
 
 
+def ingest_status(target: Path, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    status = _collect_ingest_status(target)
+
+    if json_output:
+        print(json.dumps(status, indent=2))
+        return 0 if status["has_raw_dir"] and status["has_wiki_dir"] else 1
+
+    print(f"Link ingest status: {target}")
+    print("")
+    if not status["has_raw_dir"]:
+        print("Missing raw/ directory")
+    if not status["has_wiki_dir"]:
+        print("Missing wiki/ directory")
+    if not status["has_raw_dir"] or not status["has_wiki_dir"]:
+        print("")
+        print("Next:")
+        print("  Run an installer or create a demo: python3 link.py demo")
+        return 1
+
+    print(f"Raw files: {status['raw_count']}")
+    print(f"Source pages: {status['source_page_count']}")
+    print(f"Represented in wiki/sources: {status['represented_count']}")
+    print(f"Pending ingest: {status['pending_count']}")
+    print(f"Backlinks: {status['backlinks_status']} ({status['backlinks_message']})")
+
+    pending_raw = status["pending_raw"]
+    if pending_raw:
+        print("")
+        print("Pending raw files:")
+        for item in pending_raw[:20]:
+            print(f"- {item['raw']}")
+        if len(pending_raw) > 20:
+            print(f"- ... {len(pending_raw) - 20} more")
+
+    print("")
+    print("Next:")
+    if pending_raw:
+        first_pending = pending_raw[0]["raw"]
+        print(f"  Ask your agent: ingest {first_pending}")
+        print("  After ingest: python3 link.py rebuild-backlinks .")
+        print("  Then check:  python3 link.py doctor .")
+    elif status["backlinks_status"] != "current":
+        print("  Repair graph index: python3 link.py rebuild-backlinks .")
+        print("  Then check:          python3 link.py doctor .")
+    else:
+        print("  No pending raw files. Run: python3 link.py doctor .")
+
+    return 0
+
+
 def rebuild_backlinks(target: Path) -> int:
     wiki_dir = _resolve_wiki_dir(target)
     if not wiki_dir.exists():
@@ -1024,6 +1145,10 @@ def main(argv: list[str] | None = None) -> int:
     doctor_cmd = sub.add_parser("doctor", help="check a Link wiki for common health issues")
     doctor_cmd.add_argument("target", nargs="?", default=".")
 
+    ingest_status_cmd = sub.add_parser("ingest-status", help="show raw files pending wiki ingestion")
+    ingest_status_cmd.add_argument("target", nargs="?", default=".")
+    ingest_status_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
+
     rebuild_cmd = sub.add_parser("rebuild-backlinks", help="rebuild wiki/_backlinks.json")
     rebuild_cmd.add_argument("target", nargs="?", default=".")
 
@@ -1033,6 +1158,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "doctor":
         return doctor(Path(args.target))
+    if args.command == "ingest-status":
+        return ingest_status(Path(args.target), json_output=args.json)
     if args.command == "rebuild-backlinks":
         return rebuild_backlinks(Path(args.target))
     parser.error(f"unknown command: {args.command}")

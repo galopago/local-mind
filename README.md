@@ -43,6 +43,7 @@ The demo shows raw notes, compiled pages, backlinks, MCP-friendly context, and t
 Check the demo wiki:
 
 ```bash
+python3 link.py ingest-status .
 python3 link.py doctor .
 ```
 
@@ -241,6 +242,7 @@ Local utility commands:
 
 ```bash
 python3 link.py demo              # create ./link-demo with a pre-ingested sample wiki
+python3 link.py ingest-status link-demo  # show raw files still pending ingestion
 python3 link.py doctor link-demo  # check structure, graph health, source hygiene, and secret-looking content
 python3 link.py rebuild-backlinks link-demo  # regenerate wiki/_backlinks.json without starting the server
 ```

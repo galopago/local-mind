@@ -78,6 +78,66 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("OK source-backed pages cite sources", out.getvalue())
         self.assertIn("OK no sensitive-looking file contents", out.getvalue())
 
+    def test_ingest_status_accepts_demo_wiki(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.ingest_status(target)
+
+        self.assertEqual(code, 0)
+        self.assertIn("Raw files: 3", out.getvalue())
+        self.assertIn("Pending ingest: 0", out.getvalue())
+        self.assertIn("Backlinks: current", out.getvalue())
+
+    def test_ingest_status_reports_pending_raw_file(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / "raw/new-source.md").write_text("# New source\n", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.ingest_status(target)
+
+        self.assertEqual(code, 0)
+        self.assertIn("Pending ingest: 1", out.getvalue())
+        self.assertIn("raw/new-source.md", out.getvalue())
+        self.assertIn("Ask your agent: ingest raw/new-source.md", out.getvalue())
+
+    def test_ingest_status_json(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / "raw/new-source.md").write_text("# New source\n", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.ingest_status(target, json_output=True)
+
+        data = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(data["raw_count"], 4)
+        self.assertEqual(data["pending_count"], 1)
+        self.assertEqual(data["pending_raw"][0]["raw"], "raw/new-source.md")
+
+    def test_ingest_status_reports_stale_backlinks(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        backlinks_path = target / "wiki/_backlinks.json"
+        backlinks_path.write_text(json.dumps({"backlinks": {}, "forward": {}}), encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.ingest_status(target)
+
+        self.assertEqual(code, 0)
+        self.assertIn("Backlinks: stale", out.getvalue())
+        self.assertIn("Repair graph index", out.getvalue())
+
     def test_doctor_reports_dead_links(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
         target = tmp / "demo"
