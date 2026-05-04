@@ -62,6 +62,22 @@ mcp = FastMCP(
 # ── In-memory indexes (built on first use, invalidated by mtime) ──────
 _cache: dict = {}
 _cache_mtime: float = 0.0
+MAX_TEXT_INPUT = 200
+
+
+def _clean_text_input(value, max_len: int = MAX_TEXT_INPUT) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    return text[:max_len]
+
+
+def _parse_limit(value, default: int = 20, max_limit: int = 50) -> int:
+    try:
+        limit = int(value)
+    except (TypeError, ValueError):
+        return default
+    return min(max(limit, 1), max_limit)
 
 
 def _wiki_mtime() -> float:
@@ -200,6 +216,10 @@ def _build_cache() -> dict:
 
 
 def _search(q: str, limit: int = 20) -> list[dict]:
+    q = _clean_text_input(q)
+    limit = _parse_limit(limit)
+    if not q:
+        return []
     q_lower = q.lower()
     c = _build_cache()
     pages = c["pages"]
@@ -241,6 +261,10 @@ def _search(q: str, limit: int = 20) -> list[dict]:
 
 
 def _get_context(topic: str) -> dict:
+    topic = _clean_text_input(topic)
+    if not topic:
+        return {"topic": "", "found": False, "error": "topic required", "pages": []}
+
     c = _build_cache()
     matches = _search(topic, limit=5)
     if not matches:
@@ -335,7 +359,12 @@ def search_wiki(query: str, limit: int = 20) -> str:
 
     Use this to find relevant pages before calling get_context.
     """
-    results = _search(query, limit=min(limit, 50))
+    query = _clean_text_input(query)
+    limit = _parse_limit(limit)
+    if not query:
+        return json.dumps({"error": "query required", "query": "", "count": 0, "results": []})
+
+    results = _search(query, limit=limit)
     if not results:
         return json.dumps({"query": query, "count": 0, "results": []})
     # Strip heavy fields for the search response
@@ -376,6 +405,9 @@ def get_pages(category: str = "", page_type: str = "", maturity: str = "") -> st
     """
     c = _build_cache()
     pages = c["pages"]
+    category = _clean_text_input(category).lower()
+    page_type = _clean_text_input(page_type).lower()
+    maturity = _clean_text_input(maturity).lower()
     if category:
         pages = [p for p in pages if p["category"] == category]
     if page_type:
@@ -402,6 +434,10 @@ def get_backlinks(page_name: str) -> str:
         raw = json.loads(bl_path.read_text(encoding="utf-8"))
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+    page_name = _clean_text_input(page_name)
+    if not page_name:
+        return json.dumps({"error": "page_name required", "inbound": [], "forward": []})
 
     name = page_name.lower().replace(" ", "-")
     backlinks = raw.get("backlinks", raw)

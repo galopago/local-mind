@@ -101,6 +101,35 @@ class ServeTests(unittest.TestCase):
         self.assertNotIn("<script>", rendered)
         self.assertNotIn("javascript:", rendered.lower())
 
+    def test_wikilink_targets_encode_path_separators(self):
+        rendered = serve._md_to_html("[[../raw/private|private]]")
+
+        self.assertIn('<a href="/page/..%2Fraw%2Fprivate">private</a>', rendered)
+        self.assertNotIn("/page/../raw/private", rendered)
+
+    def test_json_for_script_escapes_script_end_tags(self):
+        rendered = serve._json_for_script({"title": "</script><script>alert(1)</script>"})
+
+        self.assertIn("\\u003c/script\\u003e", rendered)
+        self.assertNotIn("</script>", rendered.lower())
+
+    def test_static_file_allowlist_rejects_raw_traversal(self):
+        wiki = self.make_wiki()
+        raw_dir = wiki.parent / "raw"
+        raw_dir.mkdir()
+        reset_wiki(wiki)
+
+        allowed = serve._safe_resolve(raw_dir / "note.txt")
+        denied = serve._safe_resolve(raw_dir / "../serve.py")
+
+        self.assertIsNotNone(allowed)
+        self.assertIsNotNone(denied)
+        self.assertTrue(serve._is_allowed_static_file(allowed))
+        self.assertFalse(serve._is_allowed_static_file(denied))
+
+    def test_static_file_resolve_handles_malformed_paths(self):
+        self.assertIsNone(serve._safe_resolve(Path("bad\0path")))
+
     def test_cache_invalidation_sees_existing_page_edits(self):
         wiki = self.make_wiki()
         page = write_page(
@@ -177,6 +206,19 @@ class ServeTests(unittest.TestCase):
         html = serve._render_graph()
 
         self.assertLess(html.index('id="graph-tooltip"'), html.index("var tooltip ="))
+
+    def test_graph_script_embeds_titles_safely(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/evil.md",
+            "---\ntype: concept\ntitle: </script><script>alert(1)</script>\n---\n# Evil\n",
+        )
+
+        rendered = serve._render_graph()
+
+        self.assertIn("\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e", rendered)
+        self.assertNotIn("</script><script>alert(1)</script>", rendered.lower())
 
     def test_search_limit_validation(self):
         self.assertEqual(serve._parse_search_limit("3"), (3, None))

@@ -336,6 +336,20 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("sensitive-looking file contents", out.getvalue())
 
+    def test_doctor_fails_on_google_api_key_content(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        fake_key = "AIza" + ("A" * 35)
+        (target / "raw/google-leak.md").write_text(f"key = {fake_key}\n", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.doctor(target)
+
+        self.assertEqual(code, 1)
+        self.assertIn("Google API key", out.getvalue())
+
     def test_doctor_fails_on_sensitive_filename(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
         target = tmp / "demo"
@@ -348,6 +362,19 @@ class LinkCliTests(unittest.TestCase):
 
         self.assertEqual(code, 1)
         self.assertIn("sensitive-looking filenames", out.getvalue())
+
+    def test_doctor_fails_on_service_account_filename(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / "raw/service-account-prod.json").write_text("{}", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.doctor(target)
+
+        self.assertEqual(code, 1)
+        self.assertIn("service-account-prod.json", out.getvalue())
 
 
 if __name__ == "__main__":

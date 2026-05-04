@@ -177,6 +177,47 @@ def _parse_search_limit(raw: str) -> tuple[int | None, str | None]:
     return min(limit, 50), None
 
 
+def _page_href(name: str) -> str:
+    return "/page/" + urllib.parse.quote(name.strip(), safe="")
+
+
+def _json_for_script(data) -> str:
+    """Serialize JSON for direct embedding inside a <script> tag."""
+    return (
+        json.dumps(data, ensure_ascii=False)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
+
+def _safe_resolve(path: Path) -> Path | None:
+    try:
+        return path.resolve()
+    except (OSError, ValueError):
+        return None
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def _is_allowed_static_file(path: Path) -> bool:
+    root = Path(__file__).parent.resolve()
+    raw_root = RAW_DIR.resolve()
+    allowed_root_files = {
+        (root / "logo.svg").resolve(),
+        (root / "logo.png").resolve(),
+    }
+    return path in allowed_root_files or _is_relative_to(path, raw_root)
+
+
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
@@ -211,7 +252,7 @@ def _inline(text):
     def _wl(m):
         inner = html.unescape(m.group(1))
         t, d = (inner.split("|", 1) if "|" in inner else (inner, inner))
-        href = "/page/" + urllib.parse.quote(t.strip())
+        href = _page_href(t)
         return _stash(f'<a href="{href}">{html.escape(d.strip())}</a>')
 
     def _md_link(m):
@@ -482,7 +523,7 @@ def _render_home():
     sections = ""
     for cat in sorted(cats.keys()):
         items = "".join(
-            f'<li><a href="/page/{urllib.parse.quote(p["name"])}">{html.escape(p["title"])}</a>'
+            f'<li><a href="{_page_href(p["name"])}">{html.escape(p["title"])}</a>'
             f'<span class="type">{p["type"]}</span></li>'
             for p in sorted(cats[cat], key=lambda x: x["title"])
         )
@@ -529,7 +570,7 @@ def _render_page(page_path):
 def _render_all():
     pages = _get_all_pages()
     items = "".join(
-        f'<li><a href="/page/{urllib.parse.quote(p["name"])}">{html.escape(p["title"])}</a>'
+        f'<li><a href="{_page_href(p["name"])}">{html.escape(p["title"])}</a>'
         f'<span class="type">{p["type"] or p["category"]}</span></li>'
         for p in sorted(pages, key=lambda x: x["title"])
     )
@@ -545,8 +586,8 @@ def _render_graph():
         e for e in graph["edges"]
         if e["source"] in visible_ids and e["target"] in visible_ids
     ]
-    nodes_json = json.dumps(visible_nodes)
-    edges_json = json.dumps(visible_edges)
+    nodes_json = _json_for_script(visible_nodes)
+    edges_json = _json_for_script(visible_edges)
     node_count = len(visible_nodes)
     edge_count = len(visible_edges)
 
@@ -559,7 +600,7 @@ def _render_graph():
 (function() {{
   var nodes = {nodes_json};
   var edges = {edges_json};
-  var catColors = {json.dumps(cat_colors)};
+  var catColors = {_json_for_script(cat_colors)};
 
   var canvas = document.getElementById('graph-canvas');
   var ctx = canvas.getContext('2d');
@@ -910,7 +951,7 @@ def _render_search(query):
         )
 
     items = "".join(
-        f'<li><a href="/page/{urllib.parse.quote(r["name"])}">{_highlight(r["title"], query)}</a>'
+        f'<li><a href="{_page_href(r["name"])}">{_highlight(r["title"], query)}</a>'
         f'<br><small style="color:#888">...{_highlight(r.get("snippet",""), query)}...</small></li>'
         for r in results[:30]
     )
@@ -1226,6 +1267,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         encoded = body.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self._security_headers()
         self.send_header("Content-Length", str(len(encoded)))
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
@@ -1236,6 +1278,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         encoded = _layout("Not Found", f"<h1>Not found</h1><p>No page: {html.escape(name)}</p>").encode()
         self.send_response(404)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self._security_headers()
         self.send_header("Content-Length", str(len(encoded)))
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
@@ -1246,34 +1289,35 @@ class Handler(http.server.BaseHTTPRequestHandler):
         encoded = json.dumps(data).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        self._security_headers()
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
 
+    def _security_headers(self):
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+
     def _file(self, fpath, content_type):
-        fpath = fpath.resolve()
-        # Ensure the resolved path is within the expected parent directory
-        # (prevents path traversal via /raw/../../sensitive-file)
-        raw_resolved = RAW_DIR.resolve()
-        root = Path(__file__).parent
-        allowed_root_files = {
-            (root / "logo.svg").resolve(),
-            (root / "logo.png").resolve(),
-        }
-        if fpath not in allowed_root_files and not str(fpath).startswith(str(raw_resolved) + "/") and fpath != raw_resolved:
-            self._err("forbidden")
+        fpath = _safe_resolve(fpath)
+        if not fpath or not _is_allowed_static_file(fpath):
+            self._err("file")
             return
         if fpath.exists() and fpath.is_file():
             data = fpath.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", content_type)
+            self._security_headers()
+            if content_type == "image/svg+xml":
+                self.send_header("Content-Security-Policy", "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; sandbox")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             if not getattr(self, '_head_only', False):
                 self.wfile.write(data)
         else:
-            self._err(str(fpath))
+            self._err("file")
 
     def log_message(self, *a): pass
 

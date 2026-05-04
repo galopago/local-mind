@@ -100,6 +100,20 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("score", payload["results"][0])
         self.assertIn("snippet", payload["results"][0])
 
+    def test_search_wiki_handles_invalid_limits(self):
+        bad_limit = json.loads(self.server.search_wiki("agent memory", limit="bad"))
+        negative_limit = json.loads(self.server.search_wiki("agent memory", limit=-10))
+
+        self.assertGreaterEqual(bad_limit["count"], 1)
+        self.assertEqual(negative_limit["count"], 1)
+
+    def test_search_wiki_rejects_empty_query(self):
+        payload = json.loads(self.server.search_wiki("   ", limit=5))
+
+        self.assertEqual(payload["error"], "query required")
+        self.assertEqual(payload["count"], 0)
+        self.assertEqual(payload["results"], [])
+
     def test_get_context_contract(self):
         payload = json.loads(self.server.get_context("agent memory"))
         page_names = [page["name"] for page in payload["pages"]]
@@ -112,6 +126,13 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("link", page_names)
         self.assertIn("agent-memory-session", page_names)
         self.assertEqual(payload["pages"][0]["relationship"], "primary")
+
+    def test_get_context_rejects_empty_topic(self):
+        payload = json.loads(self.server.get_context(""))
+
+        self.assertFalse(payload["found"])
+        self.assertEqual(payload["error"], "topic required")
+        self.assertEqual(payload["pages"], [])
 
     def test_get_pages_filters_contract(self):
         concepts = json.loads(self.server.get_pages(category="concepts"))
@@ -132,6 +153,13 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(len(payload["forward"]), 5)
         self.assertIn("link", payload["inbound"])
         self.assertIn("agent-memory-session", payload["forward"])
+
+    def test_get_backlinks_rejects_empty_page_name(self):
+        payload = json.loads(self.server.get_backlinks(""))
+
+        self.assertEqual(payload["error"], "page_name required")
+        self.assertEqual(payload["inbound"], [])
+        self.assertEqual(payload["forward"], [])
 
     def test_get_graph_contract(self):
         payload = json.loads(self.server.get_graph())
