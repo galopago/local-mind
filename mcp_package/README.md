@@ -6,6 +6,8 @@ MCP server for the [Link](https://github.com/gowtham0992/link) personal knowledg
 
 Listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.gowtham0992/link`.
 
+Release notes: [CHANGELOG.md](https://github.com/gowtham0992/link/blob/main/CHANGELOG.md)
+
 ## Install
 
 ```bash

@@ -13,6 +13,8 @@ Implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.gowtham0992%2Flink-blue)](https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink)
 [![PyPI](https://img.shields.io/pypi/v/link-mcp)](https://pypi.org/project/link-mcp/)
 
+Release notes: [CHANGELOG.md](CHANGELOG.md)
+
 ## How it works
 
 1. Drop sources (articles, papers, notes, images) into `raw/`
@@ -276,20 +278,21 @@ python3 link.py rebuild-backlinks .
 
 Use branches and CI for public releases:
 
-1. Create a branch such as `codex/ci-trust-gates`.
+1. Create a branch such as `release/mcp-1.0.6`.
 2. Make the release changes and bump the MCP package version in `mcp_package/pyproject.toml`, `mcp_package/server.json`, and `mcp_package/link_mcp/__init__.py`.
-3. Open a PR into `main`.
-4. Merge only after CI passes.
-5. Tag the exact merged release commit on `main`.
-6. Publish `link-mcp` to PyPI, then publish the MCP registry entry.
+3. Update [CHANGELOG.md](CHANGELOG.md): move relevant `Unreleased` items into the new version section and leave `Unreleased` ready for the next release.
+4. Open a PR into `main`.
+5. Merge only after CI passes.
+6. Tag the exact merged release commit on `main`.
+7. Publish `link-mcp` to PyPI, then publish the MCP registry entry.
 
 For a patch release:
 
 ```bash
 git switch main
 git pull --ff-only
-git tag -a v1.0.5 -m "v1.0.5"
-git push origin v1.0.5
+git tag -a v1.0.6 -m "v1.0.6"
+git push origin v1.0.6
 cd mcp_package
 rm -rf dist ./*.egg-info
 python3 -m build

@@ -57,6 +57,8 @@ BINARY_SUFFIXES = {
     ".zip",
 }
 
+CHANGELOG_VERSION_RE = re.compile(r"^## \[([^\]]+)\](?: - \d{4}-\d{2}-\d{2})?\s*$", re.MULTILINE)
+
 
 def tracked_files() -> list[Path]:
     result = subprocess.run(
@@ -78,7 +80,7 @@ def read_init_version(path: Path) -> str | None:
     return match.group(1) if match else None
 
 
-def check_version_consistency(findings: list[str]) -> None:
+def check_version_consistency(findings: list[str]) -> str | None:
     pyproject_version = read_pyproject_version(Path("mcp_package/pyproject.toml"))
     init_version = read_init_version(Path("mcp_package/link_mcp/__init__.py"))
     server = json.loads(Path("mcp_package/server.json").read_text(encoding="utf-8"))
@@ -97,11 +99,33 @@ def check_version_consistency(findings: list[str]) -> None:
         for label, version in versions.items():
             findings.append(f"version mismatch: {label} is {version!r}")
         findings.append(f"version mismatch: server.json package versions are {sorted(package_versions)!r}")
+    return pyproject_version
+
+
+def read_changelog_versions(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return CHANGELOG_VERSION_RE.findall(text)
+
+
+def check_changelog(findings: list[str], current_version: str | None, path: Path = Path("CHANGELOG.md")) -> None:
+    versions = read_changelog_versions(path)
+    if not versions:
+        findings.append("missing or empty CHANGELOG.md version sections")
+        return
+    if "Unreleased" not in versions:
+        findings.append("CHANGELOG.md missing ## [Unreleased] section")
+    if not current_version:
+        findings.append("could not determine current package version for CHANGELOG.md check")
+    elif current_version not in versions:
+        findings.append(f"CHANGELOG.md missing current package version: {current_version}")
 
 
 def main() -> int:
     findings: list[str] = []
-    check_version_consistency(findings)
+    current_version = check_version_consistency(findings)
+    check_changelog(findings, current_version)
 
     for path in tracked_files():
         name = path.name
