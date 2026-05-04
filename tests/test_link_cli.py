@@ -184,6 +184,55 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Rebuilt", out.getvalue())
         self.assertIn("agent-memory", rebuilt["backlinks"])
 
+    def test_doctor_fix_repairs_stale_backlinks(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        backlinks_path = target / "wiki/_backlinks.json"
+        backlinks_path.write_text(json.dumps({"backlinks": {}, "forward": {}}), encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.doctor(target, fix=True)
+
+        rebuilt = json.loads(backlinks_path.read_text(encoding="utf-8"))
+        self.assertEqual(code, 0)
+        self.assertIn("rebuilt wiki/_backlinks.json", out.getvalue())
+        self.assertIn("Result: healthy", out.getvalue())
+        self.assertIn("agent-memory", rebuilt["backlinks"])
+
+    def test_doctor_fix_creates_missing_structure(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "empty"
+        target.mkdir()
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.doctor(target, fix=True)
+
+        self.assertEqual(code, 0)
+        self.assertTrue((target / "raw").is_dir())
+        self.assertTrue((target / "wiki/sources").is_dir())
+        self.assertTrue((target / "wiki/concepts").is_dir())
+        self.assertTrue((target / "wiki/_backlinks.json").exists())
+        self.assertIn("created raw", out.getvalue())
+        self.assertIn("created wiki/index.md", out.getvalue())
+        self.assertIn("Result: healthy", out.getvalue())
+
+    def test_doctor_fix_does_not_hide_content_errors(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        page = target / "wiki/concepts/agent-memory.md"
+        page.write_text(page.read_text(encoding="utf-8") + "\n[[missing-page]]\n", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.doctor(target, fix=True)
+
+        self.assertEqual(code, 1)
+        self.assertIn("dead wikilinks", out.getvalue())
+
     def test_doctor_warns_on_missing_summary(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
         target = tmp / "demo"
