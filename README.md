@@ -106,6 +106,12 @@ Point it at your wiki and add to your MCP client config:
 
 That's it. No cloning required if you already have a wiki.
 
+Verify MCP setup from a Link checkout:
+
+```bash
+python3 link.py verify-mcp .
+```
+
 > **Don't have a wiki yet?** Run `bash link/integrations/kiro/install.sh` after cloning — it scaffolds `~/link/`, installs `link-mcp`, and registers it in your MCP config automatically.
 
 **macOS/Homebrew Python:** if pip reports `externally-managed-environment`, use a dedicated venv and point your MCP client at that Python:
@@ -246,6 +252,7 @@ python3 link.py ingest-status link-demo  # show raw files still pending ingestio
 python3 link.py doctor link-demo  # check structure, graph health, source hygiene, and secret-looking content
 python3 link.py doctor link-demo --fix  # safely create missing structure and repair backlinks
 python3 link.py rebuild-backlinks link-demo  # regenerate wiki/_backlinks.json without starting the server
+python3 link.py verify-mcp link-demo  # verify link-mcp import and print MCP client config
 ```
 
 ## Design principles

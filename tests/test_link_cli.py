@@ -138,6 +138,78 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Backlinks: stale", out.getvalue())
         self.assertIn("Repair graph index", out.getvalue())
 
+    def test_verify_mcp_ready(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                python_cmd="/tmp/python",
+                import_check=lambda _: {"installed": True, "version": "9.9.9", "error": None},
+            )
+
+        self.assertEqual(code, 0)
+        self.assertIn("link-mcp: installed (9.9.9)", out.getvalue())
+        self.assertIn('"command": "/tmp/python"', out.getvalue())
+        self.assertIn("Result: ready", out.getvalue())
+
+    def test_verify_mcp_json(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                json_output=True,
+                python_cmd="/tmp/python",
+                import_check=lambda _: {"installed": True, "version": "9.9.9", "error": None},
+            )
+
+        data = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertTrue(data["ready"])
+        self.assertEqual(data["link_mcp"]["version"], "9.9.9")
+        self.assertEqual(data["config"]["mcpServers"]["link"]["command"], "/tmp/python")
+
+    def test_verify_mcp_reports_missing_package(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                python_cmd="/tmp/python",
+                import_check=lambda _: {"installed": False, "version": None, "error": "No module named link_mcp"},
+            )
+
+        self.assertEqual(code, 1)
+        self.assertIn("link-mcp: missing", out.getvalue())
+        self.assertIn("python3 -m pip install --upgrade link-mcp", out.getvalue())
+
+    def test_verify_mcp_reports_missing_wiki(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "empty"
+        target.mkdir()
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                python_cmd="/tmp/python",
+                import_check=lambda _: {"installed": True, "version": "9.9.9", "error": None},
+            )
+
+        self.assertEqual(code, 1)
+        self.assertIn("Wiki: missing", out.getvalue())
+        self.assertIn("python3 link.py demo", out.getvalue())
+
     def test_doctor_reports_dead_links(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
         target = tmp / "demo"

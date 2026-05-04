@@ -6,6 +6,7 @@ Usage:
   python link.py doctor [target]
   python link.py ingest-status [target]
   python link.py rebuild-backlinks [target]
+  python link.py verify-mcp [target]
 """
 from __future__ import annotations
 
@@ -14,8 +15,10 @@ import fnmatch
 import json
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
 
 
 ROOT = Path(__file__).resolve().parent
@@ -1137,6 +1140,110 @@ def rebuild_backlinks(target: Path) -> int:
     return 0
 
 
+def _check_link_mcp_import(python_cmd: str) -> dict[str, object]:
+    code = (
+        "import json, link_mcp; "
+        "print(json.dumps({'installed': True, 'version': getattr(link_mcp, '__version__', 'unknown')}))"
+    )
+    try:
+        result = subprocess.run(
+            [python_cmd, "-c", code],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except OSError as exc:
+        return {"installed": False, "version": None, "error": str(exc)}
+    if result.returncode != 0:
+        error = (result.stderr or result.stdout).strip()
+        return {"installed": False, "version": None, "error": error}
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {"installed": False, "version": None, "error": "could not parse link_mcp import output"}
+    return {
+        "installed": bool(data.get("installed")),
+        "version": data.get("version") or "unknown",
+        "error": None,
+    }
+
+
+def _mcp_config(python_cmd: str, wiki_dir: Path) -> dict[str, object]:
+    return {
+        "mcpServers": {
+            "link": {
+                "command": python_cmd,
+                "args": ["-m", "link_mcp", "--wiki", str(wiki_dir)],
+            }
+        }
+    }
+
+
+def verify_mcp(
+    target: Path,
+    json_output: bool = False,
+    python_cmd: str | None = None,
+    import_check: Callable[[str], dict[str, object]] = _check_link_mcp_import,
+) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    python_cmd = str(Path(python_cmd).expanduser()) if python_cmd else sys.executable
+    import_status = import_check(python_cmd)
+    wiki_exists = wiki_dir.exists() and wiki_dir.is_dir()
+    config = _mcp_config(python_cmd, wiki_dir)
+    ready = bool(import_status.get("installed")) and wiki_exists
+    status = {
+        "ready": ready,
+        "python": python_cmd,
+        "link_mcp": import_status,
+        "wiki": {
+            "path": str(wiki_dir),
+            "exists": wiki_exists,
+        },
+        "config": config,
+    }
+
+    if json_output:
+        print(json.dumps(status, indent=2))
+        return 0 if ready else 1
+
+    print(f"Link MCP verification: {target}")
+    print("")
+    print(f"Python: {python_cmd}")
+    if import_status.get("installed"):
+        print(f"link-mcp: installed ({import_status.get('version')})")
+    else:
+        print("link-mcp: missing")
+        error = import_status.get("error")
+        if error:
+            print(f"Import error: {error}")
+    print(f"Wiki: {'found' if wiki_exists else 'missing'} ({wiki_dir})")
+
+    print("")
+    print("MCP config:")
+    print(json.dumps(config, indent=2))
+
+    if ready:
+        print("")
+        print("Result: ready")
+        return 0
+
+    print("")
+    print("Next:")
+    if not import_status.get("installed"):
+        print("  Install: python3 -m pip install --upgrade link-mcp")
+        print("  macOS/Homebrew fallback:")
+        print("    python3 -m venv ~/.link-mcp-venv")
+        print("    ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp")
+        print("    Then rerun with: python3 link.py verify-mcp . --python ~/.link-mcp-venv/bin/python")
+    if not wiki_exists:
+        print("  Create a wiki with an installer, or try: python3 link.py demo")
+    print("")
+    print("Result: needs attention")
+    return 1
+
+
 def _copy_runtime_files(target: Path) -> None:
     for name in ("serve.py", "link.py", "LINK.md", ".linkignore"):
         src = ROOT / name
@@ -1218,6 +1325,11 @@ def main(argv: list[str] | None = None) -> int:
     rebuild_cmd = sub.add_parser("rebuild-backlinks", help="rebuild wiki/_backlinks.json")
     rebuild_cmd.add_argument("target", nargs="?", default=".")
 
+    verify_mcp_cmd = sub.add_parser("verify-mcp", help="verify link-mcp import and print MCP config")
+    verify_mcp_cmd.add_argument("target", nargs="?", default=".")
+    verify_mcp_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
+    verify_mcp_cmd.add_argument("--python", default=None, help="Python executable to verify")
+
     args = parser.parse_args(argv)
     if args.command == "demo":
         create_demo(Path(args.target), force=args.force)
@@ -1228,6 +1340,8 @@ def main(argv: list[str] | None = None) -> int:
         return ingest_status(Path(args.target), json_output=args.json)
     if args.command == "rebuild-backlinks":
         return rebuild_backlinks(Path(args.target))
+    if args.command == "verify-mcp":
+        return verify_mcp(Path(args.target), json_output=args.json, python_cmd=args.python)
     parser.error(f"unknown command: {args.command}")
     return 2
 

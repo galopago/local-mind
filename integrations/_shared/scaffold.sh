@@ -132,6 +132,8 @@ if [ -f "$TARGET_DIR/link.py" ]; then
     echo ""
     echo "  Check wiki health:"
     echo "    python3 \"$TARGET_DIR/link.py\" doctor \"$TARGET_DIR\""
+    echo "  Verify MCP setup:"
+    echo "    python3 \"$TARGET_DIR/link.py\" verify-mcp \"$TARGET_DIR\""
     echo "  Repair stale graph index:"
     echo "    python3 \"$TARGET_DIR/link.py\" rebuild-backlinks \"$TARGET_DIR\""
 fi
