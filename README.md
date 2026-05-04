@@ -244,6 +244,7 @@ Local utility commands:
 python3 link.py demo              # create ./link-demo with a pre-ingested sample wiki
 python3 link.py ingest-status link-demo  # show raw files still pending ingestion
 python3 link.py doctor link-demo  # check structure, graph health, source hygiene, and secret-looking content
+python3 link.py doctor link-demo --fix  # safely create missing structure and repair backlinks
 python3 link.py rebuild-backlinks link-demo  # regenerate wiki/_backlinks.json without starting the server
 ```
 

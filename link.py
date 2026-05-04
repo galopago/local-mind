@@ -889,17 +889,10 @@ def _find_sensitive_values(target: Path) -> list[str]:
     return sorted(matches)
 
 
-def doctor(target: Path) -> int:
-    target = target.expanduser().resolve()
+def _required_paths(target: Path) -> list[Path]:
     wiki_dir = target / "wiki"
     raw_dir = target / "raw"
-    errors: list[str] = []
-    warnings: list[str] = []
-
-    print(f"Link doctor: {target}")
-    print("")
-
-    required = [
+    return [
         raw_dir,
         wiki_dir,
         wiki_dir / "index.md",
@@ -911,6 +904,78 @@ def doctor(target: Path) -> int:
         wiki_dir / "comparisons",
         wiki_dir / "explorations",
     ]
+
+
+def _write_default_index(path: Path) -> None:
+    path.write_text(
+        "# Link Wiki Index\n\n"
+        "> Last updated: not yet ingested | 0 pages | 0 sources\n\n"
+        "## Categories\n\n"
+        "## Recent\n\n"
+        "| Date | Operation | Pages Touched |\n"
+        "|------|-----------|---------------|\n",
+        encoding="utf-8",
+    )
+
+
+def _write_default_log(path: Path) -> None:
+    path.write_text("# Link Wiki Log\n\n*Append-only record of wiki operations.*\n", encoding="utf-8")
+
+
+def _apply_doctor_fixes(target: Path) -> list[str]:
+    target = target.expanduser().resolve()
+    wiki_dir = target / "wiki"
+    fixes: list[str] = []
+
+    for path in _required_paths(target):
+        if path.suffix:
+            continue
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+            fixes.append(f"created {path.relative_to(target)}")
+
+    index_path = wiki_dir / "index.md"
+    if not index_path.exists():
+        _write_default_index(index_path)
+        fixes.append("created wiki/index.md")
+
+    log_path = wiki_dir / "log.md"
+    if not log_path.exists():
+        _write_default_log(log_path)
+        fixes.append("created wiki/log.md")
+
+    if wiki_dir.exists():
+        backlinks_path = wiki_dir / "_backlinks.json"
+        current, load_error = _load_backlinks(backlinks_path)
+        expected = _build_backlinks(wiki_dir)
+        if load_error or current is None or _normalize_link_index(current) != _normalize_link_index(expected):
+            backlinks_path.write_text(json.dumps(expected, indent=2) + "\n", encoding="utf-8")
+            fixes.append("rebuilt wiki/_backlinks.json")
+
+    return fixes
+
+
+def doctor(target: Path, fix: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = target / "wiki"
+    raw_dir = target / "raw"
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    print(f"Link doctor: {target}")
+    print("")
+    if fix:
+        fixes = _apply_doctor_fixes(target)
+        if fixes:
+            print("Fixes applied:")
+            for item in fixes:
+                print(f"- {item}")
+            print("")
+        else:
+            print("Fixes applied: none")
+            print("")
+
+    required = _required_paths(target)
     missing = [str(path.relative_to(target)) for path in required if not path.exists()]
     if missing:
         errors.append("missing required paths: " + ", ".join(missing))
@@ -1144,6 +1209,7 @@ def main(argv: list[str] | None = None) -> int:
 
     doctor_cmd = sub.add_parser("doctor", help="check a Link wiki for common health issues")
     doctor_cmd.add_argument("target", nargs="?", default=".")
+    doctor_cmd.add_argument("--fix", action="store_true", help="repair safe structural and backlink issues")
 
     ingest_status_cmd = sub.add_parser("ingest-status", help="show raw files pending wiki ingestion")
     ingest_status_cmd.add_argument("target", nargs="?", default=".")
@@ -1157,7 +1223,7 @@ def main(argv: list[str] | None = None) -> int:
         create_demo(Path(args.target), force=args.force)
         return 0
     if args.command == "doctor":
-        return doctor(Path(args.target))
+        return doctor(Path(args.target), fix=args.fix)
     if args.command == "ingest-status":
         return ingest_status(Path(args.target), json_output=args.json)
     if args.command == "rebuild-backlinks":
