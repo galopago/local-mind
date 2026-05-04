@@ -279,8 +279,17 @@ python3 link.py rebuild-backlinks .
 Use branches and CI for public releases:
 
 1. Create a branch such as `release/mcp-1.0.6`.
-2. Make the release changes and bump the MCP package version in `mcp_package/pyproject.toml`, `mcp_package/server.json`, and `mcp_package/link_mcp/__init__.py`.
-3. Update [CHANGELOG.md](CHANGELOG.md): move relevant `Unreleased` items into the new version section and leave `Unreleased` ready for the next release.
+2. Make the release changes.
+3. Prepare release files:
+
+```bash
+python3 scripts/prepare_release.py 1.0.6
+```
+
+This bumps `mcp_package/pyproject.toml`, `mcp_package/server.json`, and `mcp_package/link_mcp/__init__.py`, then moves [CHANGELOG.md](CHANGELOG.md) `Unreleased` notes into `## [1.0.6] - YYYY-MM-DD`.
+
+Then finish the PR:
+
 4. Open a PR into `main`.
 5. Merge only after CI passes.
 6. Tag the exact merged release commit on `main`.
@@ -294,7 +303,7 @@ git pull --ff-only
 git tag -a v1.0.6 -m "v1.0.6"
 git push origin v1.0.6
 cd mcp_package
-rm -rf dist ./*.egg-info
+python3 -c "from pathlib import Path; import shutil; shutil.rmtree('dist', ignore_errors=True); [shutil.rmtree(p, ignore_errors=True) for p in Path('.').glob('*.egg-info')]"
 python3 -m build
 python3 -m twine check dist/*
 TWINE_USERNAME=__token__ python3 -m twine upload dist/*
