@@ -516,3 +516,5 @@ If the wiki is empty, start here:
 4. Wiki grows from there — use **query** to ask questions, **lint** to health-check, **research** to find new sources
 
 If the wiki already exists, read `wiki/index.md` and `wiki/log.md` first to understand current state before doing anything.
+
+To verify MCP access, run `python3 link.py verify-mcp .` when `link.py` is available. It checks whether `link_mcp` imports in the configured Python and prints the MCP client config for the current wiki.

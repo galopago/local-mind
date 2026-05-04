@@ -33,6 +33,7 @@ jobs:
           python /tmp/link-demo-ci/link.py doctor /tmp/link-demo-ci
           python /tmp/link-demo-ci/link.py rebuild-backlinks /tmp/link-demo-ci
           python /tmp/link-demo-ci/link.py doctor /tmp/link-demo-ci
+          PYTHONPATH=mcp_package python link.py verify-mcp /tmp/link-demo-ci --python python
 
   installer-syntax:
     runs-on: ubuntu-latest
