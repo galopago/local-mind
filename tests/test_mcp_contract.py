@@ -1,0 +1,162 @@
+import importlib.util
+import json
+import sys
+import tempfile
+import types
+import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+LINK_SPEC = importlib.util.spec_from_file_location("link_cli_for_mcp_tests", ROOT / "link.py")
+link_cli = importlib.util.module_from_spec(LINK_SPEC)
+assert LINK_SPEC.loader is not None
+LINK_SPEC.loader.exec_module(link_cli)
+
+
+class FakeFastMCP:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+    def tool(self):
+        def decorator(fn):
+            return fn
+
+        return decorator
+
+    def run(self, transport: str = "stdio") -> None:
+        return None
+
+
+def install_mcp_stub() -> dict[str, types.ModuleType | None]:
+    previous = {
+        "mcp": sys.modules.get("mcp"),
+        "mcp.server": sys.modules.get("mcp.server"),
+        "mcp.server.fastmcp": sys.modules.get("mcp.server.fastmcp"),
+    }
+    mcp_mod = types.ModuleType("mcp")
+    server_mod = types.ModuleType("mcp.server")
+    fastmcp_mod = types.ModuleType("mcp.server.fastmcp")
+    fastmcp_mod.FastMCP = FakeFastMCP
+    server_mod.fastmcp = fastmcp_mod
+    mcp_mod.server = server_mod
+    sys.modules["mcp"] = mcp_mod
+    sys.modules["mcp.server"] = server_mod
+    sys.modules["mcp.server.fastmcp"] = fastmcp_mod
+    return previous
+
+
+def restore_mcp_modules(previous: dict[str, types.ModuleType | None]) -> None:
+    for name, module in previous.items():
+        if module is None:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = module
+
+
+def create_demo_quiet(target: Path) -> None:
+    with redirect_stdout(StringIO()):
+        link_cli.create_demo(target, force=False)
+
+
+def import_mcp_server(wiki_dir: Path):
+    previous_modules = install_mcp_stub()
+    previous_argv = sys.argv[:]
+    module_name = f"link_mcp_server_contract_{id(wiki_dir)}"
+    try:
+        sys.argv = ["link_mcp.server", "--wiki", str(wiki_dir)]
+        spec = importlib.util.spec_from_file_location(module_name, ROOT / "mcp_package/link_mcp/server.py")
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module, previous_modules, previous_argv, module_name
+    except BaseException:
+        restore_mcp_modules(previous_modules)
+        sys.argv = previous_argv
+        raise
+
+
+class McpContractTests(unittest.TestCase):
+    def setUp(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-mcp-contract-"))
+        self.target = tmp / "demo"
+        create_demo_quiet(self.target)
+        self.server, self.previous_modules, self.previous_argv, self.module_name = import_mcp_server(self.target / "wiki")
+
+    def tearDown(self):
+        sys.modules.pop(self.module_name, None)
+        restore_mcp_modules(self.previous_modules)
+        sys.argv = self.previous_argv
+
+    def test_search_wiki_contract(self):
+        payload = json.loads(self.server.search_wiki("agent memory", limit=5))
+
+        self.assertEqual(payload["query"], "agent memory")
+        self.assertGreaterEqual(payload["count"], 1)
+        self.assertEqual(payload["results"][0]["name"], "agent-memory")
+        self.assertIn("score", payload["results"][0])
+        self.assertIn("snippet", payload["results"][0])
+
+    def test_get_context_contract(self):
+        payload = json.loads(self.server.get_context("agent memory"))
+        page_names = [page["name"] for page in payload["pages"]]
+
+        self.assertTrue(payload["found"])
+        self.assertEqual(payload["primary"], "agent-memory")
+        self.assertEqual(payload["inbound_count"], 9)
+        self.assertEqual(payload["forward_count"], 5)
+        self.assertEqual(page_names[0], "agent-memory")
+        self.assertIn("link", page_names)
+        self.assertIn("agent-memory-session", page_names)
+        self.assertEqual(payload["pages"][0]["relationship"], "primary")
+
+    def test_get_pages_filters_contract(self):
+        concepts = json.loads(self.server.get_pages(category="concepts"))
+        mature = json.loads(self.server.get_pages(maturity="growing"))
+        sources = json.loads(self.server.get_pages(page_type="source"))
+
+        self.assertEqual(concepts["count"], 5)
+        self.assertEqual({page["category"] for page in concepts["pages"]}, {"concepts"})
+        self.assertIn("agent-memory", {page["name"] for page in mature["pages"]})
+        self.assertEqual(sources["count"], 3)
+        self.assertEqual({page["type"] for page in sources["pages"]}, {"source"})
+
+    def test_get_backlinks_contract(self):
+        payload = json.loads(self.server.get_backlinks("agent-memory"))
+
+        self.assertEqual(payload["page"], "agent-memory")
+        self.assertEqual(len(payload["inbound"]), 9)
+        self.assertEqual(len(payload["forward"]), 5)
+        self.assertIn("link", payload["inbound"])
+        self.assertIn("agent-memory-session", payload["forward"])
+
+    def test_get_graph_contract(self):
+        payload = json.loads(self.server.get_graph())
+        nodes = {node["id"] for node in payload["nodes"]}
+        edges = {(edge["source"], edge["target"]) for edge in payload["edges"]}
+
+        self.assertEqual(len(payload["nodes"]), 12)
+        self.assertEqual(len(payload["edges"]), 54)
+        self.assertEqual(len(edges), len(payload["edges"]))
+        self.assertIn("agent-memory", nodes)
+        self.assertIn(("agent-memory", "link"), edges)
+        self.assertIn(("retrieval-augmented-generation", "transformers"), edges)
+
+    def test_rebuild_backlinks_contract(self):
+        backlinks_path = self.target / "wiki/_backlinks.json"
+        backlinks_path.write_text(json.dumps({"backlinks": {}, "forward": {}}), encoding="utf-8")
+
+        payload = json.loads(self.server.rebuild_backlinks())
+        rebuilt = json.loads(backlinks_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(payload["rebuilt"])
+        self.assertIn("agent-memory", rebuilt["backlinks"])
+        self.assertIn("agent-memory", rebuilt["forward"])
+        self.assertIn("link", rebuilt["backlinks"]["agent-memory"])
+
+
+if __name__ == "__main__":
+    unittest.main()
