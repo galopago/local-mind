@@ -401,12 +401,22 @@ mark { background: #fff3cd; color: inherit; border-radius: 2px; padding: 0 1px; 
                 border: 1px solid #eee; border-radius: 4px; background: #101418;
                 cursor: grab; display: block; margin: 12px 0; }
 #graph-canvas:active { cursor: grabbing; }
+#graph-canvas:focus { outline: 2px solid #6ea8fe; outline-offset: 2px; }
+.graph-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+                 margin: 12px 0 8px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; }
+.graph-toolbar button { border: 1px solid #d0d7de; background: #fff; color: #24292f;
+                        border-radius: 4px; padding: 5px 9px; cursor: pointer; }
+.graph-toolbar button:hover { background: #f6f8fa; }
+.graph-toolbar button[aria-pressed="true"] { background: #0969da; border-color: #0969da; color: #fff; }
+.graph-status { color: #666; margin-left: auto; }
 .graph-tooltip { position: fixed; background: #fff; border: 1px solid #ccc; border-radius: 4px;
                  padding: 6px 10px; font-size: 13px; pointer-events: none; display: none;
                  box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 100; }
 .graph-legend { font-size: 12px; color: #888; font-family: sans-serif; margin-top: 8px; }
 .graph-legend span { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
                      margin-right: 4px; vertical-align: middle; }
+.graph-empty { border: 1px solid #eee; border-radius: 4px; padding: 28px; background: #fafafa;
+               color: #666; font-family: sans-serif; margin: 12px 0; }
 
 footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
          font-size: 12px; color: #aaa; font-family: sans-serif; }
@@ -427,6 +437,10 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
   .page-list li { border-color: #2a2a2a; }
   footer { border-color: #333; }
   .home-stats .stat .num { color: #6ea8fe; }
+  .graph-toolbar button { background: #222; color: #ddd; border-color: #444; }
+  .graph-toolbar button:hover { background: #2a2a2a; }
+  .graph-status { color: #aaa; }
+  .graph-empty { background: #222; border-color: #333; color: #aaa; }
 }
 """
 
@@ -591,6 +605,17 @@ def _render_graph():
     node_count = len(visible_nodes)
     edge_count = len(visible_edges)
 
+    if node_count == 0:
+        body = (
+            f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
+            f'<h1>Knowledge Graph</h1>'
+            f'<div class="graph-empty">'
+            f'<strong>No graph pages yet.</strong><br>'
+            f'Add sources to <code>raw/</code>, ingest them, then rebuild backlinks.'
+            f'</div>'
+        )
+        return _layout("Knowledge Graph", body)
+
     # Category → color mapping
     cat_colors = {"concepts": "#4e79a7", "entities": "#f28e2b", "sources": "#59a14f",
                   "comparisons": "#e15759", "explorations": "#76b7b2", "root": "#bab0ac"}
@@ -605,6 +630,10 @@ def _render_graph():
   var canvas = document.getElementById('graph-canvas');
   var ctx = canvas.getContext('2d');
   var tooltip = document.getElementById('graph-tooltip');
+  var resetButton = document.getElementById('graph-reset');
+  var labelsButton = document.getElementById('graph-labels');
+  var motionButton = document.getElementById('graph-motion');
+  var status = document.getElementById('graph-status');
   var W, H;
 
   // Compact neural-map sizing: concepts lead, sources recede.
@@ -649,6 +678,8 @@ def _render_graph():
   var downX = 0, downY = 0, didDrag = false, suppressClick = false;
   var zoom = 1;
   var frame = 0;
+  var showAllLabels = false;
+  var motionPaused = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var SETTLE = 200; // frames of physics
 
   function resize() {{
@@ -668,6 +699,22 @@ def _render_graph():
   }}
   function isActiveNode(n) {{
     return !hoverNode || n.id === hoverNode.id || isNeighbor(hoverNode.id, n.id);
+  }}
+  function pinnedCount() {{
+    var count = 0;
+    Object.keys(pinned).forEach(function(id) {{ if (pinned[id]) count++; }});
+    return count;
+  }}
+  function updateStatus() {{
+    if (!status) return;
+    var parts = [
+      nodes.length + ' nodes',
+      edges.length + ' edges',
+      Math.round(zoom * 100) + '%'
+    ];
+    var locked = pinnedCount();
+    if (locked) parts.push(locked + ' placed');
+    status.textContent = parts.join(' · ');
   }}
 
   function toScreen(x, y) {{
@@ -727,6 +774,7 @@ def _render_graph():
     zoom = Math.min(W / gw, H / gh, 2);
     panX = -(minX + maxX) / 2;
     panY = -(minY + maxY) / 2;
+    updateStatus();
   }}
 
   var fitted = false;
@@ -802,7 +850,7 @@ def _render_graph():
 
       // Labels stay sparse until a node is hovered.
       var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
-      var showLabel = hoverNode ? activeNode : (n.category !== 'sources' && degree[n.id] >= 2);
+      var showLabel = showAllLabels || (hoverNode ? activeNode : (n.category !== 'sources' && degree[n.id] >= 2));
       if (showLabel) {{
         ctx.font = LABEL_FONT;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -816,7 +864,7 @@ def _render_graph():
   }}
 
   function loop() {{
-    if (frame < SETTLE) {{
+    if (!motionPaused && frame < SETTLE) {{
       simulate();
       // Auto-fit once physics has mostly settled
       if (frame === SETTLE - 1) {{ autoFit(); fitted = true; }}
@@ -840,7 +888,23 @@ def _render_graph():
 
   function movedPastThreshold(sx, sy) {{
     var dx = sx - downX, dy = sy - downY;
-    return dx * dx + dy * dy > 25;
+    return dx * dx + dy * dy > 9;
+  }}
+
+  function resetView() {{
+    pinned = {{}};
+    frame = SETTLE;
+    autoFit();
+    updateStatus();
+  }}
+
+  function setMotionPaused(next) {{
+    motionPaused = next;
+    if (motionButton) {{
+      motionButton.setAttribute('aria-pressed', motionPaused ? 'true' : 'false');
+      motionButton.textContent = motionPaused ? 'Motion paused' : 'Motion on';
+    }}
+    updateStatus();
   }}
 
   canvas.addEventListener('mousedown', function(e) {{
@@ -850,10 +914,12 @@ def _render_graph():
     var hit = hitTest(sx, sy);
     if (hit) {{
       dragging = hit; pinned[hit.id] = true;
+      canvas.style.cursor = 'grabbing';
       var w = toWorld(sx, sy);
       dragOffX = pos[hit.id].x - w.x; dragOffY = pos[hit.id].y - w.y;
     }} else {{
       panning = true; didPan = false;
+      canvas.style.cursor = 'grabbing';
       panStartX = sx - panX * zoom; panStartY = sy - panY * zoom;
     }}
   }});
@@ -865,9 +931,11 @@ def _render_graph():
       if (movedPastThreshold(sx, sy)) didDrag = true;
       var w = toWorld(sx, sy);
       pos[dragging.id].x = w.x + dragOffX; pos[dragging.id].y = w.y + dragOffY;
+      updateStatus();
     }} else if (panning) {{
       panX = (sx - panStartX) / zoom; panY = (sy - panStartY) / zoom;
       if (movedPastThreshold(sx, sy)) didPan = true;
+      updateStatus();
     }} else {{
       var hit = hitTest(sx, sy);
       hoverNode = hit;
@@ -885,9 +953,15 @@ def _render_graph():
   }});
 
   canvas.addEventListener('mouseup', function() {{
-    if (dragging) {{ pinned[dragging.id] = false; dragging = null; suppressClick = didDrag; }}
+    if (dragging) {{
+      pinned[dragging.id] = didDrag;
+      dragging = null;
+      suppressClick = didDrag;
+      updateStatus();
+    }}
     if (panning) {{ suppressClick = didPan; }}
     panning = false;
+    canvas.style.cursor = hoverNode ? 'pointer' : 'grab';
   }});
 
   canvas.addEventListener('mouseleave', function() {{
@@ -904,12 +978,42 @@ def _render_graph():
 
   canvas.addEventListener('wheel', function(e) {{
     e.preventDefault();
+    var rect = canvas.getBoundingClientRect();
+    var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    var before = toWorld(sx, sy);
     var factor = e.deltaY < 0 ? 1.12 : 0.9;
     zoom = Math.max(0.15, Math.min(6, zoom * factor));
+    var after = toWorld(sx, sy);
+    panX += after.x - before.x;
+    panY += after.y - before.y;
+    updateStatus();
   }}, {{ passive: false }});
 
-  window.addEventListener('resize', function() {{ resize(); if (fitted) autoFit(); }});
+  canvas.addEventListener('keydown', function(e) {{
+    if (e.key === '+' || e.key === '=') {{ zoom = Math.min(6, zoom * 1.12); updateStatus(); e.preventDefault(); }}
+    if (e.key === '-' || e.key === '_') {{ zoom = Math.max(0.15, zoom * 0.9); updateStatus(); e.preventDefault(); }}
+    if (e.key === '0') {{ resetView(); e.preventDefault(); }}
+    if (e.key === 'l' || e.key === 'L') {{
+      showAllLabels = !showAllLabels;
+      if (labelsButton) labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
+      e.preventDefault();
+    }}
+  }});
+
+  if (resetButton) resetButton.addEventListener('click', resetView);
+  if (labelsButton) labelsButton.addEventListener('click', function() {{
+    showAllLabels = !showAllLabels;
+    labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
+  }});
+  if (motionButton) motionButton.addEventListener('click', function() {{
+    setMotionPaused(!motionPaused);
+  }});
+
+  window.addEventListener('resize', function() {{ resize(); if (fitted) autoFit(); updateStatus(); }});
   resize();
+  if (motionPaused) {{ autoFit(); fitted = true; frame = SETTLE; }}
+  setMotionPaused(motionPaused);
+  updateStatus();
   loop();
 }})();
 </script>"""
@@ -922,9 +1026,15 @@ def _render_graph():
     body = (
         f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
         f'<h1>Knowledge Graph</h1>'
-        f'<p style="color:#888;font-size:13px;font-family:sans-serif">'
-        f'{node_count} nodes · {edge_count} edges · click opens · drag moves · scroll zooms</p>'
-        f'<canvas id="graph-canvas"></canvas>'
+        f'<div class="graph-toolbar" aria-label="Graph controls">'
+        f'<button id="graph-reset" type="button">Reset</button>'
+        f'<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
+        f'<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
+        f'<span id="graph-status" class="graph-status" aria-live="polite">'
+        f'{node_count} nodes · {edge_count} edges</span>'
+        f'</div>'
+        f'<canvas id="graph-canvas" tabindex="0" role="img" '
+        f'aria-label="Knowledge graph with {node_count} nodes and {edge_count} edges"></canvas>'
         f'<div class="graph-legend">{legend_items}</div>'
         f'{graph_js}'
     )

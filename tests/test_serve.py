@@ -207,6 +207,45 @@ class ServeTests(unittest.TestCase):
 
         self.assertLess(html.index('id="graph-tooltip"'), html.index("var tooltip ="))
 
+    def test_graph_controls_exist_before_graph_script(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n",
+        )
+
+        html = serve._render_graph()
+
+        self.assertLess(html.index('id="graph-reset"'), html.index("var resetButton ="))
+        self.assertLess(html.index('id="graph-labels"'), html.index("var labelsButton ="))
+        self.assertLess(html.index('id="graph-motion"'), html.index("var motionButton ="))
+        self.assertIn('id="graph-status"', html)
+        self.assertIn('tabindex="0"', html)
+        self.assertIn('role="img"', html)
+
+    def test_graph_empty_state_when_no_visible_pages(self):
+        wiki = self.make_wiki()
+
+        html = serve._render_graph()
+
+        self.assertIn("No graph pages yet.", html)
+        self.assertNotIn('id="graph-canvas"', html)
+
+    def test_graph_drag_and_zoom_interactions_are_guarded(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n",
+        )
+
+        html = serve._render_graph()
+
+        self.assertIn("return dx * dx + dy * dy > 9;", html)
+        self.assertIn("pinned[dragging.id] = didDrag;", html)
+        self.assertIn("panX += after.x - before.x;", html)
+
     def test_graph_script_embeds_titles_safely(self):
         wiki = self.make_wiki()
         write_page(
