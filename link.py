@@ -101,14 +101,25 @@ if (_BUNDLED_CORE / "link_core").exists():
     sys.path.insert(0, str(_BUNDLED_CORE))
 
 from link_core.memory import (
+    count_values as _core_count_values,
+    extract_tldr as _extract_tldr,
+    first_body_snippet as _first_body_snippet,
+    is_active_memory as _core_is_active_memory,
+    memory_inbox as _core_memory_inbox,
+    memory_profile as _core_memory_profile,
+    memory_records as _core_memory_records,
+    memory_review_issues as _core_memory_review_issues,
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
     propose_memories_from_text as _core_propose_memories_from_text,
+    recall_memories as _core_recall_memories,
+    recent_memories as _core_recent_memories,
+    slim_memory as _core_slim_memory,
+    top_tags as _core_top_tags,
 )
 from link_core.frontmatter import (
     csv_values as _csv_values,
     frontmatter_int as _frontmatter_int,
     frontmatter_string as _frontmatter_string,
-    meta_tags as _meta_tags,
     parse_frontmatter as _parse_frontmatter,
     update_frontmatter_fields as _update_frontmatter_fields,
     yaml_list as _yaml_list,
@@ -745,172 +756,29 @@ def _unique_page_path(directory: Path, slug: str) -> Path:
     return candidate
 
 
-def _extract_tldr(body: str) -> str:
-    match = re.search(r">\s*\*\*TLDR:\*\*\s*(.+)", body)
-    return match.group(1).strip() if match else ""
-
-
-def _first_body_snippet(body: str) -> str:
-    for line in body.splitlines():
-        stripped = line.strip()
-        if stripped and not stripped.startswith("#") and not stripped.startswith(">"):
-            return stripped[:200]
-    return ""
-
-
 def _memory_records(wiki_dir: Path) -> list[dict[str, object]]:
-    memories_dir = wiki_dir / "memories"
-    if not memories_dir.exists():
-        return []
-    records: list[dict[str, object]] = []
-    for path in sorted(memories_dir.rglob("*.md")):
-        if path.name.startswith("."):
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        meta, body = _parse_frontmatter(text)
-        title = meta.get("title") or _memory_title(body)
-        records.append({
-            "name": path.stem,
-            "path": f"wiki/{path.relative_to(wiki_dir).as_posix()}",
-            "title": title,
-            "memory_type": meta.get("memory_type") or "note",
-            "scope": meta.get("scope") or "user",
-            "status": meta.get("status") or "active",
-            "date_captured": meta.get("date_captured", ""),
-            "updated_at": meta.get("updated_at", ""),
-            "update_count": meta.get("update_count", "0"),
-            "last_update_source": meta.get("last_update_source", ""),
-            "archived_at": meta.get("archived_at", ""),
-            "archive_reason": meta.get("archive_reason", ""),
-            "restored_at": meta.get("restored_at", ""),
-            "source": meta.get("source", ""),
-            "review_status": meta.get("review_status") or "pending",
-            "reviewed_at": meta.get("reviewed_at", ""),
-            "review_note": meta.get("review_note", ""),
-            "tags": _meta_tags(meta.get("tags", "")),
-            "tldr": _extract_tldr(body),
-            "snippet": _first_body_snippet(body),
-            "body": body,
-        })
-    return records
+    return _core_memory_records(wiki_dir)
 
 
 def _slim_memory(record: dict[str, object]) -> dict[str, object]:
-    return {key: value for key, value in record.items() if key != "body"}
+    return _core_slim_memory(record)
 
 
 def _is_active_memory(record: dict[str, object]) -> bool:
-    return str(record.get("status") or "active").lower() not in {"archived", "stale"}
+    return _core_is_active_memory(record)
 
 
 def _memory_review_issues(record: dict[str, object]) -> list[dict[str, str]]:
-    issues: list[dict[str, str]] = []
-    status = str(record.get("status") or "active").lower()
-    review_status = str(record.get("review_status") or "pending").lower()
-    memory_type = str(record.get("memory_type") or "")
-    scope = str(record.get("scope") or "")
-
-    if review_status in {"pending", "needs_review"}:
-        issues.append({
-            "code": "pending_review",
-            "severity": "medium",
-            "message": "Memory has not been reviewed by the user.",
-            "suggested_action": "Confirm it is still accurate, then run review-memory.",
-        })
-    elif review_status == "needs_update":
-        issues.append({
-            "code": "needs_update",
-            "severity": "high",
-            "message": "Memory is marked as needing an update.",
-            "suggested_action": "Edit the memory page or archive it if it is no longer useful.",
-        })
-    elif review_status not in MEMORY_REVIEW_STATUSES:
-        issues.append({
-            "code": "invalid_review_status",
-            "severity": "high",
-            "message": f"Unknown review_status: {review_status}.",
-            "suggested_action": "Use pending, reviewed, or needs_update.",
-        })
-
-    if status == "stale":
-        issues.append({
-            "code": "stale_status",
-            "severity": "high",
-            "message": "Memory is marked stale and is excluded from default recall.",
-            "suggested_action": "Archive it, restore it, or update the memory text.",
-        })
-    if memory_type not in MEMORY_TYPES:
-        issues.append({
-            "code": "invalid_memory_type",
-            "severity": "high",
-            "message": f"Unknown memory_type: {memory_type or 'missing'}.",
-            "suggested_action": f"Use one of: {', '.join(MEMORY_TYPES)}.",
-        })
-    if scope not in MEMORY_SCOPES:
-        issues.append({
-            "code": "invalid_scope",
-            "severity": "high",
-            "message": f"Unknown scope: {scope or 'missing'}.",
-            "suggested_action": f"Use one of: {', '.join(MEMORY_SCOPES)}.",
-        })
-    if not str(record.get("source") or "").strip():
-        issues.append({
-            "code": "missing_source",
-            "severity": "medium",
-            "message": "Memory has no source metadata.",
-            "suggested_action": "Add source metadata so future agents know why this memory exists.",
-        })
-    if not str(record.get("date_captured") or "").strip():
-        issues.append({
-            "code": "missing_date_captured",
-            "severity": "medium",
-            "message": "Memory has no date_captured metadata.",
-            "suggested_action": "Add the capture timestamp or recreate the memory.",
-        })
-    if not (str(record.get("tldr") or "").strip() or str(record.get("snippet") or "").strip()):
-        issues.append({
-            "code": "missing_summary",
-            "severity": "medium",
-            "message": "Memory has no usable summary.",
-            "suggested_action": "Add a TLDR line or a clear first paragraph.",
-        })
-    return issues
+    return _core_memory_review_issues(record, review_command="review-memory")
 
 
 def _memory_inbox(wiki_dir: Path, limit: int = 20, include_archived: bool = False) -> dict[str, object]:
-    limit = max(1, min(limit, 50))
-    items: list[dict[str, object]] = []
-    severity_rank = {"high": 0, "medium": 1, "low": 2}
-    for record in _memory_records(wiki_dir):
-        if not include_archived and str(record.get("status") or "").lower() == "archived":
-            continue
-        issues = _memory_review_issues(record)
-        if not issues:
-            continue
-        item = _slim_memory(record)
-        item["issues"] = issues
-        item["issue_count"] = len(issues)
-        item["highest_severity"] = min(
-            (issue["severity"] for issue in issues),
-            key=lambda severity: severity_rank.get(severity, 9),
-        )
-        items.append(item)
-    items.sort(key=lambda item: (
-        severity_rank.get(str(item["highest_severity"]), 9),
-        -int(item["issue_count"]),
-        str(item.get("date_captured") or ""),
-        str(item.get("title") or "").lower(),
-    ))
-    counts_by_severity: dict[str, int] = {}
-    for item in items:
-        severity = str(item["highest_severity"])
-        counts_by_severity[severity] = counts_by_severity.get(severity, 0) + 1
-    return {
-        "review_count": len(items),
-        "counts_by_severity": counts_by_severity,
-        "include_archived": include_archived,
-        "items": items[:limit],
-    }
+    return _core_memory_inbox(
+        _memory_records(wiki_dir),
+        limit=limit,
+        include_archived=include_archived,
+        review_command="review-memory",
+    )
 
 
 def _extract_wikilinks(text: str) -> list[str]:
@@ -1014,98 +882,19 @@ def _memory_explanation(wiki_dir: Path, identifier: str) -> dict[str, object]:
 
 
 def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for record in records:
-        value = str(record.get(field) or "unknown")
-        counts[value] = counts.get(value, 0) + 1
-    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+    return _core_count_values(records, field)
 
 
 def _top_tags(records: list[dict[str, object]], limit: int = 12) -> list[dict[str, object]]:
-    counts: dict[str, int] = {}
-    skip = {"memory", *MEMORY_TYPES}
-    for record in records:
-        for tag in record.get("tags", []):
-            tag_text = str(tag).strip()
-            if not tag_text or tag_text in skip:
-                continue
-            counts[tag_text] = counts.get(tag_text, 0) + 1
-    return [
-        {"tag": tag, "count": count}
-        for tag, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
-    ]
+    return _core_top_tags(records, limit=limit)
 
 
 def _recent_memories(records: list[dict[str, object]]) -> list[dict[str, object]]:
-    return sorted(
-        records,
-        key=lambda record: (
-            str(record.get("date_captured") or ""),
-            str(record.get("title") or "").lower(),
-        ),
-        reverse=True,
-    )
+    return _core_recent_memories(records)
 
 
 def _memory_profile(wiki_dir: Path, limit: int = 10) -> dict[str, object]:
-    limit = max(1, min(limit, 50))
-    records = _memory_records(wiki_dir)
-    active_records = [record for record in records if _is_active_memory(record)]
-    archived_records = [
-        record for record in records
-        if str(record.get("status") or "").lower() == "archived"
-    ]
-    recent = [_slim_memory(record) for record in _recent_memories(active_records)]
-
-    def typed(memory_type: str) -> list[dict[str, object]]:
-        return [
-            _slim_memory(record)
-            for record in _recent_memories(active_records)
-            if str(record.get("memory_type") or "") == memory_type
-        ][:limit]
-
-    return {
-        "memory_count": len(records),
-        "active_count": len(active_records),
-        "review_count": _memory_inbox(wiki_dir, limit=limit)["review_count"],
-        "by_type": _count_values(records, "memory_type"),
-        "by_scope": _count_values(records, "scope"),
-        "by_status": _count_values(records, "status"),
-        "top_tags": _top_tags(records),
-        "recent": recent[:limit],
-        "preferences": typed("preference"),
-        "decisions": typed("decision"),
-        "projects": typed("project"),
-        "archived": [_slim_memory(record) for record in _recent_memories(archived_records)][:limit],
-    }
-
-
-def _score_memory(record: dict[str, object], query: str) -> int:
-    q = query.lower().strip()
-    tokens = [token for token in re.split(r"\W+", q) if len(token) >= 3]
-    title = str(record.get("title", "")).lower()
-    tldr = str(record.get("tldr", "")).lower()
-    body = str(record.get("body", "")).lower()
-    tags = " ".join(str(tag).lower() for tag in record.get("tags", []))
-    score = 0
-    if q and q in title:
-        score += 20
-    if q and q in tldr:
-        score += 12
-    if q and q in tags:
-        score += 8
-    if q and q in body:
-        score += 4
-    for token in tokens:
-        if token in title:
-            score += 6
-        if token in tldr:
-            score += 4
-        if token in tags:
-            score += 3
-        if token in body:
-            score += 1
-    return score
+    return _core_memory_profile(_memory_records(wiki_dir), limit=limit, review_command="review-memory")
 
 
 def _recall_memories(
@@ -1114,20 +903,12 @@ def _recall_memories(
     limit: int = 10,
     include_archived: bool = False,
 ) -> list[dict[str, object]]:
-    q = query.strip()
-    if not q:
-        return []
-    scored: list[tuple[int, dict[str, object]]] = []
-    for record in _memory_records(wiki_dir):
-        if not include_archived and not _is_active_memory(record):
-            continue
-        score = _score_memory(record, q)
-        if score > 0:
-            slim = _slim_memory(record)
-            slim["score"] = score
-            scored.append((score, slim))
-    scored.sort(key=lambda item: (-item[0], str(item[1]["title"]).lower()))
-    return [record for _, record in scored[:limit]]
+    return _core_recall_memories(
+        _memory_records(wiki_dir),
+        query,
+        limit=limit,
+        include_archived=include_archived,
+    )
 
 
 def _memory_duplicate_candidates(

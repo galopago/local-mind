@@ -21,6 +21,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; memory write operations remain CLI/MCP-only.
 - Extracted shared memory proposal logic into `link_core` so CLI, HTTP, and MCP proposal behavior stays aligned.
 - Extracted shared frontmatter parsing and typed update helpers into `link_core` for safer memory metadata writes.
+- Extracted shared memory record loading, review inbox, profile, and recall helpers into `link_core`.
 
 ## [1.0.7] - 2026-05-04
 

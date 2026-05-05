@@ -10,11 +10,16 @@ if (_BUNDLED_CORE / "link_core").exists():
     sys.path.insert(0, str(_BUNDLED_CORE))
 
 from link_core.memory import (
+    count_values as _core_count_values,
+    is_active_memory as _core_is_active_memory,
+    memory_inbox as _core_memory_inbox,
+    memory_profile as _core_memory_profile,
+    memory_records as _core_memory_records,
+    memory_review_issues as _core_memory_review_issues,
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
     propose_memories_from_text as _core_propose_memories_from_text,
 )
 from link_core.frontmatter import (
-    meta_tags as _meta_tags,
     parse_frontmatter as _parse_frontmatter,
 )
 del _BUNDLED_CORE
@@ -204,181 +209,29 @@ def _plural_type_label(page_type: str) -> str:
     return page_type if page_type.endswith("s") else page_type + "s"
 
 
-def _extract_tldr(body: str) -> str:
-    match = re.search(r">\s*\*\*TLDR:\*\*\s*(.+)", body)
-    return match.group(1).strip() if match else ""
-
-
-def _first_body_snippet(body: str) -> str:
-    for line in body.splitlines():
-        stripped = line.strip()
-        if stripped and not stripped.startswith("#") and not stripped.startswith(">"):
-            return stripped[:200]
-    return ""
-
-
 def _memory_records() -> list[dict[str, object]]:
-    memories_dir = WIKI_DIR / "memories"
-    if not memories_dir.exists():
-        return []
-    records = []
-    for path in sorted(memories_dir.rglob("*.md")):
-        if path.name.startswith("."):
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        meta, body = _parse_frontmatter(text)
-        title = meta.get("title", "")
-        if not title:
-            match = re.search(r"^#\s+(.+)", body, re.MULTILINE)
-            title = match.group(1) if match else path.stem
-        records.append({
-            "name": path.stem,
-            "path": f"wiki/{path.relative_to(WIKI_DIR).as_posix()}",
-            "title": title,
-            "memory_type": meta.get("memory_type") or "note",
-            "scope": meta.get("scope") or "user",
-            "status": meta.get("status") or "active",
-            "date_captured": meta.get("date_captured", ""),
-            "updated_at": meta.get("updated_at", ""),
-            "update_count": meta.get("update_count", "0"),
-            "last_update_source": meta.get("last_update_source", ""),
-            "archived_at": meta.get("archived_at", ""),
-            "archive_reason": meta.get("archive_reason", ""),
-            "restored_at": meta.get("restored_at", ""),
-            "source": meta.get("source", ""),
-            "review_status": meta.get("review_status") or "pending",
-            "reviewed_at": meta.get("reviewed_at", ""),
-            "review_note": meta.get("review_note", ""),
-            "tags": _meta_tags(meta.get("tags", "")),
-            "tldr": _extract_tldr(body),
-            "snippet": _first_body_snippet(body),
-        })
-    return records
+    return _core_memory_records(WIKI_DIR, include_body=False)
 
 
 def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for record in records:
-        value = str(record.get(field) or "unknown")
-        counts[value] = counts.get(value, 0) + 1
-    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+    return _core_count_values(records, field)
 
 
 def _is_active_memory(record: dict[str, object]) -> bool:
-    return str(record.get("status") or "active").lower() not in {"archived", "stale"}
+    return _core_is_active_memory(record)
 
 
 def _memory_review_issues(record: dict[str, object]) -> list[dict[str, str]]:
-    issues: list[dict[str, str]] = []
-    status = str(record.get("status") or "active").lower()
-    review_status = str(record.get("review_status") or "pending").lower()
-    memory_type = str(record.get("memory_type") or "")
-    scope = str(record.get("scope") or "")
-    memory_types = {"preference", "decision", "project", "fact", "note"}
-    memory_scopes = {"user", "project", "global"}
-    review_statuses = {"pending", "reviewed", "needs_update"}
-
-    if review_status in {"pending", "needs_review"}:
-        issues.append({
-            "code": "pending_review",
-            "severity": "medium",
-            "message": "Memory has not been reviewed by the user.",
-            "suggested_action": "Confirm it is still accurate, then run review-memory.",
-        })
-    elif review_status == "needs_update":
-        issues.append({
-            "code": "needs_update",
-            "severity": "high",
-            "message": "Memory is marked as needing an update.",
-            "suggested_action": "Edit the memory page or archive it if it is no longer useful.",
-        })
-    elif review_status not in review_statuses:
-        issues.append({
-            "code": "invalid_review_status",
-            "severity": "high",
-            "message": f"Unknown review_status: {review_status}.",
-            "suggested_action": "Use pending, reviewed, or needs_update.",
-        })
-
-    if status == "stale":
-        issues.append({
-            "code": "stale_status",
-            "severity": "high",
-            "message": "Memory is marked stale and excluded from default recall.",
-            "suggested_action": "Archive it, restore it, or update the memory text.",
-        })
-    if memory_type not in memory_types:
-        issues.append({
-            "code": "invalid_memory_type",
-            "severity": "high",
-            "message": f"Unknown memory_type: {memory_type or 'missing'}.",
-            "suggested_action": "Use preference, decision, project, fact, or note.",
-        })
-    if scope not in memory_scopes:
-        issues.append({
-            "code": "invalid_scope",
-            "severity": "high",
-            "message": f"Unknown scope: {scope or 'missing'}.",
-            "suggested_action": "Use user, project, or global.",
-        })
-    if not str(record.get("source") or "").strip():
-        issues.append({
-            "code": "missing_source",
-            "severity": "medium",
-            "message": "Memory has no source metadata.",
-            "suggested_action": "Add source metadata so future agents know why this memory exists.",
-        })
-    if not str(record.get("date_captured") or "").strip():
-        issues.append({
-            "code": "missing_date_captured",
-            "severity": "medium",
-            "message": "Memory has no date_captured metadata.",
-            "suggested_action": "Add the capture timestamp or recreate the memory.",
-        })
-    if not (str(record.get("tldr") or "").strip() or str(record.get("snippet") or "").strip()):
-        issues.append({
-            "code": "missing_summary",
-            "severity": "medium",
-            "message": "Memory has no usable summary.",
-            "suggested_action": "Add a TLDR line or a clear first paragraph.",
-        })
-    return issues
+    return _core_memory_review_issues(record, review_command="review-memory")
 
 
 def _memory_inbox(limit: int = 20, include_archived: bool = False) -> dict[str, object]:
-    limit = max(1, min(limit, 50))
-    severity_rank = {"high": 0, "medium": 1, "low": 2}
-    items = []
-    for record in _memory_records():
-        if not include_archived and str(record.get("status") or "").lower() == "archived":
-            continue
-        issues = _memory_review_issues(record)
-        if not issues:
-            continue
-        item = dict(record)
-        item["issues"] = issues
-        item["issue_count"] = len(issues)
-        item["highest_severity"] = min(
-            (issue["severity"] for issue in issues),
-            key=lambda severity: severity_rank.get(severity, 9),
-        )
-        items.append(item)
-    items.sort(key=lambda item: (
-        severity_rank.get(str(item["highest_severity"]), 9),
-        -int(item["issue_count"]),
-        str(item.get("date_captured") or ""),
-        str(item.get("title") or "").lower(),
-    ))
-    counts_by_severity = {}
-    for item in items:
-        severity = str(item["highest_severity"])
-        counts_by_severity[severity] = counts_by_severity.get(severity, 0) + 1
-    return {
-        "review_count": len(items),
-        "counts_by_severity": counts_by_severity,
-        "include_archived": include_archived,
-        "items": items[:limit],
-    }
+    return _core_memory_inbox(
+        _memory_records(),
+        limit=limit,
+        include_archived=include_archived,
+        review_command="review-memory",
+    )
 
 
 def _slugify(value: str, fallback: str = "memory") -> str:
@@ -561,52 +414,7 @@ def _memory_explanation(identifier: str) -> dict[str, object]:
 
 
 def _memory_profile(limit: int = 10) -> dict[str, object]:
-    limit = max(1, min(limit, 50))
-    records = _memory_records()
-    active_records = [
-        record for record in records
-        if _is_active_memory(record)
-    ]
-    archived_records = [
-        record for record in records
-        if str(record.get("status") or "").lower() == "archived"
-    ]
-    recent_active = sorted(
-        active_records,
-        key=lambda record: (
-            str(record.get("date_captured") or ""),
-            str(record.get("title") or "").lower(),
-        ),
-        reverse=True,
-    )
-
-    def typed(memory_type: str) -> list[dict[str, object]]:
-        return [
-            record for record in recent_active
-            if str(record.get("memory_type") or "") == memory_type
-        ][:limit]
-
-    archived = sorted(
-        archived_records,
-        key=lambda record: (
-            str(record.get("date_captured") or ""),
-            str(record.get("title") or "").lower(),
-        ),
-        reverse=True,
-    )
-    return {
-        "memory_count": len(records),
-        "active_count": len(active_records),
-        "review_count": _memory_inbox(limit=limit)["review_count"],
-        "by_type": _count_values(records, "memory_type"),
-        "by_scope": _count_values(records, "scope"),
-        "by_status": _count_values(records, "status"),
-        "recent": recent_active[:limit],
-        "preferences": typed("preference"),
-        "decisions": typed("decision"),
-        "projects": typed("project"),
-        "archived": archived[:limit],
-    }
+    return _core_memory_profile(_memory_records(), limit=limit, review_command="review-memory")
 
 
 def _memory_activity_key(record: dict[str, object]) -> tuple[str, str, str]:
