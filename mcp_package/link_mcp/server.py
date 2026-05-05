@@ -58,9 +58,9 @@ mcp = FastMCP(
         "explain_memory to audit why a memory exists. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
         "neighborhood. Only call remember_memory when the user explicitly asks "
-        "you to remember something; if it returns duplicate candidates, inspect "
-        "the existing memory instead of forcing a duplicate. Use archive_memory "
-        "instead of deleting stale or wrong memories."
+        "you to remember something; if it returns duplicate candidates, use "
+        "update_memory on the existing memory instead of forcing a duplicate. "
+        "Use archive_memory instead of deleting stale or wrong memories."
     ),
 )
 
@@ -431,6 +431,9 @@ def _memory_records() -> list[dict[str, object]]:
             "scope": meta.get("scope") or "user",
             "status": meta.get("status") or "active",
             "date_captured": meta.get("date_captured", ""),
+            "updated_at": meta.get("updated_at", ""),
+            "update_count": meta.get("update_count", "0"),
+            "last_update_source": meta.get("last_update_source", ""),
             "archived_at": meta.get("archived_at", ""),
             "archive_reason": meta.get("archive_reason", ""),
             "restored_at": meta.get("restored_at", ""),
@@ -935,6 +938,33 @@ def _update_frontmatter_fields(text: str, updates: dict[str, str], remove: set[s
     return "---\n" + "\n".join(lines) + "\n---" + text[end + 4:]
 
 
+def _frontmatter_int(value: object) -> int:
+    try:
+        return int(str(value or "0").strip())
+    except ValueError:
+        return 0
+
+
+def _replace_markdown_body(text: str, body: str) -> str:
+    if text.startswith("---\n"):
+        end = text.find("\n---", 4)
+        if end != -1:
+            return text[:end + 4] + "\n\n" + body.strip() + "\n"
+    return body.strip() + "\n"
+
+
+def _append_memory_update(body: str, update_text: str, timestamp: str, source: str) -> str:
+    source_label = source.strip() or "mcp"
+    update_block = f"Update ({timestamp}, {source_label}):\n\n{update_text.strip()}"
+    pattern = re.compile(r"(## Memory\n)(.*?)(?=\n## |\Z)", flags=re.DOTALL)
+    match = pattern.search(body)
+    if not match:
+        return body.rstrip() + f"\n\n## Memory\n\n{update_block}\n"
+    existing = match.group(2).rstrip()
+    merged = (existing + "\n\n" if existing else "") + update_block + "\n\n"
+    return body[:match.start(2)] + merged + body[match.end(2):]
+
+
 def _resolve_memory_page(identifier: str) -> tuple[Path | None, dict[str, object] | None, str | None]:
     needle = _clean_text_input(identifier, max_len=300)
     if not needle:
@@ -967,6 +997,9 @@ def _resolve_memory_page(identifier: str) -> tuple[Path | None, dict[str, object
                 "scope": meta.get("scope") or "user",
                 "status": meta.get("status") or "active",
                 "date_captured": meta.get("date_captured", ""),
+                "updated_at": meta.get("updated_at", ""),
+                "update_count": meta.get("update_count", "0"),
+                "last_update_source": meta.get("last_update_source", ""),
                 "source": meta.get("source", ""),
                 "review_status": meta.get("review_status") or "pending",
                 "reviewed_at": meta.get("reviewed_at", ""),
@@ -1084,6 +1117,67 @@ def _mark_memory_reviewed(identifier: str, note: str = "") -> dict[str, object]:
         "review_status": "reviewed",
         "remaining_issue_count": len(issues),
         "remaining_issues": issues,
+    }
+
+
+def _update_memory_page(identifier: str, text: str, source: str = "mcp") -> dict[str, object]:
+    clean_text = _clean_text_input(text, max_len=4000)
+    if not clean_text:
+        raise ValueError("memory update text required")
+    clean_source = _clean_text_input(source, max_len=500) or "mcp"
+    page_path, record, error = _resolve_memory_page(identifier)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and record is not None
+    if not _is_active_memory(record):
+        raise ValueError("cannot update archived or stale memory; restore it first")
+
+    timestamp = _utc_timestamp()
+    previous_review_status = str(record.get("review_status") or "pending")
+    previous_update_count = _frontmatter_int(record.get("update_count"))
+    next_update_count = previous_update_count + 1
+    original = page_path.read_text(encoding="utf-8", errors="replace")
+    _, body = _parse_frontmatter(original)
+    updated_body = _append_memory_update(body, clean_text, timestamp, clean_source)
+    updates = {
+        "updated_at": f'"{timestamp}"',
+        "update_count": str(next_update_count),
+        "last_update_source": f'"{_frontmatter_string(clean_source)}"',
+        "review_status": "pending",
+    }
+    updated_text = _update_frontmatter_fields(original, updates, remove={"reviewed_at", "review_note"})
+    page_path.write_text(_replace_markdown_body(updated_text, updated_body), encoding="utf-8")
+    _append_log(
+        timestamp,
+        "update-memory",
+        str(record["title"]),
+        [
+            f"Updated: memories/{page_path.name}",
+            f"Previous review status: {previous_review_status}",
+            "New review status: pending",
+            f"Update count: {next_update_count}",
+            f"Source: {clean_source}",
+        ],
+    )
+    rebuilt = json.loads(rebuild_backlinks())
+    _cache.clear()
+
+    _, updated_record, _ = _resolve_memory_page(str(record["name"]))
+    updated_record = updated_record or record
+    issues = _memory_review_issues(updated_record)
+    return {
+        "updated": True,
+        "name": updated_record["name"],
+        "path": updated_record["path"],
+        "title": updated_record["title"],
+        "previous_review_status": previous_review_status,
+        "review_status": updated_record.get("review_status", "pending"),
+        "updated_at": timestamp,
+        "update_count": next_update_count,
+        "source": clean_source,
+        "remaining_issue_count": len(issues),
+        "remaining_issues": issues,
+        "backlinks_rebuilt": bool(rebuilt.get("rebuilt")),
     }
 
 
@@ -1289,6 +1383,21 @@ def explain_memory(identifier: str) -> str:
         result = _memory_explanation(identifier)
     except ValueError as exc:
         return json.dumps({"found": False, "error": str(exc)})
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
+def update_memory(identifier: str, memory: str, source: str = "mcp") -> str:
+    """Merge new information into an existing active memory.
+
+    Use this when remember_memory returns a duplicate candidate or when the user
+    asks to update something Link already remembers. The update is appended to
+    the memory body, logged, and marked pending review.
+    """
+    try:
+        result = _update_memory_page(identifier, memory, source=source)
+    except ValueError as exc:
+        return json.dumps({"updated": False, "error": str(exc)})
     return json.dumps(result, ensure_ascii=False)
 
 

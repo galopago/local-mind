@@ -99,6 +99,7 @@ python3 ~/link/link.py recall "local personal memory" ~/link
 python3 ~/link/link.py profile ~/link
 python3 ~/link/link.py memory-inbox ~/link
 python3 ~/link/link.py explain-memory prefer-local-personal-memory ~/link
+python3 ~/link/link.py update-memory prefer-local-personal-memory "Also prefer updating existing memories over creating duplicates." ~/link
 ```
 
 ### 4. Ask your agent to ingest it
@@ -246,6 +247,7 @@ python3 ~/link/link.py profile ~/link
 python3 ~/link/link.py memory-inbox ~/link
 python3 ~/link/link.py review-memory prefer-release-branches ~/link --note "confirmed"
 python3 ~/link/link.py explain-memory prefer-release-branches ~/link
+python3 ~/link/link.py update-memory prefer-release-branches "Use release/* branches for public release work." ~/link
 python3 ~/link/link.py archive-memory prefer-release-branches ~/link --reason "superseded"
 python3 ~/link/link.py restore-memory prefer-release-branches ~/link
 ```
@@ -276,6 +278,7 @@ Obsidian also works: open the `wiki/` folder as a vault.
 | `python3 link.py demo` | Create `./link-demo` with a pre-ingested sample wiki. |
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
 | `python3 link.py remember "text" <dir>` | Save a local agent memory under `wiki/memories/`; strong duplicates are refused unless `--allow-duplicate` is set. |
+| `python3 link.py update-memory <name> "text" <dir>` | Merge new text into an existing memory, log it, rebuild backlinks, and reset review to pending. |
 | `python3 link.py recall "query" <dir>` | Search local agent memories first. |
 | `python3 link.py profile <dir>` | Show what Link remembers by type, scope, status, and recency. |
 | `python3 link.py memory-inbox <dir>` | Show memories that need review or stronger metadata. |
@@ -303,6 +306,7 @@ Available tools:
 | `search_wiki` | Ranked search by title, alias, tag, and full text. Returns scores and snippets. |
 | `recall_memory` | Search durable local memory pages for preferences, decisions, and project context. |
 | `remember_memory` | Save an explicit user-approved memory under `wiki/memories/`; strong duplicates require `allow_duplicate=true`. |
+| `update_memory` | Merge new information into an existing memory and reset review to pending. |
 | `archive_memory` | Archive stale or wrong memory without deleting the Markdown page. |
 | `restore_memory` | Restore archived memory to active status. |
 | `get_context` | Primary tool. Returns the best page plus inbound and forward graph neighbors. |

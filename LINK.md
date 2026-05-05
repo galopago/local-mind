@@ -172,7 +172,11 @@ memory_type: preference | decision | project | fact | note
 scope: user | project | global
 status: active | stale | archived
 date_captured: "2026-04-09T14:30:00Z"
+updated_at: ""
+update_count: 0
 source: "manual | conversation | mcp | raw/source.md"
+last_update_source: ""
+review_status: pending | reviewed | needs_update
 tags: [memory, relevant-tag]
 ---
 
@@ -285,7 +289,8 @@ Rules:
 - Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
 - Run `python3 link.py profile .` when the human asks what Link knows or when you need a quick overview of remembered preferences, decisions, and project context.
 - Run `python3 link.py memory-inbox .` to find pending, stale, invalid, or underspecified memories that need human review.
-- If `remember` reports a duplicate candidate, inspect it with `python3 link.py explain-memory "<name-or-title>" .` and update/review/archive the existing memory instead of creating another one. Use `--allow-duplicate` only when the human confirms it should be separate.
+- If `remember` reports a duplicate candidate, inspect it with `python3 link.py explain-memory "<name-or-title>" .` and merge new information with `python3 link.py update-memory "<name-or-title>" "new detail" .` instead of creating another one. Use `--allow-duplicate` only when the human confirms it should be separate.
+- After updating a memory, review it again with the human because `update-memory` resets `review_status` to `pending`.
 - After the human confirms a memory is accurate, run `python3 link.py review-memory "<name-or-title>" .`.
 - Run `python3 link.py explain-memory "<name-or-title>" .` when the human asks why an agent knows something or whether a memory is safe to use.
 - If a memory is stale or wrong, archive it with `python3 link.py archive-memory "<name-or-title>" . --reason "why"`. Do not delete memory pages unless the human explicitly asks for permanent removal.

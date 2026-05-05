@@ -6,6 +6,7 @@ Usage:
   python link.py doctor [target]
   python link.py ingest-status [target]
   python link.py remember "memory text" [target]
+  python link.py update-memory <name-or-title> "new memory text" [target]
   python link.py recall "query" [target]
   python link.py profile [target]
   python link.py archive-memory <name-or-title> [target]
@@ -793,6 +794,9 @@ def _memory_records(wiki_dir: Path) -> list[dict[str, object]]:
             "scope": meta.get("scope") or "user",
             "status": meta.get("status") or "active",
             "date_captured": meta.get("date_captured", ""),
+            "updated_at": meta.get("updated_at", ""),
+            "update_count": meta.get("update_count", "0"),
+            "last_update_source": meta.get("last_update_source", ""),
             "archived_at": meta.get("archived_at", ""),
             "archive_reason": meta.get("archive_reason", ""),
             "restored_at": meta.get("restored_at", ""),
@@ -1280,6 +1284,33 @@ def _update_frontmatter_fields(text: str, updates: dict[str, str], remove: set[s
     return "---\n" + "\n".join(lines) + "\n---" + text[end + 4:]
 
 
+def _frontmatter_int(value: object) -> int:
+    try:
+        return int(str(value or "0").strip())
+    except ValueError:
+        return 0
+
+
+def _replace_markdown_body(text: str, body: str) -> str:
+    if text.startswith("---\n"):
+        end = text.find("\n---", 4)
+        if end != -1:
+            return text[:end + 4] + "\n\n" + body.strip() + "\n"
+    return body.strip() + "\n"
+
+
+def _append_memory_update(body: str, update_text: str, timestamp: str, source: str) -> str:
+    source_label = source.strip() or "manual"
+    update_block = f"Update ({timestamp}, {source_label}):\n\n{update_text.strip()}"
+    pattern = re.compile(r"(## Memory\n)(.*?)(?=\n## |\Z)", flags=re.DOTALL)
+    match = pattern.search(body)
+    if not match:
+        return body.rstrip() + f"\n\n## Memory\n\n{update_block}\n"
+    existing = match.group(2).rstrip()
+    merged = (existing + "\n\n" if existing else "") + update_block + "\n\n"
+    return body[:match.start(2)] + merged + body[match.end(2):]
+
+
 def _resolve_memory_page(wiki_dir: Path, identifier: str) -> tuple[Path | None, dict[str, object] | None, str | None]:
     needle = identifier.strip()
     if not needle:
@@ -1312,6 +1343,9 @@ def _resolve_memory_page(wiki_dir: Path, identifier: str) -> tuple[Path | None, 
                 "scope": meta.get("scope") or "user",
                 "status": meta.get("status") or "active",
                 "date_captured": meta.get("date_captured", ""),
+                "updated_at": meta.get("updated_at", ""),
+                "update_count": meta.get("update_count", "0"),
+                "last_update_source": meta.get("last_update_source", ""),
                 "source": meta.get("source", ""),
                 "review_status": meta.get("review_status") or "pending",
                 "reviewed_at": meta.get("reviewed_at", ""),
@@ -1445,6 +1479,78 @@ def _mark_memory_reviewed(
         "review_status": "reviewed",
         "remaining_issue_count": len(issues),
         "remaining_issues": issues,
+    }
+
+
+def _update_memory_page(
+    target: Path,
+    identifier: str,
+    text: str,
+    source: str = "manual",
+    timestamp: str | None = None,
+) -> dict[str, object]:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
+    clean_text = text.strip()
+    if not clean_text:
+        raise ValueError("memory update text required")
+    clean_source = source.strip() if source else "manual"
+    page_path, record, error = _resolve_memory_page(wiki_dir, identifier)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and record is not None
+    if not _is_active_memory(record):
+        raise ValueError("cannot update archived or stale memory; restore it first")
+
+    timestamp = timestamp or _utc_timestamp()
+    previous_review_status = str(record.get("review_status") or "pending")
+    previous_update_count = _frontmatter_int(record.get("update_count"))
+    next_update_count = previous_update_count + 1
+    original = page_path.read_text(encoding="utf-8", errors="replace")
+    _, body = _parse_frontmatter(original)
+    updated_body = _append_memory_update(body, clean_text, timestamp, clean_source)
+    updates = {
+        "updated_at": f'"{timestamp}"',
+        "update_count": str(next_update_count),
+        "last_update_source": f'"{_frontmatter_string(clean_source)}"',
+        "review_status": "pending",
+    }
+    updated_text = _update_frontmatter_fields(original, updates, remove={"reviewed_at", "review_note"})
+    page_path.write_text(_replace_markdown_body(updated_text, updated_body), encoding="utf-8")
+    _append_log(
+        wiki_dir,
+        timestamp,
+        "update-memory",
+        str(record["title"]),
+        [
+            f"Updated: memories/{page_path.name}",
+            f"Previous review status: {previous_review_status}",
+            "New review status: pending",
+            f"Update count: {next_update_count}",
+            f"Source: {clean_source}",
+        ],
+    )
+    backlinks = _build_backlinks(wiki_dir)
+    (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
+
+    _, updated_record, _ = _resolve_memory_page(wiki_dir, str(record["name"]))
+    updated_record = updated_record or record
+    issues = _memory_review_issues(updated_record)
+    return {
+        "updated": True,
+        "name": updated_record["name"],
+        "path": updated_record["path"],
+        "title": updated_record["title"],
+        "previous_review_status": previous_review_status,
+        "review_status": updated_record.get("review_status", "pending"),
+        "updated_at": timestamp,
+        "update_count": next_update_count,
+        "source": clean_source,
+        "remaining_issue_count": len(issues),
+        "remaining_issues": issues,
+        "backlinks_rebuilt": True,
     }
 
 
@@ -2106,6 +2212,43 @@ def remember(
     return 0
 
 
+def update_memory(
+    target: Path,
+    identifier: str,
+    text: str,
+    source: str = "manual",
+    json_output: bool = False,
+) -> int:
+    if not text or not text.strip():
+        print("Memory update text is required", file=sys.stderr)
+        return 1
+    try:
+        result = _update_memory_page(
+            target,
+            identifier,
+            text,
+            source=source,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Could not update memory: {exc}", file=sys.stderr)
+        return 1
+
+    if json_output:
+        print(json.dumps(result, indent=2))
+        return 0
+
+    print("Memory updated")
+    print(f"Title: {result['title']}")
+    print(f"Path: {result['path']}")
+    print(f"Update count: {result['update_count']}")
+    print(f"Review: {result['previous_review_status']} -> {result['review_status']}")
+    print("")
+    print("Next:")
+    print(f"  python3 link.py explain-memory \"{result['name']}\" .")
+    print(f"  python3 link.py review-memory \"{result['name']}\" .")
+    return 0
+
+
 def recall(
     target: Path,
     query: str,
@@ -2594,6 +2737,13 @@ def main(argv: list[str] | None = None) -> int:
     remember_cmd.add_argument("--allow-duplicate", action="store_true", help="create a new memory even if a strong duplicate exists")
     remember_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
+    update_memory_cmd = sub.add_parser("update-memory", help="merge new text into an existing memory")
+    update_memory_cmd.add_argument("identifier", help="memory page name, title, or path")
+    update_memory_cmd.add_argument("text", help="new memory text to merge")
+    update_memory_cmd.add_argument("target", nargs="?", default=".")
+    update_memory_cmd.add_argument("--source", default="manual", help="where this update came from")
+    update_memory_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
+
     recall_cmd = sub.add_parser("recall", help="search local agent memories")
     recall_cmd.add_argument("query", help="memory query")
     recall_cmd.add_argument("target", nargs="?", default=".")
@@ -2660,6 +2810,14 @@ def main(argv: list[str] | None = None) -> int:
             tags=args.tags,
             source=args.source,
             allow_duplicate=args.allow_duplicate,
+            json_output=args.json,
+        )
+    if args.command == "update-memory":
+        return update_memory(
+            Path(args.target),
+            args.identifier,
+            args.text,
+            source=args.source,
             json_output=args.json,
         )
     if args.command == "recall":

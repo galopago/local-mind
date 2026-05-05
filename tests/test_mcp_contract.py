@@ -293,6 +293,30 @@ class McpContractTests(unittest.TestCase):
         self.assertTrue(override["duplicate_override"])
         self.assertEqual(override["name"], "prefer-release-branches-2")
 
+    def test_update_memory_contract(self):
+        reviewed = json.loads(self.server.review_memory("prefer-local-personal-memory", note="confirmed"))
+        updated = json.loads(self.server.update_memory(
+            "prefer-local-personal-memory",
+            "Also prefer updating existing memories instead of creating duplicates.",
+            source="unit test",
+        ))
+        explained = json.loads(self.server.explain_memory("prefer-local-personal-memory"))
+        memory_text = (self.target / "wiki/memories/prefer-local-personal-memory.md").read_text(encoding="utf-8")
+        log_text = (self.target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertEqual(reviewed["review_status"], "reviewed")
+        self.assertTrue(updated["updated"])
+        self.assertEqual(updated["previous_review_status"], "reviewed")
+        self.assertEqual(updated["review_status"], "pending")
+        self.assertEqual(updated["update_count"], 1)
+        self.assertTrue(updated["backlinks_rebuilt"])
+        self.assertEqual(explained["review"]["status"], "pending")
+        self.assertEqual(explained["recall"]["state"], "needs_review")
+        self.assertIn("instead of creating duplicates", explained["body"])
+        self.assertIn("update_count: 1", memory_text)
+        self.assertNotIn("reviewed_at:", memory_text)
+        self.assertIn("update-memory", log_text)
+
     def test_rebuild_backlinks_contract(self):
         backlinks_path = self.target / "wiki/_backlinks.json"
         backlinks_path.write_text(json.dumps({"backlinks": {}, "forward": {}}), encoding="utf-8")

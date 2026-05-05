@@ -215,6 +215,42 @@ class LinkCliTests(unittest.TestCase):
         self.assertTrue(override["duplicate_override"])
         self.assertEqual(override["name"], "prefer-release-branches-2")
 
+    def test_update_memory_merges_text_and_resets_review(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.review_memory(target, "prefer-local-personal-memory", note="confirmed")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.update_memory(
+                target,
+                "prefer-local-personal-memory",
+                "Also prefer updating existing memories instead of creating duplicates.",
+                source="unit test",
+                json_output=True,
+            )
+        payload = json.loads(out.getvalue())
+        memory_text = (target / "wiki/memories/prefer-local-personal-memory.md").read_text(encoding="utf-8")
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+        backlinks = json.loads((target / "wiki/_backlinks.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(code, 0)
+        self.assertTrue(payload["updated"])
+        self.assertEqual(payload["previous_review_status"], "reviewed")
+        self.assertEqual(payload["review_status"], "pending")
+        self.assertEqual(payload["update_count"], 1)
+        self.assertIn("updated_at:", memory_text)
+        self.assertIn("update_count: 1", memory_text)
+        self.assertIn('last_update_source: "unit test"', memory_text)
+        self.assertIn("review_status: pending", memory_text)
+        self.assertNotIn("reviewed_at:", memory_text)
+        self.assertIn("Update (", memory_text)
+        self.assertIn("instead of creating duplicates", memory_text)
+        self.assertIn("update-memory", log_text)
+        self.assertIn("prefer-local-personal-memory", backlinks["backlinks"]["link"])
+
     def test_recall_finds_memory_pages(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"
