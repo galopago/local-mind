@@ -10,6 +10,8 @@ Usage:
   python link.py profile [target]
   python link.py archive-memory <name-or-title> [target]
   python link.py restore-memory <name-or-title> [target]
+  python link.py memory-inbox [target]
+  python link.py review-memory <name-or-title> [target]
   python link.py rebuild-backlinks [target]
   python link.py verify-mcp [target]
 """
@@ -89,6 +91,7 @@ SKIP_SCAN_SUFFIXES = {
 }
 MEMORY_TYPES = ("preference", "decision", "project", "fact", "note")
 MEMORY_SCOPES = ("user", "project", "global")
+MEMORY_REVIEW_STATUSES = ("pending", "reviewed", "needs_update")
 
 
 DEMO_FILES: dict[str, str] = {
@@ -503,6 +506,8 @@ memory_type: preference
 scope: user
 status: active
 date_captured: "2026-05-04T00:00:00Z"
+source: "demo"
+review_status: pending
 tags: [memory, agents, local-first]
 aliases: ["local personal memory", "agent personal memory"]
 ---
@@ -791,6 +796,9 @@ def _memory_records(wiki_dir: Path) -> list[dict[str, object]]:
             "archive_reason": meta.get("archive_reason", ""),
             "restored_at": meta.get("restored_at", ""),
             "source": meta.get("source", ""),
+            "review_status": meta.get("review_status") or "pending",
+            "reviewed_at": meta.get("reviewed_at", ""),
+            "review_note": meta.get("review_note", ""),
             "tags": _meta_tags(meta.get("tags", "")),
             "tldr": _extract_tldr(body),
             "snippet": _first_body_snippet(body),
@@ -805,6 +813,116 @@ def _slim_memory(record: dict[str, object]) -> dict[str, object]:
 
 def _is_active_memory(record: dict[str, object]) -> bool:
     return str(record.get("status") or "active").lower() not in {"archived", "stale"}
+
+
+def _memory_review_issues(record: dict[str, object]) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    status = str(record.get("status") or "active").lower()
+    review_status = str(record.get("review_status") or "pending").lower()
+    memory_type = str(record.get("memory_type") or "")
+    scope = str(record.get("scope") or "")
+
+    if review_status in {"pending", "needs_review"}:
+        issues.append({
+            "code": "pending_review",
+            "severity": "medium",
+            "message": "Memory has not been reviewed by the user.",
+            "suggested_action": "Confirm it is still accurate, then run review-memory.",
+        })
+    elif review_status == "needs_update":
+        issues.append({
+            "code": "needs_update",
+            "severity": "high",
+            "message": "Memory is marked as needing an update.",
+            "suggested_action": "Edit the memory page or archive it if it is no longer useful.",
+        })
+    elif review_status not in MEMORY_REVIEW_STATUSES:
+        issues.append({
+            "code": "invalid_review_status",
+            "severity": "high",
+            "message": f"Unknown review_status: {review_status}.",
+            "suggested_action": "Use pending, reviewed, or needs_update.",
+        })
+
+    if status == "stale":
+        issues.append({
+            "code": "stale_status",
+            "severity": "high",
+            "message": "Memory is marked stale and is excluded from default recall.",
+            "suggested_action": "Archive it, restore it, or update the memory text.",
+        })
+    if memory_type not in MEMORY_TYPES:
+        issues.append({
+            "code": "invalid_memory_type",
+            "severity": "high",
+            "message": f"Unknown memory_type: {memory_type or 'missing'}.",
+            "suggested_action": f"Use one of: {', '.join(MEMORY_TYPES)}.",
+        })
+    if scope not in MEMORY_SCOPES:
+        issues.append({
+            "code": "invalid_scope",
+            "severity": "high",
+            "message": f"Unknown scope: {scope or 'missing'}.",
+            "suggested_action": f"Use one of: {', '.join(MEMORY_SCOPES)}.",
+        })
+    if not str(record.get("source") or "").strip():
+        issues.append({
+            "code": "missing_source",
+            "severity": "medium",
+            "message": "Memory has no source metadata.",
+            "suggested_action": "Add source metadata so future agents know why this memory exists.",
+        })
+    if not str(record.get("date_captured") or "").strip():
+        issues.append({
+            "code": "missing_date_captured",
+            "severity": "medium",
+            "message": "Memory has no date_captured metadata.",
+            "suggested_action": "Add the capture timestamp or recreate the memory.",
+        })
+    if not (str(record.get("tldr") or "").strip() or str(record.get("snippet") or "").strip()):
+        issues.append({
+            "code": "missing_summary",
+            "severity": "medium",
+            "message": "Memory has no usable summary.",
+            "suggested_action": "Add a TLDR line or a clear first paragraph.",
+        })
+    return issues
+
+
+def _memory_inbox(wiki_dir: Path, limit: int = 20, include_archived: bool = False) -> dict[str, object]:
+    limit = max(1, min(limit, 50))
+    items: list[dict[str, object]] = []
+    severity_rank = {"high": 0, "medium": 1, "low": 2}
+    for record in _memory_records(wiki_dir):
+        if not include_archived and str(record.get("status") or "").lower() == "archived":
+            continue
+        issues = _memory_review_issues(record)
+        if not issues:
+            continue
+        item = _slim_memory(record)
+        item["issues"] = issues
+        item["issue_count"] = len(issues)
+        item["highest_severity"] = min(
+            (issue["severity"] for issue in issues),
+            key=lambda severity: severity_rank.get(severity, 9),
+        )
+        items.append(item)
+    items.sort(key=lambda item: (
+        severity_rank.get(str(item["highest_severity"]), 9),
+        -int(item["issue_count"]),
+        str(item.get("date_captured") or ""),
+        str(item.get("title") or "").lower(),
+    ))
+    counts_by_severity: dict[str, int] = {}
+    for item in items:
+        severity = str(item["highest_severity"])
+        counts_by_severity[severity] = counts_by_severity.get(severity, 0) + 1
+    return {
+        "review_count": len(items),
+        "counts_by_severity": counts_by_severity,
+        "include_archived": include_archived,
+        "items": items[:limit],
+    }
 
 
 def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int]:
@@ -861,6 +979,7 @@ def _memory_profile(wiki_dir: Path, limit: int = 10) -> dict[str, object]:
     return {
         "memory_count": len(records),
         "active_count": len(active_records),
+        "review_count": _memory_inbox(wiki_dir, limit=limit)["review_count"],
         "by_type": _count_values(records, "memory_type"),
         "by_scope": _count_values(records, "scope"),
         "by_status": _count_values(records, "status"),
@@ -1013,6 +1132,13 @@ def _resolve_memory_page(wiki_dir: Path, identifier: str) -> tuple[Path | None, 
                 "memory_type": meta.get("memory_type") or "note",
                 "scope": meta.get("scope") or "user",
                 "status": meta.get("status") or "active",
+                "date_captured": meta.get("date_captured", ""),
+                "source": meta.get("source", ""),
+                "review_status": meta.get("review_status") or "pending",
+                "reviewed_at": meta.get("reviewed_at", ""),
+                "review_note": meta.get("review_note", ""),
+                "tldr": _extract_tldr(body),
+                "snippet": _first_body_snippet(body),
             }, None
 
     lowered = needle.lower()
@@ -1091,6 +1217,58 @@ def _set_memory_status(
     }
 
 
+def _mark_memory_reviewed(
+    target: Path,
+    identifier: str,
+    note: str | None = None,
+    timestamp: str | None = None,
+) -> dict[str, object]:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
+    page_path, record, error = _resolve_memory_page(wiki_dir, identifier)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and record is not None
+
+    timestamp = timestamp or _utc_timestamp()
+    previous_review_status = str(record.get("review_status") or "pending")
+    clean_note = note.strip() if note else ""
+    updates = {
+        "review_status": "reviewed",
+        "reviewed_at": f'"{timestamp}"',
+    }
+    if clean_note:
+        updates["review_note"] = f'"{_frontmatter_string(clean_note)}"'
+    changed = previous_review_status != "reviewed" or bool(clean_note)
+    if changed:
+        text = page_path.read_text(encoding="utf-8", errors="replace")
+        page_path.write_text(_update_frontmatter_fields(text, updates), encoding="utf-8")
+        log_lines = [
+            f"Reviewed: memories/{page_path.name}",
+            f"Previous review status: {previous_review_status}",
+            "New review status: reviewed",
+        ]
+        if clean_note:
+            log_lines.append(f"Note: {clean_note}")
+        _append_log(wiki_dir, timestamp, "review-memory", str(record["title"]), log_lines)
+
+    _, updated_record, _ = _resolve_memory_page(wiki_dir, str(record["name"]))
+    updated_record = updated_record or record
+    issues = _memory_review_issues(updated_record)
+    return {
+        "updated": changed,
+        "name": record["name"],
+        "path": record["path"],
+        "title": record["title"],
+        "previous_review_status": previous_review_status,
+        "review_status": "reviewed",
+        "remaining_issue_count": len(issues),
+        "remaining_issues": issues,
+    }
+
+
 def _write_memory_page(
     target: Path,
     text: str,
@@ -1134,6 +1312,7 @@ scope: {scope}
 status: active
 date_captured: "{timestamp}"
 source: "{_frontmatter_string(source)}"
+review_status: pending
 tags: {_yaml_list(tag_values)}
 ---
 
@@ -1798,6 +1977,72 @@ def restore_memory(target: Path, identifier: str, json_output: bool = False) -> 
     return 0
 
 
+def memory_inbox(
+    target: Path,
+    limit: int = 20,
+    include_archived: bool = False,
+    json_output: bool = False,
+) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    inbox = _memory_inbox(wiki_dir, limit=limit, include_archived=include_archived)
+
+    if json_output:
+        print(json.dumps(inbox, indent=2))
+        return 0
+
+    print(f"Link memory inbox: {target}")
+    if include_archived:
+        print("Including archived memories")
+    print("")
+    review_count = inbox["review_count"]
+    print(f"{review_count} memor{'y' if review_count == 1 else 'ies'} need review")
+    if inbox["counts_by_severity"]:
+        print(f"Severity: {_format_counts(inbox['counts_by_severity'])}")
+    print("")
+    if not inbox["items"]:
+        print("Inbox is clear.")
+        return 0
+
+    for item in inbox["items"]:
+        print(f"- {item['title']} ({item['memory_type']} · {item['scope']} · {item['status']})")
+        print(f"  {item['path']}")
+        for issue in item["issues"]:
+            print(f"  [{issue['severity']}] {issue['code']}: {issue['message']}")
+        print(f"  Review: python3 link.py review-memory \"{item['name']}\" .")
+    return 0
+
+
+def review_memory(target: Path, identifier: str, note: str | None = None, json_output: bool = False) -> int:
+    try:
+        result = _mark_memory_reviewed(target, identifier, note=note)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Could not review memory: {exc}", file=sys.stderr)
+        return 1
+
+    if json_output:
+        print(json.dumps(result, indent=2))
+        return 0
+
+    if result["updated"]:
+        print("Memory reviewed")
+    else:
+        print("Memory was already reviewed")
+    print(f"Title: {result['title']}")
+    print(f"Path: {result['path']}")
+    print(f"Previous review status: {result['previous_review_status']}")
+    print(f"Review status: {result['review_status']}")
+    if result["remaining_issue_count"]:
+        print("")
+        print(f"{result['remaining_issue_count']} issue{'s' if result['remaining_issue_count'] != 1 else ''} still need attention:")
+        for issue in result["remaining_issues"]:
+            print(f"- [{issue['severity']}] {issue['code']}: {issue['message']}")
+    return 0
+
+
 def _format_counts(counts: dict[str, int]) -> str:
     if not counts:
         return "none"
@@ -1833,7 +2078,8 @@ def profile(target: Path, limit: int = 10, json_output: bool = False) -> int:
     print("")
     memory_count = profile_data["memory_count"]
     active_count = profile_data["active_count"]
-    print(f"{memory_count} memor{'y' if memory_count == 1 else 'ies'} · {active_count} active")
+    review_count = profile_data["review_count"]
+    print(f"{memory_count} memor{'y' if memory_count == 1 else 'ies'} · {active_count} active · {review_count} need review")
     print(f"Types: {_format_counts(profile_data['by_type'])}")
     print(f"Scopes: {_format_counts(profile_data['by_scope'])}")
     print(f"Status: {_format_counts(profile_data['by_status'])}")
@@ -2095,6 +2341,18 @@ def main(argv: list[str] | None = None) -> int:
     restore_cmd.add_argument("target", nargs="?", default=".")
     restore_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
+    inbox_cmd = sub.add_parser("memory-inbox", help="show memories that need review")
+    inbox_cmd.add_argument("target", nargs="?", default=".")
+    inbox_cmd.add_argument("--limit", type=int, default=20)
+    inbox_cmd.add_argument("--include-archived", action="store_true", help="include archived memories")
+    inbox_cmd.add_argument("--json", action="store_true", help="print machine-readable inbox")
+
+    review_cmd = sub.add_parser("review-memory", help="mark a memory as reviewed")
+    review_cmd.add_argument("identifier", help="memory page name, title, or path")
+    review_cmd.add_argument("target", nargs="?", default=".")
+    review_cmd.add_argument("--note", default=None, help="optional review note")
+    review_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
+
     rebuild_cmd = sub.add_parser("rebuild-backlinks", help="rebuild wiki/_backlinks.json")
     rebuild_cmd.add_argument("target", nargs="?", default=".")
 
@@ -2136,6 +2394,15 @@ def main(argv: list[str] | None = None) -> int:
         return archive_memory(Path(args.target), args.identifier, reason=args.reason, json_output=args.json)
     if args.command == "restore-memory":
         return restore_memory(Path(args.target), args.identifier, json_output=args.json)
+    if args.command == "memory-inbox":
+        return memory_inbox(
+            Path(args.target),
+            limit=args.limit,
+            include_archived=args.include_archived,
+            json_output=args.json,
+        )
+    if args.command == "review-memory":
+        return review_memory(Path(args.target), args.identifier, note=args.note, json_output=args.json)
     if args.command == "rebuild-backlinks":
         return rebuild_backlinks(Path(args.target))
     if args.command == "verify-mcp":

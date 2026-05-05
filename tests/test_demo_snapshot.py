@@ -128,10 +128,25 @@ class DemoSnapshotTests(unittest.TestCase):
 
         self.assertEqual(profile["memory_count"], 1)
         self.assertEqual(profile["active_count"], 1)
+        self.assertEqual(profile["review_count"], 1)
         self.assertEqual(profile["by_type"]["preference"], 1)
         self.assertEqual(profile["recent"][0]["name"], "prefer-local-personal-memory")
         self.assertIn("Memory Profile", html)
         self.assertIn("Prefer local personal memory", html)
+
+    def test_demo_inbox_snapshot(self):
+        target = self.make_demo()
+        reset_serve_wiki(target / "wiki")
+
+        inbox = serve._memory_inbox()
+        html = serve._render_inbox()
+
+        self.assertEqual(inbox["review_count"], 1)
+        self.assertEqual(inbox["counts_by_severity"]["medium"], 1)
+        self.assertEqual(inbox["items"][0]["name"], "prefer-local-personal-memory")
+        self.assertEqual(inbox["items"][0]["issues"][0]["code"], "pending_review")
+        self.assertIn("Memory Review Inbox", html)
+        self.assertIn("pending_review", html)
 
     def test_demo_profile_separates_archived_memories(self):
         target = self.make_demo()
@@ -144,6 +159,7 @@ class DemoSnapshotTests(unittest.TestCase):
 
         self.assertEqual(profile["memory_count"], 1)
         self.assertEqual(profile["active_count"], 0)
+        self.assertEqual(profile["review_count"], 0)
         self.assertEqual(profile["by_status"]["archived"], 1)
         self.assertEqual(profile["recent"], [])
         self.assertEqual(profile["archived"][0]["name"], "prefer-local-personal-memory")

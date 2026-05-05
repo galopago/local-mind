@@ -244,6 +244,70 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["memory_count"], 1)
         self.assertEqual(payload["by_type"]["preference"], 1)
         self.assertEqual(payload["preferences"][0]["name"], "prefer-local-personal-memory")
+        self.assertEqual(payload["review_count"], 1)
+
+    def test_memory_inbox_and_review_memory(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        inbox_out = StringIO()
+        with redirect_stdout(inbox_out):
+            inbox_code = link_cli.memory_inbox(target, json_output=True)
+        inbox = json.loads(inbox_out.getvalue())
+
+        self.assertEqual(inbox_code, 0)
+        self.assertEqual(inbox["review_count"], 1)
+        self.assertEqual(inbox["items"][0]["name"], "prefer-local-personal-memory")
+        self.assertEqual(inbox["items"][0]["issues"][0]["code"], "pending_review")
+
+        review_out = StringIO()
+        with redirect_stdout(review_out):
+            review_code = link_cli.review_memory(
+                target,
+                "prefer-local-personal-memory",
+                note="confirmed in unit test",
+                json_output=True,
+            )
+        review = json.loads(review_out.getvalue())
+        memory_text = (target / "wiki/memories/prefer-local-personal-memory.md").read_text(encoding="utf-8")
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertEqual(review_code, 0)
+        self.assertTrue(review["updated"])
+        self.assertEqual(review["review_status"], "reviewed")
+        self.assertEqual(review["remaining_issue_count"], 0)
+        self.assertIn("review_status: reviewed", memory_text)
+        self.assertIn("reviewed_at:", memory_text)
+        self.assertIn('review_note: "confirmed in unit test"', memory_text)
+        self.assertIn("review-memory", log_text)
+
+        clear_out = StringIO()
+        with redirect_stdout(clear_out):
+            clear_code = link_cli.memory_inbox(target, json_output=True)
+        clear = json.loads(clear_out.getvalue())
+        self.assertEqual(clear_code, 0)
+        self.assertEqual(clear["review_count"], 0)
+
+    def test_reviewed_memory_with_quality_issue_stays_in_inbox(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        memory_path = target / "wiki/memories/prefer-local-personal-memory.md"
+        text = memory_path.read_text(encoding="utf-8")
+        text = text.replace('source: "demo"\n', "")
+        memory_path.write_text(text, encoding="utf-8")
+
+        with redirect_stdout(StringIO()):
+            code = link_cli.review_memory(target, "prefer-local-personal-memory")
+        inbox_out = StringIO()
+        with redirect_stdout(inbox_out):
+            link_cli.memory_inbox(target, json_output=True)
+        inbox = json.loads(inbox_out.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(inbox["review_count"], 1)
+        self.assertEqual(inbox["items"][0]["issues"][0]["code"], "missing_source")
 
     def test_archive_memory_hides_from_default_recall_and_restore_reenables(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))

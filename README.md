@@ -97,6 +97,7 @@ Use direct memories for preferences, decisions, and project context future agent
 python3 ~/link/link.py remember "I am testing Link as local personal memory for agents." ~/link --type preference --scope user --tags onboarding
 python3 ~/link/link.py recall "local personal memory" ~/link
 python3 ~/link/link.py profile ~/link
+python3 ~/link/link.py memory-inbox ~/link
 ```
 
 ### 4. Ask your agent to ingest it
@@ -241,6 +242,8 @@ Remember preferences and decisions directly:
 python3 ~/link/link.py remember "User prefers release/* branches for Link work." ~/link --title "Prefer release branches" --type preference --scope project
 python3 ~/link/link.py recall "branch preference" ~/link
 python3 ~/link/link.py profile ~/link
+python3 ~/link/link.py memory-inbox ~/link
+python3 ~/link/link.py review-memory prefer-release-branches ~/link --note "confirmed"
 python3 ~/link/link.py archive-memory prefer-release-branches ~/link --reason "superseded"
 python3 ~/link/link.py restore-memory prefer-release-branches ~/link
 ```
@@ -273,6 +276,8 @@ Obsidian also works: open the `wiki/` folder as a vault.
 | `python3 link.py remember "text" <dir>` | Save a local agent memory under `wiki/memories/`. |
 | `python3 link.py recall "query" <dir>` | Search local agent memories first. |
 | `python3 link.py profile <dir>` | Show what Link remembers by type, scope, status, and recency. |
+| `python3 link.py memory-inbox <dir>` | Show memories that need review or stronger metadata. |
+| `python3 link.py review-memory <name> <dir>` | Mark a confirmed memory as reviewed. |
 | `python3 link.py archive-memory <name> <dir>` | Reversibly hide a stale or wrong memory from default recall. |
 | `python3 link.py restore-memory <name> <dir>` | Restore an archived memory to active recall. |
 | `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, and secret-looking content. |
@@ -289,6 +294,8 @@ Available tools:
 | Tool | Description |
 |------|-------------|
 | `memory_profile` | Summarize what Link remembers by type, scope, status, recent memories, preferences, decisions, and project context. |
+| `memory_inbox` | List memories that need user review, cleanup, or stronger metadata. |
+| `review_memory` | Mark a confirmed memory as reviewed. |
 | `search_wiki` | Ranked search by title, alias, tag, and full text. Returns scores and snippets. |
 | `recall_memory` | Search durable local memory pages for preferences, decisions, and project context. |
 | `remember_memory` | Save an explicit user-approved memory under `wiki/memories/`. |
@@ -312,6 +319,7 @@ Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do no
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
 | `GET /api/memory-profile` | Counts and recent memories for the local memory profile. |
+| `GET /api/memory-inbox` | Memories that need review or metadata cleanup. |
 | `GET /api/search?q=<query>` | Ranked search by title, alias, tag, TLDR, and full text. |
 | `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
 | `GET /api/graph` | Nodes and edges for graph visualization. |

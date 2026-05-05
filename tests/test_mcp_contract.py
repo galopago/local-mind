@@ -187,10 +187,27 @@ class McpContractTests(unittest.TestCase):
 
         self.assertEqual(payload["memory_count"], 1)
         self.assertEqual(payload["active_count"], 1)
+        self.assertEqual(payload["review_count"], 1)
         self.assertEqual(payload["by_type"]["preference"], 1)
         self.assertEqual(payload["by_scope"]["user"], 1)
         self.assertEqual(payload["recent"][0]["name"], "prefer-local-personal-memory")
         self.assertEqual(payload["preferences"][0]["memory_type"], "preference")
+
+    def test_memory_inbox_and_review_memory_contract(self):
+        inbox = json.loads(self.server.memory_inbox())
+        reviewed = json.loads(self.server.review_memory(
+            "prefer-local-personal-memory",
+            note="confirmed by MCP test",
+        ))
+        clear = json.loads(self.server.memory_inbox())
+
+        self.assertEqual(inbox["review_count"], 1)
+        self.assertEqual(inbox["items"][0]["name"], "prefer-local-personal-memory")
+        self.assertEqual(inbox["items"][0]["issues"][0]["code"], "pending_review")
+        self.assertTrue(reviewed["updated"])
+        self.assertEqual(reviewed["review_status"], "reviewed")
+        self.assertEqual(reviewed["remaining_issue_count"], 0)
+        self.assertEqual(clear["review_count"], 0)
 
     def test_archive_and_restore_memory_contract(self):
         archived = json.loads(self.server.archive_memory(

@@ -234,6 +234,9 @@ def _memory_records() -> list[dict[str, object]]:
             "archive_reason": meta.get("archive_reason", ""),
             "restored_at": meta.get("restored_at", ""),
             "source": meta.get("source", ""),
+            "review_status": meta.get("review_status") or "pending",
+            "reviewed_at": meta.get("reviewed_at", ""),
+            "review_note": meta.get("review_note", ""),
             "tags": _meta_tags(meta.get("tags", "")),
             "tldr": _extract_tldr(body),
             "snippet": _first_body_snippet(body),
@@ -251,6 +254,119 @@ def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int
 
 def _is_active_memory(record: dict[str, object]) -> bool:
     return str(record.get("status") or "active").lower() not in {"archived", "stale"}
+
+
+def _memory_review_issues(record: dict[str, object]) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    status = str(record.get("status") or "active").lower()
+    review_status = str(record.get("review_status") or "pending").lower()
+    memory_type = str(record.get("memory_type") or "")
+    scope = str(record.get("scope") or "")
+    memory_types = {"preference", "decision", "project", "fact", "note"}
+    memory_scopes = {"user", "project", "global"}
+    review_statuses = {"pending", "reviewed", "needs_update"}
+
+    if review_status in {"pending", "needs_review"}:
+        issues.append({
+            "code": "pending_review",
+            "severity": "medium",
+            "message": "Memory has not been reviewed by the user.",
+            "suggested_action": "Confirm it is still accurate, then run review-memory.",
+        })
+    elif review_status == "needs_update":
+        issues.append({
+            "code": "needs_update",
+            "severity": "high",
+            "message": "Memory is marked as needing an update.",
+            "suggested_action": "Edit the memory page or archive it if it is no longer useful.",
+        })
+    elif review_status not in review_statuses:
+        issues.append({
+            "code": "invalid_review_status",
+            "severity": "high",
+            "message": f"Unknown review_status: {review_status}.",
+            "suggested_action": "Use pending, reviewed, or needs_update.",
+        })
+
+    if status == "stale":
+        issues.append({
+            "code": "stale_status",
+            "severity": "high",
+            "message": "Memory is marked stale and excluded from default recall.",
+            "suggested_action": "Archive it, restore it, or update the memory text.",
+        })
+    if memory_type not in memory_types:
+        issues.append({
+            "code": "invalid_memory_type",
+            "severity": "high",
+            "message": f"Unknown memory_type: {memory_type or 'missing'}.",
+            "suggested_action": "Use preference, decision, project, fact, or note.",
+        })
+    if scope not in memory_scopes:
+        issues.append({
+            "code": "invalid_scope",
+            "severity": "high",
+            "message": f"Unknown scope: {scope or 'missing'}.",
+            "suggested_action": "Use user, project, or global.",
+        })
+    if not str(record.get("source") or "").strip():
+        issues.append({
+            "code": "missing_source",
+            "severity": "medium",
+            "message": "Memory has no source metadata.",
+            "suggested_action": "Add source metadata so future agents know why this memory exists.",
+        })
+    if not str(record.get("date_captured") or "").strip():
+        issues.append({
+            "code": "missing_date_captured",
+            "severity": "medium",
+            "message": "Memory has no date_captured metadata.",
+            "suggested_action": "Add the capture timestamp or recreate the memory.",
+        })
+    if not (str(record.get("tldr") or "").strip() or str(record.get("snippet") or "").strip()):
+        issues.append({
+            "code": "missing_summary",
+            "severity": "medium",
+            "message": "Memory has no usable summary.",
+            "suggested_action": "Add a TLDR line or a clear first paragraph.",
+        })
+    return issues
+
+
+def _memory_inbox(limit: int = 20, include_archived: bool = False) -> dict[str, object]:
+    limit = max(1, min(limit, 50))
+    severity_rank = {"high": 0, "medium": 1, "low": 2}
+    items = []
+    for record in _memory_records():
+        if not include_archived and str(record.get("status") or "").lower() == "archived":
+            continue
+        issues = _memory_review_issues(record)
+        if not issues:
+            continue
+        item = dict(record)
+        item["issues"] = issues
+        item["issue_count"] = len(issues)
+        item["highest_severity"] = min(
+            (issue["severity"] for issue in issues),
+            key=lambda severity: severity_rank.get(severity, 9),
+        )
+        items.append(item)
+    items.sort(key=lambda item: (
+        severity_rank.get(str(item["highest_severity"]), 9),
+        -int(item["issue_count"]),
+        str(item.get("date_captured") or ""),
+        str(item.get("title") or "").lower(),
+    ))
+    counts_by_severity = {}
+    for item in items:
+        severity = str(item["highest_severity"])
+        counts_by_severity[severity] = counts_by_severity.get(severity, 0) + 1
+    return {
+        "review_count": len(items),
+        "counts_by_severity": counts_by_severity,
+        "include_archived": include_archived,
+        "items": items[:limit],
+    }
 
 
 def _memory_profile(limit: int = 10) -> dict[str, object]:
@@ -290,6 +406,7 @@ def _memory_profile(limit: int = 10) -> dict[str, object]:
     return {
         "memory_count": len(records),
         "active_count": len(active_records),
+        "review_count": _memory_inbox(limit=limit)["review_count"],
         "by_type": _count_values(records, "memory_type"),
         "by_scope": _count_values(records, "scope"),
         "by_status": _count_values(records, "status"),
@@ -517,6 +634,9 @@ hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
 .memory-profile { margin: 18px 0; }
 .memory-profile .summary { color: #666; font-family: sans-serif; margin-bottom: 16px; }
 .memory-profile .memory-meta { color: #888; font-size: 12px; font-family: sans-serif; }
+.memory-issues { margin-top: 6px; }
+.memory-issues li { border: none; padding: 0; color: #666; font-size: 13px; }
+.memory-issues .severity { font-family: sans-serif; font-size: 11px; text-transform: uppercase; color: #8a6d3b; }
 
 mark { background: #fff3cd; color: inherit; border-radius: 2px; padding: 0 1px; }
 
@@ -559,6 +679,7 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
   th, td { border-color: #333; }
   .page-list li { border-color: #2a2a2a; }
   .memory-profile .summary { color: #aaa; }
+  .memory-issues li { color: #aaa; }
   footer { border-color: #333; }
   .home-stats .stat .num { color: #6ea8fe; }
   .graph-toolbar button { background: #222; color: #ddd; border-color: #444; }
@@ -574,6 +695,7 @@ def _header_html():
   <div class="logo"><a href="/"><img src="/logo.svg" alt="">Link</a><small>agent memory</small></div>
   <nav>
     <a href="/">home</a>
+    <a href="/inbox">inbox</a>
     <a href="/profile">profile</a>
     <a href="/page/log">log</a>
     <a href="/all">all pages</a>
@@ -732,6 +854,7 @@ def _render_profile():
         f'<div class="home-stats">'
         f'<div class="stat"><span class="num">{memory_count}</span><span class="label">memories</span></div>'
         f'<div class="stat"><span class="num">{active_count}</span><span class="label">active</span></div>'
+        f'<div class="stat"><span class="num">{profile["review_count"]}</span><span class="label">review</span></div>'
         f'</div>'
     )
 
@@ -772,6 +895,56 @@ def _render_profile():
         f'</div>'
     )
     return _layout("Memory Profile", body)
+
+
+def _render_inbox():
+    inbox = _memory_inbox(limit=50)
+    review_count = inbox["review_count"]
+    stats = (
+        f'<div class="home-stats">'
+        f'<div class="stat"><span class="num">{review_count}</span><span class="label">review</span></div>'
+        f'</div>'
+    )
+    if inbox["counts_by_severity"]:
+        severity = ", ".join(
+            f"{html.escape(name)}: {count}"
+            for name, count in inbox["counts_by_severity"].items()
+        )
+        severity_html = f"<p><strong>Severity:</strong> {severity}</p>"
+    else:
+        severity_html = ""
+
+    if not inbox["items"]:
+        content = "<p>Inbox is clear.</p>"
+    else:
+        items = ""
+        for item in inbox["items"]:
+            summary = item.get("tldr") or item.get("snippet") or ""
+            meta = f'{item.get("memory_type", "")} · {item.get("scope", "")} · {item.get("status", "")}'
+            issues = "".join(
+                f'<li><span class="severity">{html.escape(str(issue["severity"]))}</span> '
+                f'{html.escape(str(issue["code"]))}: {html.escape(str(issue["message"]))}</li>'
+                for issue in item["issues"]
+            )
+            items += (
+                f'<li><a href="{_page_href(str(item["name"]))}">{html.escape(str(item["title"]))}</a>'
+                f'<div class="memory-meta">{html.escape(meta)}</div>'
+                f'{f"<small>{html.escape(str(summary))}</small>" if summary else ""}'
+                f'<ul class="memory-issues">{issues}</ul></li>'
+            )
+        content = f"<ul class='page-list'>{items}</ul>"
+
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / inbox</div>'
+        f'<h1>Memory Review Inbox</h1>'
+        f'<div class="memory-profile">'
+        f'<p class="summary">Memories that need confirmation, stronger metadata, or cleanup.</p>'
+        f'{stats}'
+        f'{severity_html}'
+        f'{content}'
+        f'</div>'
+    )
+    return _layout("Memory Review Inbox", body)
 
 
 def _render_graph():
@@ -1508,6 +1681,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._file(raw_path, ctypes.get(ext, "application/octet-stream"))
         elif path in ("/", ""):
             self._ok(_render_home())
+        elif path == "/inbox":
+            self._ok(_render_inbox())
         elif path == "/profile":
             self._ok(_render_profile())
         elif path == "/all":
@@ -1545,6 +1720,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": error}, status=400)
             else:
                 self._json(_memory_profile(limit=limit))
+        elif path == "/api/memory-inbox":
+            limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                include_archived = query.get("include_archived", ["false"])[0].lower() in {"1", "true", "yes"}
+                self._json(_memory_inbox(limit=limit, include_archived=include_archived))
         elif path == "/api/search":
             q = query.get("q", [""])[0].strip()
             limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
