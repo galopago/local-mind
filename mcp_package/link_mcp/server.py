@@ -92,6 +92,15 @@ from link_core.memory import (
 from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
 )
+from link_core.wiki import (
+    build_backlinks as _core_build_backlinks,
+    build_wiki_cache as _core_build_wiki_cache,
+    context_for_topic as _core_context_for_topic,
+    graph_data as _core_graph_data,
+    load_backlinks_index as _core_load_backlinks_index,
+    search_pages as _core_search_pages,
+    wiki_mtime as _core_wiki_mtime,
+)
 
 
 def _clean_text_input(value, max_len: int = MAX_TEXT_INPUT) -> str:
@@ -110,17 +119,7 @@ def _parse_limit(value, default: int = 20, max_limit: int = 50) -> int:
 
 
 def _wiki_mtime() -> float:
-    try:
-        t = WIKI_DIR.stat().st_mtime
-        for path in WIKI_DIR.rglob("*"):
-            try:
-                if path.is_dir() or path.suffix == ".md" or path.name == "_backlinks.json":
-                    t = max(t, path.stat().st_mtime)
-            except OSError:
-                continue
-        return t
-    except Exception:
-        return 0.0
+    return _core_wiki_mtime(WIKI_DIR)
 
 
 def _build_cache() -> dict:
@@ -129,100 +128,7 @@ def _build_cache() -> dict:
     if _cache and mtime == _cache_mtime:
         return _cache
 
-    pages = []
-    page_index: dict[str, Path] = {}
-    fulltext: dict[str, str] = {}
-    snippet_index: dict[str, str] = {}
-    token_index: dict[str, set] = {}
-    meta_token_index: dict[str, set] = {}
-
-    for md in sorted(WIKI_DIR.rglob("*.md")):
-        if md.name.startswith("."):
-            continue
-        rel = md.relative_to(WIKI_DIR)
-        text = md.read_text(encoding="utf-8", errors="replace")
-        meta, body = _parse_frontmatter(text)
-
-        title = meta.get("title", "")
-        if not title:
-            m = re.search(r"^#\s+(.+)", body, re.MULTILINE)
-            title = m.group(1) if m else md.stem
-
-        tldr = ""
-        tldr_m = re.search(r">\s*\*\*TLDR:\*\*\s*(.+)", body)
-        if tldr_m:
-            tldr = tldr_m.group(1).strip()
-
-        aliases_raw = meta.get("aliases", [])
-        if isinstance(aliases_raw, str):
-            aliases_raw = [a.strip() for a in aliases_raw.split(",") if a.strip()]
-        aliases = [a.lower() for a in aliases_raw]
-
-        tags_raw = meta.get("tags", [])
-        if isinstance(tags_raw, str):
-            tags_raw = [t.strip() for t in tags_raw.split(",") if t.strip()]
-
-        cat = rel.parts[0] if len(rel.parts) > 1 else "root"
-        stem = md.stem.lower()
-
-        page = {
-            "name": md.stem,
-            "title": title,
-            "category": cat,
-            "type": meta.get("type", ""),
-            "tags": tags_raw,
-            "aliases": aliases,
-            "maturity": meta.get("maturity", ""),
-            "source_count": meta.get("source_count", ""),
-            "tldr": tldr,
-            "date_updated": meta.get("date_updated", ""),
-            "date_published": meta.get("date_published", ""),
-        }
-        pages.append(page)
-        page_index[stem] = md
-        for alias in aliases:
-            if alias not in page_index:
-                page_index[alias] = md
-
-        text_lower = text.lower()
-        fulltext[stem] = text_lower
-        body_lines = [l.strip() for l in body.split("\n") if l.strip() and not l.startswith("#") and not l.startswith(">")]
-        snippet_index[stem] = body_lines[0][:200] if body_lines else ""
-
-        for token in re.split(r"\W+", text_lower):
-            if len(token) >= 3:
-                token_index.setdefault(token, set()).add(stem)
-
-        meta_tokens: set = set()
-        for word in re.split(r"\W+", title.lower()):
-            if len(word) >= 3:
-                meta_tokens.add(word)
-        for alias in aliases:
-            for word in re.split(r"\W+", alias):
-                if len(word) >= 3:
-                    meta_tokens.add(word)
-        for tag in tags_raw:
-            for word in re.split(r"\W+", str(tag).lower()):
-                if len(word) >= 3:
-                    meta_tokens.add(word)
-        if tldr:
-            for word in re.split(r"\W+", tldr.lower()):
-                if len(word) >= 3:
-                    meta_tokens.add(word)
-        for token in meta_tokens:
-            meta_token_index.setdefault(token, set()).add(stem)
-
-    page_map = {p["name"].lower(): p for p in pages}
-
-    _cache = {
-        "pages": pages,
-        "page_index": page_index,
-        "fulltext": fulltext,
-        "snippet_index": snippet_index,
-        "token_index": token_index,
-        "meta_token_index": meta_token_index,
-        "page_map": page_map,
-    }
+    _cache = _core_build_wiki_cache(WIKI_DIR)
     _cache_mtime = mtime
     return _cache
 
@@ -232,127 +138,12 @@ def _search(q: str, limit: int = 20) -> list[dict]:
     limit = _parse_limit(limit)
     if not q:
         return []
-    q_lower = q.lower()
-    c = _build_cache()
-    pages = c["pages"]
-    page_map = c["page_map"]
-    token_index = c["token_index"]
-    meta_token_index = c["meta_token_index"]
-    fulltext = c["fulltext"]
-    snippet_index = c["snippet_index"]
-
-    is_single = bool(re.match(r"^\w+$", q_lower))
-    if is_single and q_lower in token_index:
-        candidates = token_index[q_lower] | meta_token_index.get(q_lower, set())
-    else:
-        candidates = {p["name"].lower() for p in pages}
-
-    scored = []
-    for stem in candidates:
-        p = page_map.get(stem)
-        if not p:
-            continue
-        score = 0
-        if q_lower in p["title"].lower():
-            score += 10
-        if q_lower == stem:
-            score += 20
-        if any(q_lower in a for a in p.get("aliases", [])):
-            score += 8
-        if any(q_lower in str(t).lower() for t in p.get("tags", [])):
-            score += 5
-        if q_lower in p.get("tldr", "").lower():
-            score += 3
-        if fulltext.get(stem, "") and q_lower in fulltext[stem]:
-            score += 2
-        if score > 0:
-            scored.append((score, {**p, "score": score, "snippet": snippet_index.get(stem, "")}))
-
-    scored.sort(key=lambda x: (-x[0], x[1]["title"].lower()))
-    return [r for _, r in scored[:limit]]
+    return _core_search_pages(q, _build_cache(), limit=limit)
 
 
 def _get_context(topic: str) -> dict:
     topic = _clean_text_input(topic)
-    if not topic:
-        return {"topic": "", "found": False, "error": "topic required", "pages": []}
-
-    c = _build_cache()
-    matches = _search(topic, limit=5)
-    if not matches:
-        return {"topic": topic, "found": False, "pages": []}
-
-    primary = matches[0]
-    primary_name = primary["name"].lower()
-
-    bl_path = WIKI_DIR / "_backlinks.json"
-    backlinks_data: dict = {}
-    if bl_path.exists():
-        try:
-            raw = json.loads(bl_path.read_text(encoding="utf-8"))
-            backlinks_data = raw.get("backlinks", raw)
-        except Exception:
-            pass
-
-    inbound = backlinks_data.get(primary_name, [])
-
-    forward: list[str] = []
-    forward_seen: set[str] = set()
-    path = c["page_index"].get(primary_name)
-    if path and path.exists():
-        text = path.read_text(encoding="utf-8", errors="replace")
-        _, body = _parse_frontmatter(text)
-        page_set = {p["name"].lower() for p in c["pages"]}
-        for m in re.finditer(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", body):
-            target = m.group(1).strip().lower()
-            if target in page_set and target != primary_name and target not in forward_seen:
-                forward_seen.add(target)
-                forward.append(target)
-
-    seen = {primary_name}
-    context_names = [primary_name]
-    for name in inbound + forward:
-        if name not in seen:
-            seen.add(name)
-            context_names.append(name)
-
-    context_pages = []
-    for name in context_names[:10]:
-        p_path = c["page_index"].get(name)
-        if not p_path or not p_path.exists():
-            continue
-        text = p_path.read_text(encoding="utf-8", errors="replace")
-        meta, body = _parse_frontmatter(text)
-        is_primary = name == primary_name
-        if is_primary:
-            content = body
-        else:
-            lines = body.split("\n")
-            summary = []
-            for line in lines[:20]:
-                summary.append(line)
-                if line.startswith("## ") and len(summary) > 3:
-                    break
-            content = "\n".join(summary)
-
-        page_meta = c["page_map"].get(name, {})
-        context_pages.append({
-            "name": name,
-            "title": meta.get("title", name),
-            "type": meta.get("type", ""),
-            "is_primary": is_primary,
-            "relationship": "primary" if is_primary else ("inbound" if name in inbound else "forward"),
-            "content": content,
-        })
-
-    return {
-        "topic": topic,
-        "found": True,
-        "primary": primary["name"],
-        "inbound_count": len(inbound),
-        "forward_count": len(forward),
-        "pages": context_pages,
-    }
+    return _core_context_for_topic(WIKI_DIR, topic, _build_cache(), empty_error="topic required")
 
 
 def _utc_timestamp() -> str:
@@ -854,25 +645,19 @@ def get_backlinks(page_name: str) -> str:
 
     Useful for understanding a page's position in the knowledge graph.
     """
-    bl_path = WIKI_DIR / "_backlinks.json"
-    if not bl_path.exists():
-        return json.dumps({"error": "backlinks not built — run rebuild_backlinks first"})
-    try:
-        raw = json.loads(bl_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+    backlinks, error = _core_load_backlinks_index(WIKI_DIR / "_backlinks.json", missing_error="backlinks not built — run rebuild_backlinks first")
+    if error:
+        return json.dumps({"error": error})
 
     page_name = _clean_text_input(page_name)
     if not page_name:
         return json.dumps({"error": "page_name required", "inbound": [], "forward": []})
 
     name = page_name.lower().replace(" ", "-")
-    backlinks = raw.get("backlinks", raw)
-    forward = raw.get("forward", {})
     return json.dumps({
         "page": page_name,
-        "inbound": backlinks.get(name, []),
-        "forward": forward.get(name, []),
+        "inbound": backlinks.get("backlinks", {}).get(name, []),
+        "forward": backlinks.get("forward", {}).get(name, []),
     }, ensure_ascii=False)
 
 
@@ -887,33 +672,7 @@ def get_graph() -> str:
     Useful for understanding the overall structure of the wiki,
     finding highly-connected pages, or detecting isolated clusters.
     """
-    c = _build_cache()
-    pages = c["pages"]
-    page_ids = {p["name"].lower(): p["name"] for p in pages}
-    nodes = [{"id": p["name"], "title": p["title"], "category": p["category"], "type": p["type"]} for p in pages]
-
-    edges = []
-    seen_edges: set[tuple[str, str]] = set()
-    wl_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
-    for p in pages:
-        source = p["name"]
-        path = c["page_index"].get(source.lower())
-        if not path or not path.exists():
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        _, body = _parse_frontmatter(text)
-        for m in wl_re.finditer(body):
-            target_key = m.group(1).strip().lower()
-            target = page_ids.get(target_key)
-            if not target or target_key == source.lower():
-                continue
-            edge_key = (source, target)
-            if edge_key in seen_edges:
-                continue
-            seen_edges.add(edge_key)
-            edges.append({"source": source, "target": target})
-
-    return json.dumps({"nodes": nodes, "edges": edges}, ensure_ascii=False)
+    return json.dumps(_core_graph_data(_build_cache()), ensure_ascii=False)
 
 
 @mcp.tool()
@@ -924,27 +683,7 @@ def rebuild_backlinks() -> str:
     the graph index is up to date. Updates wiki/_backlinks.json with
     both reverse links (backlinks) and forward links.
     """
-    backlinks: dict[str, list] = {}
-    forward_links: dict[str, list] = {}
-    wl_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
-
-    for md in WIKI_DIR.rglob("*.md"):
-        if md.name.startswith("."):
-            continue
-        text = md.read_text(encoding="utf-8", errors="replace")
-        _, body = _parse_frontmatter(text)
-        source = md.stem.lower()
-        for m in wl_re.finditer(body):
-            target = m.group(1).strip().lower()
-            if target != source:
-                backlinks.setdefault(target, [])
-                if source not in backlinks[target]:
-                    backlinks[target].append(source)
-                forward_links.setdefault(source, [])
-                if target not in forward_links[source]:
-                    forward_links[source].append(target)
-
-    result = {"backlinks": backlinks, "forward": forward_links}
+    result = _core_build_backlinks(WIKI_DIR)
     bl_path = WIKI_DIR / "_backlinks.json"
     bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
@@ -953,7 +692,7 @@ def rebuild_backlinks() -> str:
     _cache = {}
     _cache_mtime = 0.0
 
-    return json.dumps({"rebuilt": True, "pages_indexed": len(backlinks)})
+    return json.dumps({"rebuilt": True, "pages_indexed": len(result["backlinks"])})
 
 
 # ── Entry point ───────────────────────────────────────────────────────

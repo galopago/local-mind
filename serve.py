@@ -25,6 +25,15 @@ from link_core.memory import (
 from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
 )
+from link_core.wiki import (
+    build_backlinks as _core_build_backlinks,
+    build_wiki_cache as _core_build_wiki_cache,
+    context_for_topic as _core_context_for_topic,
+    graph_data as _core_graph_data,
+    load_backlinks_index as _core_load_backlinks_index,
+    search_pages as _core_search_pages,
+    wiki_mtime as _core_wiki_mtime,
+)
 del _BUNDLED_CORE
 
 WIKI_DIR = ROOT / "wiki"
@@ -46,21 +55,7 @@ _meta_token_index: dict[str, set[str]] = {}  # token → stems with that token i
 
 
 def _wiki_mtime() -> float:
-    """Return an mtime signal for all files that affect wiki indexes.
-    Directory mtimes catch added/removed files; file mtimes catch normal edits
-    made from Obsidian, an editor, or an agent without touching index.md/log.md.
-    """
-    try:
-        t = WIKI_DIR.stat().st_mtime
-        for path in WIKI_DIR.rglob("*"):
-            try:
-                if path.is_dir() or path.suffix == ".md" or path.name == "_backlinks.json":
-                    t = max(t, path.stat().st_mtime)
-            except OSError:
-                continue
-        return t
-    except Exception:
-        return 0.0
+    return _core_wiki_mtime(WIKI_DIR)
 
 
 def _get_all_pages() -> list:
@@ -68,96 +63,16 @@ def _get_all_pages() -> list:
     mtime = _wiki_mtime()
     if _pages_cache is not None and mtime == _pages_cache_mtime:
         return _pages_cache
-    pages = []
-    index: dict[str, Path] = {}
-    fulltext: dict[str, str] = {}
-    snippets: dict[str, str] = {}
-    token_idx: dict[str, set[str]] = {}
-    meta_idx: dict[str, set[str]] = {}
-    for md in sorted(WIKI_DIR.rglob("*.md")):
-        if md.name.startswith("."): continue
-        rel = md.relative_to(WIKI_DIR)
-        text = md.read_text(encoding="utf-8", errors="replace")
-        meta, body = _parse_frontmatter(text)
-        title = meta.get("title", "")
-        if not title:
-            m = re.search(r"^#\s+(.+)", body, re.MULTILINE)
-            title = m.group(1) if m else md.stem
-        cat = rel.parts[0] if len(rel.parts) > 1 else "root"
-
-        # Extract TLDR for quick summaries
-        tldr = ""
-        tldr_m = re.search(r">\s*\*\*TLDR:\*\*\s*(.+)", body)
-        if tldr_m:
-            tldr = tldr_m.group(1).strip()
-
-        # Normalize aliases to list
-        aliases_raw = meta.get("aliases", [])
-        if isinstance(aliases_raw, str):
-            aliases_raw = [a.strip() for a in aliases_raw.split(",") if a.strip()]
-        aliases = [a.lower() for a in aliases_raw]
-
-        # Normalize tags to list
-        tags_raw = meta.get("tags", [])
-        if isinstance(tags_raw, str):
-            tags_raw = [t.strip() for t in tags_raw.split(",") if t.strip()]
-
-        stem = md.stem.lower()
-        pages.append({
-            "name": md.stem,
-            "title": title,
-            "category": cat,
-            "type": meta.get("type", ""),
-            "tags": tags_raw,
-            "aliases": aliases,
-            "maturity": meta.get("maturity", ""),
-            "source_count": meta.get("source_count", ""),
-            "tldr": tldr,
-            "date_updated": meta.get("date_updated", ""),
-        })
-        index[stem] = md
-        # Store full text in memory for zero-IO search
-        text_lower = text.lower()
-        fulltext[stem] = text_lower
-        # Pre-extract snippet: first non-empty body line after frontmatter
-        body_lines = [l.strip() for l in body.split("\n") if l.strip() and not l.startswith("#") and not l.startswith(">")]
-        snippets[stem] = body_lines[0][:200] if body_lines else ""
-        # Build inverted token index: token → set of page stems
-        for token in re.split(r"\W+", text_lower):
-            if len(token) >= 3:
-                if token not in token_idx:
-                    token_idx[token] = set()
-                token_idx[token].add(stem)
-        # Build meta token index: tokens from title/aliases/tags/tldr → stems
-        meta_tokens = set()
-        for word in re.split(r"\W+", title.lower()):
-            if len(word) >= 3: meta_tokens.add(word)
-        for alias in aliases:
-            for word in re.split(r"\W+", alias):
-                if len(word) >= 3: meta_tokens.add(word)
-        for tag in tags_raw:
-            for word in re.split(r"\W+", str(tag).lower()):
-                if len(word) >= 3: meta_tokens.add(word)
-        if tldr:
-            for word in re.split(r"\W+", tldr.lower()):
-                if len(word) >= 3: meta_tokens.add(word)
-        for token in meta_tokens:
-            if token not in meta_idx:
-                meta_idx[token] = set()
-            meta_idx[token].add(stem)
-        # Also index by alias so _find_page works with alternate names
-        for alias in aliases:
-            if alias not in index:
-                index[alias] = md
-    _pages_cache = pages
+    cache = _core_build_wiki_cache(WIKI_DIR)
+    _pages_cache = cache["pages"]
     _pages_cache_mtime = mtime
-    _page_index = index
-    _fulltext_index = fulltext
-    _snippet_index = snippets
-    _token_index = token_idx
-    _meta_token_index = meta_idx
-    _page_map = {p["name"].lower(): p for p in pages}
-    return pages
+    _page_index = cache["page_index"]
+    _fulltext_index = cache["fulltext"]
+    _snippet_index = cache["snippet_index"]
+    _token_index = cache["token_index"]
+    _meta_token_index = cache["meta_token_index"]
+    _page_map = cache["page_map"]
+    return _pages_cache
 
 
 def _find_page(name: str) -> Path | None:
@@ -172,23 +87,7 @@ def _all_pages() -> list:
 
 
 def _load_backlinks_index() -> tuple[dict, str | None]:
-    bl_path = WIKI_DIR / "_backlinks.json"
-    empty = {"backlinks": {}, "forward": {}}
-    if not bl_path.exists():
-        return empty, None
-    try:
-        data = json.loads(bl_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        return empty, f"invalid backlinks index: {e}"
-    if not isinstance(data, dict):
-        return empty, "invalid backlinks index: root must be an object"
-    if "backlinks" not in data:
-        return {"backlinks": data, "forward": {}}, None
-    backlinks = data.get("backlinks", {})
-    forward = data.get("forward", {})
-    if not isinstance(backlinks, dict) or not isinstance(forward, dict):
-        return empty, "invalid backlinks index: backlinks and forward must be objects"
-    return {"backlinks": backlinks, "forward": forward}, None
+    return _core_load_backlinks_index(WIKI_DIR / "_backlinks.json")
 
 
 def _parse_search_limit(raw: str) -> tuple[int | None, str | None]:
@@ -1604,58 +1503,17 @@ def _search_pages(q: str, limit: int = 20) -> list:
     """Search pages by title, alias, tag, and full-text body.
     Uses token index to pre-filter candidates, snippet index for zero file I/O.
     """
-    q_lower = q.lower()
-    pages = _get_all_pages()
-    # Use pre-built page_map — no dict comprehension per call
-    scored: list[tuple[int, dict]] = []
-
-    # Build candidate set: pages that could possibly match
-    # For single-word queries: use token index (O(1)) to get exact candidate set
-    # For multi-word/substring: fall back to all pages
-    is_single_token = bool(re.match(r"^\w+$", q_lower))
-    if is_single_token and q_lower in _token_index:
-        # Fast path: union of fulltext candidates + meta candidates — both O(1)
-        token_candidates = _token_index[q_lower]
-        meta_candidates = _meta_token_index.get(q_lower, set())
-        candidates = token_candidates | meta_candidates
-    else:
-        # Substring query — must check all pages
-        candidates = {p["name"].lower() for p in pages}
-
-    for stem in candidates:
-        p = _page_map.get(stem)
-        if not p:
-            continue
-        score = 0
-
-        # Title match
-        if q_lower in p["title"].lower():
-            score += 10
-        # Exact name match
-        if q_lower == stem:
-            score += 20
-        # Alias match
-        if any(q_lower in a for a in p.get("aliases", [])):
-            score += 8
-        # Tag match
-        if any(q_lower in str(t).lower() for t in p.get("tags", [])):
-            score += 5
-        # TLDR match
-        if q_lower in p.get("tldr", "").lower():
-            score += 3
-        # Fulltext match
-        text_lower = _fulltext_index.get(stem, "")
-        if text_lower and q_lower in text_lower:
-            score += 2
-
-        if score > 0:
-            # Use pre-extracted snippet — zero file I/O
-            snippet = _snippet_index.get(stem, "")
-            result = {**p, "score": score, "snippet": snippet}
-            scored.append((score, result))
-
-    scored.sort(key=lambda x: (-x[0], x[1]["title"].lower()))
-    return [r for _, r in scored[:limit]]
+    _get_all_pages()
+    cache = {
+        "pages": _pages_cache or [],
+        "page_index": _page_index,
+        "fulltext": _fulltext_index,
+        "snippet_index": _snippet_index,
+        "token_index": _token_index,
+        "meta_token_index": _meta_token_index,
+        "page_map": _page_map,
+    }
+    return _core_search_pages(q, cache, limit=limit)
 
 
 def _get_context(topic: str) -> dict:
@@ -1666,158 +1524,45 @@ def _get_context(topic: str) -> dict:
     - Its forward links (pages it references)
     - Related pages (shared tags or backlink overlap)
     """
-    q = topic.lower().strip()
-    pages = _get_all_pages()
-
-    # Find best matching page
-    matches = _search_pages(q, limit=5)
-    if not matches:
-        return {"topic": topic, "found": False, "pages": []}
-
-    primary = matches[0]
-    primary_name = primary["name"].lower()
-
-    # Load backlinks
-    bl_path = WIKI_DIR / "_backlinks.json"
-    backlinks_data: dict = {}
-    if bl_path.exists():
-        try:
-            raw = json.loads(bl_path.read_text(encoding="utf-8"))
-            backlinks_data = raw.get("backlinks", raw)
-        except Exception:
-            pass
-
-    inbound = backlinks_data.get(primary_name, [])
-
-    # Load forward links (pages this page links to)
-    forward: list[str] = []
-    forward_seen: set[str] = set()
-    path = _page_index.get(primary_name)
-    if path and path.exists():
-        text = path.read_text(encoding="utf-8", errors="replace")
-        _, body = _parse_frontmatter(text)
-        wl_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
-        page_set = {p["name"].lower() for p in pages}
-        for m in wl_re.finditer(body):
-            target = m.group(1).strip().lower()
-            if target in page_set and target != primary_name and target not in forward_seen:
-                forward_seen.add(target)
-                forward.append(target)
-
-    # Build context pages list: primary + inbound + forward (deduplicated)
-    seen = {primary_name}
-    context_names = [primary_name]
-    for name in (inbound + forward):
-        if name not in seen:
-            seen.add(name)
-            context_names.append(name)
-
-    # Load page summaries for context
-    context_pages = []
-    for name in context_names[:10]:  # cap at 10 to keep context lean
-        p_path = _page_index.get(name)
-        if not p_path or not p_path.exists():
-            continue
-        text = p_path.read_text(encoding="utf-8", errors="replace")
-        meta, body = _parse_frontmatter(text)
-        # Include full content for primary, TLDR+summary for related
-        is_primary = name == primary_name
-        if is_primary:
-            content = body
-        else:
-            # Extract just TLDR + first paragraph
-            lines = body.split("\n")
-            summary_lines = []
-            for line in lines[:20]:
-                summary_lines.append(line)
-                if line.startswith("## ") and len(summary_lines) > 3:
-                    break
-            content = "\n".join(summary_lines)
-
-        page_meta = next((p for p in pages if p["name"].lower() == name), {})
-        context_pages.append({
-            "name": name,
-            "title": meta.get("title", name),
-            "type": meta.get("type", ""),
-            "is_primary": is_primary,
-            "relationship": "primary" if is_primary else ("inbound" if name in inbound else "forward"),
-            "content": content,
-        })
-
-    return {
-        "topic": topic,
-        "found": True,
-        "primary": primary["name"],
-        "inbound_count": len(inbound),
-        "forward_count": len(forward),
-        "pages": context_pages,
+    _get_all_pages()
+    cache = {
+        "pages": _pages_cache or [],
+        "page_index": _page_index,
+        "fulltext": _fulltext_index,
+        "snippet_index": _snippet_index,
+        "token_index": _token_index,
+        "meta_token_index": _meta_token_index,
+        "page_map": _page_map,
     }
+    return _core_context_for_topic(WIKI_DIR, topic, cache)
 
 
 # ---------------------------------------------------------------------------
 # Graph helpers
 # ---------------------------------------------------------------------------
 
-def _build_backlinks() -> dict[str, list[str]]:
-    """Scan all wiki pages for [[wikilinks]] and build a reverse index.
-    Returns {target_stem: [source_stem, ...]} mapping.
+def _build_backlinks() -> dict[str, dict[str, list[str]]]:
+    """Scan all wiki pages for [[wikilinks]] and build graph indexes.
+    Returns {"backlinks": {target: [sources]}, "forward": {source: [targets]}}.
     """
-    backlinks: dict[str, list[str]] = {}
-    forward_links: dict[str, list[str]] = {}
-    wikilink_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
-    for md in WIKI_DIR.rglob("*.md"):
-        if md.name.startswith("."): continue
-        text = md.read_text(encoding="utf-8", errors="replace")
-        _, body = _parse_frontmatter(text)
-        source = md.stem.lower()
-        for m in wikilink_re.finditer(body):
-            target = m.group(1).strip().lower()
-            if target != source:
-                # Reverse index
-                backlinks.setdefault(target, [])
-                if source not in backlinks[target]:
-                    backlinks[target].append(source)
-                # Forward index
-                forward_links.setdefault(source, [])
-                if target not in forward_links[source]:
-                    forward_links[source].append(target)
-    return {"backlinks": backlinks, "forward": forward_links}
+    return _core_build_backlinks(WIKI_DIR)
 
 
 def _get_graph_data() -> dict:
     """Return graph nodes and edges for visualization.
     Uses in-memory fulltext index — no separate rglob scan.
     """
-    pages = _get_all_pages()
-    page_ids = {p["name"].lower(): p["name"] for p in pages}
-    nodes = [{"id": p["name"], "title": p["title"], "category": p["category"], "type": p["type"]} for p in pages]
-
-    edges = []
-    seen_edges: set[tuple[str, str]] = set()
-    wikilink_re = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
-    for p in pages:
-        source = p["name"]
-        text_lower = _fulltext_index.get(source.lower(), "")
-        if not text_lower:
-            continue
-        # Use original text for wikilink extraction (case-sensitive targets)
-        path = _page_index.get(source.lower())
-        if not path or not path.exists():
-            continue
-        orig = path.read_text(encoding="utf-8", errors="replace")
-        _, body = _parse_frontmatter(orig)
-        for m in wikilink_re.finditer(body):
-            target_key = m.group(1).strip().lower()
-            target = page_ids.get(target_key)
-            if not target or target_key == source.lower():
-                continue
-            edge_key = (source, target)
-            if edge_key in seen_edges:
-                continue
-            seen_edges.add(edge_key)
-            edges.append({"source": source, "target": target})
-
-    return {"nodes": nodes, "edges": edges}
+    _get_all_pages()
+    cache = {
+        "pages": _pages_cache or [],
+        "page_index": _page_index,
+        "fulltext": _fulltext_index,
+        "snippet_index": _snippet_index,
+        "token_index": _token_index,
+        "meta_token_index": _meta_token_index,
+        "page_map": _page_map,
+    }
+    return _core_graph_data(cache)
 
 
 # ---------------------------------------------------------------------------

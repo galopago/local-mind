@@ -121,6 +121,9 @@ from link_core.memory import (
 from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
 )
+from link_core.wiki import (
+    build_backlinks as _core_build_backlinks,
+)
 del _BUNDLED_CORE
 
 
@@ -654,24 +657,7 @@ The answer combines [[agent-memory-session]], [[transformer-reading-notes]], and
 
 
 def _build_backlinks(wiki_dir: Path) -> dict[str, dict[str, list[str]]]:
-    backlinks: dict[str, list[str]] = {}
-    forward: dict[str, list[str]] = {}
-    for md in sorted(wiki_dir.rglob("*.md")):
-        if md.name.startswith("."):
-            continue
-        source = md.stem.lower()
-        text = md.read_text(encoding="utf-8", errors="replace")
-        for match in WIKILINK_RE.finditer(text):
-            target = match.group(1).strip().lower()
-            if not target or target == source:
-                continue
-            backlinks.setdefault(target, [])
-            if source not in backlinks[target]:
-                backlinks[target].append(source)
-            forward.setdefault(source, [])
-            if target not in forward[source]:
-                forward[source].append(target)
-    return {"backlinks": backlinks, "forward": forward}
+    return _core_build_backlinks(wiki_dir, body_only=False)
 
 
 def _wiki_page_records(wiki_dir: Path) -> list[dict[str, object]]:

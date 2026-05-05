@@ -1,0 +1,129 @@
+import json
+import os
+import sys
+import tempfile
+import time
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "mcp_package"))
+
+from link_core.wiki import (  # noqa: E402
+    build_backlinks,
+    build_wiki_cache,
+    context_for_topic,
+    graph_data,
+    load_backlinks_index,
+    search_pages,
+    wiki_mtime,
+)
+
+
+def write_page(wiki: Path, rel: str, text: str) -> Path:
+    path = wiki / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+class WikiCoreTests(unittest.TestCase):
+    def make_wiki(self) -> Path:
+        root = Path(tempfile.mkdtemp(prefix="link-wiki-core-"))
+        wiki = root / "wiki"
+        wiki.mkdir()
+        write_page(wiki, "index.md", "# Index\n")
+        write_page(wiki, "log.md", "# Log\n")
+        return wiki
+
+    def test_cache_search_context_and_graph(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            (
+                "---\n"
+                "type: concept\n"
+                "title: Agent Memory\n"
+                "aliases: [durable context]\n"
+                "tags: [agents, memory]\n"
+                "maturity: growing\n"
+                "---\n"
+                "# Agent Memory\n\n"
+                "> **TLDR:** Durable memory for agents.\n\n"
+                "Links to [[link]] and [[retrieval]].\n"
+            ),
+        )
+        write_page(
+            wiki,
+            "entities/link.md",
+            "---\ntype: entity\ntitle: Link\n---\n# Link\n\nLink references [[agent-memory]].\n",
+        )
+        write_page(
+            wiki,
+            "concepts/retrieval.md",
+            "---\ntype: concept\ntitle: Retrieval\n---\n# Retrieval\n",
+        )
+        (wiki / "_backlinks.json").write_text(
+            json.dumps({"backlinks": {"agent-memory": ["link"]}, "forward": {"link": ["agent-memory"]}}),
+            encoding="utf-8",
+        )
+
+        cache = build_wiki_cache(wiki)
+        search = search_pages("durable", cache)
+        context = context_for_topic(wiki, "agent memory", cache)
+        graph = graph_data(cache)
+
+        self.assertEqual(search[0]["name"], "agent-memory")
+        self.assertIn("date_published", search[0])
+        self.assertEqual(context["primary"], "agent-memory")
+        self.assertEqual(context["inbound_count"], 1)
+        self.assertEqual(context["forward_count"], 2)
+        self.assertEqual([page["name"] for page in context["pages"]], ["agent-memory", "link", "retrieval"])
+        self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
+        self.assertIn({"source": "agent-memory", "target": "retrieval"}, graph["edges"])
+
+    def test_backlinks_loader_and_builder_shapes(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\nrelated: [[frontmatter-only]]\n---\n# A\n\n[[b]] [[b]]\n",
+        )
+        write_page(wiki, "concepts/b.md", "---\ntype: concept\ntitle: B\n---\n# B\n")
+        backlinks_path = wiki / "_backlinks.json"
+        backlinks_path.write_text(json.dumps({"a": ["b"]}), encoding="utf-8")
+
+        loaded, error = load_backlinks_index(backlinks_path)
+        body_only = build_backlinks(wiki)
+        full_text = build_backlinks(wiki, body_only=False)
+
+        self.assertIsNone(error)
+        self.assertEqual(loaded, {"backlinks": {"a": ["b"]}, "forward": {}})
+        self.assertEqual(body_only["backlinks"], {"b": ["a"]})
+        self.assertEqual(body_only["forward"], {"a": ["b"]})
+        self.assertIn("frontmatter-only", full_text["backlinks"])
+
+    def test_wiki_mtime_sees_existing_page_edits(self):
+        wiki = self.make_wiki()
+        page = write_page(wiki, "concepts/a.md", "# A\n")
+        before = wiki_mtime(wiki)
+        future = time.time() + 2
+        page.write_text("# A2\n", encoding="utf-8")
+        os.utime(page, (future, future))
+
+        self.assertGreater(wiki_mtime(wiki), before)
+
+    def test_empty_context_can_report_tool_error(self):
+        wiki = self.make_wiki()
+        cache = build_wiki_cache(wiki)
+
+        result = context_for_topic(wiki, " ", cache, empty_error="topic required")
+
+        self.assertFalse(result["found"])
+        self.assertEqual(result["error"], "topic required")
+
+
+if __name__ == "__main__":
+    unittest.main()
