@@ -369,6 +369,143 @@ def _memory_inbox(limit: int = 20, include_archived: bool = False) -> dict[str, 
     }
 
 
+def _extract_wikilinks(text: str) -> list[str]:
+    links = []
+    for match in re.finditer(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", text):
+        target = match.group(1).strip()
+        if target and target not in links:
+            links.append(target)
+    return links
+
+
+def _resolve_memory_record(identifier: str) -> tuple[Path | None, dict[str, object] | None, str | None]:
+    needle = identifier.strip()
+    if not needle:
+        return None, None, "memory name or title is required"
+    memories_dir = WIKI_DIR / "memories"
+    direct_candidates = []
+    raw_path = Path(needle)
+    if raw_path.suffix == ".md" or "/" in needle:
+        rel = Path(needle.removeprefix("wiki/"))
+        direct_candidates.append((WIKI_DIR / rel).resolve())
+        direct_candidates.append((memories_dir / raw_path.name).resolve())
+    else:
+        direct_candidates.append((memories_dir / f"{needle}.md").resolve())
+        direct_candidates.append((memories_dir / f"{re.sub(r'[^a-z0-9]+', '-', needle.lower()).strip('-')}.md").resolve())
+
+    memories_root = memories_dir.resolve()
+    for candidate in direct_candidates:
+        try:
+            candidate.relative_to(memories_root)
+        except ValueError:
+            continue
+        if candidate.exists() and candidate.is_file():
+            records = [record for record in _memory_records() if record["name"] == candidate.stem]
+            return candidate, records[0] if records else None, None
+
+    lowered = needle.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", lowered).strip("-")
+    matches = [
+        record for record in _memory_records()
+        if lowered in {str(record["name"]).lower(), str(record["title"]).lower()}
+        or slug == str(record["name"]).lower()
+    ]
+    if len(matches) > 1:
+        names = ", ".join(str(record["name"]) for record in matches[:5])
+        return None, None, f"memory identifier is ambiguous: {names}"
+    if not matches:
+        return None, None, f"memory not found: {identifier}"
+    record = matches[0]
+    return WIKI_DIR / str(record["path"]).removeprefix("wiki/"), record, None
+
+
+def _memory_log_entries(record: dict[str, object], limit: int = 8) -> list[str]:
+    log_path = WIKI_DIR / "log.md"
+    if not log_path.exists():
+        return []
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    needles = {
+        str(record.get("name") or ""),
+        str(record.get("title") or ""),
+        f"memories/{record.get('name')}.md",
+    }
+    needles = {needle.lower() for needle in needles if needle}
+    blocks = [block.strip() for block in re.split(r"\n---\n", text) if block.strip()]
+    matches = [
+        block for block in blocks
+        if any(needle in block.lower() for needle in needles)
+    ]
+    return matches[-limit:]
+
+
+def _recall_state(record: dict[str, object], issues: list[dict[str, str]]) -> dict[str, object]:
+    default_enabled = _is_active_memory(record)
+    high_issues = [issue for issue in issues if issue["severity"] == "high"]
+    if not default_enabled:
+        state = "disabled"
+        reason = f"Memory status is {record.get('status')}; default recall excludes archived and stale memories."
+    elif high_issues:
+        state = "unsafe"
+        reason = "Memory is active but has high-severity quality issues."
+    elif issues:
+        state = "needs_review"
+        reason = "Memory is active but still needs review or stronger metadata."
+    else:
+        state = "ready"
+        reason = "Memory is active, reviewed, and has no detected quality issues."
+    return {
+        "default_enabled": default_enabled,
+        "state": state,
+        "reason": reason,
+    }
+
+
+def _memory_explanation(identifier: str) -> dict[str, object]:
+    page_path, record, error = _resolve_memory_record(identifier)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and record is not None
+
+    text = page_path.read_text(encoding="utf-8", errors="replace")
+    _, body = _parse_frontmatter(text)
+    issues = _memory_review_issues(record)
+    backlinks_data, backlinks_error = _load_backlinks_index()
+    if backlinks_error:
+        backlinks_data = _build_backlinks()
+    name = str(record["name"])
+    graph = {
+        "forward": sorted(backlinks_data.get("forward", {}).get(name, [])),
+        "inbound": sorted(backlinks_data.get("backlinks", {}).get(name, [])),
+        "wikilinks": _extract_wikilinks(body),
+    }
+    return {
+        "found": True,
+        "memory": record,
+        "recall": _recall_state(record, issues),
+        "review": {
+            "status": record.get("review_status", "pending"),
+            "reviewed_at": record.get("reviewed_at", ""),
+            "review_note": record.get("review_note", ""),
+            "issues": issues,
+            "issue_count": len(issues),
+        },
+        "provenance": {
+            "source": record.get("source", ""),
+            "date_captured": record.get("date_captured", ""),
+            "path": record.get("path", ""),
+        },
+        "lifecycle": {
+            "status": record.get("status", "active"),
+            "archived_at": record.get("archived_at", ""),
+            "archive_reason": record.get("archive_reason", ""),
+            "restored_at": record.get("restored_at", ""),
+        },
+        "graph": graph,
+        "log_entries": _memory_log_entries(record),
+        "body": body,
+    }
+
+
 def _memory_profile(limit: int = 10) -> dict[str, object]:
     limit = max(1, min(limit, 50))
     records = _memory_records()
@@ -637,6 +774,10 @@ hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
 .memory-issues { margin-top: 6px; }
 .memory-issues li { border: none; padding: 0; color: #666; font-size: 13px; }
 .memory-issues .severity { font-family: sans-serif; font-size: 11px; text-transform: uppercase; color: #8a6d3b; }
+.trust-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+.trust-grid div { border: 1px solid #eee; border-radius: 4px; padding: 10px; font-family: sans-serif; }
+.trust-grid strong { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+.log-entry { white-space: pre-wrap; font-size: 12px; }
 
 mark { background: #fff3cd; color: inherit; border-radius: 2px; padding: 0 1px; }
 
@@ -680,6 +821,7 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
   .page-list li { border-color: #2a2a2a; }
   .memory-profile .summary { color: #aaa; }
   .memory-issues li { color: #aaa; }
+  .trust-grid div { border-color: #333; }
   footer { border-color: #333; }
   .home-stats .stat .num { color: #6ea8fe; }
   .graph-toolbar button { background: #222; color: #ddd; border-color: #444; }
@@ -874,6 +1016,7 @@ def _render_profile():
             items += (
                 f'<li><a href="{_page_href(str(record["name"]))}">{html.escape(str(record["title"]))}</a>'
                 f'<div class="memory-meta">{html.escape(meta)}</div>'
+                f'<div class="memory-meta"><a href="/explain-memory?memory={urllib.parse.quote(str(record["name"]), safe="")}">explain</a></div>'
                 f'{f"<small>{html.escape(str(summary))}</small>" if summary else ""}</li>'
             )
         return f"<h2>{html.escape(title)}</h2><ul class='page-list'>{items}</ul>"
@@ -929,6 +1072,7 @@ def _render_inbox():
             items += (
                 f'<li><a href="{_page_href(str(item["name"]))}">{html.escape(str(item["title"]))}</a>'
                 f'<div class="memory-meta">{html.escape(meta)}</div>'
+                f'<div class="memory-meta"><a href="/explain-memory?memory={urllib.parse.quote(str(item["name"]), safe="")}">explain</a></div>'
                 f'{f"<small>{html.escape(str(summary))}</small>" if summary else ""}'
                 f'<ul class="memory-issues">{issues}</ul></li>'
             )
@@ -945,6 +1089,60 @@ def _render_inbox():
         f'</div>'
     )
     return _layout("Memory Review Inbox", body)
+
+
+def _render_explain_memory(identifier: str):
+    try:
+        explanation = _memory_explanation(identifier)
+    except ValueError as exc:
+        return _layout("Memory Explanation", f'<h1>Memory not found</h1><p>{html.escape(str(exc))}</p>')
+
+    memory = explanation["memory"]
+    recall_info = explanation["recall"]
+    review = explanation["review"]
+    provenance = explanation["provenance"]
+    lifecycle = explanation["lifecycle"]
+    graph = explanation["graph"]
+    summary = memory.get("tldr") or memory.get("snippet") or ""
+    issues = "".join(
+        f'<li><span class="severity">{html.escape(str(issue["severity"]))}</span> '
+        f'{html.escape(str(issue["code"]))}: {html.escape(str(issue["message"]))}</li>'
+        for issue in review["issues"]
+    )
+    issue_html = (
+        f'<h2>Review Issues</h2><ul class="memory-issues">{issues}</ul>'
+        if issues else "<h2>Review Issues</h2><p>No detected issues.</p>"
+    )
+    graph_html = (
+        f'<h2>Graph</h2>'
+        f'<p><strong>Forward:</strong> {html.escape(", ".join(graph["forward"]) or "none")}</p>'
+        f'<p><strong>Inbound:</strong> {html.escape(", ".join(graph["inbound"]) or "none")}</p>'
+        f'<p><strong>Wikilinks:</strong> {html.escape(", ".join(graph["wikilinks"]) or "none")}</p>'
+    )
+    logs = "".join(
+        f'<pre class="log-entry">{html.escape(entry)}</pre>'
+        for entry in explanation["log_entries"][-5:]
+    )
+    log_html = f"<h2>Log Entries</h2>{logs}" if logs else "<h2>Log Entries</h2><p>No matching log entries.</p>"
+    body_html = _md_to_html(str(explanation.get("body") or ""))
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / explain memory</div>'
+        f'<h1>{html.escape(str(memory["title"]))}</h1>'
+        f'<p class="summary">{html.escape(str(summary))}</p>'
+        f'<div class="trust-grid">'
+        f'<div><strong>Recall</strong>{html.escape(str(recall_info["state"]))}<br><small>{html.escape(str(recall_info["reason"]))}</small></div>'
+        f'<div><strong>Review</strong>{html.escape(str(review["status"]))} · {review["issue_count"]} issues</div>'
+        f'<div><strong>Status</strong>{html.escape(str(lifecycle["status"]))}</div>'
+        f'<div><strong>Source</strong>{html.escape(str(provenance["source"] or "missing"))}</div>'
+        f'<div><strong>Captured</strong>{html.escape(str(provenance["date_captured"] or "missing"))}</div>'
+        f'<div><strong>Path</strong>{html.escape(str(provenance["path"]))}</div>'
+        f'</div>'
+        f'{issue_html}'
+        f'{graph_html}'
+        f'{log_html}'
+        f'<h2>Memory Body</h2>{body_html}'
+    )
+    return _layout(f"Explain: {memory['title']}", body)
 
 
 def _render_graph():
@@ -1683,6 +1881,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._ok(_render_home())
         elif path == "/inbox":
             self._ok(_render_inbox())
+        elif path == "/explain-memory":
+            identifier = query.get("memory", [""])[0].strip() or query.get("name", [""])[0].strip()
+            self._ok(_render_explain_memory(identifier))
         elif path == "/profile":
             self._ok(_render_profile())
         elif path == "/all":
@@ -1727,6 +1928,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else:
                 include_archived = query.get("include_archived", ["false"])[0].lower() in {"1", "true", "yes"}
                 self._json(_memory_inbox(limit=limit, include_archived=include_archived))
+        elif path == "/api/explain-memory":
+            identifier = query.get("memory", [""])[0].strip() or query.get("name", [""])[0].strip()
+            if not identifier:
+                self._json({"found": False, "error": "memory parameter required"}, status=400)
+            else:
+                try:
+                    self._json(_memory_explanation(identifier))
+                except ValueError as exc:
+                    self._json({"found": False, "error": str(exc)}, status=404)
         elif path == "/api/search":
             q = query.get("q", [""])[0].strip()
             limit, error = _parse_search_limit(query.get("limit", ["20"])[0])

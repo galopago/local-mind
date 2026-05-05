@@ -12,6 +12,7 @@ Usage:
   python link.py restore-memory <name-or-title> [target]
   python link.py memory-inbox [target]
   python link.py review-memory <name-or-title> [target]
+  python link.py explain-memory <name-or-title> [target]
   python link.py rebuild-backlinks [target]
   python link.py verify-mcp [target]
 """
@@ -922,6 +923,106 @@ def _memory_inbox(wiki_dir: Path, limit: int = 20, include_archived: bool = Fals
         "counts_by_severity": counts_by_severity,
         "include_archived": include_archived,
         "items": items[:limit],
+    }
+
+
+def _extract_wikilinks(text: str) -> list[str]:
+    links: list[str] = []
+    for match in re.finditer(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", text):
+        target = match.group(1).strip()
+        if target and target not in links:
+            links.append(target)
+    return links
+
+
+def _memory_log_entries(wiki_dir: Path, record: dict[str, object], limit: int = 8) -> list[str]:
+    log_path = wiki_dir / "log.md"
+    if not log_path.exists():
+        return []
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    needles = {
+        str(record.get("name") or ""),
+        str(record.get("title") or ""),
+        f"memories/{record.get('name')}.md",
+    }
+    needles = {needle.lower() for needle in needles if needle}
+    blocks = [block.strip() for block in re.split(r"\n---\n", text) if block.strip()]
+    matches = [
+        block for block in blocks
+        if any(needle in block.lower() for needle in needles)
+    ]
+    return matches[-limit:]
+
+
+def _recall_state(record: dict[str, object], issues: list[dict[str, str]]) -> dict[str, object]:
+    default_enabled = _is_active_memory(record)
+    high_issues = [issue for issue in issues if issue["severity"] == "high"]
+    if not default_enabled:
+        state = "disabled"
+        reason = f"Memory status is {record.get('status')}; default recall excludes archived and stale memories."
+    elif high_issues:
+        state = "unsafe"
+        reason = "Memory is active but has high-severity quality issues."
+    elif issues:
+        state = "needs_review"
+        reason = "Memory is active but still needs review or stronger metadata."
+    else:
+        state = "ready"
+        reason = "Memory is active, reviewed, and has no detected quality issues."
+    return {
+        "default_enabled": default_enabled,
+        "state": state,
+        "reason": reason,
+    }
+
+
+def _memory_explanation(wiki_dir: Path, identifier: str) -> dict[str, object]:
+    page_path, resolved_record, error = _resolve_memory_page(wiki_dir, identifier)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and resolved_record is not None
+
+    record = next(
+        (item for item in _memory_records(wiki_dir) if item["name"] == resolved_record["name"]),
+        resolved_record,
+    )
+    body = str(record.get("body") or "")
+    issues = _memory_review_issues(record)
+    backlinks_data, backlinks_error = _load_backlinks(wiki_dir / "_backlinks.json")
+    if backlinks_error:
+        backlinks_data = _build_backlinks(wiki_dir)
+    assert backlinks_data is not None
+    name = str(record["name"])
+    graph = {
+        "forward": sorted(backlinks_data.get("forward", {}).get(name, [])),
+        "inbound": sorted(backlinks_data.get("backlinks", {}).get(name, [])),
+        "wikilinks": _extract_wikilinks(body),
+    }
+    return {
+        "found": True,
+        "memory": _slim_memory(record),
+        "recall": _recall_state(record, issues),
+        "review": {
+            "status": record.get("review_status", "pending"),
+            "reviewed_at": record.get("reviewed_at", ""),
+            "review_note": record.get("review_note", ""),
+            "issues": issues,
+            "issue_count": len(issues),
+        },
+        "provenance": {
+            "source": record.get("source", ""),
+            "date_captured": record.get("date_captured", ""),
+            "path": record.get("path", ""),
+        },
+        "lifecycle": {
+            "status": record.get("status", "active"),
+            "archived_at": record.get("archived_at", ""),
+            "archive_reason": record.get("archive_reason", ""),
+            "restored_at": record.get("restored_at", ""),
+        },
+        "graph": graph,
+        "log_entries": _memory_log_entries(wiki_dir, record),
+        "body": body,
     }
 
 
@@ -2043,6 +2144,61 @@ def review_memory(target: Path, identifier: str, note: str | None = None, json_o
     return 0
 
 
+def explain_memory(target: Path, identifier: str, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    try:
+        explanation = _memory_explanation(wiki_dir, identifier)
+    except ValueError as exc:
+        print(f"Could not explain memory: {exc}", file=sys.stderr)
+        return 1
+
+    if json_output:
+        print(json.dumps(explanation, indent=2))
+        return 0
+
+    memory = explanation["memory"]
+    recall_info = explanation["recall"]
+    review = explanation["review"]
+    provenance = explanation["provenance"]
+    lifecycle = explanation["lifecycle"]
+    graph = explanation["graph"]
+
+    print(f"Link memory explanation: {memory['title']}")
+    print("")
+    print(f"Path: {memory['path']}")
+    print(f"Type: {memory['memory_type']} · Scope: {memory['scope']} · Status: {lifecycle['status']}")
+    print(f"Source: {provenance['source'] or 'missing'}")
+    print(f"Captured: {provenance['date_captured'] or 'missing'}")
+    print(f"Review: {review['status']} · Issues: {review['issue_count']}")
+    print(f"Recall: {recall_info['state']} ({'enabled' if recall_info['default_enabled'] else 'disabled'} by default)")
+    print(f"Reason: {recall_info['reason']}")
+    summary = memory.get("tldr") or memory.get("snippet")
+    if summary:
+        print("")
+        print(f"Summary: {summary}")
+    if review["issues"]:
+        print("")
+        print("Review issues:")
+        for issue in review["issues"]:
+            print(f"- [{issue['severity']}] {issue['code']}: {issue['message']}")
+            print(f"  Action: {issue['suggested_action']}")
+    print("")
+    print("Graph:")
+    print(f"- Forward links: {', '.join(graph['forward']) if graph['forward'] else 'none'}")
+    print(f"- Inbound links: {', '.join(graph['inbound']) if graph['inbound'] else 'none'}")
+    if explanation["log_entries"]:
+        print("")
+        print("Recent lifecycle log:")
+        for entry in explanation["log_entries"][-3:]:
+            first_line = next((line for line in entry.splitlines() if line.strip().startswith("## ")), "")
+            print(f"- {first_line[3:] if first_line.startswith('## ') else first_line or 'log entry'}")
+    return 0
+
+
 def _format_counts(counts: dict[str, int]) -> str:
     if not counts:
         return "none"
@@ -2353,6 +2509,11 @@ def main(argv: list[str] | None = None) -> int:
     review_cmd.add_argument("--note", default=None, help="optional review note")
     review_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
+    explain_cmd = sub.add_parser("explain-memory", help="explain why a memory exists and whether it is recall-ready")
+    explain_cmd.add_argument("identifier", help="memory page name, title, or path")
+    explain_cmd.add_argument("target", nargs="?", default=".")
+    explain_cmd.add_argument("--json", action="store_true", help="print machine-readable explanation")
+
     rebuild_cmd = sub.add_parser("rebuild-backlinks", help="rebuild wiki/_backlinks.json")
     rebuild_cmd.add_argument("target", nargs="?", default=".")
 
@@ -2403,6 +2564,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.command == "review-memory":
         return review_memory(Path(args.target), args.identifier, note=args.note, json_output=args.json)
+    if args.command == "explain-memory":
+        return explain_memory(Path(args.target), args.identifier, json_output=args.json)
     if args.command == "rebuild-backlinks":
         return rebuild_backlinks(Path(args.target))
     if args.command == "verify-mcp":

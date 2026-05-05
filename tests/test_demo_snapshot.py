@@ -148,6 +148,21 @@ class DemoSnapshotTests(unittest.TestCase):
         self.assertIn("Memory Review Inbox", html)
         self.assertIn("pending_review", html)
 
+    def test_demo_explain_memory_snapshot(self):
+        target = self.make_demo()
+        reset_serve_wiki(target / "wiki")
+
+        explanation = serve._memory_explanation("prefer-local-personal-memory")
+        html = serve._render_explain_memory("prefer-local-personal-memory")
+
+        self.assertTrue(explanation["found"])
+        self.assertEqual(explanation["memory"]["name"], "prefer-local-personal-memory")
+        self.assertEqual(explanation["provenance"]["source"], "demo")
+        self.assertEqual(explanation["recall"]["state"], "needs_review")
+        self.assertIn("agent-memory", explanation["graph"]["forward"])
+        self.assertIn("Explain: Prefer local personal memory", html)
+        self.assertIn("pending_review", html)
+
     def test_demo_profile_separates_archived_memories(self):
         target = self.make_demo()
         with redirect_stdout(StringIO()):

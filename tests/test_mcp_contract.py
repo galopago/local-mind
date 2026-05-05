@@ -209,6 +209,24 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(reviewed["remaining_issue_count"], 0)
         self.assertEqual(clear["review_count"], 0)
 
+    def test_explain_memory_contract(self):
+        payload = json.loads(self.server.explain_memory("prefer-local-personal-memory"))
+
+        self.assertTrue(payload["found"])
+        self.assertEqual(payload["memory"]["name"], "prefer-local-personal-memory")
+        self.assertEqual(payload["provenance"]["source"], "demo")
+        self.assertEqual(payload["recall"]["state"], "needs_review")
+        self.assertEqual(payload["review"]["issues"][0]["code"], "pending_review")
+        self.assertIn("agent-memory", payload["graph"]["forward"])
+
+    def test_explain_memory_after_review_contract(self):
+        self.server.review_memory("prefer-local-personal-memory")
+
+        payload = json.loads(self.server.explain_memory("prefer-local-personal-memory"))
+
+        self.assertEqual(payload["recall"]["state"], "ready")
+        self.assertEqual(payload["review"]["issue_count"], 0)
+
     def test_archive_and_restore_memory_contract(self):
         archived = json.loads(self.server.archive_memory(
             "prefer-local-personal-memory",

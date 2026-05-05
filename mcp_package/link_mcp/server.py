@@ -54,11 +54,12 @@ mcp = FastMCP(
     instructions=(
         "Link is local personal memory for agents. Use memory_profile to inspect "
         "what Link remembers, recall_memory for user preferences, decisions, and "
-        "project context, and memory_inbox to find memories needing review. "
-        "Use search_wiki to find general pages and get_context to retrieve a "
-        "topic with its full graph neighborhood. Only call remember_memory when "
-        "the user explicitly asks you to remember something. Use archive_memory "
-        "instead of deleting stale or wrong memories."
+        "project context, memory_inbox to find memories needing review, and "
+        "explain_memory to audit why a memory exists. Use search_wiki to find "
+        "general pages and get_context to retrieve a topic with its full graph "
+        "neighborhood. Only call remember_memory when the user explicitly asks "
+        "you to remember something. Use archive_memory instead of deleting stale "
+        "or wrong memories."
     ),
 )
 
@@ -559,6 +560,120 @@ def _memory_inbox(limit: int = 20, include_archived: bool = False) -> dict[str, 
         "counts_by_severity": counts_by_severity,
         "include_archived": include_archived,
         "items": items[:limit],
+    }
+
+
+def _extract_wikilinks(text: str) -> list[str]:
+    links: list[str] = []
+    for match in re.finditer(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", text):
+        target = match.group(1).strip()
+        if target and target not in links:
+            links.append(target)
+    return links
+
+
+def _load_backlinks() -> dict[str, dict[str, list[str]]]:
+    bl_path = WIKI_DIR / "_backlinks.json"
+    if not bl_path.exists():
+        return {"backlinks": {}, "forward": {}}
+    try:
+        raw = json.loads(bl_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"backlinks": {}, "forward": {}}
+    if "backlinks" not in raw:
+        return {"backlinks": raw if isinstance(raw, dict) else {}, "forward": {}}
+    backlinks = raw.get("backlinks", {})
+    forward = raw.get("forward", {})
+    if not isinstance(backlinks, dict) or not isinstance(forward, dict):
+        return {"backlinks": {}, "forward": {}}
+    return {"backlinks": backlinks, "forward": forward}
+
+
+def _memory_log_entries(record: dict[str, object], limit: int = 8) -> list[str]:
+    log_path = WIKI_DIR / "log.md"
+    if not log_path.exists():
+        return []
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    needles = {
+        str(record.get("name") or ""),
+        str(record.get("title") or ""),
+        f"memories/{record.get('name')}.md",
+    }
+    needles = {needle.lower() for needle in needles if needle}
+    blocks = [block.strip() for block in re.split(r"\n---\n", text) if block.strip()]
+    matches = [
+        block for block in blocks
+        if any(needle in block.lower() for needle in needles)
+    ]
+    return matches[-limit:]
+
+
+def _recall_state(record: dict[str, object], issues: list[dict[str, str]]) -> dict[str, object]:
+    default_enabled = _is_active_memory(record)
+    high_issues = [issue for issue in issues if issue["severity"] == "high"]
+    if not default_enabled:
+        state = "disabled"
+        reason = f"Memory status is {record.get('status')}; default recall excludes archived and stale memories."
+    elif high_issues:
+        state = "unsafe"
+        reason = "Memory is active but has high-severity quality issues."
+    elif issues:
+        state = "needs_review"
+        reason = "Memory is active but still needs review or stronger metadata."
+    else:
+        state = "ready"
+        reason = "Memory is active, reviewed, and has no detected quality issues."
+    return {
+        "default_enabled": default_enabled,
+        "state": state,
+        "reason": reason,
+    }
+
+
+def _memory_explanation(identifier: str) -> dict[str, object]:
+    page_path, resolved_record, error = _resolve_memory_page(identifier)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and resolved_record is not None
+
+    record = next(
+        (item for item in _memory_records() if item["name"] == resolved_record["name"]),
+        resolved_record,
+    )
+    body = str(record.get("body") or "")
+    issues = _memory_review_issues(record)
+    backlinks = _load_backlinks()
+    name = str(record["name"])
+    graph = {
+        "forward": sorted(backlinks.get("forward", {}).get(name, [])),
+        "inbound": sorted(backlinks.get("backlinks", {}).get(name, [])),
+        "wikilinks": _extract_wikilinks(body),
+    }
+    return {
+        "found": True,
+        "memory": _slim_memory(record),
+        "recall": _recall_state(record, issues),
+        "review": {
+            "status": record.get("review_status", "pending"),
+            "reviewed_at": record.get("reviewed_at", ""),
+            "review_note": record.get("review_note", ""),
+            "issues": issues,
+            "issue_count": len(issues),
+        },
+        "provenance": {
+            "source": record.get("source", ""),
+            "date_captured": record.get("date_captured", ""),
+            "path": record.get("path", ""),
+        },
+        "lifecycle": {
+            "status": record.get("status", "active"),
+            "archived_at": record.get("archived_at", ""),
+            "archive_reason": record.get("archive_reason", ""),
+            "restored_at": record.get("restored_at", ""),
+        },
+        "graph": graph,
+        "log_entries": _memory_log_entries(record),
+        "body": body,
     }
 
 
@@ -1063,6 +1178,20 @@ def review_memory(identifier: str, note: str = "") -> str:
         result = _mark_memory_reviewed(identifier, note=note)
     except ValueError as exc:
         return json.dumps({"updated": False, "error": str(exc)})
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
+def explain_memory(identifier: str) -> str:
+    """Explain why a memory exists and whether it is ready for recall.
+
+    Returns provenance, review state, lifecycle state, graph links, recent log
+    entries, and detected quality issues for one memory.
+    """
+    try:
+        result = _memory_explanation(identifier)
+    except ValueError as exc:
+        return json.dumps({"found": False, "error": str(exc)})
     return json.dumps(result, ensure_ascii=False)
 
 

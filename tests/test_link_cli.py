@@ -289,6 +289,52 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(clear_code, 0)
         self.assertEqual(clear["review_count"], 0)
 
+    def test_explain_memory_reports_trust_state_and_graph(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.explain_memory(target, "prefer-local-personal-memory", json_output=True)
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertTrue(payload["found"])
+        self.assertEqual(payload["memory"]["name"], "prefer-local-personal-memory")
+        self.assertEqual(payload["provenance"]["source"], "demo")
+        self.assertEqual(payload["recall"]["state"], "needs_review")
+        self.assertTrue(payload["recall"]["default_enabled"])
+        self.assertEqual(payload["review"]["issues"][0]["code"], "pending_review")
+        self.assertIn("agent-memory", payload["graph"]["forward"])
+        self.assertIn("link", payload["graph"]["forward"])
+        self.assertIn("Prefer local personal memory", payload["body"])
+
+    def test_explain_memory_ready_after_review_and_disabled_after_archive(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.review_memory(target, "prefer-local-personal-memory")
+
+        reviewed_out = StringIO()
+        with redirect_stdout(reviewed_out):
+            link_cli.explain_memory(target, "prefer-local-personal-memory", json_output=True)
+        reviewed = json.loads(reviewed_out.getvalue())
+
+        with redirect_stdout(StringIO()):
+            link_cli.archive_memory(target, "prefer-local-personal-memory", reason="unit test")
+        archived_out = StringIO()
+        with redirect_stdout(archived_out):
+            link_cli.explain_memory(target, "prefer-local-personal-memory", json_output=True)
+        archived = json.loads(archived_out.getvalue())
+
+        self.assertEqual(reviewed["recall"]["state"], "ready")
+        self.assertEqual(reviewed["review"]["issue_count"], 0)
+        self.assertEqual(archived["recall"]["state"], "disabled")
+        self.assertFalse(archived["recall"]["default_enabled"])
+        self.assertEqual(archived["lifecycle"]["status"], "archived")
+
     def test_reviewed_memory_with_quality_issue_stays_in_inbox(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"
