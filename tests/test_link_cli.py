@@ -168,6 +168,53 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("prefer-release-branches", backlinks["backlinks"])
         self.assertIn("Memory saved", out.getvalue())
 
+    def test_remember_blocks_strong_duplicate_by_default(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.remember(
+                target,
+                "User prefers release branches for Link work.",
+                title="Prefer release branches",
+                memory_type="preference",
+                scope="project",
+            )
+
+        duplicate_out = StringIO()
+        with redirect_stdout(duplicate_out):
+            duplicate_code = link_cli.remember(
+                target,
+                "User prefers release branches for Link work.",
+                title="Prefer release branches",
+                memory_type="preference",
+                scope="project",
+                json_output=True,
+            )
+        duplicate = json.loads(duplicate_out.getvalue())
+
+        override_out = StringIO()
+        with redirect_stdout(override_out):
+            override_code = link_cli.remember(
+                target,
+                "User prefers release branches for Link work.",
+                title="Prefer release branches",
+                memory_type="preference",
+                scope="project",
+                allow_duplicate=True,
+                json_output=True,
+            )
+        override = json.loads(override_out.getvalue())
+
+        self.assertEqual(duplicate_code, 0)
+        self.assertFalse(duplicate["created"])
+        self.assertTrue(duplicate["duplicate"])
+        self.assertEqual(duplicate["candidates"][0]["name"], "prefer-release-branches")
+        self.assertEqual(override_code, 0)
+        self.assertTrue(override["created"])
+        self.assertTrue(override["duplicate_override"])
+        self.assertEqual(override["name"], "prefer-release-branches-2")
+
     def test_recall_finds_memory_pages(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

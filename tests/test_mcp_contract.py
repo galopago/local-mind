@@ -264,6 +264,35 @@ class McpContractTests(unittest.TestCase):
         self.assertTrue((self.target / "wiki/memories/prefer-release-branches.md").exists())
         self.assertEqual(recall["memories"][0]["name"], "prefer-release-branches")
 
+    def test_remember_memory_blocks_strong_duplicate(self):
+        first = json.loads(self.server.remember_memory(
+            "User prefers release branches for Link work.",
+            title="Prefer release branches",
+            memory_type="preference",
+            scope="project",
+        ))
+        duplicate = json.loads(self.server.remember_memory(
+            "User prefers release branches for Link work.",
+            title="Prefer release branches",
+            memory_type="preference",
+            scope="project",
+        ))
+        override = json.loads(self.server.remember_memory(
+            "User prefers release branches for Link work.",
+            title="Prefer release branches",
+            memory_type="preference",
+            scope="project",
+            allow_duplicate=True,
+        ))
+
+        self.assertTrue(first["created"])
+        self.assertFalse(duplicate["created"])
+        self.assertTrue(duplicate["duplicate"])
+        self.assertEqual(duplicate["candidates"][0]["name"], "prefer-release-branches")
+        self.assertTrue(override["created"])
+        self.assertTrue(override["duplicate_override"])
+        self.assertEqual(override["name"], "prefer-release-branches-2")
+
     def test_rebuild_backlinks_contract(self):
         backlinks_path = self.target / "wiki/_backlinks.json"
         backlinks_path.write_text(json.dumps({"backlinks": {}, "forward": {}}), encoding="utf-8")

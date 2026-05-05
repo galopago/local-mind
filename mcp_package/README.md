@@ -86,7 +86,7 @@ Custom wiki path:
 | `review_memory(identifier, note?)` | Mark a confirmed memory as reviewed. |
 | `explain_memory(identifier)` | Explain provenance, lifecycle, graph links, review issues, and recall readiness for one memory. |
 | `recall_memory(query, limit?, include_archived?)` | Search durable local memories for preferences, decisions, and project context. |
-| `remember_memory(memory, title?, memory_type?, scope?, tags?, source?)` | Save an explicit user-approved local memory under `wiki/memories/`. |
+| `remember_memory(memory, title?, memory_type?, scope?, tags?, source?, allow_duplicate?)` | Save an explicit user-approved local memory under `wiki/memories/`; strong duplicates require `allow_duplicate=true`. |
 | `archive_memory(identifier, reason?)` | Archive stale or wrong memory without deleting the Markdown page. |
 | `restore_memory(identifier)` | Restore archived memory to active status. |
 | `search_wiki(query, limit?)` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets. |

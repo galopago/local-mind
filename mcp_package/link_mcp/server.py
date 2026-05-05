@@ -58,8 +58,9 @@ mcp = FastMCP(
         "explain_memory to audit why a memory exists. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
         "neighborhood. Only call remember_memory when the user explicitly asks "
-        "you to remember something. Use archive_memory instead of deleting stale "
-        "or wrong memories."
+        "you to remember something; if it returns duplicate candidates, inspect "
+        "the existing memory instead of forcing a duplicate. Use archive_memory "
+        "instead of deleting stale or wrong memories."
     ),
 )
 
@@ -789,6 +790,83 @@ def _recall_memories(query: str, limit: int = 10, include_archived: bool = False
     return [record for _, record in scored[:limit]]
 
 
+def _memory_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in re.split(r"[^a-z0-9]+", value.lower())
+        if len(token) >= 3
+    }
+
+
+def _compact_memory_text(value: str) -> str:
+    return " ".join(
+        token
+        for token in re.split(r"[^a-z0-9]+", value.lower())
+        if token
+    )
+
+
+def _memory_duplicate_candidates(
+    text: str,
+    title: str,
+    memory_type: str,
+    scope: str,
+    limit: int = 3,
+) -> list[dict[str, object]]:
+    memory_title = _memory_title(text, title)
+    new_slug = _slugify(memory_title)
+    new_title = _compact_memory_text(memory_title)
+    new_body = _compact_memory_text(text)
+    new_tokens = _memory_tokens(f"{memory_title} {text}")
+    candidates: list[tuple[int, dict[str, object]]] = []
+
+    for record in _memory_records():
+        if not _is_active_memory(record):
+            continue
+        reasons: list[str] = []
+        score = 0
+        record_title = _compact_memory_text(str(record.get("title") or ""))
+        record_text = _compact_memory_text(
+            " ".join(
+                str(record.get(field) or "")
+                for field in ("title", "tldr", "snippet", "body")
+            )
+        )
+        record_tokens = _memory_tokens(record_text)
+
+        if str(record.get("name") or "") == new_slug:
+            score = max(score, 100)
+            reasons.append("same_slug")
+        if new_title and record_title == new_title:
+            score = max(score, 96)
+            reasons.append("same_title")
+        if len(new_body) >= 40 and new_body in record_text:
+            score = max(score, 94)
+            reasons.append("same_memory_text")
+
+        overlap = sorted(new_tokens & record_tokens)
+        union = new_tokens | record_tokens
+        overlap_ratio = (len(overlap) / len(union)) if union else 0.0
+        same_kind = (
+            str(record.get("memory_type") or "") == memory_type
+            and str(record.get("scope") or "") == scope
+        )
+        if same_kind and len(overlap) >= 5 and overlap_ratio >= 0.72:
+            score = max(score, min(92, int(70 + overlap_ratio * 25)))
+            reasons.append("high_token_overlap")
+
+        if score < 85:
+            continue
+        candidate = _slim_memory(record)
+        candidate["duplicate_score"] = min(score, 100)
+        candidate["duplicate_reasons"] = reasons
+        candidate["matching_terms"] = overlap[:12]
+        candidates.append((int(candidate["duplicate_score"]), candidate))
+
+    candidates.sort(key=lambda item: (-item[0], str(item[1]["title"]).lower()))
+    return [candidate for _, candidate in candidates[:limit]]
+
+
 def _update_memory_index(page_name: str, title: str, summary: str, memory_type: str, scope: str) -> None:
     index_path = WIKI_DIR / "index.md"
     if not index_path.exists():
@@ -1016,6 +1094,7 @@ def _write_memory_page(
     scope: str = "user",
     tags: str = "",
     source: str = "mcp",
+    allow_duplicate: bool = False,
 ) -> dict[str, object]:
     clean_text = _clean_text_input(text, max_len=4000)
     if not clean_text:
@@ -1032,6 +1111,22 @@ def _write_memory_page(
     summary = clean_text.splitlines()[0].strip()
     if len(summary) > 180:
         summary = summary[:177].rstrip() + "..."
+    duplicate_candidates = _memory_duplicate_candidates(
+        clean_text,
+        _clean_text_input(title),
+        memory_type,
+        scope,
+    )
+    if duplicate_candidates and not allow_duplicate:
+        return {
+            "created": False,
+            "duplicate": True,
+            "message": "Similar active memory already exists. Review or update the existing memory, or pass allow_duplicate if this is intentional.",
+            "title": memory_title,
+            "memory_type": memory_type,
+            "scope": scope,
+            "candidates": duplicate_candidates,
+        }
     memories_dir = WIKI_DIR / "memories"
     memories_dir.mkdir(parents=True, exist_ok=True)
     page_path = _unique_page_path(memories_dir, _slugify(memory_title))
@@ -1093,6 +1188,8 @@ tags: {_yaml_list(tag_values)}
         "memory_type": memory_type,
         "scope": scope,
         "backlinks_rebuilt": bool(rebuilt.get("rebuilt")),
+        "duplicate_override": bool(duplicate_candidates and allow_duplicate),
+        "duplicate_candidates": duplicate_candidates,
     }
 
 
@@ -1228,11 +1325,13 @@ def remember_memory(
     scope: str = "user",
     tags: str = "",
     source: str = "mcp",
+    allow_duplicate: bool = False,
 ) -> str:
     """Save a local agent memory as a Markdown page.
 
     Use only when the user explicitly asks you to remember something. The memory
-    is written under wiki/memories/, indexed, logged, and kept local.
+    is written under wiki/memories/, indexed, logged, and kept local. Strong
+    duplicates are refused unless allow_duplicate is true.
     memory_type: preference, decision, project, fact, or note.
     scope: user, project, or global.
     tags: optional comma-separated tags.
@@ -1245,6 +1344,7 @@ def remember_memory(
             scope=scope,
             tags=tags,
             source=source,
+            allow_duplicate=allow_duplicate,
         )
     except ValueError as exc:
         return json.dumps({"created": False, "error": str(exc)})

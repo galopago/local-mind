@@ -275,7 +275,7 @@ Obsidian also works: open the `wiki/` folder as a vault.
 |---------|-------------|
 | `python3 link.py demo` | Create `./link-demo` with a pre-ingested sample wiki. |
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
-| `python3 link.py remember "text" <dir>` | Save a local agent memory under `wiki/memories/`. |
+| `python3 link.py remember "text" <dir>` | Save a local agent memory under `wiki/memories/`; strong duplicates are refused unless `--allow-duplicate` is set. |
 | `python3 link.py recall "query" <dir>` | Search local agent memories first. |
 | `python3 link.py profile <dir>` | Show what Link remembers by type, scope, status, and recency. |
 | `python3 link.py memory-inbox <dir>` | Show memories that need review or stronger metadata. |
@@ -302,7 +302,7 @@ Available tools:
 | `explain_memory` | Explain why a memory exists and whether it is ready for recall. |
 | `search_wiki` | Ranked search by title, alias, tag, and full text. Returns scores and snippets. |
 | `recall_memory` | Search durable local memory pages for preferences, decisions, and project context. |
-| `remember_memory` | Save an explicit user-approved memory under `wiki/memories/`. |
+| `remember_memory` | Save an explicit user-approved memory under `wiki/memories/`; strong duplicates require `allow_duplicate=true`. |
 | `archive_memory` | Archive stale or wrong memory without deleting the Markdown page. |
 | `restore_memory` | Restore archived memory to active status. |
 | `get_context` | Primary tool. Returns the best page plus inbound and forward graph neighbors. |

@@ -1143,6 +1143,84 @@ def _recall_memories(
     return [record for _, record in scored[:limit]]
 
 
+def _memory_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in re.split(r"[^a-z0-9]+", value.lower())
+        if len(token) >= 3
+    }
+
+
+def _compact_memory_text(value: str) -> str:
+    return " ".join(
+        token
+        for token in re.split(r"[^a-z0-9]+", value.lower())
+        if token
+    )
+
+
+def _memory_duplicate_candidates(
+    wiki_dir: Path,
+    text: str,
+    title: str | None,
+    memory_type: str,
+    scope: str,
+    limit: int = 3,
+) -> list[dict[str, object]]:
+    memory_title = _memory_title(text, title)
+    new_slug = _slugify(memory_title)
+    new_title = _compact_memory_text(memory_title)
+    new_body = _compact_memory_text(text)
+    new_tokens = _memory_tokens(f"{memory_title} {text}")
+    candidates: list[tuple[int, dict[str, object]]] = []
+
+    for record in _memory_records(wiki_dir):
+        if not _is_active_memory(record):
+            continue
+        reasons: list[str] = []
+        score = 0
+        record_title = _compact_memory_text(str(record.get("title") or ""))
+        record_text = _compact_memory_text(
+            " ".join(
+                str(record.get(field) or "")
+                for field in ("title", "tldr", "snippet", "body")
+            )
+        )
+        record_tokens = _memory_tokens(record_text)
+
+        if str(record.get("name") or "") == new_slug:
+            score = max(score, 100)
+            reasons.append("same_slug")
+        if new_title and record_title == new_title:
+            score = max(score, 96)
+            reasons.append("same_title")
+        if len(new_body) >= 40 and new_body in record_text:
+            score = max(score, 94)
+            reasons.append("same_memory_text")
+
+        overlap = sorted(new_tokens & record_tokens)
+        union = new_tokens | record_tokens
+        overlap_ratio = (len(overlap) / len(union)) if union else 0.0
+        same_kind = (
+            str(record.get("memory_type") or "") == memory_type
+            and str(record.get("scope") or "") == scope
+        )
+        if same_kind and len(overlap) >= 5 and overlap_ratio >= 0.72:
+            score = max(score, min(92, int(70 + overlap_ratio * 25)))
+            reasons.append("high_token_overlap")
+
+        if score < 85:
+            continue
+        candidate = _slim_memory(record)
+        candidate["duplicate_score"] = min(score, 100)
+        candidate["duplicate_reasons"] = reasons
+        candidate["matching_terms"] = overlap[:12]
+        candidates.append((int(candidate["duplicate_score"]), candidate))
+
+    candidates.sort(key=lambda item: (-item[0], str(item[1]["title"]).lower()))
+    return [candidate for _, candidate in candidates[:limit]]
+
+
 def _update_memory_index(index_path: Path, page_name: str, title: str, summary: str, memory_type: str, scope: str) -> None:
     if not index_path.exists():
         _write_default_index(index_path)
@@ -1379,6 +1457,7 @@ def _write_memory_page(
     tags: str | None = None,
     source: str = "manual",
     timestamp: str | None = None,
+    allow_duplicate: bool = False,
 ) -> dict[str, object]:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
@@ -1391,10 +1470,29 @@ def _write_memory_page(
 
     timestamp = timestamp or _utc_timestamp()
     clean_text = text.strip()
+    if not clean_text:
+        raise ValueError("memory text required")
     memory_title = _memory_title(clean_text, title)
     summary = clean_text.splitlines()[0].strip()
     if len(summary) > 180:
         summary = summary[:177].rstrip() + "..."
+    duplicate_candidates = _memory_duplicate_candidates(
+        wiki_dir,
+        clean_text,
+        title,
+        memory_type,
+        scope,
+    )
+    if duplicate_candidates and not allow_duplicate:
+        return {
+            "created": False,
+            "duplicate": True,
+            "message": "Similar active memory already exists. Review or update the existing memory, or pass allow_duplicate if this is intentional.",
+            "title": memory_title,
+            "memory_type": memory_type,
+            "scope": scope,
+            "candidates": duplicate_candidates,
+        }
     memories_dir = wiki_dir / "memories"
     memories_dir.mkdir(parents=True, exist_ok=True)
     page_path = _unique_page_path(memories_dir, _slugify(memory_title))
@@ -1456,6 +1554,8 @@ tags: {_yaml_list(tag_values)}
         "title": memory_title,
         "memory_type": memory_type,
         "scope": scope,
+        "duplicate_override": bool(duplicate_candidates and allow_duplicate),
+        "duplicate_candidates": duplicate_candidates,
     }
 
 
@@ -1953,6 +2053,7 @@ def remember(
     scope: str = "user",
     tags: str | None = None,
     source: str = "manual",
+    allow_duplicate: bool = False,
     json_output: bool = False,
 ) -> int:
     if not text or not text.strip():
@@ -1967,6 +2068,7 @@ def remember(
             scope=scope,
             tags=tags,
             source=source,
+            allow_duplicate=allow_duplicate,
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"Could not remember: {exc}", file=sys.stderr)
@@ -1974,6 +2076,23 @@ def remember(
 
     if json_output:
         print(json.dumps(result, indent=2))
+        return 0
+
+    if not result.get("created"):
+        print("Similar memory already exists")
+        print(f"Title requested: {result['title']}")
+        print(f"Type: {result['memory_type']}")
+        print(f"Scope: {result['scope']}")
+        print("")
+        print("Existing candidates:")
+        for candidate in result.get("candidates", []):
+            print(f"- {candidate['title']} ({candidate['path']})")
+        print("")
+        print("Next:")
+        first = next(iter(result.get("candidates", [])), None)
+        if first:
+            print(f"  python3 link.py explain-memory \"{first['name']}\" .")
+        print("  Use --allow-duplicate only if this should be a separate memory.")
         return 0
 
     print("Memory saved")
@@ -2472,6 +2591,7 @@ def main(argv: list[str] | None = None) -> int:
     remember_cmd.add_argument("--scope", choices=MEMORY_SCOPES, default="user")
     remember_cmd.add_argument("--tags", default=None, help="comma-separated tags")
     remember_cmd.add_argument("--source", default="manual", help="where this memory came from")
+    remember_cmd.add_argument("--allow-duplicate", action="store_true", help="create a new memory even if a strong duplicate exists")
     remember_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
     recall_cmd = sub.add_parser("recall", help="search local agent memories")
@@ -2539,6 +2659,7 @@ def main(argv: list[str] | None = None) -> int:
             scope=args.scope,
             tags=args.tags,
             source=args.source,
+            allow_duplicate=args.allow_duplicate,
             json_output=args.json,
         )
     if args.command == "recall":
