@@ -94,7 +94,6 @@ SKIP_SCAN_SUFFIXES = {
 }
 MEMORY_TYPES = ("preference", "decision", "project", "fact", "note")
 MEMORY_SCOPES = ("user", "project", "global")
-MEMORY_REVIEW_STATUSES = ("pending", "reviewed", "needs_update")
 
 _BUNDLED_CORE = ROOT / "mcp_package"
 if (_BUNDLED_CORE / "link_core").exists():
@@ -108,7 +107,6 @@ from link_core.memory import (
     memory_profile as _core_memory_profile,
     memory_records as _core_memory_records,
     memory_review_issues as _core_memory_review_issues,
-    memory_duplicate_candidates as _core_memory_duplicate_candidates,
     propose_memories_from_text as _core_propose_memories_from_text,
     recall_memories as _core_recall_memories,
     recall_state as _core_recall_state,
@@ -118,12 +116,10 @@ from link_core.memory import (
     slim_memory as _core_slim_memory,
     top_tags as _core_top_tags,
     update_memory_page as _core_update_memory_page,
+    write_memory_page as _core_write_memory_page,
 )
 from link_core.frontmatter import (
-    csv_values as _csv_values,
-    frontmatter_string as _frontmatter_string,
     parse_frontmatter as _parse_frontmatter,
-    yaml_list as _yaml_list,
 )
 del _BUNDLED_CORE
 
@@ -733,30 +729,6 @@ def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _slugify(value: str, fallback: str = "memory") -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return slug or fallback
-
-
-def _memory_title(text: str, explicit_title: str | None = None) -> str:
-    if explicit_title and explicit_title.strip():
-        return explicit_title.strip()
-    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "Memory")
-    first_sentence = re.split(r"(?<=[.!?])\s+", first_line, maxsplit=1)[0].strip()
-    if len(first_sentence) <= 70:
-        return first_sentence.rstrip(".")
-    return first_sentence[:67].rstrip() + "..."
-
-
-def _unique_page_path(directory: Path, slug: str) -> Path:
-    candidate = directory / f"{slug}.md"
-    index = 2
-    while candidate.exists():
-        candidate = directory / f"{slug}-{index}.md"
-        index += 1
-    return candidate
-
-
 def _memory_records(wiki_dir: Path) -> list[dict[str, object]]:
     return _core_memory_records(wiki_dir)
 
@@ -875,24 +847,6 @@ def _recall_memories(
     )
 
 
-def _memory_duplicate_candidates(
-    wiki_dir: Path,
-    text: str,
-    title: str | None,
-    memory_type: str,
-    scope: str,
-    limit: int = 3,
-) -> list[dict[str, object]]:
-    return _core_memory_duplicate_candidates(
-        _memory_records(wiki_dir),
-        text,
-        title,
-        memory_type,
-        scope,
-        limit=limit,
-    )
-
-
 def _propose_memories_from_text(
     wiki_dir: Path,
     text: str,
@@ -906,23 +860,6 @@ def _propose_memories_from_text(
         limit=limit,
         writes_memory=False,
     )
-
-
-def _update_memory_index(index_path: Path, page_name: str, title: str, summary: str, memory_type: str, scope: str) -> None:
-    if not index_path.exists():
-        _write_default_index(index_path)
-    text = index_path.read_text(encoding="utf-8", errors="replace")
-    if f"[[{page_name}]]" in text:
-        return
-    entry = f"- [[{page_name}]] - {summary} {memory_type} · {scope}\n"
-    if "### memories" in text:
-        pattern = re.compile(r"(### memories\n)(.*?)(?=\n### |\n## Recent|\Z)", flags=re.DOTALL)
-        text = pattern.sub(lambda m: m.group(1) + m.group(2).rstrip() + "\n" + entry, text, count=1)
-    elif "\n## Recent" in text:
-        text = text.replace("\n## Recent", f"\n### memories\n{entry}\n## Recent", 1)
-    else:
-        text = text.rstrip() + f"\n\n### memories\n{entry}"
-    index_path.write_text(text, encoding="utf-8")
 
 
 def _append_log(wiki_dir: Path, timestamp: str, operation: str, description: str, lines: list[str]) -> None:
@@ -1049,100 +986,35 @@ def _write_memory_page(
     wiki_dir = _resolve_wiki_dir(target)
     if not wiki_dir.exists():
         raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
-    if memory_type not in MEMORY_TYPES:
-        raise ValueError(f"memory_type must be one of: {', '.join(MEMORY_TYPES)}")
-    if scope not in MEMORY_SCOPES:
-        raise ValueError(f"scope must be one of: {', '.join(MEMORY_SCOPES)}")
-
-    timestamp = timestamp or _utc_timestamp()
     clean_text = text.strip()
     if not clean_text:
         raise ValueError("memory text required")
-    memory_title = _memory_title(clean_text, title)
-    summary = clean_text.splitlines()[0].strip()
-    if len(summary) > 180:
-        summary = summary[:177].rstrip() + "..."
-    duplicate_candidates = _memory_duplicate_candidates(
+
+    def rebuild_memory_backlinks() -> bool:
+        backlinks = _build_backlinks(wiki_dir)
+        (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
+        return True
+
+    return _core_write_memory_page(
         wiki_dir,
         clean_text,
-        title,
-        memory_type,
-        scope,
+        title=title,
+        memory_type=memory_type,
+        scope=scope,
+        tags=tags,
+        source=source,
+        timestamp=timestamp or _utc_timestamp(),
+        records=_memory_records(wiki_dir),
+        allow_duplicate=allow_duplicate,
+        log_writer=lambda ts, operation, description, lines: _append_log(
+            wiki_dir,
+            ts,
+            operation,
+            description,
+            lines,
+        ),
+        rebuild_backlinks=rebuild_memory_backlinks,
     )
-    if duplicate_candidates and not allow_duplicate:
-        return {
-            "created": False,
-            "duplicate": True,
-            "message": "Similar active memory already exists. Review or update the existing memory, or pass allow_duplicate if this is intentional.",
-            "title": memory_title,
-            "memory_type": memory_type,
-            "scope": scope,
-            "candidates": duplicate_candidates,
-        }
-    memories_dir = wiki_dir / "memories"
-    memories_dir.mkdir(parents=True, exist_ok=True)
-    page_path = _unique_page_path(memories_dir, _slugify(memory_title))
-    page_name = page_path.stem
-    tag_values = ["memory", memory_type]
-    for tag in _csv_values(tags):
-        slug_tag = _slugify(tag, fallback="")
-        if slug_tag and slug_tag not in tag_values:
-            tag_values.append(slug_tag)
-
-    page = f"""---
-type: memory
-title: "{_frontmatter_string(memory_title)}"
-memory_type: {memory_type}
-scope: {scope}
-status: active
-date_captured: "{timestamp}"
-source: "{_frontmatter_string(source)}"
-review_status: pending
-tags: {_yaml_list(tag_values)}
----
-
-# {memory_title}
-
-> **TLDR:** {summary}
-
-## Memory
-
-{clean_text}
-
-## Use This When
-
-- An agent needs relevant {scope} context for future work.
-- A future answer depends on this {memory_type}.
-
-## Source
-
-{source}
-"""
-    page_path.write_text(page, encoding="utf-8")
-    _update_memory_index(wiki_dir / "index.md", page_name, memory_title, summary, memory_type, scope)
-    _append_log(
-        wiki_dir,
-        timestamp,
-        "remember",
-        memory_title,
-        [
-            f"Created: memories/{page_path.name}",
-            f"Type: {memory_type}",
-            f"Scope: {scope}",
-        ],
-    )
-    backlinks = _build_backlinks(wiki_dir)
-    (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
-    return {
-        "created": True,
-        "name": page_name,
-        "path": f"wiki/memories/{page_path.name}",
-        "title": memory_title,
-        "memory_type": memory_type,
-        "scope": scope,
-        "duplicate_override": bool(duplicate_candidates and allow_duplicate),
-        "duplicate_candidates": duplicate_candidates,
-    }
 
 
 def _normalize_link_index(data: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:

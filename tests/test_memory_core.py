@@ -19,6 +19,7 @@ from link_core.memory import (  # noqa: E402
     resolve_memory_page,
     set_memory_status,
     update_memory_page,
+    write_memory_page,
 )
 
 
@@ -323,6 +324,76 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertNotIn("archived_at:", restored_text)
         self.assertNotIn("archive_reason:", restored_text)
         self.assertEqual(logged[-1][1], "restore-memory")
+
+    def test_write_memory_page_creates_index_log_and_blocks_duplicates(self):
+        root = Path(tempfile.mkdtemp(prefix="link-memory-write-"))
+        wiki = root / "wiki"
+        wiki.mkdir(parents=True)
+        logged: list[tuple[str, str, str, list[str]]] = []
+        rebuilds = []
+
+        def log_writer(timestamp: str, operation: str, description: str, lines: list[str]) -> None:
+            logged.append((timestamp, operation, description, lines))
+
+        created = write_memory_page(
+            wiki,
+            "User prefers release branches for Link work.",
+            title="Prefer release branches",
+            memory_type="preference",
+            scope="project",
+            tags="git, release",
+            source="unit test",
+            timestamp="2026-05-05T06:00:00Z",
+            records=[],
+            log_writer=log_writer,
+            rebuild_backlinks=lambda: rebuilds.append(True) or True,
+        )
+        memory_path = wiki / "memories/prefer-release-branches.md"
+        memory_text = memory_path.read_text(encoding="utf-8")
+        index_text = (wiki / "index.md").read_text(encoding="utf-8")
+
+        self.assertTrue(created["created"])
+        self.assertEqual(created["name"], "prefer-release-branches")
+        self.assertTrue(created["backlinks_rebuilt"])
+        self.assertEqual(rebuilds, [True])
+        self.assertIn('title: "Prefer release branches"', memory_text)
+        self.assertIn("memory_type: preference", memory_text)
+        self.assertIn("tags: [memory, preference, git, release]", memory_text)
+        self.assertIn("## Source\n\nunit test", memory_text)
+        self.assertIn("[[prefer-release-branches]]", index_text)
+        self.assertEqual(logged[-1][1], "remember")
+        self.assertIn("Created: memories/prefer-release-branches.md", logged[-1][3])
+
+        duplicate = write_memory_page(
+            wiki,
+            "User prefers release branches for Link work.",
+            title="Prefer release branches",
+            memory_type="preference",
+            scope="project",
+            tags="git, release",
+            source="unit test",
+            timestamp="2026-05-05T07:00:00Z",
+            records=memory_records(wiki),
+        )
+        self.assertFalse(duplicate["created"])
+        self.assertTrue(duplicate["duplicate"])
+        self.assertEqual(duplicate["candidates"][0]["name"], "prefer-release-branches")
+
+        duplicate_override = write_memory_page(
+            wiki,
+            "User prefers release branches for Link work.",
+            title="Prefer release branches",
+            memory_type="preference",
+            scope="project",
+            tags="git, release",
+            source="unit test",
+            timestamp="2026-05-05T08:00:00Z",
+            records=memory_records(wiki),
+            allow_duplicate=True,
+        )
+        self.assertTrue(duplicate_override["created"])
+        self.assertTrue(duplicate_override["duplicate_override"])
+        self.assertEqual(duplicate_override["name"], "prefer-release-branches-2")
 
 
 if __name__ == "__main__":
