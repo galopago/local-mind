@@ -148,6 +148,45 @@ class DemoSnapshotTests(unittest.TestCase):
         self.assertIn("Memory Review Inbox", html)
         self.assertIn("pending_review", html)
 
+    def test_demo_memory_dashboard_snapshot(self):
+        target = self.make_demo()
+        reset_serve_wiki(target / "wiki")
+
+        dashboard = serve._memory_dashboard()
+        html = serve._render_memory_dashboard()
+
+        self.assertEqual(dashboard["memory_count"], 1)
+        self.assertEqual(dashboard["active_count"], 1)
+        self.assertEqual(dashboard["review_count"], 1)
+        self.assertEqual(dashboard["review"][0]["name"], "prefer-local-personal-memory")
+        self.assertEqual(dashboard["review"][0]["actions"][1]["label"], "Review")
+        self.assertIn("Memory Dashboard", html)
+        self.assertIn("Review needed", html)
+        self.assertIn("Prefer local personal memory", html)
+        self.assertIn("python3 link.py review-memory", html)
+        self.assertIn("python3 link.py update-memory", html)
+        self.assertIn("python3 link.py archive-memory", html)
+
+    def test_demo_memory_dashboard_shows_recent_updates(self):
+        target = self.make_demo()
+        with redirect_stdout(StringIO()):
+            link_cli.update_memory(
+                target,
+                "prefer-local-personal-memory",
+                "Also prefer checking the web memory dashboard for review status.",
+                source="snapshot test",
+            )
+        reset_serve_wiki(target / "wiki")
+
+        dashboard = serve._memory_dashboard()
+        html = serve._render_memory_dashboard()
+
+        self.assertEqual(dashboard["updated_count"], 1)
+        self.assertEqual(dashboard["recent_updates"][0]["name"], "prefer-local-personal-memory")
+        self.assertEqual(dashboard["recent_updates"][0]["update_count"], "1")
+        self.assertIn("Recent updates", html)
+        self.assertIn("snapshot test", dashboard["recent_updates"][0]["last_update_source"])
+
     def test_demo_explain_memory_snapshot(self):
         target = self.make_demo()
         reset_serve_wiki(target / "wiki")

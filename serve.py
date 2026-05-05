@@ -230,6 +230,9 @@ def _memory_records() -> list[dict[str, object]]:
             "scope": meta.get("scope") or "user",
             "status": meta.get("status") or "active",
             "date_captured": meta.get("date_captured", ""),
+            "updated_at": meta.get("updated_at", ""),
+            "update_count": meta.get("update_count", "0"),
+            "last_update_source": meta.get("last_update_source", ""),
             "archived_at": meta.get("archived_at", ""),
             "archive_reason": meta.get("archive_reason", ""),
             "restored_at": meta.get("restored_at", ""),
@@ -555,6 +558,92 @@ def _memory_profile(limit: int = 10) -> dict[str, object]:
     }
 
 
+def _memory_activity_key(record: dict[str, object]) -> tuple[str, str, str]:
+    return (
+        str(record.get("updated_at") or record.get("date_captured") or ""),
+        str(record.get("date_captured") or ""),
+        str(record.get("title") or "").lower(),
+    )
+
+
+def _memory_action_hints(record: dict[str, object]) -> list[dict[str, str]]:
+    name = str(record.get("name") or "")
+    status = str(record.get("status") or "active").lower()
+    hints = [
+        {
+            "label": "Explain",
+            "href": f"/explain-memory?memory={urllib.parse.quote(name, safe='')}",
+            "command": f'python3 link.py explain-memory "{name}" .',
+        },
+    ]
+    if status == "archived":
+        hints.append({
+            "label": "Restore",
+            "href": "",
+            "command": f'python3 link.py restore-memory "{name}" .',
+        })
+        return hints
+    hints.extend([
+        {
+            "label": "Review",
+            "href": "",
+            "command": f'python3 link.py review-memory "{name}" .',
+        },
+        {
+            "label": "Update",
+            "href": "",
+            "command": f'python3 link.py update-memory "{name}" "new detail" .',
+        },
+        {
+            "label": "Archive",
+            "href": "",
+            "command": f'python3 link.py archive-memory "{name}" . --reason "why"',
+        },
+    ])
+    return hints
+
+
+def _memory_with_actions(record: dict[str, object]) -> dict[str, object]:
+    item = dict(record)
+    item["actions"] = _memory_action_hints(record)
+    return item
+
+
+def _memory_dashboard(limit: int = 12) -> dict[str, object]:
+    limit = max(1, min(limit, 50))
+    records = _memory_records()
+    active_records = [record for record in records if _is_active_memory(record)]
+    archived_records = [
+        record for record in records
+        if str(record.get("status") or "").lower() == "archived"
+    ]
+    recent_active = sorted(active_records, key=_memory_activity_key, reverse=True)
+    recent_updates = sorted(
+        [record for record in records if str(record.get("updated_at") or "").strip()],
+        key=lambda record: (
+            str(record.get("updated_at") or ""),
+            str(record.get("title") or "").lower(),
+        ),
+        reverse=True,
+    )
+    archived = sorted(archived_records, key=_memory_activity_key, reverse=True)
+    inbox = _memory_inbox(limit=limit)
+    return {
+        "memory_count": len(records),
+        "active_count": len(active_records),
+        "review_count": inbox["review_count"],
+        "archived_count": len(archived_records),
+        "updated_count": len(recent_updates),
+        "by_type": _count_values(records, "memory_type"),
+        "by_scope": _count_values(records, "scope"),
+        "counts_by_severity": inbox["counts_by_severity"],
+        "active": [_memory_with_actions(record) for record in recent_active[:limit]],
+        "review": [_memory_with_actions(record) for record in inbox["items"][:limit]],
+        "recent_updates": [_memory_with_actions(record) for record in recent_updates[:limit]],
+        "archived": [_memory_with_actions(record) for record in archived[:limit]],
+    }
+
+
 def _json_for_script(data) -> str:
     """Serialize JSON for direct embedding inside a <script> tag."""
     return (
@@ -774,6 +863,17 @@ hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
 .memory-issues { margin-top: 6px; }
 .memory-issues li { border: none; padding: 0; color: #666; font-size: 13px; }
 .memory-issues .severity { font-family: sans-serif; font-size: 11px; text-transform: uppercase; color: #8a6d3b; }
+.memory-dashboard { margin: 18px 0; }
+.memory-dashboard .section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.memory-dashboard .section-heading a { font-size: 13px; font-family: sans-serif; font-weight: normal; }
+.memory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 12px 0; }
+.memory-card { border: 1px solid #eee; border-radius: 6px; padding: 12px; }
+.memory-card h3 { margin-top: 0; font-size: 16px; }
+.memory-card .summary { color: #555; font-family: sans-serif; font-size: 13px; line-height: 1.5; margin: 8px 0; }
+.memory-card .memory-meta { color: #888; font-size: 12px; font-family: sans-serif; }
+.memory-actions { margin-top: 10px; display: grid; gap: 6px; }
+.memory-actions div { font-size: 12px; font-family: sans-serif; }
+.memory-actions code { display: block; margin-top: 2px; white-space: normal; overflow-wrap: anywhere; }
 .trust-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
 .trust-grid div { border: 1px solid #eee; border-radius: 4px; padding: 10px; font-family: sans-serif; }
 .trust-grid strong { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
@@ -821,6 +921,8 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
   .page-list li { border-color: #2a2a2a; }
   .memory-profile .summary { color: #aaa; }
   .memory-issues li { color: #aaa; }
+  .memory-card { border-color: #333; }
+  .memory-card .summary { color: #aaa; }
   .trust-grid div { border-color: #333; }
   footer { border-color: #333; }
   .home-stats .stat .num { color: #6ea8fe; }
@@ -837,6 +939,7 @@ def _header_html():
   <div class="logo"><a href="/"><img src="/logo.svg" alt="">Link</a><small>agent memory</small></div>
   <nav>
     <a href="/">home</a>
+    <a href="/memory">memory</a>
     <a href="/inbox">inbox</a>
     <a href="/profile">profile</a>
     <a href="/page/log">log</a>
@@ -986,6 +1089,95 @@ def _render_all():
     )
     return _layout("All Pages", f'<div class="breadcrumb"><a href="/">Link</a> / all pages</div>'
                    f"<h1>All Pages ({len(pages)})</h1><ul class='page-list'>{items}</ul>")
+
+
+def _render_memory_card(record: dict[str, object], include_issues: bool = False) -> str:
+    name = str(record.get("name") or "")
+    title = str(record.get("title") or name)
+    summary = str(record.get("tldr") or record.get("snippet") or "")
+    meta_parts = [
+        str(record.get("memory_type") or "note"),
+        str(record.get("scope") or "user"),
+        str(record.get("status") or "active"),
+    ]
+    if record.get("updated_at"):
+        meta_parts.append(f'updated {record["updated_at"]}')
+    elif record.get("date_captured"):
+        meta_parts.append(f'captured {record["date_captured"]}')
+    meta = " · ".join(part for part in meta_parts if part)
+    issues_html = ""
+    if include_issues and record.get("issues"):
+        issues_html = "<ul class='memory-issues'>" + "".join(
+            f'<li><span class="severity">{html.escape(str(issue["severity"]))}</span> '
+            f'{html.escape(str(issue["code"]))}: {html.escape(str(issue["message"]))}</li>'
+            for issue in record["issues"]
+        ) + "</ul>"
+    actions = ""
+    for action in _memory_action_hints(record):
+        label = html.escape(action["label"])
+        if action["href"]:
+            label_html = f'<a href="{html.escape(action["href"])}">{label}</a>'
+        else:
+            label_html = label
+        actions += (
+            f'<div><strong>{label_html}</strong>'
+            f'<code>{html.escape(action["command"])}</code></div>'
+        )
+    summary_html = f'<p class="summary">{html.escape(summary)}</p>' if summary else ""
+    return (
+        '<article class="memory-card">'
+        f'<h3><a href="{_page_href(name)}">{html.escape(title)}</a></h3>'
+        f'<div class="memory-meta">{html.escape(meta)}</div>'
+        f'{summary_html}'
+        f'{issues_html}'
+        f'<div class="memory-actions">{actions}</div>'
+        '</article>'
+    )
+
+
+def _render_memory_section(title: str, records: list[dict[str, object]], empty: str, href: str = "", include_issues: bool = False) -> str:
+    heading_link = f'<a href="{html.escape(href)}">view all</a>' if href else ""
+    heading = f'<div class="section-heading"><h2>{html.escape(title)}</h2>{heading_link}</div>'
+    if not records:
+        return heading + f"<p>{html.escape(empty)}</p>"
+    cards = "".join(_render_memory_card(record, include_issues=include_issues) for record in records)
+    return heading + f'<div class="memory-grid">{cards}</div>'
+
+
+def _render_memory_dashboard():
+    dashboard = _memory_dashboard(limit=8)
+    stats = (
+        f'<div class="home-stats">'
+        f'<div class="stat"><span class="num">{dashboard["memory_count"]}</span><span class="label">memories</span></div>'
+        f'<div class="stat"><span class="num">{dashboard["active_count"]}</span><span class="label">active</span></div>'
+        f'<div class="stat"><span class="num">{dashboard["review_count"]}</span><span class="label">review</span></div>'
+        f'<div class="stat"><span class="num">{dashboard["updated_count"]}</span><span class="label">updated</span></div>'
+        f'<div class="stat"><span class="num">{dashboard["archived_count"]}</span><span class="label">archived</span></div>'
+        f'</div>'
+    )
+    counts = ""
+    if dashboard["by_type"]:
+        counts += "<p><strong>Types:</strong> " + ", ".join(
+            f"{html.escape(name)}: {count}" for name, count in dashboard["by_type"].items()
+        ) + "</p>"
+    if dashboard["by_scope"]:
+        counts += "<p><strong>Scopes:</strong> " + ", ".join(
+            f"{html.escape(name)}: {count}" for name, count in dashboard["by_scope"].items()
+        ) + "</p>"
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / memory</div>'
+        f'<h1>Memory Dashboard</h1>'
+        f'<div class="memory-dashboard">'
+        f'<p class="summary">Read-only command center for what local agents can remember, what needs review, and what changed recently.</p>'
+        f'{stats}'
+        f'{counts}'
+        f'{_render_memory_section("Review needed", dashboard["review"], "No memories need review.", href="/inbox", include_issues=True)}'
+        f'{_render_memory_section("Recent updates", dashboard["recent_updates"], "No memory updates yet.")}'
+        f'{_render_memory_section("Active memories", dashboard["active"], "No active memories yet.", href="/profile")}'
+        f'{_render_memory_section("Archived memories", dashboard["archived"], "No archived memories.")}'
+        f'</div>'
+    )
+    return _layout("Memory Dashboard", body)
 
 
 def _render_profile():
@@ -1879,6 +2071,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._file(raw_path, ctypes.get(ext, "application/octet-stream"))
         elif path in ("/", ""):
             self._ok(_render_home())
+        elif path == "/memory":
+            self._ok(_render_memory_dashboard())
         elif path == "/inbox":
             self._ok(_render_inbox())
         elif path == "/explain-memory":
@@ -1921,6 +2115,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": error}, status=400)
             else:
                 self._json(_memory_profile(limit=limit))
+        elif path == "/api/memory-dashboard":
+            limit, error = _parse_search_limit(query.get("limit", ["12"])[0])
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                self._json(_memory_dashboard(limit=limit))
         elif path == "/api/memory-inbox":
             limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
             if error:

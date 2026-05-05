@@ -17,6 +17,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added duplicate protection for `remember`/`remember_memory`; strong duplicate memories are refused unless explicitly allowed.
 - Added memory merge/update workflow with `update-memory` and MCP `update_memory`, including update counts, audit logs, backlink rebuilds, and review reset.
 - Added proposal-only memory extraction with `propose-memories` and MCP `propose_memories` for chat/session notes.
+- Added read-only web Memory Dashboard at `/memory` and `/api/memory-dashboard` for active memories, review queue, recent updates, archived memories, and next-action commands.
 
 ## [1.0.7] - 2026-05-04
 

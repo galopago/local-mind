@@ -30,6 +30,7 @@ python3 serve.py
 Open:
 
 - `http://localhost:3000`
+- `http://localhost:3000/memory`
 - `http://localhost:3000/graph`
 
 The demo shows the full loop: local memories, raw notes, source pages, concept pages, backlinks, graph context, search, and MCP-ready retrieval.
@@ -269,7 +270,7 @@ cd ~/link
 python3 serve.py
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000` or the memory dashboard at `http://localhost:3000/memory`.
 
 Obsidian also works: open the `wiki/` folder as a vault.
 
@@ -330,6 +331,7 @@ Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do no
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
+| `GET /api/memory-dashboard` | Read-only memory dashboard data: active, review queue, recent updates, archived, and next-action command hints. |
 | `GET /api/memory-profile` | Counts and recent memories for the local memory profile. |
 | `GET /api/memory-inbox` | Memories that need review or metadata cleanup. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness for one memory. |
