@@ -75,17 +75,18 @@ MEMORY_REVIEW_STATUSES = ("pending", "reviewed", "needs_update")
 
 from link_core.memory import (
     count_values as _core_count_values,
-    extract_tldr as _extract_tldr,
-    first_body_snippet as _first_body_snippet,
     is_active_memory as _core_is_active_memory,
     memory_inbox as _core_memory_inbox,
+    memory_log_entries as _core_memory_log_entries,
     memory_profile as _core_memory_profile,
     memory_records as _core_memory_records,
     memory_review_issues as _core_memory_review_issues,
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
     propose_memories_from_text as _core_propose_memories_from_text,
     recall_memories as _core_recall_memories,
+    recall_state as _core_recall_state,
     recent_memories as _core_recent_memories,
+    resolve_memory_page as _core_resolve_memory_page,
     slim_memory as _core_slim_memory,
     top_tags as _core_top_tags,
 )
@@ -440,44 +441,11 @@ def _load_backlinks() -> dict[str, dict[str, list[str]]]:
 
 
 def _memory_log_entries(record: dict[str, object], limit: int = 8) -> list[str]:
-    log_path = WIKI_DIR / "log.md"
-    if not log_path.exists():
-        return []
-    text = log_path.read_text(encoding="utf-8", errors="replace")
-    needles = {
-        str(record.get("name") or ""),
-        str(record.get("title") or ""),
-        f"memories/{record.get('name')}.md",
-    }
-    needles = {needle.lower() for needle in needles if needle}
-    blocks = [block.strip() for block in re.split(r"\n---\n", text) if block.strip()]
-    matches = [
-        block for block in blocks
-        if any(needle in block.lower() for needle in needles)
-    ]
-    return matches[-limit:]
+    return _core_memory_log_entries(WIKI_DIR, record, limit=limit)
 
 
 def _recall_state(record: dict[str, object], issues: list[dict[str, str]]) -> dict[str, object]:
-    default_enabled = _is_active_memory(record)
-    high_issues = [issue for issue in issues if issue["severity"] == "high"]
-    if not default_enabled:
-        state = "disabled"
-        reason = f"Memory status is {record.get('status')}; default recall excludes archived and stale memories."
-    elif high_issues:
-        state = "unsafe"
-        reason = "Memory is active but has high-severity quality issues."
-    elif issues:
-        state = "needs_review"
-        reason = "Memory is active but still needs review or stronger metadata."
-    else:
-        state = "ready"
-        reason = "Memory is active, reviewed, and has no detected quality issues."
-    return {
-        "default_enabled": default_enabled,
-        "state": state,
-        "reason": reason,
-    }
+    return _core_recall_state(record, issues)
 
 
 def _memory_explanation(identifier: str) -> dict[str, object]:
@@ -638,62 +606,12 @@ def _append_memory_update(body: str, update_text: str, timestamp: str, source: s
 
 
 def _resolve_memory_page(identifier: str) -> tuple[Path | None, dict[str, object] | None, str | None]:
-    needle = _clean_text_input(identifier, max_len=300)
-    if not needle:
-        return None, None, "memory name or title is required"
-    memories_dir = WIKI_DIR / "memories"
-    direct_candidates = []
-    raw_path = Path(needle)
-    if raw_path.suffix == ".md" or "/" in needle:
-        rel = Path(needle.removeprefix("wiki/"))
-        direct_candidates.append((WIKI_DIR / rel).resolve())
-        direct_candidates.append((memories_dir / raw_path.name).resolve())
-    else:
-        direct_candidates.append((memories_dir / f"{needle}.md").resolve())
-        direct_candidates.append((memories_dir / f"{_slugify(needle)}.md").resolve())
-
-    memories_root = memories_dir.resolve()
-    for candidate in direct_candidates:
-        try:
-            candidate.relative_to(memories_root)
-        except ValueError:
-            continue
-        if candidate.exists() and candidate.is_file():
-            text = candidate.read_text(encoding="utf-8", errors="replace")
-            meta, body = _parse_frontmatter(text)
-            return candidate, {
-                "name": candidate.stem,
-                "path": f"wiki/{candidate.relative_to(WIKI_DIR).as_posix()}",
-                "title": meta.get("title") or _memory_title(body),
-                "memory_type": meta.get("memory_type") or "note",
-                "scope": meta.get("scope") or "user",
-                "status": meta.get("status") or "active",
-                "date_captured": meta.get("date_captured", ""),
-                "updated_at": meta.get("updated_at", ""),
-                "update_count": meta.get("update_count", "0"),
-                "last_update_source": meta.get("last_update_source", ""),
-                "source": meta.get("source", ""),
-                "review_status": meta.get("review_status") or "pending",
-                "reviewed_at": meta.get("reviewed_at", ""),
-                "review_note": meta.get("review_note", ""),
-                "tldr": _extract_tldr(body),
-                "snippet": _first_body_snippet(body),
-            }, None
-
-    lowered = needle.lower()
-    slug = _slugify(needle)
-    matches = [
-        record for record in _memory_records()
-        if lowered in {str(record["name"]).lower(), str(record["title"]).lower()}
-        or slug == str(record["name"]).lower()
-    ]
-    if len(matches) > 1:
-        names = ", ".join(str(record["name"]) for record in matches[:5])
-        return None, None, f"memory identifier is ambiguous: {names}"
-    if not matches:
-        return None, None, f"memory not found: {identifier}"
-    record = matches[0]
-    return WIKI_DIR / str(record["path"]).removeprefix("wiki/"), record, None
+    return _core_resolve_memory_page(
+        WIKI_DIR,
+        identifier,
+        records=_memory_records(),
+        max_identifier_len=300,
+    )
 
 
 def _set_memory_status(identifier: str, status: str, reason: str = "") -> dict[str, object]:

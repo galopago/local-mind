@@ -187,6 +187,123 @@ def memory_review_issues(
     return issues
 
 
+def memory_log_entries(
+    wiki_dir: Path,
+    record: Mapping[str, object],
+    limit: int = 8,
+) -> list[str]:
+    try:
+        parsed_limit = int(limit)
+    except (TypeError, ValueError):
+        parsed_limit = 8
+    limit = max(1, min(parsed_limit, 50))
+    log_path = wiki_dir / "log.md"
+    if not log_path.exists():
+        return []
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    name = str(record.get("name") or "")
+    needles = {name, str(record.get("title") or "")}
+    if name:
+        needles.add(f"memories/{name}.md")
+    needles = {needle.lower() for needle in needles if needle}
+    blocks = [block.strip() for block in re.split(r"\n---\n", text) if block.strip()]
+    matches = [
+        block for block in blocks
+        if any(needle in block.lower() for needle in needles)
+    ]
+    return matches[-limit:]
+
+
+def recall_state(
+    record: Mapping[str, object],
+    issues: list[Mapping[str, str]],
+) -> dict[str, object]:
+    default_enabled = is_active_memory(record)
+    high_issues = [issue for issue in issues if str(issue.get("severity") or "") == "high"]
+    if not default_enabled:
+        state = "disabled"
+        reason = f"Memory status is {record.get('status')}; default recall excludes archived and stale memories."
+    elif high_issues:
+        state = "unsafe"
+        reason = "Memory is active but has high-severity quality issues."
+    elif issues:
+        state = "needs_review"
+        reason = "Memory is active but still needs review or stronger metadata."
+    else:
+        state = "ready"
+        reason = "Memory is active, reviewed, and has no detected quality issues."
+    return {
+        "default_enabled": default_enabled,
+        "state": state,
+        "reason": reason,
+    }
+
+
+def resolve_memory_page(
+    wiki_dir: Path,
+    identifier: str,
+    records: Iterable[Mapping[str, object]] | None = None,
+    max_identifier_len: int | None = None,
+) -> tuple[Path | None, dict[str, object] | None, str | None]:
+    needle = str(identifier or "").strip()
+    if max_identifier_len is not None:
+        needle = needle[:max_identifier_len]
+    if not needle:
+        return None, None, "memory name or title is required"
+
+    memories_dir = wiki_dir / "memories"
+    direct_candidates: list[Path] = []
+    raw_path = Path(needle)
+    if raw_path.suffix == ".md" or "/" in needle:
+        rel = Path(needle.removeprefix("wiki/"))
+        direct_candidates.append((wiki_dir / rel).resolve())
+        direct_candidates.append((memories_dir / raw_path.name).resolve())
+    else:
+        direct_candidates.append((memories_dir / f"{needle}.md").resolve())
+        direct_candidates.append((memories_dir / f"{slugify(needle)}.md").resolve())
+
+    record_list = [dict(record) for record in records] if records is not None else None
+    memories_root = memories_dir.resolve()
+    for candidate in direct_candidates:
+        try:
+            candidate.relative_to(memories_root)
+        except ValueError:
+            continue
+        if candidate.exists() and candidate.is_file():
+            if record_list is None:
+                record_list = memory_records(wiki_dir)
+            record = next(
+                (record for record in record_list if str(record.get("name") or "") == candidate.stem),
+                None,
+            )
+            if record is None:
+                record = next(
+                    (
+                        record for record in memory_records(wiki_dir)
+                        if str(record.get("name") or "") == candidate.stem
+                    ),
+                    None,
+                )
+            return candidate, dict(record) if record else None, None
+
+    lowered = needle.lower()
+    slug = slugify(needle)
+    if record_list is None:
+        record_list = memory_records(wiki_dir)
+    matches = [
+        dict(record) for record in record_list
+        if lowered in {str(record.get("name") or "").lower(), str(record.get("title") or "").lower()}
+        or slug == str(record.get("name") or "").lower()
+    ]
+    if len(matches) > 1:
+        names = ", ".join(str(record.get("name") or "") for record in matches[:5])
+        return None, None, f"memory identifier is ambiguous: {names}"
+    if not matches:
+        return None, None, f"memory not found: {identifier}"
+    record = matches[0]
+    return wiki_dir / str(record["path"]).removeprefix("wiki/"), record, None
+
+
 def memory_inbox(
     records: Iterable[Mapping[str, object]],
     limit: int = 20,
