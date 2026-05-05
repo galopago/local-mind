@@ -238,9 +238,11 @@ ingest raw/notes.md into Link
 Remember preferences and decisions directly:
 
 ```bash
-python3 ~/link/link.py remember "User prefers release/* branches for Link work." ~/link --type preference --scope project
+python3 ~/link/link.py remember "User prefers release/* branches for Link work." ~/link --title "Prefer release branches" --type preference --scope project
 python3 ~/link/link.py recall "branch preference" ~/link
 python3 ~/link/link.py profile ~/link
+python3 ~/link/link.py archive-memory prefer-release-branches ~/link --reason "superseded"
+python3 ~/link/link.py restore-memory prefer-release-branches ~/link
 ```
 
 Maintain the wiki:
@@ -271,6 +273,8 @@ Obsidian also works: open the `wiki/` folder as a vault.
 | `python3 link.py remember "text" <dir>` | Save a local agent memory under `wiki/memories/`. |
 | `python3 link.py recall "query" <dir>` | Search local agent memories first. |
 | `python3 link.py profile <dir>` | Show what Link remembers by type, scope, status, and recency. |
+| `python3 link.py archive-memory <name> <dir>` | Reversibly hide a stale or wrong memory from default recall. |
+| `python3 link.py restore-memory <name> <dir>` | Restore an archived memory to active recall. |
 | `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, and secret-looking content. |
 | `python3 link.py doctor <dir> --fix` | Create missing structure and repair backlinks safely. |
 | `python3 link.py rebuild-backlinks <dir>` | Regenerate `wiki/_backlinks.json`. |
@@ -288,6 +292,8 @@ Available tools:
 | `search_wiki` | Ranked search by title, alias, tag, and full text. Returns scores and snippets. |
 | `recall_memory` | Search durable local memory pages for preferences, decisions, and project context. |
 | `remember_memory` | Save an explicit user-approved memory under `wiki/memories/`. |
+| `archive_memory` | Archive stale or wrong memory without deleting the Markdown page. |
+| `restore_memory` | Restore archived memory to active status. |
 | `get_context` | Primary tool. Returns the best page plus inbound and forward graph neighbors. |
 | `get_pages` | Lists pages with metadata. Filter by category, type, or maturity. |
 | `get_backlinks` | Returns inbound and forward links for one page. |

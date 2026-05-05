@@ -230,6 +230,9 @@ def _memory_records() -> list[dict[str, object]]:
             "scope": meta.get("scope") or "user",
             "status": meta.get("status") or "active",
             "date_captured": meta.get("date_captured", ""),
+            "archived_at": meta.get("archived_at", ""),
+            "archive_reason": meta.get("archive_reason", ""),
+            "restored_at": meta.get("restored_at", ""),
             "source": meta.get("source", ""),
             "tags": _meta_tags(meta.get("tags", "")),
             "tldr": _extract_tldr(body),
@@ -246,10 +249,23 @@ def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int
     return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
 
 
+def _is_active_memory(record: dict[str, object]) -> bool:
+    return str(record.get("status") or "active").lower() not in {"archived", "stale"}
+
+
 def _memory_profile(limit: int = 10) -> dict[str, object]:
     limit = max(1, min(limit, 50))
-    records = sorted(
-        _memory_records(),
+    records = _memory_records()
+    active_records = [
+        record for record in records
+        if _is_active_memory(record)
+    ]
+    archived_records = [
+        record for record in records
+        if str(record.get("status") or "").lower() == "archived"
+    ]
+    recent_active = sorted(
+        active_records,
         key=lambda record: (
             str(record.get("date_captured") or ""),
             str(record.get("title") or "").lower(),
@@ -259,24 +275,29 @@ def _memory_profile(limit: int = 10) -> dict[str, object]:
 
     def typed(memory_type: str) -> list[dict[str, object]]:
         return [
-            record for record in records
+            record for record in recent_active
             if str(record.get("memory_type") or "") == memory_type
         ][:limit]
 
-    active = [
-        record for record in records
-        if str(record.get("status") or "active").lower() not in {"archived", "stale"}
-    ]
+    archived = sorted(
+        archived_records,
+        key=lambda record: (
+            str(record.get("date_captured") or ""),
+            str(record.get("title") or "").lower(),
+        ),
+        reverse=True,
+    )
     return {
         "memory_count": len(records),
-        "active_count": len(active),
+        "active_count": len(active_records),
         "by_type": _count_values(records, "memory_type"),
         "by_scope": _count_values(records, "scope"),
         "by_status": _count_values(records, "status"),
-        "recent": records[:limit],
+        "recent": recent_active[:limit],
         "preferences": typed("preference"),
         "decisions": typed("decision"),
         "projects": typed("project"),
+        "archived": archived[:limit],
     }
 
 
@@ -747,6 +768,7 @@ def _render_profile():
         f'{section("Preferences", profile["preferences"])}'
         f'{section("Decisions", profile["decisions"])}'
         f'{section("Project context", profile["projects"])}'
+        f'{section("Archived memories", profile["archived"]) if profile["archived"] else ""}'
         f'</div>'
     )
     return _layout("Memory Profile", body)

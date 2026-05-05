@@ -133,6 +133,23 @@ class DemoSnapshotTests(unittest.TestCase):
         self.assertIn("Memory Profile", html)
         self.assertIn("Prefer local personal memory", html)
 
+    def test_demo_profile_separates_archived_memories(self):
+        target = self.make_demo()
+        with redirect_stdout(StringIO()):
+            link_cli.archive_memory(target, "prefer-local-personal-memory", reason="snapshot test")
+        reset_serve_wiki(target / "wiki")
+
+        profile = serve._memory_profile()
+        html = serve._render_profile()
+
+        self.assertEqual(profile["memory_count"], 1)
+        self.assertEqual(profile["active_count"], 0)
+        self.assertEqual(profile["by_status"]["archived"], 1)
+        self.assertEqual(profile["recent"], [])
+        self.assertEqual(profile["archived"][0]["name"], "prefer-local-personal-memory")
+        self.assertIn("Archived memories", html)
+        self.assertIn("Prefer local personal memory", html)
+
     def test_demo_context_snapshot(self):
         target = self.make_demo()
         reset_serve_wiki(target / "wiki")

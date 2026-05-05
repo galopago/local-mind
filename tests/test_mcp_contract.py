@@ -192,6 +192,27 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["recent"][0]["name"], "prefer-local-personal-memory")
         self.assertEqual(payload["preferences"][0]["memory_type"], "preference")
 
+    def test_archive_and_restore_memory_contract(self):
+        archived = json.loads(self.server.archive_memory(
+            "prefer-local-personal-memory",
+            reason="unit test stale memory",
+        ))
+        recall_default = json.loads(self.server.recall_memory("local personal memory"))
+        recall_archived = json.loads(self.server.recall_memory("local personal memory", include_archived=True))
+        profile = json.loads(self.server.memory_profile())
+        restored = json.loads(self.server.restore_memory("Prefer local personal memory"))
+        recall_restored = json.loads(self.server.recall_memory("local personal memory"))
+
+        self.assertTrue(archived["updated"])
+        self.assertEqual(archived["status"], "archived")
+        self.assertEqual(recall_default["count"], 0)
+        self.assertEqual(recall_archived["memories"][0]["status"], "archived")
+        self.assertEqual(profile["active_count"], 0)
+        self.assertEqual(profile["archived"][0]["name"], "prefer-local-personal-memory")
+        self.assertTrue(restored["updated"])
+        self.assertEqual(restored["status"], "active")
+        self.assertEqual(recall_restored["memories"][0]["name"], "prefer-local-personal-memory")
+
     def test_remember_memory_contract(self):
         payload = json.loads(self.server.remember_memory(
             "User prefers release branches for Link work.",

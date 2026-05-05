@@ -56,7 +56,8 @@ mcp = FastMCP(
         "what Link remembers, recall_memory for user preferences, decisions, and "
         "project context, search_wiki to find general pages, and get_context to "
         "retrieve a topic with its full graph neighborhood. Only call "
-        "remember_memory when the user explicitly asks you to remember something."
+        "remember_memory when the user explicitly asks you to remember something. "
+        "Use archive_memory instead of deleting stale or wrong memories."
     ),
 )
 
@@ -426,6 +427,9 @@ def _memory_records() -> list[dict[str, object]]:
             "scope": meta.get("scope") or "user",
             "status": meta.get("status") or "active",
             "date_captured": meta.get("date_captured", ""),
+            "archived_at": meta.get("archived_at", ""),
+            "archive_reason": meta.get("archive_reason", ""),
+            "restored_at": meta.get("restored_at", ""),
             "source": meta.get("source", ""),
             "tags": _meta_tags(meta.get("tags", "")),
             "tldr": _extract_tldr(body),
@@ -437,6 +441,10 @@ def _memory_records() -> list[dict[str, object]]:
 
 def _slim_memory(record: dict[str, object]) -> dict[str, object]:
     return {key: value for key, value in record.items() if key != "body"}
+
+
+def _is_active_memory(record: dict[str, object]) -> bool:
+    return str(record.get("status") or "active").lower() not in {"archived", "stale"}
 
 
 def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int]:
@@ -476,22 +484,23 @@ def _recent_memories(records: list[dict[str, object]]) -> list[dict[str, object]
 def _memory_profile(limit: int = 10) -> dict[str, object]:
     limit = max(1, min(limit, 50))
     records = _memory_records()
-    recent = [_slim_memory(record) for record in _recent_memories(records)]
+    active_records = [record for record in records if _is_active_memory(record)]
+    archived_records = [
+        record for record in records
+        if str(record.get("status") or "").lower() == "archived"
+    ]
+    recent = [_slim_memory(record) for record in _recent_memories(active_records)]
 
     def typed(memory_type: str) -> list[dict[str, object]]:
         return [
             _slim_memory(record)
-            for record in _recent_memories(records)
+            for record in _recent_memories(active_records)
             if str(record.get("memory_type") or "") == memory_type
         ][:limit]
 
-    active = [
-        record for record in records
-        if str(record.get("status") or "active").lower() not in {"archived", "stale"}
-    ]
     return {
         "memory_count": len(records),
-        "active_count": len(active),
+        "active_count": len(active_records),
         "by_type": _count_values(records, "memory_type"),
         "by_scope": _count_values(records, "scope"),
         "by_status": _count_values(records, "status"),
@@ -500,6 +509,7 @@ def _memory_profile(limit: int = 10) -> dict[str, object]:
         "preferences": typed("preference"),
         "decisions": typed("decision"),
         "projects": typed("project"),
+        "archived": [_slim_memory(record) for record in _recent_memories(archived_records)][:limit],
     }
 
 
@@ -531,12 +541,14 @@ def _score_memory(record: dict[str, object], query: str) -> int:
     return score
 
 
-def _recall_memories(query: str, limit: int = 10) -> list[dict[str, object]]:
+def _recall_memories(query: str, limit: int = 10, include_archived: bool = False) -> list[dict[str, object]]:
     query = _clean_text_input(query)
     if not query:
         return []
     scored: list[tuple[int, dict[str, object]]] = []
     for record in _memory_records():
+        if not include_archived and not _is_active_memory(record):
+            continue
         score = _score_memory(record, query)
         if score > 0:
             slim = _slim_memory(record)
@@ -581,6 +593,138 @@ def _append_log(timestamp: str, operation: str, description: str, lines: list[st
     entry.extend(["", "---", ""])
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write("\n".join(entry))
+
+
+def _update_frontmatter_fields(text: str, updates: dict[str, str], remove: set[str] | None = None) -> str:
+    remove = remove or set()
+    if not text.startswith("---\n"):
+        frontmatter = [f"{key}: {value}" for key, value in updates.items()]
+        return "---\n" + "\n".join(frontmatter) + "\n---\n\n" + text.lstrip("\n")
+
+    end = text.find("\n---", 4)
+    if end == -1:
+        frontmatter = [f"{key}: {value}" for key, value in updates.items()]
+        return "---\n" + "\n".join(frontmatter) + "\n---\n\n" + text
+
+    seen: set[str] = set()
+    lines: list[str] = []
+    for line in text[4:end].splitlines():
+        if ":" not in line or line.lstrip().startswith("#"):
+            lines.append(line)
+            continue
+        key = line.split(":", 1)[0].strip()
+        if key in remove:
+            continue
+        if key in updates:
+            lines.append(f"{key}: {updates[key]}")
+            seen.add(key)
+        else:
+            lines.append(line)
+    for key, value in updates.items():
+        if key not in seen:
+            lines.append(f"{key}: {value}")
+    return "---\n" + "\n".join(lines) + "\n---" + text[end + 4:]
+
+
+def _resolve_memory_page(identifier: str) -> tuple[Path | None, dict[str, object] | None, str | None]:
+    needle = _clean_text_input(identifier, max_len=300)
+    if not needle:
+        return None, None, "memory name or title is required"
+    memories_dir = WIKI_DIR / "memories"
+    direct_candidates = []
+    raw_path = Path(needle)
+    if raw_path.suffix == ".md" or "/" in needle:
+        rel = Path(needle.removeprefix("wiki/"))
+        direct_candidates.append((WIKI_DIR / rel).resolve())
+        direct_candidates.append((memories_dir / raw_path.name).resolve())
+    else:
+        direct_candidates.append((memories_dir / f"{needle}.md").resolve())
+        direct_candidates.append((memories_dir / f"{_slugify(needle)}.md").resolve())
+
+    memories_root = memories_dir.resolve()
+    for candidate in direct_candidates:
+        try:
+            candidate.relative_to(memories_root)
+        except ValueError:
+            continue
+        if candidate.exists() and candidate.is_file():
+            text = candidate.read_text(encoding="utf-8", errors="replace")
+            meta, body = _parse_frontmatter(text)
+            return candidate, {
+                "name": candidate.stem,
+                "path": f"wiki/{candidate.relative_to(WIKI_DIR).as_posix()}",
+                "title": meta.get("title") or _memory_title(body),
+                "memory_type": meta.get("memory_type") or "note",
+                "scope": meta.get("scope") or "user",
+                "status": meta.get("status") or "active",
+            }, None
+
+    lowered = needle.lower()
+    slug = _slugify(needle)
+    matches = [
+        record for record in _memory_records()
+        if lowered in {str(record["name"]).lower(), str(record["title"]).lower()}
+        or slug == str(record["name"]).lower()
+    ]
+    if len(matches) > 1:
+        names = ", ".join(str(record["name"]) for record in matches[:5])
+        return None, None, f"memory identifier is ambiguous: {names}"
+    if not matches:
+        return None, None, f"memory not found: {identifier}"
+    record = matches[0]
+    return WIKI_DIR / str(record["path"]).removeprefix("wiki/"), record, None
+
+
+def _set_memory_status(identifier: str, status: str, reason: str = "") -> dict[str, object]:
+    page_path, record, error = _resolve_memory_page(identifier)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and record is not None
+
+    timestamp = _utc_timestamp()
+    current_status = str(record.get("status") or "active")
+    reason = _clean_text_input(reason, max_len=500)
+    if status == "archived":
+        updates = {
+            "status": "archived",
+            "archived_at": f'"{timestamp}"',
+        }
+        if reason:
+            updates["archive_reason"] = f'"{_frontmatter_string(reason)}"'
+        remove = {"restored_at"}
+        operation = "archive-memory"
+    elif status == "active":
+        updates = {
+            "status": "active",
+            "restored_at": f'"{timestamp}"',
+        }
+        remove = {"archived_at", "archive_reason"}
+        operation = "restore-memory"
+    else:
+        raise ValueError("unsupported memory status")
+
+    changed = current_status != status
+    if changed:
+        text = page_path.read_text(encoding="utf-8", errors="replace")
+        page_path.write_text(_update_frontmatter_fields(text, updates, remove=remove), encoding="utf-8")
+        log_lines = [
+            f"Updated: memories/{page_path.name}",
+            f"Previous status: {current_status}",
+            f"New status: {status}",
+        ]
+        if reason:
+            log_lines.append(f"Reason: {reason}")
+        _append_log(timestamp, operation, str(record["title"]), log_lines)
+        _cache.clear()
+
+    return {
+        "updated": changed,
+        "name": record["name"],
+        "path": record["path"],
+        "title": record["title"],
+        "previous_status": current_status,
+        "status": status,
+    }
 
 
 def _write_memory_page(
@@ -699,19 +843,25 @@ def search_wiki(query: str, limit: int = 20) -> str:
 
 
 @mcp.tool()
-def recall_memory(query: str, limit: int = 10) -> str:
+def recall_memory(query: str, limit: int = 10, include_archived: bool = False) -> str:
     """Search local agent memory pages first.
 
     Use this when the user asks about preferences, decisions, project context,
     or anything the agent should remember across sessions. Returns only pages
-    under wiki/memories/.
+    under wiki/memories/. Archived and stale memories are excluded unless
+    include_archived is true.
     """
     query = _clean_text_input(query)
     limit = _parse_limit(limit, default=10)
     if not query:
         return json.dumps({"error": "query required", "query": "", "count": 0, "memories": []})
-    memories = _recall_memories(query, limit=limit)
-    return json.dumps({"query": query, "count": len(memories), "memories": memories}, ensure_ascii=False)
+    memories = _recall_memories(query, limit=limit, include_archived=include_archived)
+    return json.dumps({
+        "query": query,
+        "count": len(memories),
+        "include_archived": include_archived,
+        "memories": memories,
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -724,6 +874,31 @@ def memory_profile(limit: int = 10) -> str:
     """
     limit = _parse_limit(limit, default=10)
     return json.dumps(_memory_profile(limit=limit), ensure_ascii=False)
+
+
+@mcp.tool()
+def archive_memory(identifier: str, reason: str = "") -> str:
+    """Archive a memory without deleting its Markdown page.
+
+    Use this when the user says a memory is stale, wrong, or no longer useful.
+    The page remains local and inspectable, recall_memory hides it by default,
+    and the operation is appended to wiki/log.md.
+    """
+    try:
+        result = _set_memory_status(identifier, "archived", reason=reason)
+    except ValueError as exc:
+        return json.dumps({"updated": False, "error": str(exc)})
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
+def restore_memory(identifier: str) -> str:
+    """Restore an archived memory to active status."""
+    try:
+        result = _set_memory_status(identifier, "active")
+    except ValueError as exc:
+        return json.dumps({"updated": False, "error": str(exc)})
+    return json.dumps(result, ensure_ascii=False)
 
 
 @mcp.tool()

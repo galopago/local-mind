@@ -2,7 +2,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 
@@ -244,6 +244,76 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["memory_count"], 1)
         self.assertEqual(payload["by_type"]["preference"], 1)
         self.assertEqual(payload["preferences"][0]["name"], "prefer-local-personal-memory")
+
+    def test_archive_memory_hides_from_default_recall_and_restore_reenables(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        with redirect_stdout(StringIO()):
+            archive_code = link_cli.archive_memory(
+                target,
+                "prefer-local-personal-memory",
+                reason="unit test stale memory",
+            )
+
+        memory_path = target / "wiki/memories/prefer-local-personal-memory.md"
+        archived_text = memory_path.read_text(encoding="utf-8")
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertEqual(archive_code, 0)
+        self.assertIn("status: archived", archived_text)
+        self.assertIn("archived_at:", archived_text)
+        self.assertIn('archive_reason: "unit test stale memory"', archived_text)
+        self.assertIn("archive-memory", log_text)
+
+        profile_out = StringIO()
+        with redirect_stdout(profile_out):
+            link_cli.profile(target, json_output=True)
+        profile_payload = json.loads(profile_out.getvalue())
+        self.assertEqual(profile_payload["active_count"], 0)
+        self.assertEqual(profile_payload["by_status"]["archived"], 1)
+        self.assertEqual(profile_payload["archived"][0]["name"], "prefer-local-personal-memory")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            recall_code = link_cli.recall(target, "local personal memory")
+        self.assertEqual(recall_code, 0)
+        self.assertIn("No matching memories found.", out.getvalue())
+
+        out_json = StringIO()
+        with redirect_stdout(out_json):
+            include_code = link_cli.recall(target, "local personal memory", include_archived=True, json_output=True)
+        include_payload = json.loads(out_json.getvalue())
+        self.assertEqual(include_code, 0)
+        self.assertTrue(include_payload["include_archived"])
+        self.assertEqual(include_payload["memories"][0]["status"], "archived")
+
+        with redirect_stdout(StringIO()):
+            restore_code = link_cli.restore_memory(target, "Prefer local personal memory")
+        restored_text = memory_path.read_text(encoding="utf-8")
+        self.assertEqual(restore_code, 0)
+        self.assertIn("status: active", restored_text)
+        self.assertIn("restored_at:", restored_text)
+        self.assertNotIn("archived_at:", restored_text)
+        self.assertNotIn("archive_reason:", restored_text)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            link_cli.recall(target, "local personal memory")
+        self.assertIn("Prefer local personal memory", out.getvalue())
+
+    def test_archive_memory_json_not_found(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        err = StringIO()
+        with redirect_stdout(StringIO()), redirect_stderr(err):
+            code = link_cli.archive_memory(target, "missing-memory", json_output=True)
+
+        self.assertEqual(code, 1)
+        self.assertIn("memory not found", err.getvalue())
 
     def test_verify_mcp_ready(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))

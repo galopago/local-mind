@@ -284,6 +284,8 @@ Rules:
 - Use `scope: user` for broad personal preferences, `project` for the current project, and `global` for agent-wide principles.
 - Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
 - Run `python3 link.py profile .` when the human asks what Link knows or when you need a quick overview of remembered preferences, decisions, and project context.
+- If a memory is stale or wrong, archive it with `python3 link.py archive-memory "<name-or-title>" . --reason "why"`. Do not delete memory pages unless the human explicitly asks for permanent removal.
+- Restore an archived memory with `python3 link.py restore-memory "<name-or-title>" .`.
 
 ### 2. Ingest
 
