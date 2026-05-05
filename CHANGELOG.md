@@ -33,6 +33,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ### Fixed
 
+- Tightened README onboarding and release examples around Link's local memory product value.
 - Hardened backlink rebuild over HTTP so local web rebuilds require JSON POST instead of a mutating GET.
 - Hardened `/raw/` static serving so the local web viewer only serves supported media/PDF source assets.
 - Refreshed the checked-in demo backlink index so `link.py doctor .` reports a healthy graph.

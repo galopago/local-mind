@@ -8,6 +8,13 @@ Local personal memory for LLM agents.
 
 Link turns raw sources into a local Markdown wiki that agents can search, cite, traverse, and maintain over time. It implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): keep knowledge outside the chat window, make every claim inspectable, and let the memory compound.
 
+What it gives you:
+
+- One local memory layer shared by Codex, Claude, Cursor, Kiro, VS Code, Copilot, and other MCP clients.
+- Plain Markdown storage you can inspect, edit, back up, and use with Obsidian.
+- Source-backed context retrieval, backlinks, graph traversal, and recall-ready personal/project memories.
+- Local-first operation: no hosted backend, no telemetry, no cloud lock-in.
+
 [![GitHub](https://img.shields.io/github/stars/gowtham0992/link?style=flat)](https://github.com/gowtham0992/link)
 [![CI](https://github.com/gowtham0992/link/actions/workflows/ci.yml/badge.svg)](https://github.com/gowtham0992/link/actions/workflows/ci.yml)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.gowtham0992%2Flink-blue)](https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink)
@@ -130,7 +137,7 @@ query Link for first Link memory
 
 If the agent answers from Link, the local memory loop is working.
 
-## Choose Your Path
+## Install Paths
 
 ### I want to try Link
 
@@ -206,7 +213,7 @@ Then use that Python in your MCP config:
 ```bash
 python3 -m unittest discover -s tests
 python3 scripts/check_release_hygiene.py
-python3 scripts/prepare_release.py 1.0.6 --dry-run
+python3 scripts/prepare_release.py 1.0.8 --dry-run
 ```
 
 Release flow details are lower in this document.
@@ -382,7 +389,7 @@ git diff --check
 Prepare release files:
 
 ```bash
-python3 scripts/prepare_release.py 1.0.6
+python3 scripts/prepare_release.py 1.0.8
 ```
 
 This bumps the MCP version files and moves `CHANGELOG.md` `Unreleased` notes into a dated version section.
@@ -392,8 +399,8 @@ After the release PR merges and CI passes:
 ```bash
 git switch main
 git pull --ff-only
-git tag -a v1.0.6 -m "v1.0.6"
-git push origin v1.0.6
+git tag -a v1.0.8 -m "v1.0.8"
+git push origin v1.0.8
 cd mcp_package
 python3 -c "from pathlib import Path; import shutil; shutil.rmtree('dist', ignore_errors=True); [shutil.rmtree(p, ignore_errors=True) for p in Path('.').glob('*.egg-info')]"
 python3 -m build
