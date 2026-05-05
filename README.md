@@ -418,7 +418,7 @@ link/
 │   ├── comparisons/     # side-by-side analyses
 │   └── explorations/    # filed query results
 ├── integrations/        # one-step setup per AI tool
-├── mcp_package/         # PyPI package for link-mcp
+├── mcp_package/         # PyPI package for link-mcp and shared link_core
 ├── scripts/             # release and hygiene tooling
 ├── serve.py             # local web viewer and HTTP API
 └── link.py              # local utility CLI

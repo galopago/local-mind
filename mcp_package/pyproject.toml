@@ -30,7 +30,7 @@ Repository = "https://github.com/gowtham0992/link"
 link-mcp = "link_mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["link_mcp"]
+packages = ["link_mcp", "link_core"]
 
 [tool.hatch.build.targets.sdist]
 exclude = [

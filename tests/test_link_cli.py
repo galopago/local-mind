@@ -29,6 +29,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertTrue((target / ".link-demo").exists())
         self.assertTrue((target / "serve.py").exists())
         self.assertTrue((target / "link.py").exists())
+        self.assertTrue((target / "link_core/memory.py").exists())
         self.assertTrue((target / "LINK.md").exists())
         self.assertTrue((target / "raw/agent-memory-session.md").exists())
         self.assertTrue((target / "wiki/concepts/agent-memory.md").exists())
