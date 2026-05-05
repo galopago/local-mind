@@ -73,14 +73,13 @@ MAX_TEXT_INPUT = 200
 from link_core.memory import (
     count_values as _core_count_values,
     mark_memory_reviewed as _core_mark_memory_reviewed,
+    memory_explanation as _core_memory_explanation,
     memory_inbox as _core_memory_inbox,
-    memory_log_entries as _core_memory_log_entries,
     memory_profile as _core_memory_profile,
     memory_records as _core_memory_records,
     memory_review_issues as _core_memory_review_issues,
     propose_memories_from_text as _core_propose_memories_from_text,
     recall_memories as _core_recall_memories,
-    recall_state as _core_recall_state,
     recent_memories as _core_recent_memories,
     resolve_memory_page as _core_resolve_memory_page,
     set_memory_status as _core_set_memory_status,
@@ -171,85 +170,13 @@ def _memory_inbox(limit: int = 20, include_archived: bool = False) -> dict[str, 
     )
 
 
-def _extract_wikilinks(text: str) -> list[str]:
-    links: list[str] = []
-    for match in re.finditer(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", text):
-        target = match.group(1).strip()
-        if target and target not in links:
-            links.append(target)
-    return links
-
-
-def _load_backlinks() -> dict[str, dict[str, list[str]]]:
-    bl_path = WIKI_DIR / "_backlinks.json"
-    if not bl_path.exists():
-        return {"backlinks": {}, "forward": {}}
-    try:
-        raw = json.loads(bl_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {"backlinks": {}, "forward": {}}
-    if "backlinks" not in raw:
-        return {"backlinks": raw if isinstance(raw, dict) else {}, "forward": {}}
-    backlinks = raw.get("backlinks", {})
-    forward = raw.get("forward", {})
-    if not isinstance(backlinks, dict) or not isinstance(forward, dict):
-        return {"backlinks": {}, "forward": {}}
-    return {"backlinks": backlinks, "forward": forward}
-
-
-def _memory_log_entries(record: dict[str, object], limit: int = 8) -> list[str]:
-    return _core_memory_log_entries(WIKI_DIR, record, limit=limit)
-
-
-def _recall_state(record: dict[str, object], issues: list[dict[str, str]]) -> dict[str, object]:
-    return _core_recall_state(record, issues)
-
-
 def _memory_explanation(identifier: str) -> dict[str, object]:
-    page_path, resolved_record, error = _resolve_memory_page(identifier)
-    if error:
-        raise ValueError(error)
-    assert page_path is not None and resolved_record is not None
-
-    record = next(
-        (item for item in _memory_records() if item["name"] == resolved_record["name"]),
-        resolved_record,
+    return _core_memory_explanation(
+        WIKI_DIR,
+        identifier,
+        records=_memory_records(),
+        review_command="review_memory",
     )
-    body = str(record.get("body") or "")
-    issues = _memory_review_issues(record)
-    backlinks = _load_backlinks()
-    name = str(record["name"])
-    graph = {
-        "forward": sorted(backlinks.get("forward", {}).get(name, [])),
-        "inbound": sorted(backlinks.get("backlinks", {}).get(name, [])),
-        "wikilinks": _extract_wikilinks(body),
-    }
-    return {
-        "found": True,
-        "memory": _slim_memory(record),
-        "recall": _recall_state(record, issues),
-        "review": {
-            "status": record.get("review_status", "pending"),
-            "reviewed_at": record.get("reviewed_at", ""),
-            "review_note": record.get("review_note", ""),
-            "issues": issues,
-            "issue_count": len(issues),
-        },
-        "provenance": {
-            "source": record.get("source", ""),
-            "date_captured": record.get("date_captured", ""),
-            "path": record.get("path", ""),
-        },
-        "lifecycle": {
-            "status": record.get("status", "active"),
-            "archived_at": record.get("archived_at", ""),
-            "archive_reason": record.get("archive_reason", ""),
-            "restored_at": record.get("restored_at", ""),
-        },
-        "graph": graph,
-        "log_entries": _memory_log_entries(record),
-        "body": body,
-    }
 
 
 def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int]:

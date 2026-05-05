@@ -12,15 +12,13 @@ if (_BUNDLED_CORE / "link_core").exists():
 from link_core.memory import (
     count_values as _core_count_values,
     is_active_memory as _core_is_active_memory,
+    memory_explanation as _core_memory_explanation,
     memory_inbox as _core_memory_inbox,
-    memory_log_entries as _core_memory_log_entries,
     memory_profile as _core_memory_profile,
     memory_records as _core_memory_records,
     memory_review_issues as _core_memory_review_issues,
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
     propose_memories_from_text as _core_propose_memories_from_text,
-    recall_state as _core_recall_state,
-    resolve_memory_page as _core_resolve_memory_page,
 )
 from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
@@ -178,71 +176,13 @@ def _propose_memories_from_text(text: str, source: str = "http", limit: int = 10
     )
 
 
-def _extract_wikilinks(text: str) -> list[str]:
-    links = []
-    for match in re.finditer(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", text):
-        target = match.group(1).strip()
-        if target and target not in links:
-            links.append(target)
-    return links
-
-
-def _resolve_memory_record(identifier: str) -> tuple[Path | None, dict[str, object] | None, str | None]:
-    return _core_resolve_memory_page(WIKI_DIR, identifier, records=_memory_records())
-
-
-def _memory_log_entries(record: dict[str, object], limit: int = 8) -> list[str]:
-    return _core_memory_log_entries(WIKI_DIR, record, limit=limit)
-
-
-def _recall_state(record: dict[str, object], issues: list[dict[str, str]]) -> dict[str, object]:
-    return _core_recall_state(record, issues)
-
-
 def _memory_explanation(identifier: str) -> dict[str, object]:
-    page_path, record, error = _resolve_memory_record(identifier)
-    if error:
-        raise ValueError(error)
-    assert page_path is not None and record is not None
-
-    text = page_path.read_text(encoding="utf-8", errors="replace")
-    _, body = _parse_frontmatter(text)
-    issues = _memory_review_issues(record)
-    backlinks_data, backlinks_error = _load_backlinks_index()
-    if backlinks_error:
-        backlinks_data = _build_backlinks()
-    name = str(record["name"])
-    graph = {
-        "forward": sorted(backlinks_data.get("forward", {}).get(name, [])),
-        "inbound": sorted(backlinks_data.get("backlinks", {}).get(name, [])),
-        "wikilinks": _extract_wikilinks(body),
-    }
-    return {
-        "found": True,
-        "memory": record,
-        "recall": _recall_state(record, issues),
-        "review": {
-            "status": record.get("review_status", "pending"),
-            "reviewed_at": record.get("reviewed_at", ""),
-            "review_note": record.get("review_note", ""),
-            "issues": issues,
-            "issue_count": len(issues),
-        },
-        "provenance": {
-            "source": record.get("source", ""),
-            "date_captured": record.get("date_captured", ""),
-            "path": record.get("path", ""),
-        },
-        "lifecycle": {
-            "status": record.get("status", "active"),
-            "archived_at": record.get("archived_at", ""),
-            "archive_reason": record.get("archive_reason", ""),
-            "restored_at": record.get("restored_at", ""),
-        },
-        "graph": graph,
-        "log_entries": _memory_log_entries(record),
-        "body": body,
-    }
+    return _core_memory_explanation(
+        WIKI_DIR,
+        identifier,
+        records=_memory_records(),
+        review_command="review-memory",
+    )
 
 
 def _memory_profile(limit: int = 10) -> dict[str, object]:

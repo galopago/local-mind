@@ -26,6 +26,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Extracted shared memory lifecycle mutations for archive, restore, review, and update workflows into `link_core`.
 - Extracted shared memory creation for `remember` and `remember_memory` into `link_core`.
 - Extracted shared wiki indexing, search, context, graph, and backlink helpers into `link_core`.
+- Extracted shared memory explanation/audit payloads into `link_core`.
 
 ### Fixed
 

@@ -14,6 +14,11 @@ from .frontmatter import (
     update_frontmatter_fields,
     yaml_list,
 )
+from .wiki import (
+    WIKILINK_RE,
+    build_backlinks,
+    load_backlinks_index,
+)
 
 
 MEMORY_TYPES = ("preference", "decision", "project", "fact", "note")
@@ -224,6 +229,15 @@ def memory_log_entries(
     return matches[-limit:]
 
 
+def extract_wikilinks(text: str) -> list[str]:
+    links: list[str] = []
+    for match in WIKILINK_RE.finditer(text):
+        target = match.group(1).strip()
+        if target and target not in links:
+            links.append(target)
+    return links
+
+
 def recall_state(
     record: Mapping[str, object],
     issues: list[Mapping[str, str]],
@@ -246,6 +260,66 @@ def recall_state(
         "default_enabled": default_enabled,
         "state": state,
         "reason": reason,
+    }
+
+
+def memory_explanation(
+    wiki_dir: Path,
+    identifier: str,
+    records: Iterable[Mapping[str, object]] | None = None,
+    review_command: str = "review-memory",
+    backlinks_body_only: bool = True,
+) -> dict[str, object]:
+    record_list = [dict(record) for record in records] if records is not None else memory_records(wiki_dir)
+    page_path, resolved_record, error = resolve_memory_page(wiki_dir, identifier, records=record_list)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and resolved_record is not None
+
+    record = next(
+        (
+            item for item in record_list
+            if str(item.get("name") or "") == str(resolved_record.get("name") or "")
+        ),
+        dict(resolved_record),
+    )
+    text = page_path.read_text(encoding="utf-8", errors="replace")
+    _, body = parse_frontmatter(text)
+    issues = memory_review_issues(record, review_command=review_command)
+    backlinks, backlinks_error = load_backlinks_index(wiki_dir / "_backlinks.json")
+    if backlinks_error:
+        backlinks = build_backlinks(wiki_dir, body_only=backlinks_body_only)
+    name = str(record["name"])
+    graph = {
+        "forward": sorted(backlinks.get("forward", {}).get(name, [])),
+        "inbound": sorted(backlinks.get("backlinks", {}).get(name, [])),
+        "wikilinks": extract_wikilinks(body),
+    }
+    return {
+        "found": True,
+        "memory": slim_memory(record),
+        "recall": recall_state(record, issues),
+        "review": {
+            "status": record.get("review_status", "pending"),
+            "reviewed_at": record.get("reviewed_at", ""),
+            "review_note": record.get("review_note", ""),
+            "issues": issues,
+            "issue_count": len(issues),
+        },
+        "provenance": {
+            "source": record.get("source", ""),
+            "date_captured": record.get("date_captured", ""),
+            "path": record.get("path", ""),
+        },
+        "lifecycle": {
+            "status": record.get("status", "active"),
+            "archived_at": record.get("archived_at", ""),
+            "archive_reason": record.get("archive_reason", ""),
+            "restored_at": record.get("restored_at", ""),
+        },
+        "graph": graph,
+        "log_entries": memory_log_entries(wiki_dir, record),
+        "body": body,
     }
 
 

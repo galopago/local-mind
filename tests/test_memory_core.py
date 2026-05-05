@@ -8,7 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.memory import (  # noqa: E402
+    extract_wikilinks,
     mark_memory_reviewed,
+    memory_explanation,
     memory_inbox,
     memory_log_entries,
     memory_profile,
@@ -206,6 +208,58 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(needs_review["state"], "needs_review")
         self.assertEqual(unsafe["state"], "unsafe")
         self.assertEqual(disabled["state"], "disabled")
+
+    def test_memory_explanation_reports_audit_payload_and_graph(self):
+        root = Path(tempfile.mkdtemp(prefix="link-memory-explain-"))
+        wiki = root / "wiki"
+        memories = wiki / "memories"
+        memories.mkdir(parents=True)
+        (memories / "prefer-focused-commits.md").write_text(
+            "---\n"
+            "type: memory\n"
+            "title: \"Prefer focused commits\"\n"
+            "memory_type: preference\n"
+            "scope: project\n"
+            "status: active\n"
+            "date_captured: \"2026-05-05T00:00:00Z\"\n"
+            "source: \"unit test\"\n"
+            "review_status: reviewed\n"
+            "tags: [memory, git]\n"
+            "---\n\n"
+            "# Prefer focused commits\n\n"
+            "> **TLDR:** User prefers focused commits on develop.\n\n"
+            "## Memory\n\n"
+            "User prefers focused commits on develop and links [[release-workflow]].\n",
+            encoding="utf-8",
+        )
+        (wiki / "_backlinks.json").write_text(
+            '{"backlinks": {"prefer-focused-commits": ["agent-memory"]}, "forward": {"prefer-focused-commits": ["release-workflow"]}}',
+            encoding="utf-8",
+        )
+        (wiki / "log.md").write_text(
+            "# Link Wiki Log\n\n"
+            "## remember | Prefer focused commits\n\n"
+            "- Added [[prefer-focused-commits]]\n"
+            "---\n",
+            encoding="utf-8",
+        )
+
+        explanation = memory_explanation(
+            wiki,
+            "prefer-focused-commits",
+            records=memory_records(wiki, include_body=False),
+        )
+
+        self.assertTrue(explanation["found"])
+        self.assertEqual(explanation["memory"]["name"], "prefer-focused-commits")
+        self.assertNotIn("body", explanation["memory"])
+        self.assertEqual(explanation["recall"]["state"], "ready")
+        self.assertEqual(explanation["graph"]["inbound"], ["agent-memory"])
+        self.assertEqual(explanation["graph"]["forward"], ["release-workflow"])
+        self.assertEqual(explanation["graph"]["wikilinks"], ["release-workflow"])
+        self.assertIn("User prefers focused commits", explanation["body"])
+        self.assertEqual(len(explanation["log_entries"]), 1)
+        self.assertEqual(extract_wikilinks("[[one]] [[one]] [[two|Two]]"), ["one", "two"])
 
     def test_memory_lifecycle_mutations_update_files_and_callbacks(self):
         root = Path(tempfile.mkdtemp(prefix="link-memory-lifecycle-"))
