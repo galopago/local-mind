@@ -182,6 +182,16 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["memories"][0]["name"], "prefer-local-personal-memory")
         self.assertEqual(payload["memories"][0]["memory_type"], "preference")
 
+    def test_memory_profile_contract(self):
+        payload = json.loads(self.server.memory_profile())
+
+        self.assertEqual(payload["memory_count"], 1)
+        self.assertEqual(payload["active_count"], 1)
+        self.assertEqual(payload["by_type"]["preference"], 1)
+        self.assertEqual(payload["by_scope"]["user"], 1)
+        self.assertEqual(payload["recent"][0]["name"], "prefer-local-personal-memory")
+        self.assertEqual(payload["preferences"][0]["memory_type"], "preference")
+
     def test_remember_memory_contract(self):
         payload = json.loads(self.server.remember_memory(
             "User prefers release branches for Link work.",

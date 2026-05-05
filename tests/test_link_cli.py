@@ -205,6 +205,46 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["count"], 2)
         self.assertEqual(payload["memories"][0]["name"], "local-memory-preference")
 
+    def test_profile_summarizes_memories(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.remember(
+                target,
+                "User decided to keep Memory Mode local.",
+                title="Keep Memory Mode local",
+                memory_type="decision",
+                scope="project",
+                tags="product",
+            )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.profile(target)
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link memory profile", out.getvalue())
+        self.assertIn("2 memories", out.getvalue())
+        self.assertIn("preference: 1", out.getvalue())
+        self.assertIn("decision: 1", out.getvalue())
+        self.assertIn("Keep Memory Mode local", out.getvalue())
+
+    def test_profile_json(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.profile(target, json_output=True)
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["memory_count"], 1)
+        self.assertEqual(payload["by_type"]["preference"], 1)
+        self.assertEqual(payload["preferences"][0]["name"], "prefer-local-personal-memory")
+
     def test_verify_mcp_ready(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
         target = tmp / "demo"

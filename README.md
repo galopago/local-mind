@@ -96,6 +96,7 @@ Use direct memories for preferences, decisions, and project context future agent
 ```bash
 python3 ~/link/link.py remember "I am testing Link as local personal memory for agents." ~/link --type preference --scope user --tags onboarding
 python3 ~/link/link.py recall "local personal memory" ~/link
+python3 ~/link/link.py profile ~/link
 ```
 
 ### 4. Ask your agent to ingest it
@@ -239,6 +240,7 @@ Remember preferences and decisions directly:
 ```bash
 python3 ~/link/link.py remember "User prefers release/* branches for Link work." ~/link --type preference --scope project
 python3 ~/link/link.py recall "branch preference" ~/link
+python3 ~/link/link.py profile ~/link
 ```
 
 Maintain the wiki:
@@ -268,6 +270,7 @@ Obsidian also works: open the `wiki/` folder as a vault.
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
 | `python3 link.py remember "text" <dir>` | Save a local agent memory under `wiki/memories/`. |
 | `python3 link.py recall "query" <dir>` | Search local agent memories first. |
+| `python3 link.py profile <dir>` | Show what Link remembers by type, scope, status, and recency. |
 | `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, and secret-looking content. |
 | `python3 link.py doctor <dir> --fix` | Create missing structure and repair backlinks safely. |
 | `python3 link.py rebuild-backlinks <dir>` | Regenerate `wiki/_backlinks.json`. |
@@ -281,6 +284,7 @@ Available tools:
 
 | Tool | Description |
 |------|-------------|
+| `memory_profile` | Summarize what Link remembers by type, scope, status, recent memories, preferences, decisions, and project context. |
 | `search_wiki` | Ranked search by title, alias, tag, and full text. Returns scores and snippets. |
 | `recall_memory` | Search durable local memory pages for preferences, decisions, and project context. |
 | `remember_memory` | Save an explicit user-approved memory under `wiki/memories/`. |
@@ -290,7 +294,7 @@ Available tools:
 | `get_graph` | Returns all nodes and edges for graph reasoning. |
 | `rebuild_backlinks` | Rebuilds `_backlinks.json` after ingest or maintenance. |
 
-Use `recall_memory` first when an answer depends on preferences, decisions, or project context. Use `get_context` for source-backed topic answers; it gives the agent the primary page plus its graph neighborhood in one call.
+Use `memory_profile` to inspect the user/project memory shape, then `recall_memory` when an answer depends on preferences, decisions, or project context. Use `get_context` for source-backed topic answers; it gives the agent the primary page plus its graph neighborhood in one call.
 
 ## HTTP API
 
@@ -301,6 +305,7 @@ Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do no
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
+| `GET /api/memory-profile` | Counts and recent memories for the local memory profile. |
 | `GET /api/search?q=<query>` | Ranked search by title, alias, tag, TLDR, and full text. |
 | `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
 | `GET /api/graph` | Nodes and edges for graph visualization. |

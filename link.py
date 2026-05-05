@@ -7,6 +7,7 @@ Usage:
   python link.py ingest-status [target]
   python link.py remember "memory text" [target]
   python link.py recall "query" [target]
+  python link.py profile [target]
   python link.py rebuild-backlinks [target]
   python link.py verify-mcp [target]
 """
@@ -780,15 +781,85 @@ def _memory_records(wiki_dir: Path) -> list[dict[str, object]]:
             "name": path.stem,
             "path": f"wiki/{path.relative_to(wiki_dir).as_posix()}",
             "title": title,
-            "memory_type": meta.get("memory_type", meta.get("type", "memory")),
-            "scope": meta.get("scope", ""),
-            "status": meta.get("status", ""),
+            "memory_type": meta.get("memory_type") or "note",
+            "scope": meta.get("scope") or "user",
+            "status": meta.get("status") or "active",
+            "date_captured": meta.get("date_captured", ""),
+            "source": meta.get("source", ""),
             "tags": _meta_tags(meta.get("tags", "")),
             "tldr": _extract_tldr(body),
             "snippet": _first_body_snippet(body),
             "body": body,
         })
     return records
+
+
+def _slim_memory(record: dict[str, object]) -> dict[str, object]:
+    return {key: value for key, value in record.items() if key != "body"}
+
+
+def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        value = str(record.get(field) or "unknown")
+        counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _top_tags(records: list[dict[str, object]], limit: int = 12) -> list[dict[str, object]]:
+    counts: dict[str, int] = {}
+    skip = {"memory", *MEMORY_TYPES}
+    for record in records:
+        for tag in record.get("tags", []):
+            tag_text = str(tag).strip()
+            if not tag_text or tag_text in skip:
+                continue
+            counts[tag_text] = counts.get(tag_text, 0) + 1
+    return [
+        {"tag": tag, "count": count}
+        for tag, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    ]
+
+
+def _recent_memories(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    return sorted(
+        records,
+        key=lambda record: (
+            str(record.get("date_captured") or ""),
+            str(record.get("title") or "").lower(),
+        ),
+        reverse=True,
+    )
+
+
+def _memory_profile(wiki_dir: Path, limit: int = 10) -> dict[str, object]:
+    limit = max(1, min(limit, 50))
+    records = _memory_records(wiki_dir)
+    recent = [_slim_memory(record) for record in _recent_memories(records)]
+
+    def typed(memory_type: str) -> list[dict[str, object]]:
+        return [
+            _slim_memory(record)
+            for record in _recent_memories(records)
+            if str(record.get("memory_type") or "") == memory_type
+        ][:limit]
+
+    active = [
+        record for record in records
+        if str(record.get("status") or "active").lower() not in {"archived", "stale"}
+    ]
+    return {
+        "memory_count": len(records),
+        "active_count": len(active),
+        "by_type": _count_values(records, "memory_type"),
+        "by_scope": _count_values(records, "scope"),
+        "by_status": _count_values(records, "status"),
+        "top_tags": _top_tags(records),
+        "recent": recent[:limit],
+        "preferences": typed("preference"),
+        "decisions": typed("decision"),
+        "projects": typed("project"),
+    }
 
 
 def _score_memory(record: dict[str, object], query: str) -> int:
@@ -827,7 +898,7 @@ def _recall_memories(wiki_dir: Path, query: str, limit: int = 10) -> list[dict[s
     for record in _memory_records(wiki_dir):
         score = _score_memory(record, q)
         if score > 0:
-            slim = {key: value for key, value in record.items() if key != "body"}
+            slim = _slim_memory(record)
             slim["score"] = score
             scored.append((score, slim))
     scored.sort(key=lambda item: (-item[0], str(item[1]["title"]).lower()))
@@ -1509,6 +1580,70 @@ def recall(target: Path, query: str, limit: int = 10, json_output: bool = False)
     return 0
 
 
+def _format_counts(counts: dict[str, int]) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{name}: {count}" for name, count in counts.items())
+
+
+def _print_memory_list(title: str, records: list[dict[str, object]], empty: str = "none") -> None:
+    print(title)
+    if not records:
+        print(f"- {empty}")
+        return
+    for record in records:
+        print(f"- {record['title']} ({record['memory_type']} · {record['scope']})")
+        print(f"  {record['path']}")
+        summary = record.get("tldr") or record.get("snippet")
+        if summary:
+            print(f"  {summary}")
+
+
+def profile(target: Path, limit: int = 10, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    profile_data = _memory_profile(wiki_dir, limit=limit)
+
+    if json_output:
+        print(json.dumps(profile_data, indent=2))
+        return 0
+
+    print(f"Link memory profile: {target}")
+    print("")
+    memory_count = profile_data["memory_count"]
+    active_count = profile_data["active_count"]
+    print(f"{memory_count} memor{'y' if memory_count == 1 else 'ies'} · {active_count} active")
+    print(f"Types: {_format_counts(profile_data['by_type'])}")
+    print(f"Scopes: {_format_counts(profile_data['by_scope'])}")
+    print(f"Status: {_format_counts(profile_data['by_status'])}")
+    tags = ", ".join(
+        f"{item['tag']} ({item['count']})"
+        for item in profile_data["top_tags"]
+    )
+    if tags:
+        print(f"Tags: {tags}")
+    print("")
+
+    if memory_count == 0:
+        print("No memories found.")
+        print("")
+        print("Next:")
+        print("  Add one: python3 link.py remember \"Memory to keep\" .")
+        return 0
+
+    _print_memory_list("Recent memories", profile_data["recent"])
+    print("")
+    _print_memory_list("Preferences", profile_data["preferences"])
+    print("")
+    _print_memory_list("Decisions", profile_data["decisions"])
+    print("")
+    _print_memory_list("Project context", profile_data["projects"])
+    return 0
+
+
 def _check_link_mcp_import(python_cmd: str) -> dict[str, object]:
     code = (
         "import json, link_mcp; "
@@ -1722,6 +1857,11 @@ def main(argv: list[str] | None = None) -> int:
     recall_cmd.add_argument("--limit", type=int, default=10)
     recall_cmd.add_argument("--json", action="store_true", help="print machine-readable results")
 
+    profile_cmd = sub.add_parser("profile", help="show what Link remembers")
+    profile_cmd.add_argument("target", nargs="?", default=".")
+    profile_cmd.add_argument("--limit", type=int, default=10)
+    profile_cmd.add_argument("--json", action="store_true", help="print machine-readable profile")
+
     rebuild_cmd = sub.add_parser("rebuild-backlinks", help="rebuild wiki/_backlinks.json")
     rebuild_cmd.add_argument("target", nargs="?", default=".")
 
@@ -1751,6 +1891,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.command == "recall":
         return recall(Path(args.target), args.query, limit=args.limit, json_output=args.json)
+    if args.command == "profile":
+        return profile(Path(args.target), limit=args.limit, json_output=args.json)
     if args.command == "rebuild-backlinks":
         return rebuild_backlinks(Path(args.target))
     if args.command == "verify-mcp":

@@ -52,11 +52,11 @@ except ImportError:
 mcp = FastMCP(
     "link",
     instructions=(
-        "Link is local personal memory for agents. Use recall_memory for "
-        "user preferences, decisions, and project context; use search_wiki to "
-        "find general pages; use get_context to retrieve a topic with its full "
-        "graph neighborhood. Only call remember_memory when the user explicitly "
-        "asks you to remember something."
+        "Link is local personal memory for agents. Use memory_profile to inspect "
+        "what Link remembers, recall_memory for user preferences, decisions, and "
+        "project context, search_wiki to find general pages, and get_context to "
+        "retrieve a topic with its full graph neighborhood. Only call "
+        "remember_memory when the user explicitly asks you to remember something."
     ),
 )
 
@@ -422,15 +422,85 @@ def _memory_records() -> list[dict[str, object]]:
             "name": path.stem,
             "path": f"wiki/{path.relative_to(WIKI_DIR).as_posix()}",
             "title": title,
-            "memory_type": meta.get("memory_type", meta.get("type", "memory")),
-            "scope": meta.get("scope", ""),
-            "status": meta.get("status", ""),
+            "memory_type": meta.get("memory_type") or "note",
+            "scope": meta.get("scope") or "user",
+            "status": meta.get("status") or "active",
+            "date_captured": meta.get("date_captured", ""),
+            "source": meta.get("source", ""),
             "tags": _meta_tags(meta.get("tags", "")),
             "tldr": _extract_tldr(body),
             "snippet": _first_body_snippet(body),
             "body": body,
         })
     return records
+
+
+def _slim_memory(record: dict[str, object]) -> dict[str, object]:
+    return {key: value for key, value in record.items() if key != "body"}
+
+
+def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        value = str(record.get(field) or "unknown")
+        counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _top_tags(records: list[dict[str, object]], limit: int = 12) -> list[dict[str, object]]:
+    counts: dict[str, int] = {}
+    skip = {"memory", *MEMORY_TYPES}
+    for record in records:
+        for tag in record.get("tags", []):
+            tag_text = str(tag).strip()
+            if not tag_text or tag_text in skip:
+                continue
+            counts[tag_text] = counts.get(tag_text, 0) + 1
+    return [
+        {"tag": tag, "count": count}
+        for tag, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    ]
+
+
+def _recent_memories(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    return sorted(
+        records,
+        key=lambda record: (
+            str(record.get("date_captured") or ""),
+            str(record.get("title") or "").lower(),
+        ),
+        reverse=True,
+    )
+
+
+def _memory_profile(limit: int = 10) -> dict[str, object]:
+    limit = max(1, min(limit, 50))
+    records = _memory_records()
+    recent = [_slim_memory(record) for record in _recent_memories(records)]
+
+    def typed(memory_type: str) -> list[dict[str, object]]:
+        return [
+            _slim_memory(record)
+            for record in _recent_memories(records)
+            if str(record.get("memory_type") or "") == memory_type
+        ][:limit]
+
+    active = [
+        record for record in records
+        if str(record.get("status") or "active").lower() not in {"archived", "stale"}
+    ]
+    return {
+        "memory_count": len(records),
+        "active_count": len(active),
+        "by_type": _count_values(records, "memory_type"),
+        "by_scope": _count_values(records, "scope"),
+        "by_status": _count_values(records, "status"),
+        "top_tags": _top_tags(records),
+        "recent": recent[:limit],
+        "preferences": typed("preference"),
+        "decisions": typed("decision"),
+        "projects": typed("project"),
+    }
 
 
 def _score_memory(record: dict[str, object], query: str) -> int:
@@ -469,7 +539,7 @@ def _recall_memories(query: str, limit: int = 10) -> list[dict[str, object]]:
     for record in _memory_records():
         score = _score_memory(record, query)
         if score > 0:
-            slim = {key: value for key, value in record.items() if key != "body"}
+            slim = _slim_memory(record)
             slim["score"] = score
             scored.append((score, slim))
     scored.sort(key=lambda item: (-item[0], str(item[1]["title"]).lower()))
@@ -642,6 +712,18 @@ def recall_memory(query: str, limit: int = 10) -> str:
         return json.dumps({"error": "query required", "query": "", "count": 0, "memories": []})
     memories = _recall_memories(query, limit=limit)
     return json.dumps({"query": query, "count": len(memories), "memories": memories}, ensure_ascii=False)
+
+
+@mcp.tool()
+def memory_profile(limit: int = 10) -> str:
+    """Summarize what Link currently remembers.
+
+    Use this to inspect the local memory profile before doing personalized work.
+    Returns counts by type/scope/status, top tags, recent memories, and focused
+    lists for preferences, decisions, and project context.
+    """
+    limit = _parse_limit(limit, default=10)
+    return json.dumps(_memory_profile(limit=limit), ensure_ascii=False)
 
 
 @mcp.tool()

@@ -188,6 +188,98 @@ def _plural_type_label(page_type: str) -> str:
     return page_type if page_type.endswith("s") else page_type + "s"
 
 
+def _meta_tags(value) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    raw = str(value or "").strip("[]")
+    return [item.strip().strip("\"'") for item in raw.split(",") if item.strip()]
+
+
+def _extract_tldr(body: str) -> str:
+    match = re.search(r">\s*\*\*TLDR:\*\*\s*(.+)", body)
+    return match.group(1).strip() if match else ""
+
+
+def _first_body_snippet(body: str) -> str:
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and not stripped.startswith(">"):
+            return stripped[:200]
+    return ""
+
+
+def _memory_records() -> list[dict[str, object]]:
+    memories_dir = WIKI_DIR / "memories"
+    if not memories_dir.exists():
+        return []
+    records = []
+    for path in sorted(memories_dir.rglob("*.md")):
+        if path.name.startswith("."):
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        meta, body = _parse_frontmatter(text)
+        title = meta.get("title", "")
+        if not title:
+            match = re.search(r"^#\s+(.+)", body, re.MULTILINE)
+            title = match.group(1) if match else path.stem
+        records.append({
+            "name": path.stem,
+            "path": f"wiki/{path.relative_to(WIKI_DIR).as_posix()}",
+            "title": title,
+            "memory_type": meta.get("memory_type") or "note",
+            "scope": meta.get("scope") or "user",
+            "status": meta.get("status") or "active",
+            "date_captured": meta.get("date_captured", ""),
+            "source": meta.get("source", ""),
+            "tags": _meta_tags(meta.get("tags", "")),
+            "tldr": _extract_tldr(body),
+            "snippet": _first_body_snippet(body),
+        })
+    return records
+
+
+def _count_values(records: list[dict[str, object]], field: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in records:
+        value = str(record.get(field) or "unknown")
+        counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _memory_profile(limit: int = 10) -> dict[str, object]:
+    limit = max(1, min(limit, 50))
+    records = sorted(
+        _memory_records(),
+        key=lambda record: (
+            str(record.get("date_captured") or ""),
+            str(record.get("title") or "").lower(),
+        ),
+        reverse=True,
+    )
+
+    def typed(memory_type: str) -> list[dict[str, object]]:
+        return [
+            record for record in records
+            if str(record.get("memory_type") or "") == memory_type
+        ][:limit]
+
+    active = [
+        record for record in records
+        if str(record.get("status") or "active").lower() not in {"archived", "stale"}
+    ]
+    return {
+        "memory_count": len(records),
+        "active_count": len(active),
+        "by_type": _count_values(records, "memory_type"),
+        "by_scope": _count_values(records, "scope"),
+        "by_status": _count_values(records, "status"),
+        "recent": records[:limit],
+        "preferences": typed("preference"),
+        "decisions": typed("decision"),
+        "projects": typed("project"),
+    }
+
+
 def _json_for_script(data) -> str:
     """Serialize JSON for direct embedding inside a <script> tag."""
     return (
@@ -401,6 +493,9 @@ hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
 .page-list li { padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
 .page-list li:last-child { border-bottom: none; }
 .page-list .type { font-size: 11px; color: #888; font-family: sans-serif; margin-left: 6px; }
+.memory-profile { margin: 18px 0; }
+.memory-profile .summary { color: #666; font-family: sans-serif; margin-bottom: 16px; }
+.memory-profile .memory-meta { color: #888; font-size: 12px; font-family: sans-serif; }
 
 mark { background: #fff3cd; color: inherit; border-radius: 2px; padding: 0 1px; }
 
@@ -442,6 +537,7 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
   th { background: #252525; }
   th, td { border-color: #333; }
   .page-list li { border-color: #2a2a2a; }
+  .memory-profile .summary { color: #aaa; }
   footer { border-color: #333; }
   .home-stats .stat .num { color: #6ea8fe; }
   .graph-toolbar button { background: #222; color: #ddd; border-color: #444; }
@@ -457,6 +553,7 @@ def _header_html():
   <div class="logo"><a href="/"><img src="/logo.svg" alt="">Link</a><small>agent memory</small></div>
   <nav>
     <a href="/">home</a>
+    <a href="/profile">profile</a>
     <a href="/page/log">log</a>
     <a href="/all">all pages</a>
     <a href="/graph">graph</a>
@@ -468,7 +565,7 @@ def _header_html():
 
 
 def _footer_html():
-    return '<footer>Link — personal knowledge wiki · <a href="https://github.com/gowtham0992/link">github</a></footer>'
+    return '<footer>Link — local agent memory · <a href="https://github.com/gowtham0992/link">github</a></footer>'
 
 
 def _layout(title, body):
@@ -560,7 +657,7 @@ def _render_home():
     if not cats:
         sections = "<p>Wiki is empty. Drop sources into <code>raw/</code> and tell your agent to ingest them.</p>"
 
-    return _layout("Link", f"<h1>Link</h1><p>Personal knowledge wiki. Knowledge compounds here.</p>{stats}{sections}")
+    return _layout("Link", f"<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>{stats}{sections}")
 
 
 def _render_page(page_path):
@@ -604,6 +701,55 @@ def _render_all():
     )
     return _layout("All Pages", f'<div class="breadcrumb"><a href="/">Link</a> / all pages</div>'
                    f"<h1>All Pages ({len(pages)})</h1><ul class='page-list'>{items}</ul>")
+
+
+def _render_profile():
+    profile = _memory_profile(limit=12)
+    memory_count = profile["memory_count"]
+    active_count = profile["active_count"]
+    stats = (
+        f'<div class="home-stats">'
+        f'<div class="stat"><span class="num">{memory_count}</span><span class="label">memories</span></div>'
+        f'<div class="stat"><span class="num">{active_count}</span><span class="label">active</span></div>'
+        f'</div>'
+    )
+
+    def counts_line(title: str, counts: dict[str, int]) -> str:
+        if not counts:
+            return ""
+        parts = ", ".join(f"{html.escape(name)}: {count}" for name, count in counts.items())
+        return f"<p><strong>{html.escape(title)}:</strong> {parts}</p>"
+
+    def section(title: str, records: list[dict[str, object]], empty: str = "none") -> str:
+        if not records:
+            return f"<h2>{html.escape(title)}</h2><p>{html.escape(empty)}</p>"
+        items = ""
+        for record in records:
+            summary = record.get("tldr") or record.get("snippet") or ""
+            meta = f'{record.get("memory_type", "")} · {record.get("scope", "")}'
+            items += (
+                f'<li><a href="{_page_href(str(record["name"]))}">{html.escape(str(record["title"]))}</a>'
+                f'<div class="memory-meta">{html.escape(meta)}</div>'
+                f'{f"<small>{html.escape(str(summary))}</small>" if summary else ""}</li>'
+            )
+        return f"<h2>{html.escape(title)}</h2><ul class='page-list'>{items}</ul>"
+
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / profile</div>'
+        f'<h1>Memory Profile</h1>'
+        f'<div class="memory-profile">'
+        f'<p class="summary">What Link currently remembers about the user, projects, decisions, and preferences.</p>'
+        f'{stats}'
+        f'{counts_line("Types", profile["by_type"])}'
+        f'{counts_line("Scopes", profile["by_scope"])}'
+        f'{counts_line("Status", profile["by_status"])}'
+        f'{section("Recent memories", profile["recent"])}'
+        f'{section("Preferences", profile["preferences"])}'
+        f'{section("Decisions", profile["decisions"])}'
+        f'{section("Project context", profile["projects"])}'
+        f'</div>'
+    )
+    return _layout("Memory Profile", body)
 
 
 def _render_graph():
@@ -1340,6 +1486,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._file(raw_path, ctypes.get(ext, "application/octet-stream"))
         elif path in ("/", ""):
             self._ok(_render_home())
+        elif path == "/profile":
+            self._ok(_render_profile())
         elif path == "/all":
             self._ok(_render_all())
         elif path == "/graph":
@@ -1369,6 +1517,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json({"rebuilt": True, "pages": len(result.get("backlinks", {}))})
         elif path == "/api/graph":
             self._json(_get_graph_data())
+        elif path == "/api/memory-profile":
+            limit, error = _parse_search_limit(query.get("limit", ["10"])[0])
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                self._json(_memory_profile(limit=limit))
         elif path == "/api/search":
             q = query.get("q", [""])[0].strip()
             limit, error = _parse_search_limit(query.get("limit", ["20"])[0])

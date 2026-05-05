@@ -283,6 +283,7 @@ Rules:
 - Use `memory_type: preference` for user preferences, `decision` for choices made, `project` for project context, `fact` for stable facts, and `note` for everything else.
 - Use `scope: user` for broad personal preferences, `project` for the current project, and `global` for agent-wide principles.
 - Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
+- Run `python3 link.py profile .` when the human asks what Link knows or when you need a quick overview of remembered preferences, decisions, and project context.
 
 ### 2. Ingest
 
@@ -324,7 +325,7 @@ When the human adds a new source to `raw/` and asks you to process it:
 
 When the human asks a question:
 
-1. If the question may depend on user preferences, project decisions, or personal context, run `python3 link.py recall "<question>" .` first or call MCP `recall_memory`.
+1. If the question may depend on user preferences, project decisions, or personal context, inspect `python3 link.py profile .` or MCP `memory_profile` when you need the memory overview, then run `python3 link.py recall "<question>" .` or MCP `recall_memory` for focused recall.
 2. **If `serve.py` is running:** call `GET /api/context?topic=<question>` — returns the best matching page plus all related pages via graph traversal in one call. This is faster and uses fewer tokens than reading index.md manually.
 3. **If server is not running:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
 4. Read the relevant pages and synthesize an answer.

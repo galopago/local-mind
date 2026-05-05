@@ -119,6 +119,20 @@ class DemoSnapshotTests(unittest.TestCase):
         self.assertIn('<span class="label">memories</span>', html)
         self.assertIn("Prefer local personal memory", html)
 
+    def test_demo_profile_snapshot(self):
+        target = self.make_demo()
+        reset_serve_wiki(target / "wiki")
+
+        profile = serve._memory_profile()
+        html = serve._render_profile()
+
+        self.assertEqual(profile["memory_count"], 1)
+        self.assertEqual(profile["active_count"], 1)
+        self.assertEqual(profile["by_type"]["preference"], 1)
+        self.assertEqual(profile["recent"][0]["name"], "prefer-local-personal-memory")
+        self.assertIn("Memory Profile", html)
+        self.assertIn("Prefer local personal memory", html)
+
     def test_demo_context_snapshot(self):
         target = self.make_demo()
         reset_serve_wiki(target / "wiki")

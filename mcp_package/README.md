@@ -81,6 +81,7 @@ Custom wiki path:
 
 | Tool | Description |
 |------|-------------|
+| `memory_profile(limit?)` | Summarize what Link remembers by type, scope, status, recency, preferences, decisions, and project context. |
 | `recall_memory(query, limit?)` | Search durable local memories for preferences, decisions, and project context. |
 | `remember_memory(memory, title?, memory_type?, scope?, tags?, source?)` | Save an explicit user-approved local memory under `wiki/memories/`. |
 | `search_wiki(query, limit?)` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets. |
@@ -90,7 +91,7 @@ Custom wiki path:
 | `get_graph()` | All nodes + edges for graph reasoning. |
 | `rebuild_backlinks()` | Rebuild `_backlinks.json` after ingest or lint. |
 
-Use `recall_memory` first for user preferences, decisions, and project context. Use `get_context` for source-backed topic answers — one call returns the primary page plus all related pages via graph traversal.
+Use `memory_profile` to inspect the user/project memory shape, then `recall_memory` for user preferences, decisions, and project context. Use `get_context` for source-backed topic answers — one call returns the primary page plus all related pages via graph traversal.
 
 ## Wiki location
 
