@@ -249,6 +249,56 @@ def _memory_with_actions(record: dict[str, object]) -> dict[str, object]:
     return item
 
 
+def _memory_dashboard_next_actions(
+    memory_count: int,
+    review_count: int,
+    updated_count: int,
+    archived_count: int,
+) -> list[dict[str, str]]:
+    actions: list[dict[str, str]] = []
+    if review_count:
+        actions.append({
+            "label": "Review pending memories",
+            "detail": f"{review_count} memory{'ies' if review_count != 1 else 'y'} need confirmation or metadata cleanup.",
+            "href": "/inbox",
+            "command": "python3 link.py memory-inbox .",
+            "priority": "high",
+        })
+    if updated_count:
+        actions.append({
+            "label": "Audit recent memory updates",
+            "detail": f"{updated_count} memory update{'s' if updated_count != 1 else ''} should be checked for accuracy.",
+            "href": "/memory",
+            "command": "python3 link.py profile .",
+            "priority": "medium",
+        })
+    if archived_count:
+        actions.append({
+            "label": "Inspect archived memory",
+            "detail": f"{archived_count} archived memory page{'s' if archived_count != 1 else ''} remain inspectable but hidden from default recall.",
+            "href": "/profile",
+            "command": "python3 link.py profile .",
+            "priority": "low",
+        })
+    if not memory_count:
+        actions.append({
+            "label": "Create the first memory",
+            "detail": "Save an explicit preference, decision, project fact, or note for local agents.",
+            "href": "",
+            "command": 'python3 link.py remember "User prefers ..." . --type preference --scope user',
+            "priority": "high",
+        })
+    if not actions:
+        actions.append({
+            "label": "Memory is recall-ready",
+            "detail": "No pending review items or recent updates need attention.",
+            "href": "/profile",
+            "command": "python3 link.py profile .",
+            "priority": "info",
+        })
+    return actions[:3]
+
+
 def _memory_dashboard(limit: int = 12) -> dict[str, object]:
     limit = max(1, min(limit, 50))
     records = _memory_records()
@@ -268,15 +318,24 @@ def _memory_dashboard(limit: int = 12) -> dict[str, object]:
     )
     archived = sorted(archived_records, key=_memory_activity_key, reverse=True)
     inbox = _memory_inbox(limit=limit)
+    review_count = inbox["review_count"]
+    updated_count = len(recent_updates)
+    archived_count = len(archived_records)
     return {
         "memory_count": len(records),
         "active_count": len(active_records),
-        "review_count": inbox["review_count"],
-        "archived_count": len(archived_records),
-        "updated_count": len(recent_updates),
+        "review_count": review_count,
+        "archived_count": archived_count,
+        "updated_count": updated_count,
         "by_type": _count_values(records, "memory_type"),
         "by_scope": _count_values(records, "scope"),
         "counts_by_severity": inbox["counts_by_severity"],
+        "next_actions": _memory_dashboard_next_actions(
+            memory_count=len(records),
+            review_count=review_count,
+            updated_count=updated_count,
+            archived_count=archived_count,
+        ),
         "active": [_memory_with_actions(record) for record in recent_active[:limit]],
         "review": [_memory_with_actions(record) for record in inbox["items"][:limit]],
         "recent_updates": [_memory_with_actions(record) for record in recent_updates[:limit]],
@@ -494,6 +553,10 @@ hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
 .memory-dashboard { margin: 18px 0; }
 .memory-dashboard .section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .memory-dashboard .section-heading a { font-size: 13px; font-family: sans-serif; font-weight: normal; }
+.memory-next { border-left: 3px solid #0969da; padding: 10px 12px; margin: 12px 0 16px; background: #f6f8fa; font-family: sans-serif; }
+.memory-next ul { margin: 8px 0 0; padding-left: 18px; }
+.memory-next li { margin: 4px 0; }
+.memory-next code { white-space: normal; overflow-wrap: anywhere; }
 .memory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 12px 0; }
 .memory-card { border: 1px solid #eee; border-radius: 6px; padding: 12px; }
 .memory-card h3 { margin-top: 0; font-size: 16px; }
@@ -557,6 +620,7 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
   .page-list li { border-color: #2a2a2a; }
   .memory-profile .summary { color: #aaa; }
   .memory-issues li { color: #aaa; }
+  .memory-next { background: #222; border-color: #6ea8fe; }
   .memory-card { border-color: #333; }
   .memory-card .summary { color: #aaa; }
   .trust-grid div { border-color: #333; }
@@ -788,6 +852,21 @@ def _render_memory_section(title: str, records: list[dict[str, object]], empty: 
     return heading + f'<div class="memory-grid">{cards}</div>'
 
 
+def _render_memory_next_actions(actions: list[dict[str, str]]) -> str:
+    items = ""
+    for action in actions:
+        label = html.escape(action["label"])
+        if action.get("href"):
+            label_html = f'<a href="{html.escape(action["href"])}">{label}</a>'
+        else:
+            label_html = label
+        items += (
+            f'<li><strong>{label_html}</strong>: {html.escape(action["detail"])}'
+            f'<br><code>{html.escape(action["command"])}</code></li>'
+        )
+    return f'<div class="memory-next"><strong>Next actions</strong><ul>{items}</ul></div>'
+
+
 def _render_memory_dashboard():
     dashboard = _memory_dashboard(limit=8)
     stats = (
@@ -814,6 +893,7 @@ def _render_memory_dashboard():
         f'<div class="memory-dashboard">'
         f'<p class="summary">Read-only command center for what local agents can remember, what needs review, and what changed recently.</p>'
         f'{stats}'
+        f'{_render_memory_next_actions(dashboard["next_actions"])}'
         f'{counts}'
         f'{_render_memory_section("Review needed", dashboard["review"], "No memories need review.", href="/inbox", include_issues=True)}'
         f'{_render_memory_section("Recent updates", dashboard["recent_updates"], "No memory updates yet.")}'

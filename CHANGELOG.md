@@ -21,6 +21,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; memory write operations remain CLI/MCP-only.
 - Added a graph node inspector so moving nodes no longer accidentally opens pages; double-click or Open page still navigates.
 - Added a real MCP stdio smoke test for the built `link-mcp` wheel in CI.
+- Added Memory Dashboard next actions so the web UI and API surface the most important memory maintenance step.
 - Extracted shared memory proposal logic into `link_core` so CLI, HTTP, and MCP proposal behavior stays aligned.
 - Extracted shared frontmatter parsing and typed update helpers into `link_core` for safer memory metadata writes.
 - Extracted shared memory record loading, review inbox, profile, and recall helpers into `link_core`.

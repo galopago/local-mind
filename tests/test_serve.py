@@ -171,6 +171,25 @@ class ServeTests(unittest.TestCase):
     def test_static_file_resolve_handles_malformed_paths(self):
         self.assertIsNone(serve._safe_resolve(Path("bad\0path")))
 
+    def test_memory_dashboard_next_actions_empty_and_ready_states(self):
+        empty_actions = serve._memory_dashboard_next_actions(
+            memory_count=0,
+            review_count=0,
+            updated_count=0,
+            archived_count=0,
+        )
+        ready_actions = serve._memory_dashboard_next_actions(
+            memory_count=2,
+            review_count=0,
+            updated_count=0,
+            archived_count=0,
+        )
+
+        self.assertEqual(empty_actions[0]["label"], "Create the first memory")
+        self.assertIn("remember", empty_actions[0]["command"])
+        self.assertEqual(ready_actions[0]["label"], "Memory is recall-ready")
+        self.assertEqual(ready_actions[0]["href"], "/profile")
+
     def test_cache_invalidation_sees_existing_page_edits(self):
         wiki = self.make_wiki()
         page = write_page(
