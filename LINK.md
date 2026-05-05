@@ -326,7 +326,7 @@ When the human adds a new source to `raw/` and asks you to process it:
 - Images in `raw/` (png, jpg, webp, gif, svg) are valid sources. Use vision to understand what the image IS.
 - Create a source page for the image just like any other source. Describe what you see.
 - Embed the image in the source page using: `![description](/raw/filename.png)`
-- The web viewer serves `raw/` files directly, so image paths just work.
+- The web viewer serves supported `raw/` image/PDF assets directly, so image paths just work without exposing every raw file type.
 - For screenshots: describe the UI, layout, key elements, purpose.
 - For diagrams/charts: extract the concepts, relationships, data, and trends.
 - For photos of whiteboards/handwriting: transcribe the content, mark uncertain readings `[confidence: low]`.

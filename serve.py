@@ -38,6 +38,15 @@ WIKI_DIR = ROOT / "wiki"
 RAW_DIR = ROOT / "raw"
 PORT = 3000
 MAX_POST_BYTES = 64 * 1024
+RAW_STATIC_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+    ".pdf": "application/pdf",
+}
 
 # ---------------------------------------------------------------------------
 # In-memory caches — invalidated on each request by mtime check
@@ -309,7 +318,10 @@ def _is_allowed_static_file(path: Path) -> bool:
         (root / "logo.svg").resolve(),
         (root / "logo.png").resolve(),
     }
-    return path in allowed_root_files or _is_relative_to(path, raw_root)
+    return path in allowed_root_files or (
+        _is_relative_to(path, raw_root)
+        and path.suffix.lower() in RAW_STATIC_TYPES
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1661,11 +1673,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._file(Path(__file__).parent / "logo.png", "image/png")
         elif path.startswith("/raw/"):
             raw_path = Path(__file__).parent / "raw" / urllib.parse.unquote(path[5:])
-            ext = raw_path.suffix.lower()
-            ctypes = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-                      ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
-                      ".pdf": "application/pdf"}
-            self._file(raw_path, ctypes.get(ext, "application/octet-stream"))
+            content_type = RAW_STATIC_TYPES.get(raw_path.suffix.lower())
+            if content_type:
+                self._file(raw_path, content_type)
+            else:
+                self._err("file")
         elif path in ("/", ""):
             self._ok(_render_home())
         elif path == "/memory":

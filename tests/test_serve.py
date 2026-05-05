@@ -157,12 +157,15 @@ class ServeTests(unittest.TestCase):
         raw_dir.mkdir()
         reset_wiki(wiki)
 
-        allowed = serve._safe_resolve(raw_dir / "note.txt")
+        allowed = serve._safe_resolve(raw_dir / "image.png")
+        unsupported = serve._safe_resolve(raw_dir / "note.txt")
         denied = serve._safe_resolve(raw_dir / "../serve.py")
 
         self.assertIsNotNone(allowed)
+        self.assertIsNotNone(unsupported)
         self.assertIsNotNone(denied)
         self.assertTrue(serve._is_allowed_static_file(allowed))
+        self.assertFalse(serve._is_allowed_static_file(unsupported))
         self.assertFalse(serve._is_allowed_static_file(denied))
 
     def test_static_file_resolve_handles_malformed_paths(self):
