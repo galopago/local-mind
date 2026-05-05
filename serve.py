@@ -499,9 +499,10 @@ mark { background: #fff3cd; color: inherit; border-radius: 2px; padding: 0 1px; 
 
 #graph-canvas { width: 100%; height: min(64vh, 620px); min-height: 420px;
                 border: 1px solid #eee; border-radius: 4px; background: #101418;
-                cursor: grab; display: block; margin: 12px 0; }
+                cursor: grab; display: block; margin: 0; }
 #graph-canvas:active { cursor: grabbing; }
 #graph-canvas:focus { outline: 2px solid #6ea8fe; outline-offset: 2px; }
+.graph-shell { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; align-items: stretch; margin: 12px 0; }
 .graph-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
                  margin: 12px 0 8px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; }
 .graph-toolbar button { border: 1px solid #d0d7de; background: #fff; color: #24292f;
@@ -509,6 +510,13 @@ mark { background: #fff3cd; color: inherit; border-radius: 2px; padding: 0 1px; 
 .graph-toolbar button:hover { background: #f6f8fa; }
 .graph-toolbar button[aria-pressed="true"] { background: #0969da; border-color: #0969da; color: #fff; }
 .graph-status { color: #666; margin-left: auto; }
+.graph-inspector { border: 1px solid #eee; border-radius: 4px; padding: 12px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; color: #57606a; background: #fff; }
+.graph-inspector strong { display: block; color: #24292f; font-size: 15px; margin-bottom: 6px; overflow-wrap: anywhere; }
+.graph-inspector p { margin: 0 0 10px; line-height: 1.4; }
+.graph-inspector-links { display: grid; gap: 5px; margin: 10px 0; max-height: 180px; overflow: auto; }
+.graph-inspector-links a { overflow-wrap: anywhere; }
+.graph-inspector button { border: 1px solid #d0d7de; background: #f6f8fa; color: #24292f; border-radius: 4px; padding: 6px 9px; cursor: pointer; }
+.graph-inspector button:disabled { color: #8c959f; cursor: default; }
 .graph-tooltip { position: fixed; background: #fff; border: 1px solid #ccc; border-radius: 4px;
                  padding: 6px 10px; font-size: 13px; pointer-events: none; display: none;
                  box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 100; }
@@ -545,7 +553,15 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #eee;
   .graph-toolbar button { background: #222; color: #ddd; border-color: #444; }
   .graph-toolbar button:hover { background: #2a2a2a; }
   .graph-status { color: #aaa; }
+  .graph-inspector { background: #222; border-color: #333; color: #aaa; }
+  .graph-inspector strong { color: #ddd; }
+  .graph-inspector button { background: #2a2a2a; color: #ddd; border-color: #444; }
+  .graph-inspector button:disabled { color: #777; }
   .graph-empty { background: #222; border-color: #333; color: #aaa; }
+}
+@media (max-width: 760px) {
+  .graph-shell { grid-template-columns: 1fr; }
+  #graph-canvas { min-height: 360px; }
 }
 """
 
@@ -996,6 +1012,11 @@ def _render_graph():
   var labelsButton = document.getElementById('graph-labels');
   var motionButton = document.getElementById('graph-motion');
   var status = document.getElementById('graph-status');
+  var inspector = document.getElementById('graph-inspector');
+  var inspectorTitle = document.getElementById('graph-inspector-title');
+  var inspectorMeta = document.getElementById('graph-inspector-meta');
+  var inspectorLinks = document.getElementById('graph-inspector-links');
+  var inspectorOpen = document.getElementById('graph-open');
   var W, H;
 
   // Compact neural-map sizing: concepts lead, sources recede.
@@ -1035,7 +1056,7 @@ def _render_graph():
     if (adj[e.target]) {{ adj[e.target].push(e.source); degree[e.target]++; }}
   }});
 
-  var dragging = null, dragOffX = 0, dragOffY = 0, hoverNode = null;
+  var dragging = null, dragOffX = 0, dragOffY = 0, hoverNode = null, selectedNode = null;
   var panX = 0, panY = 0, panStartX = 0, panStartY = 0, panning = false, didPan = false;
   var downX = 0, downY = 0, didDrag = false, suppressClick = false;
   var zoom = 1;
@@ -1051,6 +1072,7 @@ def _render_graph():
   }}
 
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
+  function pageHref(id) {{ return '/page/' + encodeURIComponent(id); }}
   function nodeRadius(n) {{
     if (n.category === 'sources') return 4.5;
     if (n.category === 'memories') return 6.4;
@@ -1077,7 +1099,49 @@ def _render_graph():
     ];
     var locked = pinnedCount();
     if (locked) parts.push(locked + ' placed');
+    if (selectedNode) parts.push('selected ' + selectedNode.id);
     status.textContent = parts.join(' · ');
+  }}
+
+  function updateInspector() {{
+    if (!inspector || !inspectorTitle || !inspectorMeta || !inspectorLinks || !inspectorOpen) return;
+    inspectorLinks.textContent = '';
+    if (!selectedNode) {{
+      inspectorTitle.textContent = 'Select a node';
+      inspectorMeta.textContent = 'Click a node to inspect it. Drag a node to place it. Double-click a node, or use Open page, to navigate.';
+      inspectorOpen.disabled = true;
+      return;
+    }}
+    var neighbors = (adj[selectedNode.id] || []).slice().sort(function(a, b) {{
+      return (nodeById[a] ? nodeById[a].title : a).localeCompare(nodeById[b] ? nodeById[b].title : b);
+    }});
+    inspectorTitle.textContent = selectedNode.title;
+    inspectorMeta.textContent = selectedNode.category + ' · ' + neighbors.length + ' linked page' + (neighbors.length === 1 ? '' : 's');
+    inspectorOpen.disabled = false;
+    neighbors.slice(0, 10).forEach(function(id) {{
+      var target = nodeById[id];
+      var link = document.createElement('a');
+      link.href = pageHref(id);
+      link.textContent = target ? target.title : id;
+      inspectorLinks.appendChild(link);
+    }});
+    if (neighbors.length > 10) {{
+      var more = document.createElement('span');
+      more.textContent = '+' + (neighbors.length - 10) + ' more';
+      inspectorLinks.appendChild(more);
+    }}
+  }}
+
+  function selectNode(node) {{
+    selectedNode = node;
+    hoverNode = node;
+    updateInspector();
+    updateStatus();
+    draw();
+  }}
+
+  function openNode(node) {{
+    if (node) window.location.href = pageHref(node.id);
   }}
 
   function toScreen(x, y) {{
@@ -1187,6 +1251,7 @@ def _render_graph():
       var color = nodeColor(n);
       var pulse = Math.sin(time * 1.2 + (pos[n.id].x + pos[n.id].y) * 0.01) * 0.12 + 0.88;
       var activeNode = isActiveNode(n);
+      var selected = selectedNode && selectedNode.id === n.id;
       ctx.save();
       ctx.globalAlpha = hoverNode && !activeNode ? 0.28 : 1;
 
@@ -1204,7 +1269,7 @@ def _render_graph():
 
       // Node border
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
-      ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = selected ? '#ffffff' : color; ctx.lineWidth = selected ? 2.4 : 1.5;
       ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1;
 
       // Inner bright core
@@ -1256,8 +1321,11 @@ def _render_graph():
 
   function resetView() {{
     pinned = {{}};
+    selectedNode = null;
+    hoverNode = null;
     frame = SETTLE;
     autoFit();
+    updateInspector();
     updateStatus();
   }}
 
@@ -1336,7 +1404,14 @@ def _render_graph():
     if (suppressClick) {{ suppressClick = false; return; }}
     var rect = canvas.getBoundingClientRect();
     var hit = hitTest(e.clientX - rect.left, e.clientY - rect.top);
-    if (hit) window.location.href = '/page/' + encodeURIComponent(hit.id);
+    if (hit) selectNode(hit);
+  }});
+
+  canvas.addEventListener('dblclick', function(e) {{
+    e.preventDefault();
+    var rect = canvas.getBoundingClientRect();
+    var hit = hitTest(e.clientX - rect.left, e.clientY - rect.top);
+    if (hit) openNode(hit);
   }});
 
   canvas.addEventListener('wheel', function(e) {{
@@ -1356,6 +1431,8 @@ def _render_graph():
     if (e.key === '+' || e.key === '=') {{ zoom = Math.min(6, zoom * 1.12); updateStatus(); e.preventDefault(); }}
     if (e.key === '-' || e.key === '_') {{ zoom = Math.max(0.15, zoom * 0.9); updateStatus(); e.preventDefault(); }}
     if (e.key === '0') {{ resetView(); e.preventDefault(); }}
+    if (e.key === 'Enter' && hoverNode) {{ openNode(hoverNode); e.preventDefault(); }}
+    if (e.key === 'Escape') {{ selectedNode = null; updateInspector(); updateStatus(); e.preventDefault(); }}
     if (e.key === 'l' || e.key === 'L') {{
       showAllLabels = !showAllLabels;
       if (labelsButton) labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
@@ -1371,11 +1448,13 @@ def _render_graph():
   if (motionButton) motionButton.addEventListener('click', function() {{
     setMotionPaused(!motionPaused);
   }});
+  if (inspectorOpen) inspectorOpen.addEventListener('click', function() {{ openNode(selectedNode); }});
 
   window.addEventListener('resize', function() {{ resize(); if (fitted) autoFit(); updateStatus(); }});
   resize();
   if (motionPaused) {{ autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
+  updateInspector();
   updateStatus();
   loop();
 }})();
@@ -1396,8 +1475,17 @@ def _render_graph():
         f'<span id="graph-status" class="graph-status" aria-live="polite">'
         f'{node_count} nodes · {edge_count} edges</span>'
         f'</div>'
+        f'<div class="graph-shell">'
         f'<canvas id="graph-canvas" tabindex="0" role="img" '
         f'aria-label="Knowledge graph with {node_count} nodes and {edge_count} edges"></canvas>'
+        f'<aside id="graph-inspector" class="graph-inspector" aria-live="polite">'
+        f'<strong id="graph-inspector-title">Select a node</strong>'
+        f'<p id="graph-inspector-meta">Click a node to inspect it. Drag a node to place it. '
+        f'Double-click a node, or use Open page, to navigate.</p>'
+        f'<div id="graph-inspector-links" class="graph-inspector-links"></div>'
+        f'<button id="graph-open" type="button" disabled>Open page</button>'
+        f'</aside>'
+        f'</div>'
         f'<div class="graph-legend">{legend_items}</div>'
         f'{graph_js}'
     )

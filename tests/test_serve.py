@@ -325,7 +325,9 @@ class ServeTests(unittest.TestCase):
         self.assertLess(html.index('id="graph-reset"'), html.index("var resetButton ="))
         self.assertLess(html.index('id="graph-labels"'), html.index("var labelsButton ="))
         self.assertLess(html.index('id="graph-motion"'), html.index("var motionButton ="))
+        self.assertLess(html.index('id="graph-inspector"'), html.index("var inspector ="))
         self.assertIn('id="graph-status"', html)
+        self.assertIn('id="graph-open"', html)
         self.assertIn('tabindex="0"', html)
         self.assertIn('role="img"', html)
 
@@ -349,6 +351,9 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn("return dx * dx + dy * dy > 9;", html)
         self.assertIn("pinned[dragging.id] = didDrag;", html)
+        self.assertIn("if (hit) selectNode(hit);", html)
+        self.assertIn("canvas.addEventListener('dblclick'", html)
+        self.assertIn("if (hit) openNode(hit);", html)
         self.assertIn("panX += after.x - before.x;", html)
 
     def test_graph_script_embeds_titles_safely(self):
