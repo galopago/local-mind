@@ -104,6 +104,15 @@ from link_core.memory import (
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
     propose_memories_from_text as _core_propose_memories_from_text,
 )
+from link_core.frontmatter import (
+    csv_values as _csv_values,
+    frontmatter_int as _frontmatter_int,
+    frontmatter_string as _frontmatter_string,
+    meta_tags as _meta_tags,
+    parse_frontmatter as _parse_frontmatter,
+    update_frontmatter_fields as _update_frontmatter_fields,
+    yaml_list as _yaml_list,
+)
 del _BUNDLED_CORE
 
 
@@ -657,23 +666,6 @@ def _build_backlinks(wiki_dir: Path) -> dict[str, dict[str, list[str]]]:
     return {"backlinks": backlinks, "forward": forward}
 
 
-def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
-    if not text.startswith("---\n"):
-        return {}, text
-    end = text.find("\n---", 4)
-    if end == -1:
-        return {}, text
-    frontmatter = text[4:end]
-    body = text[end + 4:].lstrip("\n")
-    meta: dict[str, str] = {}
-    for line in frontmatter.splitlines():
-        if ":" not in line or line.lstrip().startswith("#"):
-            continue
-        key, value = line.split(":", 1)
-        meta[key.strip()] = value.strip().strip("\"'")
-    return meta, body
-
-
 def _wiki_page_records(wiki_dir: Path) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for md in _wiki_pages(wiki_dir):
@@ -732,26 +724,6 @@ def _utc_timestamp() -> str:
 def _slugify(value: str, fallback: str = "memory") -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug or fallback
-
-
-def _frontmatter_string(value: str) -> str:
-    return str(value).replace("\\", "\\\\").replace('"', '\\"')
-
-
-def _csv_values(raw: str | None) -> list[str]:
-    if not raw:
-        return []
-    return [item.strip() for item in raw.split(",") if item.strip()]
-
-
-def _meta_tags(value: object) -> list[str]:
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    return [item.strip().strip("\"'") for item in _csv_values(str(value).strip("[]"))]
-
-
-def _yaml_list(values: list[str]) -> str:
-    return "[" + ", ".join(values) + "]"
 
 
 def _memory_title(text: str, explicit_title: str | None = None) -> str:
@@ -1217,44 +1189,6 @@ def _append_log(wiki_dir: Path, timestamp: str, operation: str, description: str
     entry.extend(["", "---", ""])
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write("\n".join(entry))
-
-
-def _update_frontmatter_fields(text: str, updates: dict[str, str], remove: set[str] | None = None) -> str:
-    remove = remove or set()
-    if not text.startswith("---\n"):
-        frontmatter = [f"{key}: {value}" for key, value in updates.items()]
-        return "---\n" + "\n".join(frontmatter) + "\n---\n\n" + text.lstrip("\n")
-
-    end = text.find("\n---", 4)
-    if end == -1:
-        frontmatter = [f"{key}: {value}" for key, value in updates.items()]
-        return "---\n" + "\n".join(frontmatter) + "\n---\n\n" + text
-
-    seen: set[str] = set()
-    lines: list[str] = []
-    for line in text[4:end].splitlines():
-        if ":" not in line or line.lstrip().startswith("#"):
-            lines.append(line)
-            continue
-        key = line.split(":", 1)[0].strip()
-        if key in remove:
-            continue
-        if key in updates:
-            lines.append(f"{key}: {updates[key]}")
-            seen.add(key)
-        else:
-            lines.append(line)
-    for key, value in updates.items():
-        if key not in seen:
-            lines.append(f"{key}: {value}")
-    return "---\n" + "\n".join(lines) + "\n---" + text[end + 4:]
-
-
-def _frontmatter_int(value: object) -> int:
-    try:
-        return int(str(value or "0").strip())
-    except ValueError:
-        return 0
 
 
 def _replace_markdown_body(text: str, body: str) -> str:

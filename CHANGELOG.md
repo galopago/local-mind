@@ -20,6 +20,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added read-only web Memory Dashboard at `/memory` and `/api/memory-dashboard` for active memories, review queue, recent updates, archived memories, and next-action commands.
 - Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; memory write operations remain CLI/MCP-only.
 - Extracted shared memory proposal logic into `link_core` so CLI, HTTP, and MCP proposal behavior stays aligned.
+- Extracted shared frontmatter parsing and typed update helpers into `link_core` for safer memory metadata writes.
 
 ## [1.0.7] - 2026-05-04
 

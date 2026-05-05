@@ -13,6 +13,10 @@ from link_core.memory import (
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
     propose_memories_from_text as _core_propose_memories_from_text,
 )
+from link_core.frontmatter import (
+    meta_tags as _meta_tags,
+    parse_frontmatter as _parse_frontmatter,
+)
 del _BUNDLED_CORE
 
 WIKI_DIR = ROOT / "wiki"
@@ -198,13 +202,6 @@ def _plural_type_label(page_type: str) -> str:
     if page_type in irregular:
         return irregular[page_type]
     return page_type if page_type.endswith("s") else page_type + "s"
-
-
-def _meta_tags(value) -> list[str]:
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    raw = str(value or "").strip("[]")
-    return [item.strip().strip("\"'") for item in raw.split(",") if item.strip()]
 
 
 def _extract_tldr(body: str) -> str:
@@ -738,21 +735,6 @@ def _is_allowed_static_file(path: Path) -> bool:
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
-
-def _parse_frontmatter(text):
-    if not text.startswith("---"): return {}, text
-    end = text.find("---", 3)
-    if end == -1: return {}, text
-    meta = {}
-    for line in text[3:end].strip().splitlines():
-        if ":" in line:
-            k, v = line.split(":", 1)
-            v = v.strip().strip('"').strip("'")
-            if v.startswith("[") and v.endswith("]"):
-                v = [x.strip().strip('"').strip("'") for x in v[1:-1].split(",")]
-            meta[k.strip()] = v
-    return meta, text[end+3:].strip()
-
 
 def _inline(text):
     def _stash(rendered: str) -> str:
