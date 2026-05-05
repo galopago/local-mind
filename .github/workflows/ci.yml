@@ -24,7 +24,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Compile Python
-        run: python -m py_compile serve.py link.py scripts/check_release_hygiene.py scripts/prepare_release.py mcp_package/link_mcp/server.py mcp_package/link_mcp/__main__.py mcp_package/link_mcp/__init__.py
+        run: python -m py_compile serve.py link.py scripts/check_release_hygiene.py scripts/prepare_release.py scripts/smoke_mcp_stdio.py mcp_package/link_mcp/server.py mcp_package/link_mcp/__main__.py mcp_package/link_mcp/__init__.py
 
       - name: Run tests
         run: python -m unittest discover -s tests
@@ -76,3 +76,12 @@ jobs:
       - name: Check package metadata
         working-directory: mcp_package
         run: python -m twine check dist/*
+
+      - name: Install built wheel
+        working-directory: mcp_package
+        run: python -m pip install dist/*.whl
+
+      - name: MCP stdio smoke test
+        run: |
+          python link.py demo /tmp/link-mcp-smoke --force
+          python scripts/smoke_mcp_stdio.py /tmp/link-mcp-smoke/wiki

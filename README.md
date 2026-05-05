@@ -371,9 +371,11 @@ Run the local gate:
 
 ```bash
 python3 -m unittest discover -s tests
-python3 -m py_compile link.py serve.py scripts/check_release_hygiene.py scripts/prepare_release.py mcp_package/link_mcp/server.py
+python3 -m py_compile link.py serve.py scripts/check_release_hygiene.py scripts/prepare_release.py scripts/smoke_mcp_stdio.py mcp_package/link_mcp/server.py
 python3 scripts/check_release_hygiene.py
 bash -n integrations/*/install.sh integrations/*/uninstall.sh integrations/_shared/*.sh
+python3 link.py demo /tmp/link-mcp-smoke --force
+PYTHONPATH=mcp_package python3 scripts/smoke_mcp_stdio.py /tmp/link-mcp-smoke/wiki
 git diff --check
 ```
 
