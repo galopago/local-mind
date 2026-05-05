@@ -25,6 +25,7 @@ Add to your MCP client config:
 """
 from __future__ import annotations
 import argparse, json, re, sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ── Resolve wiki directory ────────────────────────────────────────────
@@ -51,11 +52,11 @@ except ImportError:
 mcp = FastMCP(
     "link",
     instructions=(
-        "Link is a personal knowledge wiki. Use search_wiki to find pages, "
-        "get_context to retrieve a topic with its full graph neighborhood, "
-        "and get_pages to browse all pages. Always prefer get_context over "
-        "reading files directly — it returns the primary page plus related "
-        "pages via graph traversal in one call."
+        "Link is local personal memory for agents. Use recall_memory for "
+        "user preferences, decisions, and project context; use search_wiki to "
+        "find general pages; use get_context to retrieve a topic with its full "
+        "graph neighborhood. Only call remember_memory when the user explicitly "
+        "asks you to remember something."
     ),
 )
 
@@ -63,6 +64,8 @@ mcp = FastMCP(
 _cache: dict = {}
 _cache_mtime: float = 0.0
 MAX_TEXT_INPUT = 200
+MEMORY_TYPES = ("preference", "decision", "project", "fact", "note")
+MEMORY_SCOPES = ("user", "project", "global")
 
 
 def _clean_text_input(value, max_len: int = MAX_TEXT_INPUT) -> str:
@@ -343,6 +346,259 @@ def _get_context(topic: str) -> dict:
     }
 
 
+def _utc_timestamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _slugify(value: str, fallback: str = "memory") -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or fallback
+
+
+def _frontmatter_string(value: str) -> str:
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _csv_values(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _meta_tags(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip().strip("\"'") for item in _csv_values(str(value).strip("[]"))]
+
+
+def _yaml_list(values: list[str]) -> str:
+    return "[" + ", ".join(values) + "]"
+
+
+def _memory_title(text: str, explicit_title: str | None = None) -> str:
+    if explicit_title and explicit_title.strip():
+        return explicit_title.strip()
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "Memory")
+    first_sentence = re.split(r"(?<=[.!?])\s+", first_line, maxsplit=1)[0].strip()
+    if len(first_sentence) <= 70:
+        return first_sentence.rstrip(".")
+    return first_sentence[:67].rstrip() + "..."
+
+
+def _unique_page_path(directory: Path, slug: str) -> Path:
+    candidate = directory / f"{slug}.md"
+    index = 2
+    while candidate.exists():
+        candidate = directory / f"{slug}-{index}.md"
+        index += 1
+    return candidate
+
+
+def _extract_tldr(body: str) -> str:
+    match = re.search(r">\s*\*\*TLDR:\*\*\s*(.+)", body)
+    return match.group(1).strip() if match else ""
+
+
+def _first_body_snippet(body: str) -> str:
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and not stripped.startswith(">"):
+            return stripped[:200]
+    return ""
+
+
+def _memory_records() -> list[dict[str, object]]:
+    memories_dir = WIKI_DIR / "memories"
+    if not memories_dir.exists():
+        return []
+    records: list[dict[str, object]] = []
+    for path in sorted(memories_dir.rglob("*.md")):
+        if path.name.startswith("."):
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        meta, body = _parse_frontmatter(text)
+        title = meta.get("title") or _memory_title(body)
+        records.append({
+            "name": path.stem,
+            "path": f"wiki/{path.relative_to(WIKI_DIR).as_posix()}",
+            "title": title,
+            "memory_type": meta.get("memory_type", meta.get("type", "memory")),
+            "scope": meta.get("scope", ""),
+            "status": meta.get("status", ""),
+            "tags": _meta_tags(meta.get("tags", "")),
+            "tldr": _extract_tldr(body),
+            "snippet": _first_body_snippet(body),
+            "body": body,
+        })
+    return records
+
+
+def _score_memory(record: dict[str, object], query: str) -> int:
+    q = query.lower().strip()
+    tokens = [token for token in re.split(r"\W+", q) if len(token) >= 3]
+    title = str(record.get("title", "")).lower()
+    tldr = str(record.get("tldr", "")).lower()
+    body = str(record.get("body", "")).lower()
+    tags = " ".join(str(tag).lower() for tag in record.get("tags", []))
+    score = 0
+    if q and q in title:
+        score += 20
+    if q and q in tldr:
+        score += 12
+    if q and q in tags:
+        score += 8
+    if q and q in body:
+        score += 4
+    for token in tokens:
+        if token in title:
+            score += 6
+        if token in tldr:
+            score += 4
+        if token in tags:
+            score += 3
+        if token in body:
+            score += 1
+    return score
+
+
+def _recall_memories(query: str, limit: int = 10) -> list[dict[str, object]]:
+    query = _clean_text_input(query)
+    if not query:
+        return []
+    scored: list[tuple[int, dict[str, object]]] = []
+    for record in _memory_records():
+        score = _score_memory(record, query)
+        if score > 0:
+            slim = {key: value for key, value in record.items() if key != "body"}
+            slim["score"] = score
+            scored.append((score, slim))
+    scored.sort(key=lambda item: (-item[0], str(item[1]["title"]).lower()))
+    return [record for _, record in scored[:limit]]
+
+
+def _update_memory_index(page_name: str, title: str, summary: str, memory_type: str, scope: str) -> None:
+    index_path = WIKI_DIR / "index.md"
+    if not index_path.exists():
+        index_path.write_text(
+            "# Link Wiki Index\n\n"
+            "> Last updated: not yet ingested | 0 pages | 0 sources\n\n"
+            "## Categories\n\n"
+            "## Recent\n\n"
+            "| Date | Operation | Pages Touched |\n"
+            "|------|-----------|---------------|\n",
+            encoding="utf-8",
+        )
+    text = index_path.read_text(encoding="utf-8", errors="replace")
+    if f"[[{page_name}]]" in text:
+        return
+    entry = f"- [[{page_name}]] - {summary} {memory_type} · {scope}\n"
+    if "### memories" in text:
+        pattern = re.compile(r"(### memories\n)(.*?)(?=\n### |\n## Recent|\Z)", flags=re.DOTALL)
+        text = pattern.sub(lambda m: m.group(1) + m.group(2).rstrip() + "\n" + entry, text, count=1)
+    elif "\n## Recent" in text:
+        text = text.replace("\n## Recent", f"\n### memories\n{entry}\n## Recent", 1)
+    else:
+        text = text.rstrip() + f"\n\n### memories\n{entry}"
+    index_path.write_text(text, encoding="utf-8")
+
+
+def _append_log(timestamp: str, operation: str, description: str, lines: list[str]) -> None:
+    log_path = WIKI_DIR / "log.md"
+    if not log_path.exists():
+        log_path.write_text("# Link Wiki Log\n\n*Append-only record of wiki operations.*\n", encoding="utf-8")
+    entry = [f"## [{timestamp}] {operation} | {description}", ""]
+    entry.extend(f"- {line}" for line in lines)
+    entry.extend(["", "---", ""])
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(entry))
+
+
+def _write_memory_page(
+    text: str,
+    title: str = "",
+    memory_type: str = "note",
+    scope: str = "user",
+    tags: str = "",
+    source: str = "mcp",
+) -> dict[str, object]:
+    clean_text = _clean_text_input(text, max_len=4000)
+    if not clean_text:
+        raise ValueError("memory text required")
+    memory_type = _clean_text_input(memory_type).lower() or "note"
+    scope = _clean_text_input(scope).lower() or "user"
+    if memory_type not in MEMORY_TYPES:
+        raise ValueError(f"memory_type must be one of: {', '.join(MEMORY_TYPES)}")
+    if scope not in MEMORY_SCOPES:
+        raise ValueError(f"scope must be one of: {', '.join(MEMORY_SCOPES)}")
+
+    timestamp = _utc_timestamp()
+    memory_title = _memory_title(clean_text, _clean_text_input(title))
+    summary = clean_text.splitlines()[0].strip()
+    if len(summary) > 180:
+        summary = summary[:177].rstrip() + "..."
+    memories_dir = WIKI_DIR / "memories"
+    memories_dir.mkdir(parents=True, exist_ok=True)
+    page_path = _unique_page_path(memories_dir, _slugify(memory_title))
+    page_name = page_path.stem
+    tag_values = ["memory", memory_type]
+    for tag in _csv_values(tags):
+        slug_tag = _slugify(tag, fallback="")
+        if slug_tag and slug_tag not in tag_values:
+            tag_values.append(slug_tag)
+
+    page = f"""---
+type: memory
+title: "{_frontmatter_string(memory_title)}"
+memory_type: {memory_type}
+scope: {scope}
+status: active
+date_captured: "{timestamp}"
+source: "{_frontmatter_string(source)}"
+tags: {_yaml_list(tag_values)}
+---
+
+# {memory_title}
+
+> **TLDR:** {summary}
+
+## Memory
+
+{clean_text}
+
+## Use This When
+
+- An agent needs relevant {scope} context for future work.
+- A future answer depends on this {memory_type}.
+
+## Source
+
+{source}
+"""
+    page_path.write_text(page, encoding="utf-8")
+    _update_memory_index(page_name, memory_title, summary, memory_type, scope)
+    _append_log(
+        timestamp,
+        "remember",
+        memory_title,
+        [
+            f"Created: memories/{page_path.name}",
+            f"Type: {memory_type}",
+            f"Scope: {scope}",
+        ],
+    )
+    rebuilt = json.loads(rebuild_backlinks())
+    _cache.clear()
+    return {
+        "created": True,
+        "name": page_name,
+        "path": f"wiki/memories/{page_path.name}",
+        "title": memory_title,
+        "memory_type": memory_type,
+        "scope": scope,
+        "backlinks_rebuilt": bool(rebuilt.get("rebuilt")),
+    }
+
+
 # ── MCP Tools ─────────────────────────────────────────────────────────
 
 @mcp.tool()
@@ -373,6 +629,53 @@ def search_wiki(query: str, limit: int = 20) -> str:
 
 
 @mcp.tool()
+def recall_memory(query: str, limit: int = 10) -> str:
+    """Search local agent memory pages first.
+
+    Use this when the user asks about preferences, decisions, project context,
+    or anything the agent should remember across sessions. Returns only pages
+    under wiki/memories/.
+    """
+    query = _clean_text_input(query)
+    limit = _parse_limit(limit, default=10)
+    if not query:
+        return json.dumps({"error": "query required", "query": "", "count": 0, "memories": []})
+    memories = _recall_memories(query, limit=limit)
+    return json.dumps({"query": query, "count": len(memories), "memories": memories}, ensure_ascii=False)
+
+
+@mcp.tool()
+def remember_memory(
+    memory: str,
+    title: str = "",
+    memory_type: str = "note",
+    scope: str = "user",
+    tags: str = "",
+    source: str = "mcp",
+) -> str:
+    """Save a local agent memory as a Markdown page.
+
+    Use only when the user explicitly asks you to remember something. The memory
+    is written under wiki/memories/, indexed, logged, and kept local.
+    memory_type: preference, decision, project, fact, or note.
+    scope: user, project, or global.
+    tags: optional comma-separated tags.
+    """
+    try:
+        result = _write_memory_page(
+            memory,
+            title=title,
+            memory_type=memory_type,
+            scope=scope,
+            tags=tags,
+            source=source,
+        )
+    except ValueError as exc:
+        return json.dumps({"created": False, "error": str(exc)})
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
 def get_context(topic: str) -> str:
     """Get full context for a topic from the Link wiki.
 
@@ -396,8 +699,8 @@ def get_pages(category: str = "", page_type: str = "", maturity: str = "") -> st
     """List all pages in the Link wiki with metadata.
 
     Optional filters:
-    - category: "concepts", "entities", "sources", "comparisons", "explorations"
-    - page_type: "concept", "entity", "source", "comparison", "exploration"
+    - category: "memories", "concepts", "entities", "sources", "comparisons", "explorations"
+    - page_type: "memory", "concept", "entity", "source", "comparison", "exploration"
     - maturity: "seed", "growing", "mature", "established"
 
     Returns pages with: name, title, category, type, tags, aliases, maturity,

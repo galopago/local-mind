@@ -30,6 +30,7 @@ EXPECTED_WIKI_PAGES = {
     "local-first-software",
     "local-release-notes",
     "log",
+    "prefer-local-personal-memory",
     "retrieval-augmented-generation",
     "transformer-reading-notes",
     "transformers",
@@ -44,6 +45,8 @@ EXPECTED_KEY_EDGES = {
     ("knowledge-graph", "agent-memory"),
     ("link", "knowledge-graph"),
     ("link", "retrieval-augmented-generation"),
+    ("prefer-local-personal-memory", "agent-memory"),
+    ("prefer-local-personal-memory", "link"),
     ("retrieval-augmented-generation", "transformers"),
     ("why-link-helps-agents", "agent-memory"),
 }
@@ -102,10 +105,19 @@ class DemoSnapshotTests(unittest.TestCase):
         edges = {(edge["source"], edge["target"]) for edge in graph["edges"]}
 
         self.assertEqual(node_ids, EXPECTED_WIKI_PAGES)
-        self.assertEqual(len(graph["nodes"]), 12)
-        self.assertEqual(len(graph["edges"]), 54)
+        self.assertEqual(len(graph["nodes"]), 13)
+        self.assertEqual(len(graph["edges"]), 58)
         self.assertEqual(len(edges), len(graph["edges"]))
         self.assertTrue(EXPECTED_KEY_EDGES.issubset(edges))
+
+    def test_demo_home_shows_memories(self):
+        target = self.make_demo()
+        reset_serve_wiki(target / "wiki")
+
+        html = serve._render_home()
+
+        self.assertIn('<span class="label">memories</span>', html)
+        self.assertIn("Prefer local personal memory", html)
 
     def test_demo_context_snapshot(self):
         target = self.make_demo()
@@ -117,7 +129,7 @@ class DemoSnapshotTests(unittest.TestCase):
 
         self.assertTrue(ctx["found"])
         self.assertEqual(ctx["primary"], "agent-memory")
-        self.assertEqual(ctx["inbound_count"], 9)
+        self.assertEqual(ctx["inbound_count"], 10)
         self.assertEqual(ctx["forward_count"], 5)
         self.assertEqual(page_names[0], "agent-memory")
         self.assertIn("link", page_names)

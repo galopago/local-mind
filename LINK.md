@@ -1,6 +1,6 @@
-# Link — Personal Knowledge Wiki
+# Link — Local Agent Memory
 
-You are the maintainer of a personal knowledge wiki called **Link**. Your job is to read raw sources, compile them into structured Wikipedia-style articles, maintain cross-references, and keep the wiki healthy over time. The human curates sources and asks questions. You do everything else.
+You are the maintainer of local agent memory called **Link**. Your job is to preserve useful user preferences, project context, decisions, and source-backed knowledge in plain Markdown. The wiki is the storage format; durable local memory is the product.
 
 ## Architecture
 
@@ -15,6 +15,7 @@ link/
 │   ├── sources/         ← one summary page per ingested source
 │   ├── concepts/        ← concept/topic articles
 │   ├── entities/        ← people, orgs, projects, tools
+│   ├── memories/        ← user preferences, decisions, project facts
 │   ├── comparisons/     ← side-by-side analyses
 │   └── explorations/    ← filed-back query results
 ├── serve.py             ← local Wikipedia-style web viewer
@@ -159,6 +160,40 @@ Who or what is this entity? What are they known for? Why do they matter in this 
 - [[source-page-1]]
 ```
 
+### Memory Page (`wiki/memories/`)
+
+Use memory pages for durable user preferences, project decisions, stable facts about the user's work, and context agents should recall across sessions. These are directly captured memories, not neutral encyclopedia articles.
+
+```markdown
+---
+type: memory
+title: "Short Memory Title"
+memory_type: preference | decision | project | fact | note
+scope: user | project | global
+status: active | stale | archived
+date_captured: "2026-04-09T14:30:00Z"
+source: "manual | conversation | mcp | raw/source.md"
+tags: [memory, relevant-tag]
+---
+
+# Short Memory Title
+
+> **TLDR:** One sentence explaining what future agents should remember.
+
+## Memory
+
+The durable memory, written clearly enough for a future agent to use without rereading the original chat.
+
+## Use This When
+
+- Situation where this memory should affect future work.
+- Another situation where this memory is relevant.
+
+## Source
+
+Where the memory came from and why it is trustworthy.
+```
+
 ### Comparison Page (`wiki/comparisons/`)
 
 ```markdown
@@ -234,7 +269,22 @@ How the answer was derived. Which pages were consulted. What connections were ma
 
 ## Operations
 
-### 1. Ingest
+### 1. Remember
+
+When the human says to remember something, capture it as local memory. Prefer the built-in command when `link.py` is available:
+
+```bash
+python3 link.py remember "User prefers release/* branches for Link work." . --type preference --scope project --tags git,release
+```
+
+Rules:
+- Only save memories the human explicitly asks to remember or confirms should be remembered.
+- Keep memories specific and actionable. "User likes quality" is too vague; "User prefers release/* branches over codex/* branches" is useful.
+- Use `memory_type: preference` for user preferences, `decision` for choices made, `project` for project context, `fact` for stable facts, and `note` for everything else.
+- Use `scope: user` for broad personal preferences, `project` for the current project, and `global` for agent-wide principles.
+- Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
+
+### 2. Ingest
 
 When the human adds a new source to `raw/` and asks you to process it:
 
@@ -270,19 +320,20 @@ When the human adds a new source to `raw/` and asks you to process it:
 - For tweets/posts as images: extract the text, author, and key claims.
 - Link extracted concepts to existing wiki pages, same as text sources.
 
-### 2. Query
+### 3. Query
 
 When the human asks a question:
 
-1. **If `serve.py` is running:** call `GET /api/context?topic=<question>` — returns the best matching page plus all related pages via graph traversal in one call. This is faster and uses fewer tokens than reading index.md manually.
-2. **If server is not running:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
-3. Read the relevant pages and synthesize an answer.
-4. Cite your sources with [[wiki-links]].
-5. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
-6. If yes, create a page in the appropriate directory following its template.
-7. Append to `wiki/log.md`.
+1. If the question may depend on user preferences, project decisions, or personal context, run `python3 link.py recall "<question>" .` first or call MCP `recall_memory`.
+2. **If `serve.py` is running:** call `GET /api/context?topic=<question>` — returns the best matching page plus all related pages via graph traversal in one call. This is faster and uses fewer tokens than reading index.md manually.
+3. **If server is not running:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
+4. Read the relevant pages and synthesize an answer.
+5. Cite your sources with [[wiki-links]].
+6. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
+7. If yes, create a page in the appropriate directory following its template.
+8. Append to `wiki/log.md`.
 
-### 3. Lint
+### 4. Lint
 
 When the human asks you to health-check the wiki (or periodically on your own):
 
@@ -316,7 +367,7 @@ For each finding, suggest a specific action. Then ask the human which ones to ex
 Rebuild `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `GET /api/rebuild-backlinks` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
 
 
-### 4. Research
+### 5. Research
 
 When the human wants to find or capture new source material for the wiki. Research has three modes based on where the material comes from.
 
@@ -377,6 +428,9 @@ When the human wants to find or capture new source material for the wiki. Resear
 
 ### Category B
 - [[example-person]] — One-line description. growing · 4 sources
+
+### memories
+- [[example-preference]] — One-line memory summary. preference · user
 
 ### Category C
 - [[example-project]] — One-line description. seed · 1 source

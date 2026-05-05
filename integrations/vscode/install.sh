@@ -38,7 +38,8 @@ if not isinstance(instructions, list):
     instructions = []
 instructions = [
     i for i in instructions
-    if '## Link — Personal Knowledge Wiki' not in i.get('text', '')
+    if '## Link — Local Agent Memory' not in i.get('text', '')
+    and '## Link — Personal Knowledge Wiki' not in i.get('text', '')
     and 'Link, an LLM-maintained knowledge wiki' not in i.get('text', '')
 ]
 instructions.append({'text': instructions_text})

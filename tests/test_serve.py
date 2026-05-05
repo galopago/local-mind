@@ -43,6 +43,7 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(serve._plural_type_label("source"), "sources")
         self.assertEqual(serve._plural_type_label("concept"), "concepts")
         self.assertEqual(serve._plural_type_label("entity"), "entities")
+        self.assertEqual(serve._plural_type_label("memory"), "memories")
 
     def test_layout_handles_search_enter_key(self):
         html = serve._layout("Test", "<p>Body</p>")

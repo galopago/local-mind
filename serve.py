@@ -182,7 +182,7 @@ def _page_href(name: str) -> str:
 
 
 def _plural_type_label(page_type: str) -> str:
-    irregular = {"entity": "entities"}
+    irregular = {"entity": "entities", "memory": "memories"}
     if page_type in irregular:
         return irregular[page_type]
     return page_type if page_type.endswith("s") else page_type + "s"
@@ -537,7 +537,7 @@ def _render_home():
         counts[t] = counts.get(t, 0) + 1
 
     stats_items = f'<div class="stat"><span class="num">{len(pages)}</span><span class="label">pages</span></div>'
-    for t in ["source", "concept", "entity", "comparison", "exploration"]:
+    for t in ["memory", "source", "concept", "entity", "comparison", "exploration"]:
         if counts.get(t, 0) > 0:
             label = _plural_type_label(t)
             stats_items += f'<div class="stat"><span class="num">{counts[t]}</span><span class="label">{label}</span></div>'
@@ -631,8 +631,9 @@ def _render_graph():
         return _layout("Knowledge Graph", body)
 
     # Category → color mapping
-    cat_colors = {"concepts": "#4e79a7", "entities": "#f28e2b", "sources": "#59a14f",
-                  "comparisons": "#e15759", "explorations": "#76b7b2", "root": "#bab0ac"}
+    cat_colors = {"concepts": "#4e79a7", "entities": "#f28e2b", "memories": "#edc948",
+                  "sources": "#59a14f", "comparisons": "#e15759",
+                  "explorations": "#76b7b2", "root": "#bab0ac"}
 
     graph_js = f"""
 <script>
@@ -671,7 +672,7 @@ def _render_graph():
     var lobe = i % 2 === 0 ? -1 : 1;
     var a = i * 2.399963 + stableNoise(n.id, 7) * 0.7;
     var r = 50 + Math.sqrt((i + 1) / Math.max(nodes.length, 1)) * 155;
-    var categoryDrop = n.category === 'sources' ? 58 : (n.category === 'entities' ? 24 : -6);
+    var categoryDrop = n.category === 'sources' ? 58 : (n.category === 'memories' ? -34 : (n.category === 'entities' ? 24 : -6));
     pos[n.id] = {{
       x: lobe * 78 + Math.cos(a) * r * 0.78,
       y: Math.sin(a) * r * 0.58 + categoryDrop
@@ -705,6 +706,7 @@ def _render_graph():
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
   function nodeRadius(n) {{
     if (n.category === 'sources') return 4.5;
+    if (n.category === 'memories') return 6.4;
     if (n.category === 'entities') return 6.8;
     return NODE_R;
   }}

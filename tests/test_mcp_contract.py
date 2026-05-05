@@ -120,7 +120,7 @@ class McpContractTests(unittest.TestCase):
 
         self.assertTrue(payload["found"])
         self.assertEqual(payload["primary"], "agent-memory")
-        self.assertEqual(payload["inbound_count"], 9)
+        self.assertEqual(payload["inbound_count"], 10)
         self.assertEqual(payload["forward_count"], 5)
         self.assertEqual(page_names[0], "agent-memory")
         self.assertIn("link", page_names)
@@ -149,7 +149,7 @@ class McpContractTests(unittest.TestCase):
         payload = json.loads(self.server.get_backlinks("agent-memory"))
 
         self.assertEqual(payload["page"], "agent-memory")
-        self.assertEqual(len(payload["inbound"]), 9)
+        self.assertEqual(len(payload["inbound"]), 10)
         self.assertEqual(len(payload["forward"]), 5)
         self.assertIn("link", payload["inbound"])
         self.assertIn("agent-memory-session", payload["forward"])
@@ -166,12 +166,37 @@ class McpContractTests(unittest.TestCase):
         nodes = {node["id"] for node in payload["nodes"]}
         edges = {(edge["source"], edge["target"]) for edge in payload["edges"]}
 
-        self.assertEqual(len(payload["nodes"]), 12)
-        self.assertEqual(len(payload["edges"]), 54)
+        self.assertEqual(len(payload["nodes"]), 13)
+        self.assertEqual(len(payload["edges"]), 58)
         self.assertEqual(len(edges), len(payload["edges"]))
         self.assertIn("agent-memory", nodes)
+        self.assertIn("prefer-local-personal-memory", nodes)
         self.assertIn(("agent-memory", "link"), edges)
+        self.assertIn(("prefer-local-personal-memory", "agent-memory"), edges)
         self.assertIn(("retrieval-augmented-generation", "transformers"), edges)
+
+    def test_recall_memory_contract(self):
+        payload = json.loads(self.server.recall_memory("local personal memory"))
+
+        self.assertGreaterEqual(payload["count"], 1)
+        self.assertEqual(payload["memories"][0]["name"], "prefer-local-personal-memory")
+        self.assertEqual(payload["memories"][0]["memory_type"], "preference")
+
+    def test_remember_memory_contract(self):
+        payload = json.loads(self.server.remember_memory(
+            "User prefers release branches for Link work.",
+            title="Prefer release branches",
+            memory_type="preference",
+            scope="project",
+            tags="git, release",
+            source="unit test",
+        ))
+        recall = json.loads(self.server.recall_memory("release branches"))
+
+        self.assertTrue(payload["created"])
+        self.assertEqual(payload["name"], "prefer-release-branches")
+        self.assertTrue((self.target / "wiki/memories/prefer-release-branches.md").exists())
+        self.assertEqual(recall["memories"][0]["name"], "prefer-release-branches")
 
     def test_rebuild_backlinks_contract(self):
         backlinks_path = self.target / "wiki/_backlinks.json"

@@ -11,7 +11,8 @@ settings = json.load(open('$TARGET'))
 instructions = settings.get('github.copilot.chat.codeGeneration.instructions', [])
 filtered = [
     i for i in instructions
-    if '## Link — Personal Knowledge Wiki' not in i.get('text', '')
+    if '## Link — Local Agent Memory' not in i.get('text', '')
+    and '## Link — Personal Knowledge Wiki' not in i.get('text', '')
     and 'Link, an LLM-maintained knowledge wiki' not in i.get('text', '')
 ]
 if len(filtered) < len(instructions):

@@ -6,6 +6,11 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ## [Unreleased]
 
+### Added
+
+- Added Memory Mode foundation with `wiki/memories/`, `link.py remember`, `link.py recall`, and MCP `remember_memory`/`recall_memory` tools.
+- Added a first-run demo memory page so Link presents as local agent memory, not only a wiki.
+
 ## [1.0.7] - 2026-05-04
 
 ### Fixed

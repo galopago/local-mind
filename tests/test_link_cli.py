@@ -138,6 +138,73 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Backlinks: stale", out.getvalue())
         self.assertIn("Repair graph index", out.getvalue())
 
+    def test_remember_creates_memory_page_and_updates_backlinks(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.remember(
+                target,
+                "User prefers release branches for Link work.",
+                title="Prefer release branches",
+                memory_type="preference",
+                scope="project",
+                tags="git, release",
+                source="unit test",
+            )
+
+        memory_path = target / "wiki/memories/prefer-release-branches.md"
+        backlinks = json.loads((target / "wiki/_backlinks.json").read_text(encoding="utf-8"))
+        index_text = (target / "wiki/index.md").read_text(encoding="utf-8")
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertEqual(code, 0)
+        self.assertTrue(memory_path.exists())
+        self.assertIn("memory_type: preference", memory_path.read_text(encoding="utf-8"))
+        self.assertIn("[[prefer-release-branches]]", index_text)
+        self.assertIn("Created: memories/prefer-release-branches.md", log_text)
+        self.assertIn("prefer-release-branches", backlinks["backlinks"])
+        self.assertIn("Memory saved", out.getvalue())
+
+    def test_recall_finds_memory_pages(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.remember(
+                target,
+                "User prefers release branches for Link work.",
+                title="Prefer release branches",
+                memory_type="preference",
+                scope="project",
+            )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.recall(target, "release branches")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Prefer release branches", out.getvalue())
+        self.assertIn("wiki/memories/prefer-release-branches.md", out.getvalue())
+
+    def test_recall_json(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.remember(target, "User likes local first memory.", title="Local memory preference")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.recall(target, "local memory", json_output=True)
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["count"], 2)
+        self.assertEqual(payload["memories"][0]["name"], "local-memory-preference")
+
     def test_verify_mcp_ready(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
         target = tmp / "demo"
@@ -323,6 +390,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertTrue((target / "raw").is_dir())
         self.assertTrue((target / "wiki/sources").is_dir())
         self.assertTrue((target / "wiki/concepts").is_dir())
+        self.assertTrue((target / "wiki/memories").is_dir())
         self.assertTrue((target / "wiki/_backlinks.json").exists())
         self.assertIn("created raw", out.getvalue())
         self.assertIn("created wiki/index.md", out.getvalue())

@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.gowtham0992/link -->
 
-MCP server for the [Link](https://github.com/gowtham0992/link) personal knowledge wiki. Exposes your wiki as MCP tools — search, query context, and traverse the knowledge graph without reading files directly.
+MCP server for [Link](https://github.com/gowtham0992/link), local personal memory for agents. Exposes memories and wiki context as MCP tools so agents can recall preferences, decisions, project context, sources, and graph neighborhoods without reading files directly.
 
 Listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.gowtham0992/link`.
 
@@ -81,6 +81,8 @@ Custom wiki path:
 
 | Tool | Description |
 |------|-------------|
+| `recall_memory(query, limit?)` | Search durable local memories for preferences, decisions, and project context. |
+| `remember_memory(memory, title?, memory_type?, scope?, tags?, source?)` | Save an explicit user-approved local memory under `wiki/memories/`. |
 | `search_wiki(query, limit?)` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets. |
 | `get_context(topic)` | **Primary tool.** Best matching page (full content) + inbound/forward graph links in one call. |
 | `get_pages(category?, type?, maturity?)` | All pages with metadata. Filter by category, type, or maturity. |
@@ -88,7 +90,7 @@ Custom wiki path:
 | `get_graph()` | All nodes + edges for graph reasoning. |
 | `rebuild_backlinks()` | Rebuild `_backlinks.json` after ingest or lint. |
 
-**Use `get_context` for answering questions** — one call returns the primary page plus all related pages via graph traversal. Eliminates the token waste of reading index.md every session.
+Use `recall_memory` first for user preferences, decisions, and project context. Use `get_context` for source-backed topic answers — one call returns the primary page plus all related pages via graph traversal.
 
 ## Wiki location
 

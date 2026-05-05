@@ -60,7 +60,7 @@ cp "$LINK_ROOT/.linkignore" "$TARGET_DIR/.linkignore"
 # ── Wiki structure: only on fresh install ────────────────────────────
 # Never overwrite wiki data (index.md, log.md, _backlinks.json, page files).
 if [ "$IS_UPDATE" = false ]; then
-    for dir in raw wiki/sources wiki/concepts wiki/entities wiki/comparisons wiki/explorations; do
+    for dir in raw wiki/sources wiki/concepts wiki/entities wiki/memories wiki/comparisons wiki/explorations; do
         mkdir -p "$TARGET_DIR/$dir"
         touch "$TARGET_DIR/$dir/.gitkeep"
     done
@@ -83,7 +83,7 @@ if [ "$IS_UPDATE" = false ]; then
     echo "  Wiki structure created at $TARGET_DIR"
 else
     # On update: ensure directory structure exists (in case new dirs were added)
-    for dir in raw wiki/sources wiki/concepts wiki/entities wiki/comparisons wiki/explorations; do
+    for dir in raw wiki/sources wiki/concepts wiki/entities wiki/memories wiki/comparisons wiki/explorations; do
         mkdir -p "$TARGET_DIR/$dir"
     done
 fi

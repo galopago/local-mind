@@ -5,6 +5,8 @@ Usage:
   python link.py demo [target]
   python link.py doctor [target]
   python link.py ingest-status [target]
+  python link.py remember "memory text" [target]
+  python link.py recall "query" [target]
   python link.py rebuild-backlinks [target]
   python link.py verify-mcp [target]
 """
@@ -17,6 +19,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -81,6 +84,8 @@ SKIP_SCAN_SUFFIXES = {
     ".whl",
     ".zip",
 }
+MEMORY_TYPES = ("preference", "decision", "project", "fact", "note")
+MEMORY_SCOPES = ("user", "project", "global")
 
 
 DEMO_FILES: dict[str, str] = {
@@ -488,6 +493,35 @@ The demo positions Link as a local [[agent-memory]] layer. It keeps knowledge in
 - [[agent-memory-session]]
 - [[local-release-notes]]
 """,
+    "wiki/memories/prefer-local-personal-memory.md": """---
+type: memory
+title: "Prefer local personal memory"
+memory_type: preference
+scope: user
+status: active
+date_captured: "2026-05-04T00:00:00Z"
+tags: [memory, agents, local-first]
+aliases: ["local personal memory", "agent personal memory"]
+---
+
+# Prefer local personal memory
+
+> **TLDR:** The user wants Link to be local personal memory for agents, with the wiki as the inspectable storage format.
+
+## Memory
+
+The user wants [[link]] to feel like local personal memory for agents rather than only a wiki. Agents should remember user preferences, project context, decisions, and why those memories exist.
+
+## Use This When
+
+- Positioning Link in product copy or onboarding.
+- Deciding whether a feature should prioritize [[agent-memory]] workflows over generic note management.
+- Explaining why [[local-first-software]] matters for personal agent memory.
+
+## Source
+
+Captured as demo product intent for the first-run wiki.
+""",
     "wiki/explorations/why-link-helps-agents.md": """---
 type: exploration
 title: "Why Link helps agents"
@@ -520,7 +554,7 @@ The answer combines [[agent-memory-session]], [[transformer-reading-notes]], and
 """,
     "wiki/index.md": """# Link Demo Wiki Index
 
-> Last updated: 2026-05-02 | 10 pages | 3 sources
+> Last updated: 2026-05-02 | 11 pages | 3 sources
 
 ## Categories
 
@@ -534,6 +568,9 @@ The answer combines [[agent-memory-session]], [[transformer-reading-notes]], and
 ### entities
 - [[link]] - Local-first wiki and MCP memory server for agents. growing - 2 sources - also: Link MCP
 
+### memories
+- [[prefer-local-personal-memory]] - User preference that Link should behave as local personal memory for agents. preference · user
+
 ### sources
 - [[agent-memory-session]] - Demo note on durable project context. high
 - [[transformer-reading-notes]] - Demo note connecting transformers, retrieval, and memory. high
@@ -546,7 +583,7 @@ The answer combines [[agent-memory-session]], [[transformer-reading-notes]], and
 
 | Date | Operation | Pages Touched |
 |------|-----------|---------------|
-| 2026-05-02 | demo: create first-run sample wiki | 10 pages |
+| 2026-05-02 | demo: create first-run sample wiki | 11 pages |
 """,
     "wiki/log.md": """# Link Demo Wiki Log
 
@@ -568,9 +605,10 @@ The answer combines [[agent-memory-session]], [[transformer-reading-notes]], and
 - Created: concepts/local-first-software.md
 - Created: concepts/knowledge-graph.md
 - Created: entities/link.md
+- Created: memories/prefer-local-personal-memory.md
 - Created: explorations/why-link-helps-agents.md
 - Rebuilt: wiki/_backlinks.json
-- Pages touched: 10
+- Pages touched: 11
 
 ---
 """,
@@ -664,6 +702,252 @@ def _resolve_wiki_dir(target: Path) -> Path:
     if target.name == "wiki" and (target / "index.md").exists():
         return target
     return target / "wiki"
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _slugify(value: str, fallback: str = "memory") -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or fallback
+
+
+def _frontmatter_string(value: str) -> str:
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _csv_values(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _meta_tags(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip().strip("\"'") for item in _csv_values(str(value).strip("[]"))]
+
+
+def _yaml_list(values: list[str]) -> str:
+    return "[" + ", ".join(values) + "]"
+
+
+def _memory_title(text: str, explicit_title: str | None = None) -> str:
+    if explicit_title and explicit_title.strip():
+        return explicit_title.strip()
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "Memory")
+    first_sentence = re.split(r"(?<=[.!?])\s+", first_line, maxsplit=1)[0].strip()
+    if len(first_sentence) <= 70:
+        return first_sentence.rstrip(".")
+    return first_sentence[:67].rstrip() + "..."
+
+
+def _unique_page_path(directory: Path, slug: str) -> Path:
+    candidate = directory / f"{slug}.md"
+    index = 2
+    while candidate.exists():
+        candidate = directory / f"{slug}-{index}.md"
+        index += 1
+    return candidate
+
+
+def _extract_tldr(body: str) -> str:
+    match = re.search(r">\s*\*\*TLDR:\*\*\s*(.+)", body)
+    return match.group(1).strip() if match else ""
+
+
+def _first_body_snippet(body: str) -> str:
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and not stripped.startswith(">"):
+            return stripped[:200]
+    return ""
+
+
+def _memory_records(wiki_dir: Path) -> list[dict[str, object]]:
+    memories_dir = wiki_dir / "memories"
+    if not memories_dir.exists():
+        return []
+    records: list[dict[str, object]] = []
+    for path in sorted(memories_dir.rglob("*.md")):
+        if path.name.startswith("."):
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        meta, body = _parse_frontmatter(text)
+        title = meta.get("title") or _memory_title(body)
+        records.append({
+            "name": path.stem,
+            "path": f"wiki/{path.relative_to(wiki_dir).as_posix()}",
+            "title": title,
+            "memory_type": meta.get("memory_type", meta.get("type", "memory")),
+            "scope": meta.get("scope", ""),
+            "status": meta.get("status", ""),
+            "tags": _meta_tags(meta.get("tags", "")),
+            "tldr": _extract_tldr(body),
+            "snippet": _first_body_snippet(body),
+            "body": body,
+        })
+    return records
+
+
+def _score_memory(record: dict[str, object], query: str) -> int:
+    q = query.lower().strip()
+    tokens = [token for token in re.split(r"\W+", q) if len(token) >= 3]
+    title = str(record.get("title", "")).lower()
+    tldr = str(record.get("tldr", "")).lower()
+    body = str(record.get("body", "")).lower()
+    tags = " ".join(str(tag).lower() for tag in record.get("tags", []))
+    score = 0
+    if q and q in title:
+        score += 20
+    if q and q in tldr:
+        score += 12
+    if q and q in tags:
+        score += 8
+    if q and q in body:
+        score += 4
+    for token in tokens:
+        if token in title:
+            score += 6
+        if token in tldr:
+            score += 4
+        if token in tags:
+            score += 3
+        if token in body:
+            score += 1
+    return score
+
+
+def _recall_memories(wiki_dir: Path, query: str, limit: int = 10) -> list[dict[str, object]]:
+    q = query.strip()
+    if not q:
+        return []
+    scored: list[tuple[int, dict[str, object]]] = []
+    for record in _memory_records(wiki_dir):
+        score = _score_memory(record, q)
+        if score > 0:
+            slim = {key: value for key, value in record.items() if key != "body"}
+            slim["score"] = score
+            scored.append((score, slim))
+    scored.sort(key=lambda item: (-item[0], str(item[1]["title"]).lower()))
+    return [record for _, record in scored[:limit]]
+
+
+def _update_memory_index(index_path: Path, page_name: str, title: str, summary: str, memory_type: str, scope: str) -> None:
+    if not index_path.exists():
+        _write_default_index(index_path)
+    text = index_path.read_text(encoding="utf-8", errors="replace")
+    if f"[[{page_name}]]" in text:
+        return
+    entry = f"- [[{page_name}]] - {summary} {memory_type} · {scope}\n"
+    if "### memories" in text:
+        pattern = re.compile(r"(### memories\n)(.*?)(?=\n### |\n## Recent|\Z)", flags=re.DOTALL)
+        text = pattern.sub(lambda m: m.group(1) + m.group(2).rstrip() + "\n" + entry, text, count=1)
+    elif "\n## Recent" in text:
+        text = text.replace("\n## Recent", f"\n### memories\n{entry}\n## Recent", 1)
+    else:
+        text = text.rstrip() + f"\n\n### memories\n{entry}"
+    index_path.write_text(text, encoding="utf-8")
+
+
+def _append_log(wiki_dir: Path, timestamp: str, operation: str, description: str, lines: list[str]) -> None:
+    log_path = wiki_dir / "log.md"
+    if not log_path.exists():
+        _write_default_log(log_path)
+    entry = [f"## [{timestamp}] {operation} | {description}", ""]
+    entry.extend(f"- {line}" for line in lines)
+    entry.extend(["", "---", ""])
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(entry))
+
+
+def _write_memory_page(
+    target: Path,
+    text: str,
+    title: str | None = None,
+    memory_type: str = "note",
+    scope: str = "user",
+    tags: str | None = None,
+    source: str = "manual",
+    timestamp: str | None = None,
+) -> dict[str, object]:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
+    if memory_type not in MEMORY_TYPES:
+        raise ValueError(f"memory_type must be one of: {', '.join(MEMORY_TYPES)}")
+    if scope not in MEMORY_SCOPES:
+        raise ValueError(f"scope must be one of: {', '.join(MEMORY_SCOPES)}")
+
+    timestamp = timestamp or _utc_timestamp()
+    clean_text = text.strip()
+    memory_title = _memory_title(clean_text, title)
+    summary = clean_text.splitlines()[0].strip()
+    if len(summary) > 180:
+        summary = summary[:177].rstrip() + "..."
+    memories_dir = wiki_dir / "memories"
+    memories_dir.mkdir(parents=True, exist_ok=True)
+    page_path = _unique_page_path(memories_dir, _slugify(memory_title))
+    page_name = page_path.stem
+    tag_values = ["memory", memory_type]
+    for tag in _csv_values(tags):
+        slug_tag = _slugify(tag, fallback="")
+        if slug_tag and slug_tag not in tag_values:
+            tag_values.append(slug_tag)
+
+    page = f"""---
+type: memory
+title: "{_frontmatter_string(memory_title)}"
+memory_type: {memory_type}
+scope: {scope}
+status: active
+date_captured: "{timestamp}"
+source: "{_frontmatter_string(source)}"
+tags: {_yaml_list(tag_values)}
+---
+
+# {memory_title}
+
+> **TLDR:** {summary}
+
+## Memory
+
+{clean_text}
+
+## Use This When
+
+- An agent needs relevant {scope} context for future work.
+- A future answer depends on this {memory_type}.
+
+## Source
+
+{source}
+"""
+    page_path.write_text(page, encoding="utf-8")
+    _update_memory_index(wiki_dir / "index.md", page_name, memory_title, summary, memory_type, scope)
+    _append_log(
+        wiki_dir,
+        timestamp,
+        "remember",
+        memory_title,
+        [
+            f"Created: memories/{page_path.name}",
+            f"Type: {memory_type}",
+            f"Scope: {scope}",
+        ],
+    )
+    backlinks = _build_backlinks(wiki_dir)
+    (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
+    return {
+        "created": True,
+        "name": page_name,
+        "path": f"wiki/memories/{page_path.name}",
+        "title": memory_title,
+        "memory_type": memory_type,
+        "scope": scope,
+    }
 
 
 def _normalize_link_index(data: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:
@@ -915,6 +1199,7 @@ def _required_paths(target: Path) -> list[Path]:
         wiki_dir / "sources",
         wiki_dir / "concepts",
         wiki_dir / "entities",
+        wiki_dir / "memories",
         wiki_dir / "comparisons",
         wiki_dir / "explorations",
     ]
@@ -1151,6 +1436,79 @@ def rebuild_backlinks(target: Path) -> int:
     return 0
 
 
+def remember(
+    target: Path,
+    text: str,
+    title: str | None = None,
+    memory_type: str = "note",
+    scope: str = "user",
+    tags: str | None = None,
+    source: str = "manual",
+    json_output: bool = False,
+) -> int:
+    if not text or not text.strip():
+        print("Memory text is required", file=sys.stderr)
+        return 1
+    try:
+        result = _write_memory_page(
+            target,
+            text,
+            title=title,
+            memory_type=memory_type,
+            scope=scope,
+            tags=tags,
+            source=source,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Could not remember: {exc}", file=sys.stderr)
+        return 1
+
+    if json_output:
+        print(json.dumps(result, indent=2))
+        return 0
+
+    print("Memory saved")
+    print(f"Title: {result['title']}")
+    print(f"Path: {result['path']}")
+    print(f"Type: {result['memory_type']}")
+    print(f"Scope: {result['scope']}")
+    print("")
+    print("Next:")
+    print(f"  python3 link.py recall \"{result['title']}\" .")
+    return 0
+
+
+def recall(target: Path, query: str, limit: int = 10, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    results = _recall_memories(wiki_dir, query, limit=limit)
+
+    if json_output:
+        print(json.dumps({"query": query, "count": len(results), "memories": results}, indent=2))
+        return 0
+
+    print(f"Link memory recall: {query}")
+    print("")
+    if not results:
+        print("No matching memories found.")
+        print("")
+        print("Next:")
+        print("  Add one: python3 link.py remember \"Memory to keep\" .")
+        return 0
+
+    print(f"{len(results)} memor{'y' if len(results) == 1 else 'ies'}")
+    for record in results:
+        print(f"- {record['title']} ({record['memory_type']} · {record['scope']})")
+        print(f"  {record['path']}")
+        summary = record.get("tldr") or record.get("snippet")
+        if summary:
+            print(f"  {summary}")
+    return 0
+
+
 def _check_link_mcp_import(python_cmd: str) -> dict[str, object]:
     code = (
         "import json, link_mcp; "
@@ -1303,6 +1661,7 @@ def create_demo(target: Path, force: bool = False) -> None:
         "wiki/sources",
         "wiki/concepts",
         "wiki/entities",
+        "wiki/memories",
         "wiki/comparisons",
         "wiki/explorations",
     ):
@@ -1347,6 +1706,22 @@ def main(argv: list[str] | None = None) -> int:
     ingest_status_cmd.add_argument("target", nargs="?", default=".")
     ingest_status_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
+    remember_cmd = sub.add_parser("remember", help="save a local agent memory")
+    remember_cmd.add_argument("text", help="memory text to save")
+    remember_cmd.add_argument("target", nargs="?", default=".")
+    remember_cmd.add_argument("--title", default=None, help="memory page title")
+    remember_cmd.add_argument("--type", choices=MEMORY_TYPES, default="note", dest="memory_type")
+    remember_cmd.add_argument("--scope", choices=MEMORY_SCOPES, default="user")
+    remember_cmd.add_argument("--tags", default=None, help="comma-separated tags")
+    remember_cmd.add_argument("--source", default="manual", help="where this memory came from")
+    remember_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
+
+    recall_cmd = sub.add_parser("recall", help="search local agent memories")
+    recall_cmd.add_argument("query", help="memory query")
+    recall_cmd.add_argument("target", nargs="?", default=".")
+    recall_cmd.add_argument("--limit", type=int, default=10)
+    recall_cmd.add_argument("--json", action="store_true", help="print machine-readable results")
+
     rebuild_cmd = sub.add_parser("rebuild-backlinks", help="rebuild wiki/_backlinks.json")
     rebuild_cmd.add_argument("target", nargs="?", default=".")
 
@@ -1363,6 +1738,19 @@ def main(argv: list[str] | None = None) -> int:
         return doctor(Path(args.target), fix=args.fix)
     if args.command == "ingest-status":
         return ingest_status(Path(args.target), json_output=args.json)
+    if args.command == "remember":
+        return remember(
+            Path(args.target),
+            args.text,
+            title=args.title,
+            memory_type=args.memory_type,
+            scope=args.scope,
+            tags=args.tags,
+            source=args.source,
+            json_output=args.json,
+        )
+    if args.command == "recall":
+        return recall(Path(args.target), args.query, limit=args.limit, json_output=args.json)
     if args.command == "rebuild-backlinks":
         return rebuild_backlinks(Path(args.target))
     if args.command == "verify-mcp":

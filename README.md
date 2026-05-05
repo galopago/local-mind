@@ -32,7 +32,7 @@ Open:
 - `http://localhost:3000`
 - `http://localhost:3000/graph`
 
-The demo shows the full loop: raw notes, source pages, concept pages, backlinks, graph context, search, and MCP-ready retrieval.
+The demo shows the full loop: local memories, raw notes, source pages, concept pages, backlinks, graph context, search, and MCP-ready retrieval.
 
 Check the demo:
 
@@ -89,7 +89,16 @@ Check what is pending:
 python3 ~/link/link.py ingest-status ~/link
 ```
 
-### 3. Ask your agent to ingest it
+### 3. Save one memory
+
+Use direct memories for preferences, decisions, and project context future agents should recall:
+
+```bash
+python3 ~/link/link.py remember "I am testing Link as local personal memory for agents." ~/link --type preference --scope user --tags onboarding
+python3 ~/link/link.py recall "local personal memory" ~/link
+```
+
+### 4. Ask your agent to ingest it
 
 In your agent chat:
 
@@ -99,7 +108,7 @@ ingest raw/first-memory.md into Link
 
 The agent reads `~/link/LINK.md`, creates a source page under `wiki/sources/`, creates or updates concept/entity pages, updates `wiki/index.md`, appends `wiki/log.md`, and rebuilds backlinks.
 
-### 4. Verify the loop
+### 5. Verify the loop
 
 ```bash
 python3 ~/link/link.py doctor ~/link --fix
@@ -203,6 +212,7 @@ Release flow details are lower in this document.
 | `raw/` | Immutable sources: notes, papers, articles, transcripts, images, PDFs. |
 | `wiki/` | Agent-maintained Markdown memory compiled from sources. |
 | Source pages | One page per ingested source, stored under `wiki/sources/`. |
+| Memory pages | Directly captured preferences, decisions, facts, and project context under `wiki/memories/`. |
 | Concept/entity pages | Synthesized knowledge pages with source citations and confidence tags. |
 | `_backlinks.json` | Reverse and forward link index used by search, graph, HTTP API, and MCP. |
 | `log.md` | Append-only audit trail of ingest, query, lint, and maintenance operations. |
@@ -222,6 +232,13 @@ Ask your agent:
 
 ```text
 ingest raw/notes.md into Link
+```
+
+Remember preferences and decisions directly:
+
+```bash
+python3 ~/link/link.py remember "User prefers release/* branches for Link work." ~/link --type preference --scope project
+python3 ~/link/link.py recall "branch preference" ~/link
 ```
 
 Maintain the wiki:
@@ -249,6 +266,8 @@ Obsidian also works: open the `wiki/` folder as a vault.
 |---------|-------------|
 | `python3 link.py demo` | Create `./link-demo` with a pre-ingested sample wiki. |
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
+| `python3 link.py remember "text" <dir>` | Save a local agent memory under `wiki/memories/`. |
+| `python3 link.py recall "query" <dir>` | Search local agent memories first. |
 | `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, and secret-looking content. |
 | `python3 link.py doctor <dir> --fix` | Create missing structure and repair backlinks safely. |
 | `python3 link.py rebuild-backlinks <dir>` | Regenerate `wiki/_backlinks.json`. |
@@ -263,13 +282,15 @@ Available tools:
 | Tool | Description |
 |------|-------------|
 | `search_wiki` | Ranked search by title, alias, tag, and full text. Returns scores and snippets. |
+| `recall_memory` | Search durable local memory pages for preferences, decisions, and project context. |
+| `remember_memory` | Save an explicit user-approved memory under `wiki/memories/`. |
 | `get_context` | Primary tool. Returns the best page plus inbound and forward graph neighbors. |
 | `get_pages` | Lists pages with metadata. Filter by category, type, or maturity. |
 | `get_backlinks` | Returns inbound and forward links for one page. |
 | `get_graph` | Returns all nodes and edges for graph reasoning. |
 | `rebuild_backlinks` | Rebuilds `_backlinks.json` after ingest or maintenance. |
 
-Use `get_context` for answering questions. It gives the agent the primary page plus its graph neighborhood in one call.
+Use `recall_memory` first when an answer depends on preferences, decisions, or project context. Use `get_context` for source-backed topic answers; it gives the agent the primary page plus its graph neighborhood in one call.
 
 ## HTTP API
 

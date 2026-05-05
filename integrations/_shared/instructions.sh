@@ -14,13 +14,14 @@ from pathlib import Path
 
 target = Path(os.environ["LINK_TARGET"]).expanduser()
 source = Path(os.environ["LINK_SOURCE"]).read_text(encoding="utf-8").rstrip()
-header = "## Link — Personal Knowledge Wiki"
+headers = ["## Link — Local Agent Memory", "## Link — Personal Knowledge Wiki"]
 
 existing = ""
 if target.exists():
     existing = target.read_text(encoding="utf-8", errors="replace")
 
-pattern = re.compile(rf"(^|\n){re.escape(header)}\n.*?(?=\n## |\Z)", re.DOTALL)
+header_pattern = "|".join(re.escape(header) for header in headers)
+pattern = re.compile(rf"(^|\n)(?:{header_pattern})\n.*?(?=\n## |\Z)", re.DOTALL)
 match = pattern.search(existing)
 if match:
     prefix = "\n" if match.group(1) else ""
