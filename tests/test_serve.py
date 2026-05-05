@@ -77,6 +77,33 @@ class ServeTests(unittest.TestCase):
         self.assertIn("document.activeElement.id === 'search-input'", html)
         self.assertIn("window.location.href = '/search?q=' + encodeURIComponent(q);", html)
 
+    def test_css_has_mobile_overflow_guards(self):
+        self.assertIn("html { overflow-x: hidden; }", serve.CSS)
+        self.assertIn("overflow-x: hidden; overflow-wrap: anywhere", serve.CSS)
+        self.assertIn("a, p, li, code { overflow-wrap: anywhere; }", serve.CSS)
+        self.assertIn("header nav { display: flex; gap: 16px;", serve.CSS)
+        self.assertIn("flex-wrap: wrap; min-width: 0", serve.CSS)
+        self.assertIn(".memory-grid { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
+        self.assertIn(".memory-actions code, .memory-next code { word-break: break-word; }", serve.CSS)
+
+    def test_graph_labels_are_clamped_inside_canvas(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n\n[[b]]\n",
+        )
+        write_page(
+            wiki,
+            "concepts/b.md",
+            "---\ntype: concept\ntitle: B\n---\n# B\n",
+        )
+        html = serve._render_graph()
+
+        self.assertIn("var labelWidth = ctx.measureText(label).width;", html)
+        self.assertIn("var labelX = Math.max(labelWidth / 2 + 4", html)
+        self.assertIn("ctx.fillText(label, labelX", html)
+
     def test_context_reads_current_backlinks_shape(self):
         wiki = self.make_wiki()
         write_page(
