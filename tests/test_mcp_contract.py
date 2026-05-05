@@ -317,6 +317,32 @@ class McpContractTests(unittest.TestCase):
         self.assertNotIn("reviewed_at:", memory_text)
         self.assertIn("update-memory", log_text)
 
+    def test_propose_memories_contract(self):
+        created = json.loads(self.server.remember_memory(
+            "User prefers release branches for Link work.",
+            title="Prefer release branches",
+            memory_type="preference",
+            scope="project",
+        ))
+        payload = json.loads(self.server.propose_memories(
+            "\n".join([
+                "- I prefer release branches for Link work.",
+                "- We decided to keep Memory Mode local and source-backed.",
+                "- Maybe we could add cloud sync later.",
+            ]),
+            source="unit test session",
+        ))
+
+        self.assertTrue(created["created"])
+        self.assertTrue(payload["proposed"])
+        self.assertEqual(payload["count"], 2)
+        self.assertGreaterEqual(payload["skipped_count"], 1)
+        self.assertEqual(payload["proposals"][0]["memory_type"], "preference")
+        self.assertEqual(payload["proposals"][0]["suggested_action"], "update-memory")
+        self.assertEqual(payload["proposals"][0]["duplicate_candidates"][0]["name"], "prefer-release-branches")
+        self.assertEqual(payload["proposals"][1]["memory_type"], "decision")
+        self.assertEqual(payload["proposals"][1]["suggested_action"], "remember")
+
     def test_rebuild_backlinks_contract(self):
         backlinks_path = self.target / "wiki/_backlinks.json"
         backlinks_path.write_text(json.dumps({"backlinks": {}, "forward": {}}), encoding="utf-8")

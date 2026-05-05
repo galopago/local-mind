@@ -55,7 +55,8 @@ mcp = FastMCP(
         "Link is local personal memory for agents. Use memory_profile to inspect "
         "what Link remembers, recall_memory for user preferences, decisions, and "
         "project context, memory_inbox to find memories needing review, and "
-        "explain_memory to audit why a memory exists. Use search_wiki to find "
+        "explain_memory to audit why a memory exists. Use propose_memories for "
+        "chat or session notes before writing memory. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
         "neighborhood. Only call remember_memory when the user explicitly asks "
         "you to remember something; if it returns duplicate candidates, use "
@@ -71,6 +72,7 @@ MAX_TEXT_INPUT = 200
 MEMORY_TYPES = ("preference", "decision", "project", "fact", "note")
 MEMORY_SCOPES = ("user", "project", "global")
 MEMORY_REVIEW_STATUSES = ("pending", "reviewed", "needs_update")
+MEMORY_PROPOSAL_MIN_SCORE = 70
 
 
 def _clean_text_input(value, max_len: int = MAX_TEXT_INPUT) -> str:
@@ -870,6 +872,184 @@ def _memory_duplicate_candidates(
     return [candidate for _, candidate in candidates[:limit]]
 
 
+def _memory_proposal_segments(text: str) -> list[str]:
+    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+    segments: list[str] = []
+    for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        line = re.sub(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)", "", line).strip()
+        line = re.sub(r"^(?:user|human|me|assistant|codex|agent)\s*:\s*", "", line, flags=re.IGNORECASE)
+        if not line:
+            continue
+        for sentence in re.split(r"(?<=[.!?])\s+", line):
+            sentence = sentence.strip()
+            if 18 <= len(sentence) <= 500:
+                segments.append(sentence)
+    return segments
+
+
+def _normalize_proposed_memory(text: str, memory_type: str) -> str:
+    value = text.strip()
+    value = re.sub(r"^please remember(?: that)?\s+", "", value, flags=re.IGNORECASE)
+    replacements = [
+        (r"^i prefer\b", "User prefers"),
+        (r"^i like\b", "User likes"),
+        (r"^i want\b", "User wants"),
+        (r"^i need\b", "User needs"),
+        (r"^i do not want\b", "User does not want"),
+        (r"^i don't want\b", "User does not want"),
+        (r"^i am\b", "User is"),
+        (r"^i work\b", "User works"),
+        (r"^my\b", "User's"),
+        (r"^we decided\b", "Project decided"),
+        (r"^we agreed\b", "Project agreed"),
+        (r"^we chose\b", "Project chose"),
+        (r"^we settled\b", "Project settled"),
+    ]
+    for pattern, replacement in replacements:
+        value = re.sub(pattern, replacement, value, count=1, flags=re.IGNORECASE)
+    if memory_type == "decision" and value.lower().startswith("decision:"):
+        value = value.split(":", 1)[1].strip()
+        value = "Project decided " + value[0].lower() + value[1:] if value else "Project decision"
+    if value and value[-1] not in ".!?":
+        value += "."
+    return value
+
+
+def _proposal_title(memory: str, memory_type: str) -> str:
+    title = memory.strip().rstrip(".")
+    title = re.sub(r"^(?:User|Project|Team)\s+", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"^prefers\b", "Prefer", title, flags=re.IGNORECASE)
+    title = re.sub(r"^wants\b", "Want", title, flags=re.IGNORECASE)
+    title = re.sub(r"^needs\b", "Need", title, flags=re.IGNORECASE)
+    title = re.sub(r"^decided(?: to)?\b", "Decision:", title, flags=re.IGNORECASE)
+    title = re.sub(r"^agreed(?: to)?\b", "Decision:", title, flags=re.IGNORECASE)
+    title = re.sub(r"^chose\b", "Decision:", title, flags=re.IGNORECASE)
+    if memory_type == "project" and not title.lower().startswith("project"):
+        title = f"Project {title[0].lower()}{title[1:]}" if title else "Project memory"
+    if len(title) <= 70:
+        return title or "Memory proposal"
+    return title[:67].rstrip() + "..."
+
+
+def _classify_memory_segment(segment: str) -> dict[str, object] | None:
+    text = segment.strip()
+    lower = text.lower()
+    if any(cue in lower for cue in ("maybe", "might", "not sure", "wondering", "considering", "could later")):
+        return None
+
+    checks: list[tuple[str, str, int, str, tuple[str, ...]]] = [
+        (
+            "preference",
+            "user",
+            90,
+            "Matched an explicit user preference cue.",
+            (
+                r"\b(?:i|user|human)\s+(?:prefer|prefers|like|likes|want|wants|need|needs)\b",
+                r"\b(?:please\s+)?(?:always|never|avoid|do not|don't)\b",
+                r"\bagents?\s+should\s+(?:always|never|prefer|avoid|use)\b",
+            ),
+        ),
+        (
+            "decision",
+            "project",
+            88,
+            "Matched an explicit decision cue.",
+            (
+                r"\b(?:we|project|team|user)\s+(?:decided|agreed|chose|settled)\b",
+                r"\bdecision\s*:",
+            ),
+        ),
+        (
+            "project",
+            "project",
+            76,
+            "Matched a project context cue.",
+            (
+                r"\b(?:project|repo|repository|link)\s+(?:uses|requires|runs|stores|keeps|ships|releases)\b",
+                r"\b(?:this project|this repo)\s+(?:uses|requires|keeps|stores)\b",
+            ),
+        ),
+        (
+            "fact",
+            "user",
+            74,
+            "Matched a stable user fact cue.",
+            (
+                r"\b(?:i am|i work|user is|user works|user has|my role|my timezone)\b",
+            ),
+        ),
+    ]
+
+    for memory_type, scope, score, reason, patterns in checks:
+        if any(re.search(pattern, lower) for pattern in patterns):
+            memory = _normalize_proposed_memory(text, memory_type)
+            return {
+                "memory": memory,
+                "memory_type": memory_type,
+                "scope": scope,
+                "confidence_score": score,
+                "reason": reason,
+            }
+    return None
+
+
+def _confidence_label(score: int) -> str:
+    if score >= 85:
+        return "high"
+    if score >= 70:
+        return "medium"
+    return "low"
+
+
+def _propose_memories_from_text(text: str, source: str = "mcp", limit: int = 10) -> dict[str, object]:
+    proposals: list[dict[str, object]] = []
+    seen: set[str] = set()
+    skipped = 0
+    for segment in _memory_proposal_segments(text):
+        classified = _classify_memory_segment(segment)
+        if not classified:
+            skipped += 1
+            continue
+        score = int(classified["confidence_score"])
+        if score < MEMORY_PROPOSAL_MIN_SCORE:
+            skipped += 1
+            continue
+        memory = str(classified["memory"])
+        dedupe_key = _compact_memory_text(memory)
+        if dedupe_key in seen:
+            skipped += 1
+            continue
+        seen.add(dedupe_key)
+        memory_type = str(classified["memory_type"])
+        scope = str(classified["scope"])
+        title = _proposal_title(memory, memory_type)
+        duplicate_candidates = _memory_duplicate_candidates(memory, title, memory_type, scope)
+        proposals.append({
+            "title": title,
+            "memory": memory,
+            "memory_type": memory_type,
+            "scope": scope,
+            "confidence": _confidence_label(score),
+            "confidence_score": score,
+            "reason": classified["reason"],
+            "source": source,
+            "duplicate_candidates": duplicate_candidates,
+            "suggested_action": "update-memory" if duplicate_candidates else "remember",
+        })
+        if len(proposals) >= limit:
+            break
+    return {
+        "proposed": True,
+        "source": source,
+        "count": len(proposals),
+        "skipped_count": skipped,
+        "proposals": proposals,
+    }
+
+
 def _update_memory_index(page_name: str, title: str, summary: str, memory_type: str, scope: str) -> None:
     index_path = WIKI_DIR / "index.md"
     if not index_path.exists():
@@ -1336,6 +1516,22 @@ def recall_memory(query: str, limit: int = 10, include_archived: bool = False) -
         "include_archived": include_archived,
         "memories": memories,
     }, ensure_ascii=False)
+
+
+@mcp.tool()
+def propose_memories(text: str, source: str = "mcp", limit: int = 10) -> str:
+    """Propose durable memories from chat or session notes without writing them.
+
+    Returns conservative memory proposals with type, scope, confidence, reason,
+    duplicate candidates, and a suggested follow-up action. Use remember_memory
+    or update_memory after the user confirms a proposal.
+    """
+    clean_text = _clean_text_input(text, max_len=12000)
+    if not clean_text:
+        return json.dumps({"proposed": False, "error": "text required", "count": 0, "proposals": []})
+    source = _clean_text_input(source, max_len=500) or "mcp"
+    limit = _parse_limit(limit, default=10, max_limit=20)
+    return json.dumps(_propose_memories_from_text(clean_text, source=source, limit=limit), ensure_ascii=False)
 
 
 @mcp.tool()

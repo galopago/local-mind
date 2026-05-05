@@ -286,6 +286,7 @@ Rules:
 - Keep memories specific and actionable. "User likes quality" is too vague; "User prefers release/* branches over codex/* branches" is useful.
 - Use `memory_type: preference` for user preferences, `decision` for choices made, `project` for project context, `fact` for stable facts, and `note` for everything else.
 - Use `scope: user` for broad personal preferences, `project` for the current project, and `global` for agent-wide principles.
+- For long chat/session notes, run `python3 link.py propose-memories "<file-or-text>" .` first. Treat proposals as candidates only; do not write them until the human confirms.
 - Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
 - Run `python3 link.py profile .` when the human asks what Link knows or when you need a quick overview of remembered preferences, decisions, and project context.
 - Run `python3 link.py memory-inbox .` to find pending, stale, invalid, or underspecified memories that need human review.

@@ -95,6 +95,7 @@ Use direct memories for preferences, decisions, and project context future agent
 
 ```bash
 python3 ~/link/link.py remember "I am testing Link as local personal memory for agents." ~/link --type preference --scope user --tags onboarding
+python3 ~/link/link.py propose-memories "I prefer local, inspectable agent memory. We decided to keep Link local-first." ~/link
 python3 ~/link/link.py recall "local personal memory" ~/link
 python3 ~/link/link.py profile ~/link
 python3 ~/link/link.py memory-inbox ~/link
@@ -242,6 +243,7 @@ Remember preferences and decisions directly:
 
 ```bash
 python3 ~/link/link.py remember "User prefers release/* branches for Link work." ~/link --title "Prefer release branches" --type preference --scope project
+python3 ~/link/link.py propose-memories ~/link/raw/session-notes.md ~/link
 python3 ~/link/link.py recall "branch preference" ~/link
 python3 ~/link/link.py profile ~/link
 python3 ~/link/link.py memory-inbox ~/link
@@ -278,6 +280,7 @@ Obsidian also works: open the `wiki/` folder as a vault.
 | `python3 link.py demo` | Create `./link-demo` with a pre-ingested sample wiki. |
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
 | `python3 link.py remember "text" <dir>` | Save a local agent memory under `wiki/memories/`; strong duplicates are refused unless `--allow-duplicate` is set. |
+| `python3 link.py propose-memories <file-or-text> <dir>` | Propose durable memories from notes without writing them. |
 | `python3 link.py update-memory <name> "text" <dir>` | Merge new text into an existing memory, log it, rebuild backlinks, and reset review to pending. |
 | `python3 link.py recall "query" <dir>` | Search local agent memories first. |
 | `python3 link.py profile <dir>` | Show what Link remembers by type, scope, status, and recency. |
@@ -306,6 +309,7 @@ Available tools:
 | `search_wiki` | Ranked search by title, alias, tag, and full text. Returns scores and snippets. |
 | `recall_memory` | Search durable local memory pages for preferences, decisions, and project context. |
 | `remember_memory` | Save an explicit user-approved memory under `wiki/memories/`; strong duplicates require `allow_duplicate=true`. |
+| `propose_memories` | Propose durable memories from chat/session notes without writing them. |
 | `update_memory` | Merge new information into an existing memory and reset review to pending. |
 | `archive_memory` | Archive stale or wrong memory without deleting the Markdown page. |
 | `restore_memory` | Restore archived memory to active status. |

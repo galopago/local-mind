@@ -251,6 +251,43 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("update-memory", log_text)
         self.assertIn("prefer-local-personal-memory", backlinks["backlinks"]["link"])
 
+    def test_propose_memories_from_session_note_without_writing(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.remember(
+                target,
+                "User prefers release branches for Link work.",
+                title="Prefer release branches",
+                memory_type="preference",
+                scope="project",
+            )
+        session_note = tmp / "session.md"
+        session_note.write_text(
+            "\n".join([
+                "- I prefer release branches for Link work.",
+                "- We decided to keep Memory Mode local and source-backed.",
+                "- Maybe we could add cloud sync later.",
+            ]),
+            encoding="utf-8",
+        )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.propose_memories(target, str(session_note), json_output=True)
+        payload = json.loads(out.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["count"], 2)
+        self.assertGreaterEqual(payload["skipped_count"], 1)
+        self.assertEqual(payload["proposals"][0]["memory_type"], "preference")
+        self.assertEqual(payload["proposals"][0]["suggested_action"], "update-memory")
+        self.assertEqual(payload["proposals"][0]["duplicate_candidates"][0]["name"], "prefer-release-branches")
+        self.assertEqual(payload["proposals"][1]["memory_type"], "decision")
+        self.assertEqual(payload["proposals"][1]["scope"], "project")
+        self.assertFalse((target / "wiki/memories/decision-keep-memory-mode-local.md").exists())
+
     def test_recall_finds_memory_pages(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"
