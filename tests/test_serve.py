@@ -3,6 +3,7 @@ import os
 import tempfile
 import time
 import unittest
+from io import BytesIO
 from pathlib import Path
 
 import serve
@@ -26,6 +27,31 @@ def write_page(wiki_dir: Path, rel: str, text: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return path
+
+
+def run_handler(method: str, path: str, body: bytes = b"", headers: dict[str, str] | None = None):
+    handler = object.__new__(serve.Handler)
+    handler.command = method
+    handler.path = path
+    handler.request_version = "HTTP/1.1"
+    handler.requestline = f"{method} {path} HTTP/1.1"
+    handler.client_address = ("127.0.0.1", 0)
+    handler.server = None
+    handler.headers = headers or {}
+    handler.rfile = BytesIO(body)
+    handler.wfile = BytesIO()
+    if method == "POST":
+        handler.do_POST()
+    elif method == "GET":
+        handler.do_GET()
+    else:
+        raise ValueError(method)
+    raw = handler.wfile.getvalue()
+    header_bytes, _, body_bytes = raw.partition(b"\r\n\r\n")
+    status_line = header_bytes.splitlines()[0].decode("ascii")
+    status = int(status_line.split()[1])
+    payload = json.loads(body_bytes.decode("utf-8")) if body_bytes else None
+    return status, payload
 
 
 class ServeTests(unittest.TestCase):
@@ -218,6 +244,73 @@ class ServeTests(unittest.TestCase):
         html = serve._render_graph()
 
         self.assertLess(html.index('id="graph-tooltip"'), html.index("var tooltip ="))
+
+    def test_propose_memories_post_is_write_free(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "memories/prefer-release-branches.md",
+            (
+                "---\n"
+                "type: memory\n"
+                "title: \"Prefer release branches\"\n"
+                "memory_type: preference\n"
+                "scope: project\n"
+                "status: active\n"
+                "date_captured: \"2026-05-05T00:00:00Z\"\n"
+                "source: \"unit test\"\n"
+                "review_status: pending\n"
+                "tags: [memory, preference]\n"
+                "---\n\n"
+                "# Prefer release branches\n\n"
+                "> **TLDR:** User prefers release branches for Link work.\n\n"
+                "## Memory\n\nUser prefers release branches for Link work.\n"
+            ),
+        )
+        before_files = sorted(path.relative_to(wiki).as_posix() for path in wiki.rglob("*") if path.is_file())
+
+        request_body = json.dumps({
+            "text": "\n".join([
+                "I prefer release branches for Link work.",
+                "We decided to keep Memory Mode local and source-backed.",
+                "Maybe we could add cloud sync later.",
+            ]),
+            "source": "unit test session",
+        }).encode("utf-8")
+        status, payload = run_handler(
+            "POST",
+            "/api/propose-memories",
+            body=request_body,
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": str(len(request_body)),
+            },
+        )
+        get_status, get_payload = run_handler("GET", "/api/propose-memories")
+        bad_type_status, bad_type_payload = run_handler(
+            "POST",
+            "/api/propose-memories",
+            body=request_body,
+            headers={
+                "Content-Type": "text/plain",
+                "Content-Length": str(len(request_body)),
+            },
+        )
+
+        after_files = sorted(path.relative_to(wiki).as_posix() for path in wiki.rglob("*") if path.is_file())
+
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["proposed"])
+        self.assertFalse(payload["writes_memory"])
+        self.assertEqual(payload["count"], 2)
+        self.assertEqual(payload["proposals"][0]["suggested_action"], "update-memory")
+        self.assertEqual(payload["proposals"][0]["duplicate_candidates"][0]["name"], "prefer-release-branches")
+        self.assertEqual(payload["proposals"][1]["suggested_action"], "remember")
+        self.assertEqual(before_files, after_files)
+        self.assertEqual(get_status, 405)
+        self.assertIn("use POST", get_payload["error"])
+        self.assertEqual(bad_type_status, 415)
+        self.assertIn("application/json", bad_type_payload["error"])
 
     def test_graph_controls_exist_before_graph_script(self):
         wiki = self.make_wiki()

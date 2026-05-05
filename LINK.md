@@ -555,6 +555,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
+| `POST /api/propose-memories` | Propose memories from JSON `{ "text": "..." }` without writing pages |
 | `GET /api/search?q=<query>` | Ranked search — title, alias, tag, fulltext. Returns scores + snippets |
 | `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call |
 | `GET /api/graph` | All nodes + edges for graph visualization |

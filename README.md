@@ -326,7 +326,7 @@ Use `memory_profile` to inspect the user/project memory shape, then `recall_memo
 
 `serve.py` exposes the same local memory over HTTP while the web viewer is running.
 
-Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do not expose it to the internet without adding auth.
+Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do not expose it to the internet without adding auth. Memory write operations stay CLI/MCP-only; the HTTP proposal endpoint is analysis-only and does not write memory pages.
 
 | Endpoint | Description |
 |----------|-------------|
@@ -335,6 +335,7 @@ Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do no
 | `GET /api/memory-profile` | Counts and recent memories for the local memory profile. |
 | `GET /api/memory-inbox` | Memories that need review or metadata cleanup. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness for one memory. |
+| `POST /api/propose-memories` | JSON `{ "text": "...", "source": "optional", "limit": 10 }`; returns memory proposals without writing pages. |
 | `GET /api/search?q=<query>` | Ranked search by title, alias, tag, TLDR, and full text. |
 | `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
 | `GET /api/graph` | Nodes and edges for graph visualization. |
