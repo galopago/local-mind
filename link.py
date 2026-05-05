@@ -102,7 +102,7 @@ if (_BUNDLED_CORE / "link_core").exists():
 
 from link_core.memory import (
     count_values as _core_count_values,
-    is_active_memory as _core_is_active_memory,
+    mark_memory_reviewed as _core_mark_memory_reviewed,
     memory_inbox as _core_memory_inbox,
     memory_log_entries as _core_memory_log_entries,
     memory_profile as _core_memory_profile,
@@ -114,15 +114,15 @@ from link_core.memory import (
     recall_state as _core_recall_state,
     recent_memories as _core_recent_memories,
     resolve_memory_page as _core_resolve_memory_page,
+    set_memory_status as _core_set_memory_status,
     slim_memory as _core_slim_memory,
     top_tags as _core_top_tags,
+    update_memory_page as _core_update_memory_page,
 )
 from link_core.frontmatter import (
     csv_values as _csv_values,
-    frontmatter_int as _frontmatter_int,
     frontmatter_string as _frontmatter_string,
     parse_frontmatter as _parse_frontmatter,
-    update_frontmatter_fields as _update_frontmatter_fields,
     yaml_list as _yaml_list,
 )
 del _BUNDLED_CORE
@@ -765,10 +765,6 @@ def _slim_memory(record: dict[str, object]) -> dict[str, object]:
     return _core_slim_memory(record)
 
 
-def _is_active_memory(record: dict[str, object]) -> bool:
-    return _core_is_active_memory(record)
-
-
 def _memory_review_issues(record: dict[str, object]) -> list[dict[str, str]]:
     return _core_memory_review_issues(record, review_command="review-memory")
 
@@ -940,26 +936,6 @@ def _append_log(wiki_dir: Path, timestamp: str, operation: str, description: str
         handle.write("\n".join(entry))
 
 
-def _replace_markdown_body(text: str, body: str) -> str:
-    if text.startswith("---\n"):
-        end = text.find("\n---", 4)
-        if end != -1:
-            return text[:end + 4] + "\n\n" + body.strip() + "\n"
-    return body.strip() + "\n"
-
-
-def _append_memory_update(body: str, update_text: str, timestamp: str, source: str) -> str:
-    source_label = source.strip() or "manual"
-    update_block = f"Update ({timestamp}, {source_label}):\n\n{update_text.strip()}"
-    pattern = re.compile(r"(## Memory\n)(.*?)(?=\n## |\Z)", flags=re.DOTALL)
-    match = pattern.search(body)
-    if not match:
-        return body.rstrip() + f"\n\n## Memory\n\n{update_block}\n"
-    existing = match.group(2).rstrip()
-    merged = (existing + "\n\n" if existing else "") + update_block + "\n\n"
-    return body[:match.start(2)] + merged + body[match.end(2):]
-
-
 def _resolve_memory_page(wiki_dir: Path, identifier: str) -> tuple[Path | None, dict[str, object] | None, str | None]:
     return _core_resolve_memory_page(wiki_dir, identifier, records=_memory_records(wiki_dir))
 
@@ -975,53 +951,21 @@ def _set_memory_status(
     wiki_dir = _resolve_wiki_dir(target)
     if not wiki_dir.exists():
         raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
-    page_path, record, error = _resolve_memory_page(wiki_dir, identifier)
-    if error:
-        raise ValueError(error)
-    assert page_path is not None and record is not None
-
-    timestamp = timestamp or _utc_timestamp()
-    current_status = str(record.get("status") or "active")
-    if status == "archived":
-        updates = {
-            "status": "archived",
-            "archived_at": f'"{timestamp}"',
-        }
-        if reason and reason.strip():
-            updates["archive_reason"] = f'"{_frontmatter_string(reason.strip())}"'
-        remove = {"restored_at"}
-        operation = "archive-memory"
-    elif status == "active":
-        updates = {
-            "status": "active",
-            "restored_at": f'"{timestamp}"',
-        }
-        remove = {"archived_at", "archive_reason"}
-        operation = "restore-memory"
-    else:
-        raise ValueError("unsupported memory status")
-
-    changed = current_status != status
-    if changed:
-        text = page_path.read_text(encoding="utf-8", errors="replace")
-        page_path.write_text(_update_frontmatter_fields(text, updates, remove=remove), encoding="utf-8")
-        log_lines = [
-            f"Updated: memories/{page_path.name}",
-            f"Previous status: {current_status}",
-            f"New status: {status}",
-        ]
-        if reason and reason.strip():
-            log_lines.append(f"Reason: {reason.strip()}")
-        _append_log(wiki_dir, timestamp, operation, str(record["title"]), log_lines)
-
-    return {
-        "updated": changed,
-        "name": record["name"],
-        "path": record["path"],
-        "title": record["title"],
-        "previous_status": current_status,
-        "status": status,
-    }
+    return _core_set_memory_status(
+        wiki_dir,
+        identifier,
+        status,
+        reason=reason,
+        timestamp=timestamp or _utc_timestamp(),
+        records=_memory_records(wiki_dir),
+        log_writer=lambda ts, operation, description, lines: _append_log(
+            wiki_dir,
+            ts,
+            operation,
+            description,
+            lines,
+        ),
+    )
 
 
 def _mark_memory_reviewed(
@@ -1034,46 +978,21 @@ def _mark_memory_reviewed(
     wiki_dir = _resolve_wiki_dir(target)
     if not wiki_dir.exists():
         raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
-    page_path, record, error = _resolve_memory_page(wiki_dir, identifier)
-    if error:
-        raise ValueError(error)
-    assert page_path is not None and record is not None
-
-    timestamp = timestamp or _utc_timestamp()
-    previous_review_status = str(record.get("review_status") or "pending")
-    clean_note = note.strip() if note else ""
-    updates = {
-        "review_status": "reviewed",
-        "reviewed_at": f'"{timestamp}"',
-    }
-    if clean_note:
-        updates["review_note"] = f'"{_frontmatter_string(clean_note)}"'
-    changed = previous_review_status != "reviewed" or bool(clean_note)
-    if changed:
-        text = page_path.read_text(encoding="utf-8", errors="replace")
-        page_path.write_text(_update_frontmatter_fields(text, updates), encoding="utf-8")
-        log_lines = [
-            f"Reviewed: memories/{page_path.name}",
-            f"Previous review status: {previous_review_status}",
-            "New review status: reviewed",
-        ]
-        if clean_note:
-            log_lines.append(f"Note: {clean_note}")
-        _append_log(wiki_dir, timestamp, "review-memory", str(record["title"]), log_lines)
-
-    _, updated_record, _ = _resolve_memory_page(wiki_dir, str(record["name"]))
-    updated_record = updated_record or record
-    issues = _memory_review_issues(updated_record)
-    return {
-        "updated": changed,
-        "name": record["name"],
-        "path": record["path"],
-        "title": record["title"],
-        "previous_review_status": previous_review_status,
-        "review_status": "reviewed",
-        "remaining_issue_count": len(issues),
-        "remaining_issues": issues,
-    }
+    return _core_mark_memory_reviewed(
+        wiki_dir,
+        identifier,
+        note=note,
+        timestamp=timestamp or _utc_timestamp(),
+        records=_memory_records(wiki_dir),
+        review_command="review-memory",
+        log_writer=lambda ts, operation, description, lines: _append_log(
+            wiki_dir,
+            ts,
+            operation,
+            description,
+            lines,
+        ),
+    )
 
 
 def _update_memory_page(
@@ -1090,62 +1009,29 @@ def _update_memory_page(
     clean_text = text.strip()
     if not clean_text:
         raise ValueError("memory update text required")
-    clean_source = source.strip() if source else "manual"
-    page_path, record, error = _resolve_memory_page(wiki_dir, identifier)
-    if error:
-        raise ValueError(error)
-    assert page_path is not None and record is not None
-    if not _is_active_memory(record):
-        raise ValueError("cannot update archived or stale memory; restore it first")
 
-    timestamp = timestamp or _utc_timestamp()
-    previous_review_status = str(record.get("review_status") or "pending")
-    previous_update_count = _frontmatter_int(record.get("update_count"))
-    next_update_count = previous_update_count + 1
-    original = page_path.read_text(encoding="utf-8", errors="replace")
-    _, body = _parse_frontmatter(original)
-    updated_body = _append_memory_update(body, clean_text, timestamp, clean_source)
-    updates = {
-        "updated_at": f'"{timestamp}"',
-        "update_count": str(next_update_count),
-        "last_update_source": f'"{_frontmatter_string(clean_source)}"',
-        "review_status": "pending",
-    }
-    updated_text = _update_frontmatter_fields(original, updates, remove={"reviewed_at", "review_note"})
-    page_path.write_text(_replace_markdown_body(updated_text, updated_body), encoding="utf-8")
-    _append_log(
+    def rebuild_memory_backlinks() -> bool:
+        backlinks = _build_backlinks(wiki_dir)
+        (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
+        return True
+
+    return _core_update_memory_page(
         wiki_dir,
-        timestamp,
-        "update-memory",
-        str(record["title"]),
-        [
-            f"Updated: memories/{page_path.name}",
-            f"Previous review status: {previous_review_status}",
-            "New review status: pending",
-            f"Update count: {next_update_count}",
-            f"Source: {clean_source}",
-        ],
+        identifier,
+        clean_text,
+        source=source,
+        timestamp=timestamp or _utc_timestamp(),
+        records=_memory_records(wiki_dir),
+        review_command="review-memory",
+        log_writer=lambda ts, operation, description, lines: _append_log(
+            wiki_dir,
+            ts,
+            operation,
+            description,
+            lines,
+        ),
+        rebuild_backlinks=rebuild_memory_backlinks,
     )
-    backlinks = _build_backlinks(wiki_dir)
-    (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
-
-    _, updated_record, _ = _resolve_memory_page(wiki_dir, str(record["name"]))
-    updated_record = updated_record or record
-    issues = _memory_review_issues(updated_record)
-    return {
-        "updated": True,
-        "name": updated_record["name"],
-        "path": updated_record["path"],
-        "title": updated_record["title"],
-        "previous_review_status": previous_review_status,
-        "review_status": updated_record.get("review_status", "pending"),
-        "updated_at": timestamp,
-        "update_count": next_update_count,
-        "source": clean_source,
-        "remaining_issue_count": len(issues),
-        "remaining_issues": issues,
-        "backlinks_rebuilt": True,
-    }
 
 
 def _write_memory_page(

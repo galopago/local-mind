@@ -2,16 +2,24 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
-from .frontmatter import meta_tags, parse_frontmatter
+from .frontmatter import (
+    frontmatter_int,
+    frontmatter_string,
+    meta_tags,
+    parse_frontmatter,
+    update_frontmatter_fields,
+)
 
 
 MEMORY_TYPES = ("preference", "decision", "project", "fact", "note")
 MEMORY_SCOPES = ("user", "project", "global")
 MEMORY_REVIEW_STATUSES = ("pending", "reviewed", "needs_update")
 MEMORY_PROPOSAL_MIN_SCORE = 70
+MemoryLogWriter = Callable[[str, str, str, list[str]], None]
+BacklinkRebuilder = Callable[[], bool]
 
 
 def slugify(value: str, fallback: str = "memory") -> str:
@@ -302,6 +310,206 @@ def resolve_memory_page(
         return None, None, f"memory not found: {identifier}"
     record = matches[0]
     return wiki_dir / str(record["path"]).removeprefix("wiki/"), record, None
+
+
+def replace_markdown_body(text: str, body: str) -> str:
+    if text.startswith("---\n"):
+        end = text.find("\n---", 4)
+        if end != -1:
+            return text[:end + 4] + "\n\n" + body.strip() + "\n"
+    return body.strip() + "\n"
+
+
+def append_memory_update(body: str, update_text: str, timestamp: str, source: str) -> str:
+    source_label = source.strip() or "manual"
+    update_block = f"Update ({timestamp}, {source_label}):\n\n{update_text.strip()}"
+    pattern = re.compile(r"(## Memory\n)(.*?)(?=\n## |\Z)", flags=re.DOTALL)
+    match = pattern.search(body)
+    if not match:
+        return body.rstrip() + f"\n\n## Memory\n\n{update_block}\n"
+    existing = match.group(2).rstrip()
+    merged = (existing + "\n\n" if existing else "") + update_block + "\n\n"
+    return body[:match.start(2)] + merged + body[match.end(2):]
+
+
+def set_memory_status(
+    wiki_dir: Path,
+    identifier: str,
+    status: str,
+    reason: str | None,
+    timestamp: str,
+    records: Iterable[Mapping[str, object]] | None = None,
+    log_writer: MemoryLogWriter | None = None,
+) -> dict[str, object]:
+    page_path, record, error = resolve_memory_page(wiki_dir, identifier, records=records)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and record is not None
+
+    current_status = str(record.get("status") or "active")
+    clean_reason = reason.strip() if reason else ""
+    if status == "archived":
+        updates = {
+            "status": "archived",
+            "archived_at": f'"{timestamp}"',
+        }
+        if clean_reason:
+            updates["archive_reason"] = f'"{frontmatter_string(clean_reason)}"'
+        remove = {"restored_at"}
+        operation = "archive-memory"
+    elif status == "active":
+        updates = {
+            "status": "active",
+            "restored_at": f'"{timestamp}"',
+        }
+        remove = {"archived_at", "archive_reason"}
+        operation = "restore-memory"
+    else:
+        raise ValueError("unsupported memory status")
+
+    changed = current_status != status
+    if changed:
+        text = page_path.read_text(encoding="utf-8", errors="replace")
+        page_path.write_text(update_frontmatter_fields(text, updates, remove=remove), encoding="utf-8")
+        if log_writer:
+            log_lines = [
+                f"Updated: memories/{page_path.name}",
+                f"Previous status: {current_status}",
+                f"New status: {status}",
+            ]
+            if clean_reason:
+                log_lines.append(f"Reason: {clean_reason}")
+            log_writer(timestamp, operation, str(record["title"]), log_lines)
+
+    return {
+        "updated": changed,
+        "name": record["name"],
+        "path": record["path"],
+        "title": record["title"],
+        "previous_status": current_status,
+        "status": status,
+    }
+
+
+def mark_memory_reviewed(
+    wiki_dir: Path,
+    identifier: str,
+    note: str | None,
+    timestamp: str,
+    records: Iterable[Mapping[str, object]] | None = None,
+    review_command: str = "review-memory",
+    log_writer: MemoryLogWriter | None = None,
+) -> dict[str, object]:
+    page_path, record, error = resolve_memory_page(wiki_dir, identifier, records=records)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and record is not None
+
+    previous_review_status = str(record.get("review_status") or "pending")
+    clean_note = note.strip() if note else ""
+    updates = {
+        "review_status": "reviewed",
+        "reviewed_at": f'"{timestamp}"',
+    }
+    if clean_note:
+        updates["review_note"] = f'"{frontmatter_string(clean_note)}"'
+    changed = previous_review_status != "reviewed" or bool(clean_note)
+    if changed:
+        text = page_path.read_text(encoding="utf-8", errors="replace")
+        page_path.write_text(update_frontmatter_fields(text, updates), encoding="utf-8")
+        if log_writer:
+            log_lines = [
+                f"Reviewed: memories/{page_path.name}",
+                f"Previous review status: {previous_review_status}",
+                "New review status: reviewed",
+            ]
+            if clean_note:
+                log_lines.append(f"Note: {clean_note}")
+            log_writer(timestamp, "review-memory", str(record["title"]), log_lines)
+
+    _, updated_record, _ = resolve_memory_page(wiki_dir, str(record["name"]))
+    updated_record = updated_record or record
+    issues = memory_review_issues(updated_record, review_command=review_command)
+    return {
+        "updated": changed,
+        "name": record["name"],
+        "path": record["path"],
+        "title": record["title"],
+        "previous_review_status": previous_review_status,
+        "review_status": "reviewed",
+        "remaining_issue_count": len(issues),
+        "remaining_issues": issues,
+    }
+
+
+def update_memory_page(
+    wiki_dir: Path,
+    identifier: str,
+    text: str,
+    source: str,
+    timestamp: str,
+    records: Iterable[Mapping[str, object]] | None = None,
+    review_command: str = "review-memory",
+    log_writer: MemoryLogWriter | None = None,
+    rebuild_backlinks: BacklinkRebuilder | None = None,
+) -> dict[str, object]:
+    clean_text = text.strip()
+    if not clean_text:
+        raise ValueError("memory update text required")
+    clean_source = source.strip() if source else "manual"
+    page_path, record, error = resolve_memory_page(wiki_dir, identifier, records=records)
+    if error:
+        raise ValueError(error)
+    assert page_path is not None and record is not None
+    if not is_active_memory(record):
+        raise ValueError("cannot update archived or stale memory; restore it first")
+
+    previous_review_status = str(record.get("review_status") or "pending")
+    previous_update_count = frontmatter_int(record.get("update_count"))
+    next_update_count = previous_update_count + 1
+    original = page_path.read_text(encoding="utf-8", errors="replace")
+    _, body = parse_frontmatter(original)
+    updated_body = append_memory_update(body, clean_text, timestamp, clean_source)
+    updates = {
+        "updated_at": f'"{timestamp}"',
+        "update_count": str(next_update_count),
+        "last_update_source": f'"{frontmatter_string(clean_source)}"',
+        "review_status": "pending",
+    }
+    updated_text = update_frontmatter_fields(original, updates, remove={"reviewed_at", "review_note"})
+    page_path.write_text(replace_markdown_body(updated_text, updated_body), encoding="utf-8")
+    if log_writer:
+        log_writer(
+            timestamp,
+            "update-memory",
+            str(record["title"]),
+            [
+                f"Updated: memories/{page_path.name}",
+                f"Previous review status: {previous_review_status}",
+                "New review status: pending",
+                f"Update count: {next_update_count}",
+                f"Source: {clean_source}",
+            ],
+        )
+    backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+
+    _, updated_record, _ = resolve_memory_page(wiki_dir, str(record["name"]))
+    updated_record = updated_record or record
+    issues = memory_review_issues(updated_record, review_command=review_command)
+    return {
+        "updated": True,
+        "name": updated_record["name"],
+        "path": updated_record["path"],
+        "title": updated_record["title"],
+        "previous_review_status": previous_review_status,
+        "review_status": updated_record.get("review_status", "pending"),
+        "updated_at": timestamp,
+        "update_count": next_update_count,
+        "source": clean_source,
+        "remaining_issue_count": len(issues),
+        "remaining_issues": issues,
+        "backlinks_rebuilt": bool(backlinks_rebuilt),
+    }
 
 
 def memory_inbox(

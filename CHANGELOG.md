@@ -23,6 +23,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Extracted shared frontmatter parsing and typed update helpers into `link_core` for safer memory metadata writes.
 - Extracted shared memory record loading, review inbox, profile, and recall helpers into `link_core`.
 - Extracted shared memory resolution, log lookup, and recall-state helpers into `link_core`.
+- Extracted shared memory lifecycle mutations for archive, restore, review, and update workflows into `link_core`.
 
 ### Fixed
 

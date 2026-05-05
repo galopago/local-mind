@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.memory import (  # noqa: E402
+    mark_memory_reviewed,
     memory_inbox,
     memory_log_entries,
     memory_profile,
@@ -16,6 +17,8 @@ from link_core.memory import (  # noqa: E402
     recall_memories,
     recall_state,
     resolve_memory_page,
+    set_memory_status,
+    update_memory_page,
 )
 
 
@@ -202,6 +205,124 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(needs_review["state"], "needs_review")
         self.assertEqual(unsafe["state"], "unsafe")
         self.assertEqual(disabled["state"], "disabled")
+
+    def test_memory_lifecycle_mutations_update_files_and_callbacks(self):
+        root = Path(tempfile.mkdtemp(prefix="link-memory-lifecycle-"))
+        wiki = root / "wiki"
+        memories = wiki / "memories"
+        memories.mkdir(parents=True)
+        memory_path = memories / "prefer-focused-commits.md"
+        memory_path.write_text(
+            "---\n"
+            "type: memory\n"
+            "title: \"Prefer focused commits\"\n"
+            "memory_type: preference\n"
+            "scope: project\n"
+            "status: active\n"
+            "date_captured: \"2026-05-05T00:00:00Z\"\n"
+            "source: \"unit test\"\n"
+            "review_status: pending\n"
+            "tags: [memory, git]\n"
+            "---\n\n"
+            "# Prefer focused commits\n\n"
+            "> **TLDR:** User prefers focused commits on develop.\n\n"
+            "## Memory\n\nUser prefers focused commits on develop.\n",
+            encoding="utf-8",
+        )
+        logged: list[tuple[str, str, str, list[str]]] = []
+        rebuilds = []
+
+        def log_writer(timestamp: str, operation: str, description: str, lines: list[str]) -> None:
+            logged.append((timestamp, operation, description, lines))
+
+        reviewed = mark_memory_reviewed(
+            wiki,
+            "prefer-focused-commits",
+            note="confirmed",
+            timestamp="2026-05-05T01:00:00Z",
+            records=memory_records(wiki),
+            log_writer=log_writer,
+        )
+        reviewed_text = memory_path.read_text(encoding="utf-8")
+
+        self.assertTrue(reviewed["updated"])
+        self.assertEqual(reviewed["review_status"], "reviewed")
+        self.assertEqual(reviewed["remaining_issue_count"], 0)
+        self.assertIn("review_status: reviewed", reviewed_text)
+        self.assertIn('review_note: "confirmed"', reviewed_text)
+        self.assertEqual(logged[-1][1], "review-memory")
+
+        updated = update_memory_page(
+            wiki,
+            "Prefer focused commits",
+            "Also prefer one logical change per commit.",
+            source="unit test",
+            timestamp="2026-05-05T02:00:00Z",
+            records=memory_records(wiki),
+            log_writer=log_writer,
+            rebuild_backlinks=lambda: rebuilds.append(True) or True,
+        )
+        updated_text = memory_path.read_text(encoding="utf-8")
+
+        self.assertTrue(updated["updated"])
+        self.assertEqual(updated["previous_review_status"], "reviewed")
+        self.assertEqual(updated["review_status"], "pending")
+        self.assertEqual(updated["update_count"], 1)
+        self.assertTrue(updated["backlinks_rebuilt"])
+        self.assertEqual(rebuilds, [True])
+        self.assertIn("updated_at:", updated_text)
+        self.assertIn("update_count: 1", updated_text)
+        self.assertIn('last_update_source: "unit test"', updated_text)
+        self.assertNotIn("reviewed_at:", updated_text)
+        self.assertIn("Also prefer one logical change per commit.", updated_text)
+        self.assertEqual(logged[-1][1], "update-memory")
+
+        archived = set_memory_status(
+            wiki,
+            "prefer-focused-commits",
+            "archived",
+            reason="stale",
+            timestamp="2026-05-05T03:00:00Z",
+            records=memory_records(wiki),
+            log_writer=log_writer,
+        )
+        archived_text = memory_path.read_text(encoding="utf-8")
+
+        self.assertTrue(archived["updated"])
+        self.assertEqual(archived["status"], "archived")
+        self.assertIn("status: archived", archived_text)
+        self.assertIn("archived_at:", archived_text)
+        self.assertIn('archive_reason: "stale"', archived_text)
+        self.assertEqual(logged[-1][1], "archive-memory")
+
+        with self.assertRaisesRegex(ValueError, "restore it first"):
+            update_memory_page(
+                wiki,
+                "prefer-focused-commits",
+                "Should not write while archived.",
+                source="unit test",
+                timestamp="2026-05-05T04:00:00Z",
+                records=memory_records(wiki),
+            )
+
+        restored = set_memory_status(
+            wiki,
+            "prefer-focused-commits",
+            "active",
+            reason=None,
+            timestamp="2026-05-05T05:00:00Z",
+            records=memory_records(wiki),
+            log_writer=log_writer,
+        )
+        restored_text = memory_path.read_text(encoding="utf-8")
+
+        self.assertTrue(restored["updated"])
+        self.assertEqual(restored["status"], "active")
+        self.assertIn("status: active", restored_text)
+        self.assertIn("restored_at:", restored_text)
+        self.assertNotIn("archived_at:", restored_text)
+        self.assertNotIn("archive_reason:", restored_text)
+        self.assertEqual(logged[-1][1], "restore-memory")
 
 
 if __name__ == "__main__":
