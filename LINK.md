@@ -377,7 +377,7 @@ Run these checks and report findings:
 
 For each finding, suggest a specific action. Then ask the human which ones to execute.
 
-Rebuild `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `GET /api/rebuild-backlinks` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
+Rebuild `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `POST /api/rebuild-backlinks` with JSON `{}` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
 
 
 ### 5. Research
@@ -546,7 +546,7 @@ Structure (current format):
 
 Used during query to find related pages, and during lint to detect orphans and backlink imbalances.
 
-**Rebuilding:** Run `python3 link.py rebuild-backlinks .` when `link.py` is available. Otherwise call `GET /api/rebuild-backlinks` on the local server (if running), or scan all `[[wikilinks]]` manually and write the file. Always rebuild after ingest and lint.
+**Rebuilding:** Run `python3 link.py rebuild-backlinks .` when `link.py` is available. Otherwise call `POST /api/rebuild-backlinks` with JSON `{}` on the local server (if running), or scan all `[[wikilinks]]` manually and write the file. Always rebuild after ingest and lint.
 
 ## Local Server API
 
@@ -560,7 +560,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 | `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call |
 | `GET /api/graph` | All nodes + edges for graph visualization |
 | `GET /api/backlinks` | Reverse link index |
-| `GET /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning all wikilinks |
+| `POST /api/rebuild-backlinks` | JSON `{}`; rebuild `_backlinks.json` by scanning all wikilinks |
 
 During query operations, prefer `/api/context?topic=X` over reading files manually — it returns the primary page plus all related pages via graph traversal in one call.
 

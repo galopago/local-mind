@@ -1593,6 +1593,17 @@ def _get_graph_data() -> dict:
     return _core_graph_data(cache)
 
 
+def _rebuild_backlinks_payload() -> dict[str, object]:
+    result = _build_backlinks()
+    bl_path = WIKI_DIR / "_backlinks.json"
+    bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    # Invalidate pages cache so next request picks up the new backlinks mtime.
+    global _pages_cache, _pages_cache_mtime
+    _pages_cache = None
+    _pages_cache_mtime = 0.0
+    return {"rebuilt": True, "pages": len(result.get("backlinks", {}))}
+
+
 # ---------------------------------------------------------------------------
 # HTTP handler
 # ---------------------------------------------------------------------------
@@ -1608,6 +1619,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._head_only = False
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        if path == "/api/rebuild-backlinks":
+            payload, error, status = self._read_json_body()
+            if error:
+                self._json({"rebuilt": False, "error": error}, status=status)
+                return
+            assert payload is not None
+            self._json(_rebuild_backlinks_payload())
+            return
         if path == "/api/propose-memories":
             payload, error, status = self._read_json_body()
             if error:
@@ -1677,14 +1696,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else:
                 self._json(data)
         elif path == "/api/rebuild-backlinks":
-            result = _build_backlinks()
-            bl_path = WIKI_DIR / "_backlinks.json"
-            bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
-            # Invalidate pages cache so next request picks up the new backlinks mtime
-            global _pages_cache, _pages_cache_mtime
-            _pages_cache = None
-            _pages_cache_mtime = 0.0
-            self._json({"rebuilt": True, "pages": len(result.get("backlinks", {}))})
+            self._json({"error": "use POST with JSON body: {}"}, status=405)
         elif path == "/api/graph":
             self._json(_get_graph_data())
         elif path == "/api/memory-profile":

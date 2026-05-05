@@ -340,7 +340,7 @@ Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do no
 | `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
 | `GET /api/graph` | Nodes and edges for graph visualization. |
 | `GET /api/backlinks` | Reverse and forward link index. |
-| `GET /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning wikilinks. |
+| `POST /api/rebuild-backlinks` | JSON `{}`; rebuild `_backlinks.json` by scanning wikilinks. |
 
 Search uses an in-memory token index. `/api/context` is the main endpoint for agents that need a topic and its surrounding graph.
 

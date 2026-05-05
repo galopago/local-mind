@@ -312,6 +312,40 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(bad_type_status, 415)
         self.assertIn("application/json", bad_type_payload["error"])
 
+    def test_rebuild_backlinks_requires_json_post(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n\n[[b]]\n",
+        )
+        write_page(
+            wiki,
+            "concepts/b.md",
+            "---\ntype: concept\ntitle: B\n---\n# B\n",
+        )
+        backlinks_path = wiki / "_backlinks.json"
+        backlinks_path.write_text(json.dumps({"backlinks": {}, "forward": {}}), encoding="utf-8")
+
+        get_status, get_payload = run_handler("GET", "/api/rebuild-backlinks")
+        bad_post_status, bad_post_payload = run_handler("POST", "/api/rebuild-backlinks")
+        post_status, post_payload = run_handler(
+            "POST",
+            "/api/rebuild-backlinks",
+            body=b"{}",
+            headers={"Content-Type": "application/json", "Content-Length": "2"},
+        )
+        rebuilt = json.loads(backlinks_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(get_status, 405)
+        self.assertIn("use POST", get_payload["error"])
+        self.assertEqual(bad_post_status, 415)
+        self.assertFalse(bad_post_payload["rebuilt"])
+        self.assertEqual(post_status, 200)
+        self.assertTrue(post_payload["rebuilt"])
+        self.assertEqual(rebuilt["backlinks"], {"b": ["a"]})
+        self.assertEqual(rebuilt["forward"], {"a": ["b"]})
+
     def test_graph_controls_exist_before_graph_script(self):
         wiki = self.make_wiki()
         write_page(
