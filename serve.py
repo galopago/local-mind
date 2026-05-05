@@ -257,9 +257,10 @@ def _memory_dashboard_next_actions(
 ) -> list[dict[str, str]]:
     actions: list[dict[str, str]] = []
     if review_count:
+        memory_label = "memory" if review_count == 1 else "memories"
         actions.append({
             "label": "Review pending memories",
-            "detail": f"{review_count} memory{'ies' if review_count != 1 else 'y'} need confirmation or metadata cleanup.",
+            "detail": f"{review_count} {memory_label} need confirmation or metadata cleanup.",
             "href": "/inbox",
             "command": "python3 link.py memory-inbox .",
             "priority": "high",

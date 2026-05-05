@@ -190,6 +190,17 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(ready_actions[0]["label"], "Memory is recall-ready")
         self.assertEqual(ready_actions[0]["href"], "/profile")
 
+    def test_memory_dashboard_next_actions_uses_singular_memory_label(self):
+        actions = serve._memory_dashboard_next_actions(
+            memory_count=1,
+            review_count=1,
+            updated_count=0,
+            archived_count=0,
+        )
+
+        self.assertIn("1 memory need confirmation", actions[0]["detail"])
+        self.assertNotIn("memoryy", actions[0]["detail"])
+
     def test_cache_invalidation_sees_existing_page_edits(self):
         wiki = self.make_wiki()
         page = write_page(
