@@ -1126,7 +1126,7 @@ def _collect_ingest_status(target: Path) -> dict[str, object]:
         else ("missing", "missing wiki directory")
     )
 
-    return {
+    payload: dict[str, object] = {
         "target": str(target),
         "raw_count": len(raw_files),
         "source_page_count": len(source_texts),
@@ -1138,6 +1138,72 @@ def _collect_ingest_status(target: Path) -> dict[str, object]:
         "backlinks_message": backlinks_message,
         "has_raw_dir": raw_dir.exists(),
         "has_wiki_dir": wiki_dir.exists(),
+    }
+    payload["guidance"] = _build_ingest_guidance(payload)
+    return payload
+
+
+def _build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
+    has_raw_dir = bool(status.get("has_raw_dir"))
+    has_wiki_dir = bool(status.get("has_wiki_dir"))
+    pending_raw = status.get("pending_raw")
+    pending_items = pending_raw if isinstance(pending_raw, list) else []
+    pending_count = int(status.get("pending_count") or 0)
+    raw_count = int(status.get("raw_count") or 0)
+    backlinks_status = str(status.get("backlinks_status") or "unknown")
+
+    if not has_raw_dir or not has_wiki_dir:
+        return {
+            "state": "missing_structure",
+            "summary": "Link is not initialized here yet.",
+            "agent_prompt": None,
+            "commands": ["link init", "link status --validate"],
+            "notes": ["Run the installer or initialize this directory before ingesting sources."],
+        }
+
+    if pending_items:
+        first = str(pending_items[0].get("raw", "raw/<file>"))
+        more = pending_count - 1
+        summary = f"{pending_count} raw file needs ingest."
+        if pending_count != 1:
+            summary = f"{pending_count} raw files need ingest."
+        if more > 0:
+            summary += f" Start with {first}; {more} more remain."
+        return {
+            "state": "pending_raw",
+            "summary": summary,
+            "agent_prompt": f"ingest {first} into Link",
+            "commands": ["link validate", "link doctor", "link status --validate"],
+            "notes": [
+                "If the source contains user preferences, decisions, or project context, ask for memory proposals before saving durable memories.",
+                "After ingest, rebuild backlinks if your agent did not already do it.",
+            ],
+        }
+
+    if backlinks_status != "current":
+        return {
+            "state": "stale_graph",
+            "summary": "Raw files are represented, but the graph index needs repair.",
+            "agent_prompt": "rebuild Link backlinks and validate the wiki",
+            "commands": ["link rebuild-backlinks", "link validate", "link doctor"],
+            "notes": ["Run the graph repair before relying on context or graph views."],
+        }
+
+    if raw_count == 0:
+        return {
+            "state": "empty",
+            "summary": "Link is ready, but raw/ has no source files yet.",
+            "agent_prompt": None,
+            "commands": ["link status --validate", "link serve"],
+            "notes": ["Drop notes, articles, transcripts, or project files into raw/, then ask your agent to ingest them into Link."],
+        }
+
+    return {
+        "state": "ready",
+        "summary": "All raw files are represented in wiki/sources and the graph index is current.",
+        "agent_prompt": None,
+        "commands": ["link doctor", "link status --validate"],
+        "notes": ["Add new files to raw/ when you want Link to learn new source-backed knowledge."],
     }
 
 
@@ -1533,7 +1599,7 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
     if not status["has_raw_dir"] or not status["has_wiki_dir"]:
         print("")
         print("Next:")
-        print("  Run an installer or create a demo: python3 link.py demo")
+        print("  Run an installer or initialize this directory: link init")
         return 1
 
     print(f"Raw files: {status['raw_count']}")
@@ -1541,6 +1607,9 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
     print(f"Represented in wiki/sources: {status['represented_count']}")
     print(f"Pending ingest: {status['pending_count']}")
     print(f"Backlinks: {status['backlinks_status']} ({status['backlinks_message']})")
+    guidance = status["guidance"]
+    if isinstance(guidance, dict):
+        print(f"Guidance: {guidance['summary']}")
 
     pending_raw = status["pending_raw"]
     if pending_raw:
@@ -1553,18 +1622,15 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
 
     print("")
     print("Next:")
-    if pending_raw:
-        first_pending = pending_raw[0]["raw"]
-        print(f"  Ask your agent: ingest {first_pending}")
-        print("  After ingest: python3 link.py rebuild-backlinks .")
-        print("  Then validate: python3 link.py validate .")
-        print("  Then check:    python3 link.py doctor .")
-    elif status["backlinks_status"] != "current":
-        print("  Repair graph index: python3 link.py rebuild-backlinks .")
-        print("  Then validate:       python3 link.py validate .")
-        print("  Then check:          python3 link.py doctor .")
-    else:
-        print("  No pending raw files. Run: python3 link.py doctor .")
+    if isinstance(guidance, dict):
+        agent_prompt = guidance.get("agent_prompt")
+        if agent_prompt:
+            print(f"  Ask your agent: {agent_prompt}")
+        for command in guidance.get("commands", []):
+            print(f"  Run: {command}")
+        notes = guidance.get("notes") or []
+        for note in notes[:2]:
+            print(f"  Note: {note}")
 
     return 0
 

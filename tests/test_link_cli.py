@@ -216,7 +216,9 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Pending ingest: 1", out.getvalue())
         self.assertIn("raw/new-source.md", out.getvalue())
-        self.assertIn("Ask your agent: ingest raw/new-source.md", out.getvalue())
+        self.assertIn("Guidance: 1 raw file needs ingest.", out.getvalue())
+        self.assertIn("Ask your agent: ingest raw/new-source.md into Link", out.getvalue())
+        self.assertIn("Run: link validate", out.getvalue())
 
     def test_ingest_status_json(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
@@ -233,6 +235,8 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(data["raw_count"], 4)
         self.assertEqual(data["pending_count"], 1)
         self.assertEqual(data["pending_raw"][0]["raw"], "raw/new-source.md")
+        self.assertEqual(data["guidance"]["state"], "pending_raw")
+        self.assertEqual(data["guidance"]["agent_prompt"], "ingest raw/new-source.md into Link")
 
     def test_ingest_status_reports_stale_backlinks(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
@@ -247,7 +251,8 @@ class LinkCliTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("Backlinks: stale", out.getvalue())
-        self.assertIn("Repair graph index", out.getvalue())
+        self.assertIn("Guidance: Raw files are represented, but the graph index needs repair.", out.getvalue())
+        self.assertIn("Run: link rebuild-backlinks", out.getvalue())
 
     def test_status_reports_demo_readiness(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))

@@ -209,6 +209,9 @@ Check what is pending:
 link ingest-status
 ```
 
+`link ingest-status` prints the exact agent prompt to use for the next raw file
+and the follow-up checks to run after ingest.
+
 ### 3. Save One Direct Memory
 
 You can ask your agent naturally:
@@ -523,7 +526,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link init [dir]` | Create or repair a normal Link wiki without demo content. |
 | `link serve [dir] [--port 3000]` | Start the local web viewer for a Link wiki. |
 | `link status [--validate]` | Show local readiness, page/memory counts, optional validation summary, and next actions. |
-| `link ingest-status` | Show pending raw files and graph index status. |
+| `link ingest-status` | Show pending raw files, graph index status, the next agent prompt, and follow-up checks. |
 | `link remember "text" [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
 | `link propose-memories <file-or-text> [--project slug]` | Propose durable memories from notes without writing them. |
 | `link capture-session <file-or-text> [--project slug]` | Save chat/session notes under `raw/memory-captures/` and return proposal-only memory candidates. |
