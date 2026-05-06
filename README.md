@@ -4,6 +4,8 @@
 
 # Link
 
+<!-- branch-protection smoke test -->
+
 Local personal memory for LLM agents.
 
 Link turns raw sources into a local Markdown wiki that agents can search, cite, traverse, and maintain over time. It implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): keep knowledge outside the chat window, make every claim inspectable, and let the memory compound.
