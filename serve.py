@@ -62,6 +62,7 @@ from link_core.wiki import (
     context_for_topic as _core_context_for_topic,
     graph_data as _core_graph_data,
     load_backlinks_index as _core_load_backlinks_index,
+    rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
     wiki_mtime as _core_wiki_mtime,
 )
@@ -2970,6 +2971,12 @@ def _rebuild_backlinks_payload() -> dict[str, object]:
     return {"rebuilt": True, "pages": len(result.get("backlinks", {}))}
 
 
+def _rebuild_index_payload() -> dict[str, object]:
+    result = _core_rebuild_index(WIKI_DIR, cache=_current_wiki_cache())
+    _invalidate_pages_cache()
+    return result
+
+
 def _validate_wiki_payload(strict: bool = False) -> dict[str, object]:
     return _core_validate_wiki(WIKI_DIR, strict=strict)
 
@@ -2998,6 +3005,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._head_only = False
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        if path == "/api/rebuild-index":
+            payload, error, status = self._read_json_body()
+            if error:
+                self._json({"rebuilt": False, "error": error}, status=status)
+                return
+            assert payload is not None
+            self._json(_rebuild_index_payload())
+            return
         if path == "/api/rebuild-backlinks":
             payload, error, status = self._read_json_body()
             if error:
@@ -3122,6 +3137,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else:
                 self._json(data)
         elif path == "/api/rebuild-backlinks":
+            self._json({"error": "use POST with JSON body: {}"}, status=405)
+        elif path == "/api/rebuild-index":
             self._json({"error": "use POST with JSON body: {}"}, status=405)
         elif path == "/api/validate":
             strict = query.get("strict", ["false"])[0].lower() in {"1", "true", "yes"}

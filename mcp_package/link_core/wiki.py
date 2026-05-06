@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,24 @@ from .frontmatter import parse_frontmatter
 
 
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
+INDEX_CATEGORY_ORDER = (
+    "memories",
+    "concepts",
+    "entities",
+    "sources",
+    "comparisons",
+    "explorations",
+    "root",
+)
+INDEX_CATEGORY_TITLES = {
+    "memories": "Memories",
+    "concepts": "Concepts",
+    "entities": "Entities",
+    "sources": "Sources",
+    "comparisons": "Comparisons",
+    "explorations": "Explorations",
+    "root": "Other Pages",
+}
 
 
 def normalized_search_text(value: object) -> str:
@@ -350,3 +369,137 @@ def graph_data(cache: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
             seen_edges.add(edge_key)
             edges.append({"source": source, "target": target})
     return {"nodes": nodes, "edges": edges}
+
+
+def _index_pages(cache: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        page for page in cache["pages"]
+        if str(page.get("name") or "").lower() not in {"index", "log"}
+    ]
+
+
+def _category_sort_key(category: str) -> tuple[int, str]:
+    try:
+        index = INDEX_CATEGORY_ORDER.index(category)
+    except ValueError:
+        index = len(INDEX_CATEGORY_ORDER)
+    return index, category
+
+
+def _page_sort_key(page: dict[str, Any]) -> tuple[tuple[int, str], str]:
+    return _category_sort_key(str(page.get("category") or "root")), str(page.get("title") or "").lower()
+
+
+def _page_summary(page: dict[str, Any], cache: dict[str, Any]) -> str:
+    name = str(page.get("name") or "").lower()
+    tldr = str(page.get("tldr") or "").strip()
+    snippet = str(cache.get("snippet_index", {}).get(name, "")).strip()
+    title = str(page.get("title") or page.get("name") or "").strip()
+    return tldr or snippet or title
+
+
+def _index_entry(page: dict[str, Any], cache: dict[str, Any]) -> str:
+    name = str(page.get("name") or "")
+    title = str(page.get("title") or name)
+    summary = _page_summary(page, cache)
+    metadata = [
+        value for value in (
+            str(page.get("type") or "").strip(),
+            str(page.get("maturity") or "").strip(),
+        )
+        if value
+    ]
+    meta = f" ({', '.join(metadata)})" if metadata else ""
+    if summary and summary != title:
+        return f"- [[{name}]] - {summary}{meta}"
+    return f"- [[{name}]]{meta}"
+
+
+def build_index_markdown(
+    wiki_dir: Path,
+    cache: dict[str, Any] | None = None,
+    generated_at: str | None = None,
+) -> str:
+    """Build a deterministic, human-readable catalog for a Link wiki."""
+    cache = cache or build_wiki_cache(wiki_dir)
+    pages = sorted(_index_pages(cache), key=_page_sort_key)
+    generated_at = generated_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    source_count = sum(
+        1 for page in pages
+        if str(page.get("category") or "") == "sources" or str(page.get("type") or "") == "source"
+    )
+    memory_count = sum(
+        1 for page in pages
+        if str(page.get("category") or "") == "memories" or str(page.get("type") or "") == "memory"
+    )
+
+    categories: dict[str, list[dict[str, Any]]] = {}
+    for page in pages:
+        categories.setdefault(str(page.get("category") or "root"), []).append(page)
+
+    lines = [
+        "# Link Wiki Index",
+        "",
+        f"> Last updated: {generated_at} | {len(pages)} pages | {source_count} sources | {memory_count} memories",
+        "",
+        "## Categories",
+        "",
+    ]
+    for category in sorted(categories, key=_category_sort_key):
+        title = INDEX_CATEGORY_TITLES.get(category, category.replace("-", " ").title())
+        lines.append(f"- {title}: {len(categories[category])}")
+    if not categories:
+        lines.append("- No pages yet")
+
+    for category in sorted(categories, key=_category_sort_key):
+        title = INDEX_CATEGORY_TITLES.get(category, category.replace("-", " ").title())
+        lines.extend(["", f"### {category}", ""])
+        for page in categories[category]:
+            lines.append(_index_entry(page, cache))
+
+    lines.extend([
+        "",
+        "## Recent",
+        "",
+        "See [[log]] for the append-only local audit trail.",
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def rebuild_index(
+    wiki_dir: Path,
+    cache: dict[str, Any] | None = None,
+    generated_at: str | None = None,
+) -> dict[str, Any]:
+    """Regenerate wiki/index.md from the current Markdown pages."""
+    cache = cache or build_wiki_cache(wiki_dir)
+    markdown = build_index_markdown(wiki_dir, cache=cache, generated_at=generated_at)
+    index_path = wiki_dir / "index.md"
+    index_path.write_text(markdown, encoding="utf-8")
+    pages = _index_pages(cache)
+    category_counts: dict[str, int] = {}
+    for page in pages:
+        category = str(page.get("category") or "root")
+        category_counts[category] = category_counts.get(category, 0) + 1
+    return {
+        "rebuilt": True,
+        "path": "wiki/index.md",
+        "page_count": len(pages),
+        "source_count": sum(
+            1 for page in pages
+            if str(page.get("category") or "") == "sources" or str(page.get("type") or "") == "source"
+        ),
+        "memory_count": sum(
+            1 for page in pages
+            if str(page.get("category") or "") == "memories" or str(page.get("type") or "") == "memory"
+        ),
+        "category_counts": dict(sorted(category_counts.items(), key=lambda item: _category_sort_key(item[0]))),
+        "next_actions": [
+            {
+                "tool": "rebuild_backlinks",
+                "command": "link rebuild-backlinks",
+                "reason": "Regenerated index links change graph edges; rebuild backlinks before validation.",
+            }
+        ],
+    }

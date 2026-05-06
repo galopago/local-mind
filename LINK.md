@@ -330,8 +330,8 @@ When the human adds a new source to `raw/` and asks you to process it:
 - After updating a page, re-read it as a whole. If it no longer reads as a coherent article, restructure it before moving on.
 - Watch for page bloat: if a sub-topic is growing past 2-3 paragraphs within an article, it likely deserves its own page. Split proactively.
 - Conversely, a new page must have enough substance to stand alone. If you cannot write at least a meaningful TLDR + Overview, fold the information into an existing page instead.
-- After ingest completes, rebuild `wiki/_backlinks.json` by scanning all `[[wikilinks]]` across the wiki.
-- After rebuilding backlinks, run MCP `validate_wiki`, `python3 link.py validate .`, or `GET /api/validate` when available. Treat validation errors as blockers before reporting ingest complete.
+- After ingest completes, rebuild `wiki/index.md` and `wiki/_backlinks.json` so both the human catalog and graph index match the pages.
+- After rebuilding index/backlinks, run MCP `validate_wiki`, `python3 link.py validate .`, or `GET /api/validate` when available. Treat validation errors as blockers before reporting ingest complete.
 
 **Image ingest rules:**
 - Images in `raw/` (png, jpg, webp, gif, svg) are valid sources. Use vision to understand what the image IS.
@@ -394,7 +394,7 @@ Run these checks and report findings:
 
 For each finding, suggest a specific action. Then ask the human which ones to execute.
 
-Rebuild `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `POST /api/rebuild-backlinks` with JSON `{}` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
+Rebuild `wiki/index.md` and `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-index .` and `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `POST /api/rebuild-index` and `POST /api/rebuild-backlinks` with JSON `{}` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
 
 
 ### 5. Research
@@ -563,7 +563,7 @@ Structure (current format):
 
 Used during query to find related pages, and during lint to detect orphans and backlink imbalances.
 
-**Rebuilding:** Run `python3 link.py rebuild-backlinks .` when `link.py` is available. Otherwise call `POST /api/rebuild-backlinks` with JSON `{}` on the local server (if running), or scan all `[[wikilinks]]` manually and write the file. Always rebuild after ingest and lint.
+**Rebuilding:** Run `python3 link.py rebuild-index .` and `python3 link.py rebuild-backlinks .` when `link.py` is available. Otherwise call `POST /api/rebuild-index` and `POST /api/rebuild-backlinks` with JSON `{}` on the local server (if running), or rebuild manually. Always rebuild both after ingest and lint.
 
 ## Local Server API
 
@@ -583,6 +583,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 | `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call |
 | `GET /api/graph` | All nodes + edges for graph visualization |
 | `GET /api/backlinks` | Reverse link index |
+| `POST /api/rebuild-index` | JSON `{}`; regenerate `wiki/index.md` from current pages |
 | `POST /api/rebuild-backlinks` | JSON `{}`; rebuild `_backlinks.json` by scanning all wikilinks |
 | `GET /api/validate?strict=true` | Validate generated wiki pages; failed gates return HTTP 422 with structured findings |
 

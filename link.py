@@ -25,6 +25,7 @@ Usage:
   python link.py memory-inbox [target]
   python link.py review-memory <name-or-title> [target]
   python link.py explain-memory <name-or-title> [target]
+  python link.py rebuild-index [target]
   python link.py rebuild-backlinks [target]
   python link.py verify-mcp [target]
 """
@@ -161,6 +162,7 @@ from link_core.status import (
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
+    rebuild_index as _core_rebuild_index,
 )
 del _BUNDLED_CORE
 
@@ -1540,6 +1542,20 @@ def rebuild_backlinks(target: Path) -> int:
     print(f"Rebuilt {out_path}")
     print(f"Pages: {page_count}")
     print(f"Edges: {edge_count}")
+    return 0
+
+
+def rebuild_index(target: Path) -> int:
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    result = _core_rebuild_index(wiki_dir)
+    print(f"Rebuilt {wiki_dir / 'index.md'}")
+    print(f"Pages: {result['page_count']}")
+    print(f"Sources: {result['source_count']}")
+    print(f"Memories: {result['memory_count']}")
+    print("Next: run python3 link.py rebuild-backlinks before validation")
     return 0
 
 
@@ -3147,6 +3163,9 @@ def main(argv: list[str] | None = None) -> int:
     explain_cmd.add_argument("target", nargs="?", default=".")
     explain_cmd.add_argument("--json", action="store_true", help="print machine-readable explanation")
 
+    rebuild_index_cmd = sub.add_parser("rebuild-index", help="regenerate wiki/index.md from current pages")
+    rebuild_index_cmd.add_argument("target", nargs="?", default=".")
+
     rebuild_cmd = sub.add_parser("rebuild-backlinks", help="rebuild wiki/_backlinks.json")
     rebuild_cmd.add_argument("target", nargs="?", default=".")
 
@@ -3290,6 +3309,8 @@ def main(argv: list[str] | None = None) -> int:
         return review_memory(Path(args.target), args.identifier, note=args.note, json_output=args.json)
     if args.command == "explain-memory":
         return explain_memory(Path(args.target), args.identifier, json_output=args.json)
+    if args.command == "rebuild-index":
+        return rebuild_index(Path(args.target))
     if args.command == "rebuild-backlinks":
         return rebuild_backlinks(Path(args.target))
     if args.command == "verify-mcp":

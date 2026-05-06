@@ -22,6 +22,7 @@ EXPECTED_TOOLS = {
     "get_graph",
     "recall_memory",
     "memory_profile",
+    "rebuild_index",
     "explain_memory",
 }
 
@@ -130,6 +131,17 @@ async def _run_smoke(wiki_dir: Path, python: str) -> None:
             )
             if profile.get("memory_count", 0) < 1:
                 raise RuntimeError("memory_profile did not see the demo memory")
+
+            rebuilt_index = _json_text(
+                await session.call_tool(
+                    "rebuild_index",
+                    {},
+                    read_timeout_seconds=timedelta(seconds=10),
+                ),
+                "rebuild_index",
+            )
+            if not rebuilt_index.get("rebuilt") or rebuilt_index.get("page_count", 0) < 1:
+                raise RuntimeError("rebuild_index did not rebuild the demo catalog")
 
 
 def main() -> int:

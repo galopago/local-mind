@@ -710,6 +710,20 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("agent-memory", rebuilt["forward"])
         self.assertIn("link", rebuilt["backlinks"]["agent-memory"])
 
+    def test_rebuild_index_contract(self):
+        index_path = self.target / "wiki/index.md"
+        index_path.write_text("# Broken Index\n", encoding="utf-8")
+
+        payload = json.loads(self.server.rebuild_index())
+        index_text = index_path.read_text(encoding="utf-8")
+
+        self.assertTrue(payload["rebuilt"])
+        self.assertEqual(payload["path"], "wiki/index.md")
+        self.assertGreaterEqual(payload["page_count"], 10)
+        self.assertEqual(payload["next_actions"][0]["tool"], "rebuild_backlinks")
+        self.assertIn("[[agent-memory]]", index_text)
+        self.assertIn("[[prefer-local-personal-memory]]", index_text)
+
 
 if __name__ == "__main__":
     unittest.main()

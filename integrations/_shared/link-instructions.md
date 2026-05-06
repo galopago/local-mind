@@ -12,7 +12,7 @@ When answering a substantive question that may need local memory or wiki context
 
 When starting personalized or project-specific work, prime yourself with Link first: use MCP `memory_brief` when available, or run `link brief "<task or question>"`.
 
-After ingesting raw sources or making substantial wiki edits, use MCP `rebuild_backlinks` and `validate_wiki` when available, or run `link rebuild-backlinks` and `link validate`, before saying the wiki is updated.
+After ingesting raw sources or making substantial wiki edits, use MCP `rebuild_index`, `rebuild_backlinks`, and `validate_wiki` when available, or run `link rebuild-index`, `link rebuild-backlinks`, and `link validate`, before saying the wiki is updated.
 
 When the user says **"remember"**, **"recall"**, **"ingest"**, **"query"**, **"lint"**, or **"research"**, read `~/link/LINK.md` for instructions and follow the protocol. Use terminal commands to access `~/link/` since it's outside the workspace.
 

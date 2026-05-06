@@ -436,6 +436,7 @@ Maintain the wiki:
 ```bash
 link doctor --fix
 link memory-audit
+link rebuild-index
 link rebuild-backlinks
 link validate
 link verify-mcp
@@ -479,12 +480,13 @@ Most agents should start with:
 | `redact_capture` | The user approves redacting secret-looking values from a saved raw capture. |
 | `delete_capture` | The user explicitly confirms deleting a saved raw capture. |
 | `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
+| `rebuild_index` | You ingested or edited pages and need `wiki/index.md` to reflect the current wiki. |
 
 Full tool set: `link_status`, `migrate_wiki`, `ingest_status`, `query_link`, `validate_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
-`get_context`, `get_pages`, `get_backlinks`, `get_graph`, `rebuild_backlinks`.
+`get_context`, `get_pages`, `get_backlinks`, `get_graph`, `rebuild_index`, `rebuild_backlinks`.
 
 Memory write tools return `duplicate_candidates` or `conflict_candidates` when
 the safer next step is review, update, or archive instead of creating another
@@ -529,6 +531,7 @@ Common endpoints:
 | `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
 | `GET /api/graph` | Nodes and edges for graph visualization. |
 | `POST /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning wikilinks. |
+| `POST /api/rebuild-index` | Regenerate `wiki/index.md` from current pages. |
 
 ## Command Reference
 
@@ -564,6 +567,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link doctor --fix` | Create missing structure and repair backlinks safely. |
 | `link migrate` | Apply safe wiki schema migrations and write the local schema marker. |
 | `link validate [--strict]` | Validate agent-generated wiki pages after ingest: frontmatter, type/directory alignment, required sections, dead links, and backlink freshness. |
+| `link rebuild-index` | Regenerate `wiki/index.md` from current pages so the human-readable catalog is complete. |
 | `link rebuild-backlinks` | Regenerate `wiki/_backlinks.json`. |
 | `link verify-mcp` | Verify `link-mcp` import and print MCP config. |
 | `python3 link.py demo` | From a source checkout, create `./link-demo` with a pre-ingested sample wiki. |

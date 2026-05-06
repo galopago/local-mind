@@ -68,7 +68,7 @@ mcp = FastMCP(
         "redacting, or deleting them; use propose_memories when no raw capture is needed. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
         "neighborhood. After ingesting sources or substantially editing wiki "
-        "pages, call rebuild_backlinks, then validate_wiki before saying the "
+        "pages, call rebuild_index, rebuild_backlinks, then validate_wiki before saying the "
         "wiki is updated. Only call remember_memory when the user explicitly asks "
         "you to remember something; if it returns duplicate candidates, use "
         "update_memory on the existing memory instead of forcing a duplicate. "
@@ -148,6 +148,7 @@ from link_core.wiki import (
     context_for_topic as _core_context_for_topic,
     graph_data as _core_graph_data,
     load_backlinks_index as _core_load_backlinks_index,
+    rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
     wiki_mtime as _core_wiki_mtime,
 )
@@ -1261,6 +1262,20 @@ def get_graph() -> str:
     finding highly-connected pages, or detecting isolated clusters.
     """
     return json.dumps(_core_graph_data(_build_cache()), ensure_ascii=False)
+
+
+@mcp.tool()
+def rebuild_index() -> str:
+    """Regenerate wiki/index.md from current Markdown pages.
+
+    Run this after ingesting sources or making large page edits so the
+    human-readable wiki catalog reflects all pages grouped by category.
+    """
+    global _cache, _cache_mtime
+    result = _core_rebuild_index(WIKI_DIR, cache=_build_cache())
+    _cache = {}
+    _cache_mtime = 0.0
+    return json.dumps(result, ensure_ascii=False)
 
 
 @mcp.tool()

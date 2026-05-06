@@ -969,6 +969,35 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(rebuilt["backlinks"], {"b": ["a"]})
         self.assertEqual(rebuilt["forward"], {"a": ["b"]})
 
+    def test_rebuild_index_requires_json_post(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n\n> **TLDR:** A page.\n",
+        )
+        index_path = wiki / "index.md"
+        index_path.write_text("# Broken Index\n", encoding="utf-8")
+
+        get_status, get_payload = run_handler("GET", "/api/rebuild-index")
+        bad_post_status, bad_post_payload = run_handler("POST", "/api/rebuild-index")
+        post_status, post_payload = run_handler(
+            "POST",
+            "/api/rebuild-index",
+            body=b"{}",
+            headers={"Content-Type": "application/json", "Content-Length": "2"},
+        )
+        index_text = index_path.read_text(encoding="utf-8")
+
+        self.assertEqual(get_status, 405)
+        self.assertIn("use POST", get_payload["error"])
+        self.assertEqual(bad_post_status, 415)
+        self.assertFalse(bad_post_payload["rebuilt"])
+        self.assertEqual(post_status, 200)
+        self.assertTrue(post_payload["rebuilt"])
+        self.assertIn("[[a]]", index_text)
+        self.assertEqual(post_payload["category_counts"]["concepts"], 1)
+
     def test_validate_api_reports_wiki_gate_status(self):
         wiki = self.make_wiki()
         for dirname in ("sources", "concepts", "entities", "memories", "comparisons", "explorations"):

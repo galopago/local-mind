@@ -1393,6 +1393,28 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Rebuilt", out.getvalue())
         self.assertIn("agent-memory", rebuilt["backlinks"])
 
+    def test_rebuild_index_repairs_missing_catalog_entries(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-index-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        index_path = target / "wiki/index.md"
+        index_path.write_text("# Broken Index\n", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            rebuild_code = link_cli.rebuild_index(target)
+            backlinks_code = link_cli.rebuild_backlinks(target)
+            doctor_code = link_cli.doctor(target)
+
+        index_text = index_path.read_text(encoding="utf-8")
+        self.assertEqual(rebuild_code, 0)
+        self.assertEqual(backlinks_code, 0)
+        self.assertEqual(doctor_code, 0)
+        self.assertIn("Rebuilt", out.getvalue())
+        self.assertIn("rebuild-backlinks before validation", out.getvalue())
+        self.assertIn("[[agent-memory]]", index_text)
+        self.assertIn("[[prefer-local-personal-memory]]", index_text)
+
     def test_doctor_fix_repairs_stale_backlinks(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
         target = tmp / "demo"

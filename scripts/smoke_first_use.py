@@ -121,6 +121,10 @@ def run_smoke(work_dir: Path, python: str = sys.executable) -> None:
     require(ingest.get("pending_count") == 1, "ingest-status did not report the pending raw source")
     require(ingest.get("guidance", {}).get("agent_prompt"), "ingest-status did not include the next agent prompt")
 
+    run_link("rebuild-index", str(demo_target), python=python)
+    require("[[first-use-smoke-memory]]" in (demo_target / "wiki/index.md").read_text(encoding="utf-8"), "rebuild-index did not catalog the remembered memory")
+    run_link("rebuild-backlinks", str(demo_target), python=python)
+
     validation = run_json("validate", str(demo_target), "--strict", "--json", python=python)
     require(validation.get("passed") is True, "validate --strict did not pass after first-use actions")
 

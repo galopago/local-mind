@@ -11,11 +11,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.wiki import (  # noqa: E402
+    build_index_markdown,
     build_backlinks,
     build_wiki_cache,
     context_for_topic,
     graph_data,
     load_backlinks_index,
+    rebuild_index,
     search_pages,
     wiki_mtime,
 )
@@ -123,6 +125,40 @@ class WikiCoreTests(unittest.TestCase):
 
         self.assertFalse(result["found"])
         self.assertEqual(result["error"], "topic required")
+
+    def test_rebuild_index_generates_category_catalog(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n\n"
+            "# Agent Memory\n\n> **TLDR:** Durable memory for agents.\n",
+        )
+        write_page(
+            wiki,
+            "sources/session.md",
+            "---\ntype: source\ntitle: Session Notes\n---\n\n"
+            "# Session Notes\n\n> **TLDR:** Source notes for Link.\n",
+        )
+        write_page(
+            wiki,
+            "memories/prefer-local.md",
+            "---\ntype: memory\ntitle: Prefer Local\n---\n\n"
+            "# Prefer Local\n\n> **TLDR:** User prefers local memory.\n",
+        )
+
+        markdown = build_index_markdown(wiki, generated_at="2026-05-06T00:00:00Z")
+        result = rebuild_index(wiki, generated_at="2026-05-06T00:00:00Z")
+        index_text = (wiki / "index.md").read_text(encoding="utf-8")
+
+        self.assertIn("3 pages | 1 sources | 1 memories", markdown)
+        self.assertIn("### concepts", index_text)
+        self.assertIn("- [[agent-memory]] - Durable memory for agents. (concept)", index_text)
+        self.assertIn("- [[session]] - Source notes for Link. (source)", index_text)
+        self.assertIn("- [[prefer-local]] - User prefers local memory. (memory)", index_text)
+        self.assertEqual(result["page_count"], 3)
+        self.assertEqual(result["category_counts"]["concepts"], 1)
+        self.assertEqual(result["next_actions"][0]["tool"], "rebuild_backlinks")
 
 
 if __name__ == "__main__":
