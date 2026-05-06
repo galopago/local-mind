@@ -70,5 +70,10 @@ fi
 
 echo ""
 echo "Done."
-echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
-echo "  View wiki: python ~/link/serve.py"
+if [ "$MODE" = "--project" ]; then
+    echo "  Drop sources into raw/ and say 'ingest' to process them."
+    echo "  View wiki: python serve.py"
+else
+    echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
+    echo "  View wiki: python ~/link/serve.py"
+fi

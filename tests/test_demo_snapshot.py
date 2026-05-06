@@ -64,6 +64,7 @@ def reset_serve_wiki(wiki_dir: Path) -> None:
     serve._pages_cache_mtime = 0.0
     serve._page_index = {}
     serve._fulltext_index = {}
+    serve._normalized_fulltext_index = {}
     serve._snippet_index = {}
     serve._token_index = {}
     serve._page_map = {}
@@ -118,6 +119,17 @@ class DemoSnapshotTests(unittest.TestCase):
 
         self.assertIn('<span class="label">memories</span>', html)
         self.assertIn("Prefer local personal memory", html)
+
+    def test_demo_search_matches_hyphenated_pages_with_natural_query(self):
+        target = self.make_demo()
+        reset_serve_wiki(target / "wiki")
+
+        results = serve._search_pages("local first software")
+        context = serve._get_context("local first software")
+
+        self.assertEqual(results[0]["name"], "local-first-software")
+        self.assertTrue(context["found"])
+        self.assertEqual(context["primary"], "local-first-software")
 
     def test_demo_profile_snapshot(self):
         target = self.make_demo()

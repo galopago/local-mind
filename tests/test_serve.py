@@ -16,6 +16,7 @@ def reset_wiki(wiki_dir: Path) -> None:
     serve._pages_cache_mtime = 0.0
     serve._page_index = {}
     serve._fulltext_index = {}
+    serve._normalized_fulltext_index = {}
     serve._snippet_index = {}
     serve._token_index = {}
     serve._page_map = {}
@@ -76,15 +77,25 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn("document.activeElement.id === 'search-input'", html)
         self.assertIn("window.location.href = '/search?q=' + encodeURIComponent(q);", html)
+        self.assertIn("data-theme-toggle", html)
+        self.assertIn("localStorage.getItem('link-theme')", html)
 
     def test_css_has_mobile_overflow_guards(self):
-        self.assertIn("html { overflow-x: hidden; }", serve.CSS)
+        self.assertIn("* { box-sizing: border-box; margin: 0; padding: 0; }", serve.CSS)
+        self.assertIn("html { overflow-x: hidden; background: var(--bg); }", serve.CSS)
         self.assertIn("overflow-x: hidden; overflow-wrap: anywhere", serve.CSS)
         self.assertIn("a, p, li, code { overflow-wrap: anywhere; }", serve.CSS)
         self.assertIn("header nav { display: flex; gap: 16px;", serve.CSS)
         self.assertIn("flex-wrap: wrap; min-width: 0", serve.CSS)
         self.assertIn(".memory-grid { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
         self.assertIn(".memory-actions code, .memory-next code { word-break: break-word; }", serve.CSS)
+
+    def test_css_has_explicit_black_dark_theme(self):
+        self.assertIn(':root[data-theme="dark"]', serve.CSS)
+        self.assertIn("--bg: #000000;", serve.CSS)
+        self.assertIn("body { font-family: Georgia", serve.CSS)
+        self.assertIn("background: var(--bg); color: var(--text);", serve.CSS)
+        self.assertNotIn("background: #1a1a1a", serve.CSS)
 
     def test_graph_labels_are_clamped_inside_canvas(self):
         wiki = self.make_wiki()

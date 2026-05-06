@@ -23,6 +23,14 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn("--break-system-packages", scaffold)
         self.assertIn(".link-mcp-venv", scaffold)
         self.assertIn(".link-mcp-python", scaffold)
+        self.assertIn("LINK_MCP_INSTALLED=false", scaffold)
+        self.assertIn('[ "$LINK_MCP_INSTALLED" = true ]', scaffold)
+
+    def test_scaffold_project_mode_uses_absolute_target(self):
+        scaffold = (ROOT / "integrations/_shared/scaffold.sh").read_text(encoding="utf-8")
+
+        self.assertIn('TARGET_DIR="$(pwd)"', scaffold)
+        self.assertNotIn('TARGET_DIR="."', scaffold)
 
     def test_installers_read_resolved_mcp_python_marker(self):
         for installer in INSTALLERS:
@@ -30,6 +38,13 @@ class InstallerTests(unittest.TestCase):
                 text = installer.read_text(encoding="utf-8")
                 self.assertIn("MCP_PYTHON", text)
                 self.assertIn(".link-mcp-python", text)
+
+    def test_installers_print_mode_specific_next_steps(self):
+        for installer in INSTALLERS:
+            with self.subTest(installer=installer.name):
+                text = installer.read_text(encoding="utf-8")
+                self.assertIn('if [ "$MODE" = "--project" ]; then', text)
+                self.assertIn("View wiki: python serve.py", text)
 
     def test_codex_and_kiro_update_existing_mcp_registration(self):
         codex = (ROOT / "integrations/codex/install.sh").read_text(encoding="utf-8")

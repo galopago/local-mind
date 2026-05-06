@@ -15,7 +15,7 @@ LINK_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MODE="${1:---global}"
 
 if [ "$MODE" = "--project" ]; then
-    TARGET_DIR="."
+    TARGET_DIR="$(pwd)"
 else
     TARGET_DIR="$HOME/link"
     mkdir -p "$TARGET_DIR"
@@ -111,20 +111,45 @@ fi
 LINK_MCP_PYTHON="python3"
 LINK_MCP_VENV="${LINK_MCP_VENV:-$HOME/.link-mcp-venv}"
 LINK_MCP_VENV_PYTHON="$LINK_MCP_VENV/bin/python"
+LINK_MCP_MARKER="$TARGET_DIR/.link-mcp-python"
+LINK_MCP_INSTALLED=false
+LINK_MCP_REUSED=false
 
 if python3 -m pip install --upgrade "$LINK_MCP_PACKAGE" -q 2>/dev/null; then
     LINK_MCP_PYTHON="python3"
+    LINK_MCP_INSTALLED=true
 elif python3 -m venv "$LINK_MCP_VENV" 2>/dev/null \
     && "$LINK_MCP_VENV_PYTHON" -m pip install --upgrade pip -q 2>/dev/null \
     && "$LINK_MCP_VENV_PYTHON" -m pip install --upgrade "$LINK_MCP_PACKAGE" -q 2>/dev/null; then
     LINK_MCP_PYTHON="$LINK_MCP_VENV_PYTHON"
+    LINK_MCP_INSTALLED=true
 fi
 
-if "$LINK_MCP_PYTHON" -c "import link_mcp" 2>/dev/null; then
-    printf '%s\n' "$LINK_MCP_PYTHON" > "$TARGET_DIR/.link-mcp-python"
-    echo "  ✓ link-mcp installed"
+if [ "$LINK_MCP_INSTALLED" = false ] && [ -f "$LINK_MCP_MARKER" ]; then
+    LINK_MCP_MARKER_PYTHON="$(cat "$LINK_MCP_MARKER")"
+    if [ -n "$LINK_MCP_MARKER_PYTHON" ] && "$LINK_MCP_MARKER_PYTHON" -c "import link_mcp" 2>/dev/null; then
+        LINK_MCP_PYTHON="$LINK_MCP_MARKER_PYTHON"
+        LINK_MCP_INSTALLED=true
+        LINK_MCP_REUSED=true
+    fi
+elif [ "$LINK_MCP_INSTALLED" = false ] && [ -x "$LINK_MCP_VENV_PYTHON" ] && "$LINK_MCP_VENV_PYTHON" -c "import link_mcp" 2>/dev/null; then
+    LINK_MCP_PYTHON="$LINK_MCP_VENV_PYTHON"
+    LINK_MCP_INSTALLED=true
+    LINK_MCP_REUSED=true
+fi
+
+if [ "$LINK_MCP_INSTALLED" = true ] && "$LINK_MCP_PYTHON" -c "import link_mcp" 2>/dev/null; then
+    printf '%s\n' "$LINK_MCP_PYTHON" > "$LINK_MCP_MARKER"
+    if [ "$LINK_MCP_REUSED" = true ]; then
+        echo "  ✓ existing link-mcp available"
+    else
+        echo "  ✓ link-mcp installed"
+    fi
     if [ "$LINK_MCP_PYTHON" != "python3" ]; then
         echo "  ✓ MCP Python: $LINK_MCP_PYTHON"
+    fi
+    if [ "$LINK_MCP_REUSED" = true ]; then
+        echo "  · Automatic upgrade did not complete; run verify-mcp to confirm the installed version."
     fi
     echo ""
     echo "  Add to your MCP client config:"

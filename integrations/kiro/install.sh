@@ -69,7 +69,9 @@ elif [ "$MODE" = "--project" ]; then
 
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
     echo ""
-    echo "Done. Drop sources into raw/ and say 'ingest' to process them."
+    echo "Done."
+    echo "  Drop sources into raw/ and say 'ingest' to process them."
+    echo "  View wiki: python serve.py"
 else
     echo "Usage: bash install.sh [--project]"
     exit 1

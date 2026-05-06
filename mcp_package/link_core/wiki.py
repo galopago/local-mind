@@ -12,6 +12,13 @@ from .frontmatter import parse_frontmatter
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
 
 
+def normalized_search_text(value: object) -> str:
+    """Normalize punctuation differences so natural queries match page slugs."""
+    text = str(value).lower()
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def wiki_mtime(wiki_dir: Path) -> float:
     """Return an mtime signal for files that affect wiki indexes."""
     try:
@@ -58,6 +65,7 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
     pages: list[dict[str, Any]] = []
     page_index: dict[str, Path] = {}
     fulltext: dict[str, str] = {}
+    normalized_fulltext: dict[str, str] = {}
     snippet_index: dict[str, str] = {}
     token_index: dict[str, set[str]] = {}
     meta_token_index: dict[str, set[str]] = {}
@@ -98,6 +106,7 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
 
         text_lower = text.lower()
         fulltext[stem] = text_lower
+        normalized_fulltext[stem] = normalized_search_text(text_lower)
         snippet_index[stem] = _body_snippet(body)
 
         for token in re.split(r"\W+", text_lower):
@@ -128,6 +137,7 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
         "pages": pages,
         "page_index": page_index,
         "fulltext": fulltext,
+        "normalized_fulltext": normalized_fulltext,
         "snippet_index": snippet_index,
         "token_index": token_index,
         "meta_token_index": meta_token_index,
@@ -186,11 +196,13 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
     if not q:
         return []
     q_lower = q.lower()
+    q_normalized = normalized_search_text(q)
     pages = cache["pages"]
     page_map = cache["page_map"]
     token_index = cache["token_index"]
     meta_token_index = cache["meta_token_index"]
     fulltext = cache["fulltext"]
+    normalized_fulltext = cache.get("normalized_fulltext", {})
     snippet_index = cache["snippet_index"]
 
     is_single_token = bool(re.match(r"^\w+$", q_lower))
@@ -205,18 +217,25 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
         if not page:
             continue
         score = 0
-        if q_lower in str(page["title"]).lower():
-            score += 10
-        if q_lower == stem:
-            score += 20
-        if any(q_lower in alias for alias in page.get("aliases", [])):
-            score += 8
-        if any(q_lower in str(tag).lower() for tag in page.get("tags", [])):
-            score += 5
-        if q_lower in str(page.get("tldr", "")).lower():
-            score += 3
+        title_normalized = normalized_search_text(page["title"])
+        stem_normalized = normalized_search_text(stem)
+        aliases = page.get("aliases", [])
+        tags = page.get("tags", [])
+        tldr = page.get("tldr", "")
         text_lower = fulltext.get(stem, "")
-        if text_lower and q_lower in text_lower:
+
+        if q_lower in str(page["title"]).lower() or (q_normalized and q_normalized in title_normalized):
+            score += 10
+        if q_lower == stem or (q_normalized and q_normalized == stem_normalized):
+            score += 20
+        if any(q_lower in alias or (q_normalized and q_normalized in normalized_search_text(alias)) for alias in aliases):
+            score += 8
+        if any(q_lower in str(tag).lower() or (q_normalized and q_normalized in normalized_search_text(tag)) for tag in tags):
+            score += 5
+        if q_lower in str(tldr).lower() or (q_normalized and q_normalized in normalized_search_text(tldr)):
+            score += 3
+        text_normalized = normalized_fulltext.get(stem, "")
+        if text_lower and (q_lower in text_lower or (q_normalized and q_normalized in text_normalized)):
             score += 2
         if score > 0:
             scored.append((score, {**page, "score": score, "snippet": snippet_index.get(stem, "")}))

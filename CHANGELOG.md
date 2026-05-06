@@ -20,6 +20,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added read-only web Memory Dashboard at `/memory` and `/api/memory-dashboard` for active memories, review queue, recent updates, archived memories, and next-action commands.
 - Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; memory write operations remain CLI/MCP-only.
 - Added a graph node inspector so moving nodes no longer accidentally opens pages; double-click or Open page still navigates.
+- Added an explicit `system`/`dark`/`light` theme toggle for the local web UI; dark mode now uses a black page background.
 - Added a real MCP stdio smoke test for the built `link-mcp` wheel in CI.
 - Added Memory Dashboard next actions so the web UI and API surface the most important memory maintenance step.
 - Extracted shared memory proposal logic into `link_core` so CLI, HTTP, and MCP proposal behavior stays aligned.
@@ -34,6 +35,9 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 ### Fixed
 
 - Tightened README onboarding and release examples around Link's local memory product value.
+- Fixed installer MCP setup reporting so failed upgrades no longer masquerade as success by reusing an unrelated older global `link-mcp`.
+- Fixed project-mode installer output so MCP wiki paths are absolute and next-step hints point at the project wiki instead of `~/link`.
+- Fixed search/context matching for natural queries against hyphenated page slugs, e.g. `local first software` now finds `local-first-software`.
 - Hardened backlink rebuild over HTTP so local web rebuilds require JSON POST instead of a mutating GET.
 - Hardened `/raw/` static serving so the local web viewer only serves supported media/PDF source assets.
 - Refreshed the checked-in demo backlink index so `link.py doctor .` reports a healthy graph.

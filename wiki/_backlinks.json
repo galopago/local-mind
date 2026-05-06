@@ -5,6 +5,7 @@
       "machine-learning",
       "transformers",
       "gpt",
+      "index",
       "deep-learning-overview",
       "intro-to-ml"
     ],
@@ -13,6 +14,7 @@
       "machine-learning",
       "neural-networks",
       "gpt",
+      "index",
       "attention-is-all-you-need",
       "deep-learning-overview",
       "intro-to-ml"
@@ -20,38 +22,44 @@
     "gpt": [
       "attention-mechanism",
       "transformers",
+      "index",
       "attention-is-all-you-need",
       "deep-learning-overview",
       "intro-to-ml"
     ],
     "attention-is-all-you-need": [
       "attention-mechanism",
-      "transformers"
+      "transformers",
+      "index"
     ],
     "deep-learning-overview": [
       "attention-mechanism",
       "machine-learning",
       "neural-networks",
       "transformers",
-      "gpt"
+      "gpt",
+      "index"
     ],
     "intro-to-ml": [
       "machine-learning",
       "neural-networks",
       "transformers",
-      "gpt"
+      "gpt",
+      "index"
     ],
     "attention-mechanism": [
       "machine-learning",
       "neural-networks",
       "transformers",
       "gpt",
+      "index",
       "attention-is-all-you-need"
     ],
     "machine-learning": [
       "neural-networks",
       "transformers",
       "gpt",
+      "index",
       "deep-learning-overview",
       "intro-to-ml"
     ]
@@ -94,6 +102,16 @@
       "machine-learning",
       "intro-to-ml",
       "neural-networks"
+    ],
+    "index": [
+      "attention-is-all-you-need",
+      "deep-learning-overview",
+      "intro-to-ml",
+      "attention-mechanism",
+      "machine-learning",
+      "neural-networks",
+      "transformers",
+      "gpt"
     ],
     "attention-is-all-you-need": [
       "transformers",

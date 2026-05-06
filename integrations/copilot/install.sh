@@ -37,8 +37,13 @@ fi
 
 echo ""
 echo "Done."
-echo "  Drop sources into raw/ and say 'ingest' to process them."
-echo "  View wiki: python ~/link/serve.py"
+if [ "$MODE" = "--project" ]; then
+    echo "  Drop sources into raw/ and say 'ingest' to process them."
+    echo "  View wiki: python serve.py"
+else
+    echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
+    echo "  View wiki: python ~/link/serve.py"
+fi
 echo ""
 echo "  MCP: add to your Copilot MCP config:"
 echo "  { \"mcpServers\": { \"link\": { \"command\": \"$MCP_PYTHON\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
