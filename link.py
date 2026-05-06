@@ -14,6 +14,7 @@ Usage:
   python link.py profile [target]
   python link.py archive-memory <name-or-title> [target]
   python link.py restore-memory <name-or-title> [target]
+  python link.py forget-memory <name-or-title> [target] --confirm
   python link.py memory-inbox [target]
   python link.py review-memory <name-or-title> [target]
   python link.py explain-memory <name-or-title> [target]
@@ -92,6 +93,7 @@ if (_BUNDLED_CORE / "link_core").exists():
 
 from link_core.memory import (
     count_values as _core_count_values,
+    forget_memory_page as _core_forget_memory_page,
     mark_memory_reviewed as _core_mark_memory_reviewed,
     memory_brief as _core_memory_brief,
     memory_explanation as _core_memory_explanation,
@@ -2265,6 +2267,52 @@ def restore_memory(target: Path, identifier: str, json_output: bool = False) -> 
     return 0
 
 
+def forget_memory(target: Path, identifier: str, confirm: bool = False, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+
+    def rebuild_memory_backlinks() -> bool:
+        backlinks = _build_backlinks(wiki_dir)
+        (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
+        return True
+
+    result = _core_forget_memory_page(
+        wiki_dir,
+        identifier,
+        confirm=confirm,
+        records=_memory_records(wiki_dir),
+        timestamp=_utc_timestamp(),
+        log_writer=lambda ts, operation, description, lines: _append_log(
+            wiki_dir,
+            ts,
+            operation,
+            description,
+            lines,
+        ),
+        rebuild_backlinks=rebuild_memory_backlinks,
+    )
+    if json_output:
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("forgotten") else 1
+
+    if not result.get("found"):
+        print(f"Memory not found: {identifier}", file=sys.stderr)
+        return 1
+    if result.get("confirmation_required"):
+        print("Confirmation required.")
+        print(f"Run: python3 link.py forget-memory \"{result['name']}\" . --confirm")
+        return 1
+
+    print("Memory forgotten")
+    print(f"Title: {result['title']}")
+    print(f"Deleted: {result['path']}")
+    print(f"Backlinks rebuilt: {'yes' if result.get('backlinks_rebuilt') else 'no'}")
+    return 0
+
+
 def memory_inbox(
     target: Path,
     limit: int = 20,
@@ -2844,6 +2892,12 @@ def main(argv: list[str] | None = None) -> int:
     restore_cmd.add_argument("target", nargs="?", default=".")
     restore_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
+    forget_cmd = sub.add_parser("forget-memory", help="permanently delete a memory after explicit confirmation")
+    forget_cmd.add_argument("identifier", help="memory page name, title, or path")
+    forget_cmd.add_argument("target", nargs="?", default=".")
+    forget_cmd.add_argument("--confirm", action="store_true", help="required to delete the memory")
+    forget_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
+
     inbox_cmd = sub.add_parser("memory-inbox", help="show memories that need review")
     inbox_cmd.add_argument("target", nargs="?", default=".")
     inbox_cmd.add_argument("--limit", type=int, default=20)
@@ -2971,6 +3025,8 @@ def main(argv: list[str] | None = None) -> int:
         return archive_memory(Path(args.target), args.identifier, reason=args.reason, json_output=args.json)
     if args.command == "restore-memory":
         return restore_memory(Path(args.target), args.identifier, json_output=args.json)
+    if args.command == "forget-memory":
+        return forget_memory(Path(args.target), args.identifier, confirm=args.confirm, json_output=args.json)
     if args.command == "memory-inbox":
         return memory_inbox(
             Path(args.target),

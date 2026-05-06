@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.memory import (  # noqa: E402
     extract_wikilinks,
+    forget_memory_page,
     mark_memory_reviewed,
     memory_brief,
     memory_conflict_candidates,
@@ -658,6 +659,34 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertNotIn("archived_at:", restored_text)
         self.assertNotIn("archive_reason:", restored_text)
         self.assertEqual(logged[-1][1], "restore-memory")
+
+        (wiki / "index.md").write_text("### memories\n- [[prefer-focused-commits]] - old entry\n", encoding="utf-8")
+        denied = forget_memory_page(
+            wiki,
+            "prefer-focused-commits",
+            records=memory_records(wiki),
+            log_writer=log_writer,
+            timestamp="2026-05-05T06:00:00Z",
+            rebuild_backlinks=lambda: rebuilds.append(True) or True,
+        )
+        forgotten = forget_memory_page(
+            wiki,
+            "prefer-focused-commits",
+            confirm=True,
+            records=memory_records(wiki),
+            log_writer=log_writer,
+            timestamp="2026-05-05T06:00:00Z",
+            rebuild_backlinks=lambda: rebuilds.append(True) or True,
+        )
+
+        self.assertFalse(denied["forgotten"])
+        self.assertTrue(denied["confirmation_required"])
+        self.assertTrue(forgotten["forgotten"])
+        self.assertFalse(memory_path.exists())
+        self.assertTrue(forgotten["index_updated"])
+        self.assertNotIn("[[prefer-focused-commits]]", (wiki / "index.md").read_text(encoding="utf-8"))
+        self.assertEqual(logged[-1][1], "forget-memory")
+        self.assertNotIn("User prefers focused commits", "\n".join(logged[-1][3]))
 
     def test_write_memory_page_creates_index_log_and_blocks_duplicates(self):
         root = Path(tempfile.mkdtemp(prefix="link-memory-write-"))

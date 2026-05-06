@@ -394,11 +394,12 @@ Most agents should start with:
 | `accept_capture` | The user approves one proposal from a saved raw capture. |
 | `redact_capture` | The user approves redacting secret-looking values from a saved raw capture. |
 | `delete_capture` | The user explicitly confirms deleting a saved raw capture. |
+| `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
 
 Full tool set: `memory_brief`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
-`update_memory`, `archive_memory`, `restore_memory`,
+`update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
 `get_context`, `get_pages`, `get_backlinks`, `get_graph`, `rebuild_backlinks`.
 
 Memory write tools return `duplicate_candidates` or `conflict_candidates` when
@@ -455,6 +456,7 @@ Common endpoints:
 | `python3 link.py update-memory <name> "text" <dir> [--project slug]` | Merge new text into an existing memory, blocking likely conflicts with other active memories by default. |
 | `python3 link.py archive-memory <name> <dir>` | Reversibly hide a stale or wrong memory from default recall. |
 | `python3 link.py restore-memory <name> <dir>` | Restore an archived memory to active recall. |
+| `python3 link.py forget-memory <name> <dir> --confirm` | Permanently delete a memory after explicit confirmation; archive first if you may need it later. |
 | `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, and secret-looking content. |
 | `python3 link.py doctor <dir> --fix` | Create missing structure and repair backlinks safely. |
 | `python3 link.py rebuild-backlinks <dir>` | Regenerate `wiki/_backlinks.json`. |

@@ -446,6 +446,25 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(restored["status"], "active")
         self.assertEqual(recall_restored["memories"][0]["name"], "prefer-local-personal-memory")
 
+    def test_forget_memory_contract(self):
+        memory_path = self.target / "wiki/memories/prefer-local-personal-memory.md"
+
+        denied = json.loads(self.server.forget_memory("prefer-local-personal-memory"))
+        forgotten = json.loads(self.server.forget_memory("prefer-local-personal-memory", confirm=True))
+        recall = json.loads(self.server.recall_memory("local personal memory", include_archived=True))
+        log_text = (self.target / "wiki/log.md").read_text(encoding="utf-8")
+        index_text = (self.target / "wiki/index.md").read_text(encoding="utf-8")
+
+        self.assertFalse(denied["forgotten"])
+        self.assertTrue(denied["confirmation_required"])
+        self.assertTrue(forgotten["forgotten"])
+        self.assertTrue(forgotten["backlinks_rebuilt"])
+        self.assertFalse(memory_path.exists())
+        self.assertEqual(recall["count"], 0)
+        self.assertNotIn("[[prefer-local-personal-memory]]", index_text)
+        self.assertIn("forget-memory", log_text)
+        self.assertNotIn("local personal memory for agents", log_text)
+
     def test_remember_memory_contract(self):
         payload = json.loads(self.server.remember_memory(
             "User prefers release branches for Link work.",

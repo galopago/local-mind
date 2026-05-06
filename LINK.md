@@ -303,6 +303,7 @@ Rules:
 - After the human confirms a memory is accurate, run `python3 link.py review-memory "<name-or-title>" .`.
 - Run `python3 link.py explain-memory "<name-or-title>" .` when the human asks why an agent knows something or whether a memory is safe to use.
 - If a memory is stale or wrong, archive it with `python3 link.py archive-memory "<name-or-title>" . --reason "why"`. Do not delete memory pages unless the human explicitly asks for permanent removal.
+- If the human explicitly asks Link to permanently forget a memory, use `python3 link.py forget-memory "<name-or-title>" . --confirm` or MCP `forget_memory` with `confirm: true`. Prefer archive when reversible cleanup is enough.
 - Restore an archived memory with `python3 link.py restore-memory "<name-or-title>" .`.
 
 ### 2. Ingest

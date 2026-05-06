@@ -718,6 +718,18 @@ def update_memory_index(
     index_path.write_text(text, encoding="utf-8")
 
 
+def remove_memory_from_index(index_path: Path, page_name: str) -> bool:
+    if not index_path.exists():
+        return False
+    text = index_path.read_text(encoding="utf-8", errors="replace")
+    lines = text.splitlines()
+    filtered = [line for line in lines if f"[[{page_name}]]" not in line]
+    if len(filtered) == len(lines):
+        return False
+    index_path.write_text("\n".join(filtered).rstrip() + "\n", encoding="utf-8")
+    return True
+
+
 def replace_markdown_body(text: str, body: str) -> str:
     if text.startswith("---\n"):
         end = text.find("\n---", 4)
@@ -795,6 +807,58 @@ def set_memory_status(
         "previous_status": current_status,
         "status": status,
     }
+
+
+def forget_memory_page(
+    wiki_dir: Path,
+    identifier: str,
+    confirm: bool = False,
+    records: Iterable[Mapping[str, object]] | None = None,
+    log_writer: MemoryLogWriter | None = None,
+    timestamp: str = "",
+    rebuild_backlinks: Callable[[], bool] | None = None,
+) -> dict[str, object]:
+    page_path, record, error = resolve_memory_page(wiki_dir, identifier, records=records)
+    if error:
+        return {
+            "forgotten": False,
+            "found": False,
+            "error": error,
+            "confirmation_required": False,
+        }
+    assert page_path is not None and record is not None
+
+    payload: dict[str, object] = {
+        "forgotten": False,
+        "found": True,
+        "name": record["name"],
+        "path": record["path"],
+        "title": record["title"],
+        "confirmation_required": not confirm,
+    }
+    if not confirm:
+        return payload
+
+    page_path.unlink()
+    index_updated = remove_memory_from_index(wiki_dir / "index.md", page_path.stem)
+    backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+    payload.update({
+        "forgotten": True,
+        "confirmation_required": False,
+        "index_updated": index_updated,
+        "backlinks_rebuilt": bool(backlinks_rebuilt),
+    })
+    if log_writer:
+        log_writer(
+            timestamp,
+            "forget-memory",
+            f"Forgot memory {payload['path']}",
+            [
+                f"Title: {payload['title']}",
+                "Deleted memory page only; memory body was not logged.",
+            ],
+        )
+    return payload
 
 
 def mark_memory_reviewed(

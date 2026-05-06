@@ -902,6 +902,36 @@ class LinkCliTests(unittest.TestCase):
             link_cli.recall(target, "local personal memory")
         self.assertIn("Prefer local personal memory", out.getvalue())
 
+    def test_forget_memory_requires_confirmation_and_deletes_page(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        memory_path = target / "wiki/memories/prefer-local-personal-memory.md"
+
+        denied_out = StringIO()
+        with redirect_stdout(denied_out):
+            denied_code = link_cli.forget_memory(target, "prefer-local-personal-memory", json_output=True)
+        denied = json.loads(denied_out.getvalue())
+        self.assertEqual(denied_code, 1)
+        self.assertFalse(denied["forgotten"])
+        self.assertTrue(denied["confirmation_required"])
+        self.assertTrue(memory_path.exists())
+
+        forget_out = StringIO()
+        with redirect_stdout(forget_out):
+            forget_code = link_cli.forget_memory(target, "prefer-local-personal-memory", confirm=True, json_output=True)
+        forgotten = json.loads(forget_out.getvalue())
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+        index_text = (target / "wiki/index.md").read_text(encoding="utf-8")
+
+        self.assertEqual(forget_code, 0)
+        self.assertTrue(forgotten["forgotten"])
+        self.assertTrue(forgotten["backlinks_rebuilt"])
+        self.assertFalse(memory_path.exists())
+        self.assertNotIn("[[prefer-local-personal-memory]]", index_text)
+        self.assertIn("forget-memory", log_text)
+        self.assertNotIn("local personal memory for agents", log_text)
+
     def test_archive_memory_json_not_found(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

@@ -67,7 +67,8 @@ mcp = FastMCP(
         "update_memory on the existing memory instead of forcing a duplicate. "
         "If it returns conflict candidates, ask the user whether to update or "
         "archive the older memory before forcing a conflict. "
-        "Use archive_memory instead of deleting stale or wrong memories."
+        "Use archive_memory instead of deleting stale or wrong memories; use "
+        "forget_memory only when the user explicitly asks for permanent deletion."
     ),
 )
 
@@ -79,6 +80,7 @@ MAX_CAPTURE_INPUT = 12000
 
 from link_core.memory import (
     count_values as _core_count_values,
+    forget_memory_page as _core_forget_memory_page,
     mark_memory_reviewed as _core_mark_memory_reviewed,
     memory_brief as _core_memory_brief,
     memory_explanation as _core_memory_explanation,
@@ -637,6 +639,25 @@ def _set_memory_status(identifier: str, status: str, reason: str = "") -> dict[s
     return result
 
 
+def _forget_memory(identifier: str, confirm: bool = False) -> dict[str, object]:
+    def rebuild_memory_backlinks() -> bool:
+        rebuilt = json.loads(rebuild_backlinks())
+        return bool(rebuilt.get("rebuilt"))
+
+    result = _core_forget_memory_page(
+        WIKI_DIR,
+        _clean_text_input(identifier, max_len=300),
+        confirm=confirm,
+        records=_memory_records(),
+        timestamp=_utc_timestamp(),
+        log_writer=_append_log,
+        rebuild_backlinks=rebuild_memory_backlinks,
+    )
+    if result.get("forgotten"):
+        _cache.clear()
+    return result
+
+
 def _mark_memory_reviewed(identifier: str, note: str = "") -> dict[str, object]:
     result = _core_mark_memory_reviewed(
         WIKI_DIR,
@@ -1001,6 +1022,17 @@ def restore_memory(identifier: str) -> str:
     except ValueError as exc:
         return json.dumps({"updated": False, "error": str(exc)})
     return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
+def forget_memory(identifier: str, confirm: bool = False) -> str:
+    """Permanently delete a memory after explicit user confirmation.
+
+    Prefer archive_memory for reversible cleanup. Use forget_memory only when
+    the user asks Link to permanently forget a memory; the tool refuses to
+    delete unless confirm is true and never logs the memory body.
+    """
+    return json.dumps(_forget_memory(identifier, confirm=confirm), ensure_ascii=False)
 
 
 @mcp.tool()
