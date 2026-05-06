@@ -871,11 +871,49 @@ class ServeTests(unittest.TestCase):
         html = serve._render_propose(project="link")
 
         self.assertIn('<a href="/propose">propose</a>', html)
+        self.assertIn('data-proposal-sources', html)
         self.assertIn('data-proposal-form', html)
         self.assertIn('data-proposal-results', html)
         self.assertIn('value="link"', html)
         self.assertIn("without writing anything", html)
         self.assertIn("Save only preferences", html)
+
+    def test_proposal_sources_api_lists_safe_raw_files(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        (raw / "first-memory.md").write_text(
+            "# First Memory\n\nI prefer local-first agent memory.",
+            encoding="utf-8",
+        )
+        fake_secret = "sk-" + ("a" * 24)
+        (raw / "secret-note.md").write_text(
+            f"# Secret Note\n\nToken {fake_secret} should not be loaded.",
+            encoding="utf-8",
+        )
+        (raw / "image.png").write_bytes(b"not listed")
+        reset_wiki(wiki)
+
+        list_status, list_payload = run_handler("GET", "/api/proposal-sources")
+        load_status, load_payload = run_handler("GET", "/api/proposal-source?path=raw/first-memory.md")
+        secret_status, secret_payload = run_handler("GET", "/api/proposal-source?path=raw/secret-note.md")
+        traversal_status, traversal_payload = run_handler("GET", "/api/proposal-source?path=../serve.py")
+
+        self.assertEqual(list_status, 200)
+        self.assertEqual(list_payload["count"], 2)
+        sources = {item["path"]: item for item in list_payload["sources"]}
+        self.assertTrue(sources["raw/first-memory.md"]["loadable"])
+        self.assertFalse(sources["raw/secret-note.md"]["loadable"])
+        self.assertEqual(sources["raw/secret-note.md"]["secret_warnings"], ["OpenAI API key"])
+        self.assertNotIn(fake_secret, sources["raw/secret-note.md"]["snippet"])
+        self.assertEqual(load_status, 200)
+        self.assertIn("local-first agent memory", load_payload["text"])
+        self.assertEqual(load_payload["source"], "raw/first-memory.md")
+        self.assertEqual(secret_status, 409)
+        self.assertIn("redact", secret_payload["error"])
+        self.assertNotIn("text", secret_payload)
+        self.assertEqual(traversal_status, 404)
+        self.assertFalse(traversal_payload["found"])
 
     def test_rebuild_backlinks_requires_json_post(self):
         wiki = self.make_wiki()

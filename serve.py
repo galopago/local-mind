@@ -33,6 +33,10 @@ from link_core.log import (
     append_log as _core_append_log,
     utc_timestamp as _core_utc_timestamp,
 )
+from link_core.security import (
+    redact_secret_values as _redact_secret_values,
+    secret_value_warnings as _secret_value_warnings,
+)
 from link_core.query import (
     query_link as _core_query_link,
 )
@@ -62,8 +66,21 @@ WIKI_DIR = ROOT / "wiki"
 RAW_DIR = ROOT / "raw"
 PORT = 3000
 MAX_POST_BYTES = 64 * 1024
+MAX_PROPOSAL_SOURCE_BYTES = 64 * 1024
 LOCAL_ACTION_HEADER = "X-Link-Local-Action"
 LOCAL_ACTION_VALUES = {"1", "true", "yes"}
+PROPOSAL_SOURCE_SUFFIXES = {
+    ".md",
+    ".markdown",
+    ".txt",
+    ".text",
+    ".rst",
+    ".adoc",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".csv",
+}
 RAW_STATIC_TYPES = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -633,6 +650,118 @@ def _resolve_raw_static_path(url_fragment: str) -> tuple[Path | None, str | None
     return resolved, content_type
 
 
+def _proposal_source_title(text: str, fallback: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            return stripped[2:].strip()[:100] or fallback
+        if stripped:
+            return stripped[:100]
+    return fallback
+
+
+def _proposal_source_snippet(text: str) -> str:
+    lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.strip().startswith("---")
+    ]
+    return " ".join(lines[:3])[:260]
+
+
+def _resolve_proposal_source_path(source_path: str) -> Path | None:
+    decoded = urllib.parse.unquote(str(source_path or "")).strip().lstrip("/")
+    if decoded.startswith("raw/"):
+        decoded = decoded[4:]
+    if not decoded:
+        return None
+    resolved = _safe_resolve(RAW_DIR / decoded)
+    raw_root = RAW_DIR.resolve()
+    if not resolved or not _is_relative_to(resolved, raw_root):
+        return None
+    if not resolved.is_file() or resolved.suffix.lower() not in PROPOSAL_SOURCE_SUFFIXES:
+        return None
+    return resolved
+
+
+def _proposal_source_record(path: Path, include_text: bool = False) -> dict[str, object]:
+    raw_root = RAW_DIR.resolve()
+    rel = path.relative_to(raw_root).as_posix()
+    try:
+        size = path.stat().st_size
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return {
+            "path": f"raw/{rel}",
+            "source": f"raw/{rel}",
+            "title": rel,
+            "size": 0,
+            "snippet": "",
+            "secret_warnings": [],
+            "warning_count": 0,
+            "loadable": False,
+            "error": str(exc),
+        }
+    labels = _secret_value_warnings(text)
+    redacted, _, _ = _redact_secret_values(text) if labels else (text, [], 0)
+    record: dict[str, object] = {
+        "path": f"raw/{rel}",
+        "source": f"raw/{rel}",
+        "title": _proposal_source_title(redacted, rel),
+        "size": size,
+        "snippet": _proposal_source_snippet(redacted),
+        "secret_warnings": labels,
+        "warning_count": len(labels),
+        "loadable": not labels and size <= MAX_PROPOSAL_SOURCE_BYTES,
+        "truncated": size > MAX_PROPOSAL_SOURCE_BYTES,
+    }
+    if include_text and record["loadable"]:
+        record["text"] = text[:MAX_PROPOSAL_SOURCE_BYTES]
+    return record
+
+
+def _proposal_sources(limit: int = 50) -> dict[str, object]:
+    if not RAW_DIR.exists():
+        return {"count": 0, "sources": [], "raw_dir": str(RAW_DIR), "warning_count": 0}
+    raw_root = RAW_DIR.resolve()
+    sources: list[dict[str, object]] = []
+    for path in sorted(RAW_DIR.rglob("*")):
+        resolved = _safe_resolve(path)
+        if not resolved or not _is_relative_to(resolved, raw_root):
+            continue
+        if not resolved.is_file() or resolved.suffix.lower() not in PROPOSAL_SOURCE_SUFFIXES:
+            continue
+        if any(part.startswith(".") for part in resolved.relative_to(raw_root).parts):
+            continue
+        sources.append(_proposal_source_record(resolved))
+        if len(sources) >= limit:
+            break
+    warning_count = sum(int(source.get("warning_count") or 0) for source in sources)
+    return {
+        "count": len(sources),
+        "sources": sources,
+        "raw_dir": str(RAW_DIR),
+        "warning_count": warning_count,
+    }
+
+
+def _proposal_source_payload(source_path: str) -> tuple[dict[str, object], int]:
+    path = _resolve_proposal_source_path(source_path)
+    if not path:
+        return {"found": False, "error": "source path not found or unsupported"}, 404
+    record = _proposal_source_record(path, include_text=True)
+    if record.get("warning_count"):
+        record["found"] = True
+        record["error"] = "source contains secret-looking values; redact before loading"
+        return record, 409
+    if not record.get("loadable"):
+        record["found"] = True
+        record["error"] = "source is too large to load into the proposal form"
+        return record, 413
+    record["found"] = True
+    return record, 200
+
+
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
@@ -920,6 +1049,13 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .proposal-form button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
                         border-radius: 4px; padding: 8px 10px; cursor: pointer; font: inherit; }
 .proposal-form button:hover { background: var(--button-hover); }
+.proposal-source-list { display: grid; gap: 10px; margin: 16px 0; }
+.proposal-source-card { border: 1px solid var(--border-soft); border-radius: 6px; padding: 10px;
+                        background: var(--surface); min-width: 0; display: grid; gap: 6px; }
+.proposal-source-card strong { overflow-wrap: anywhere; }
+.proposal-source-card button { justify-self: start; border: 1px solid var(--border); background: var(--button-bg);
+                               color: var(--button-text); border-radius: 4px; padding: 6px 9px; cursor: pointer; }
+.proposal-source-card button:disabled { color: var(--button-disabled); cursor: default; }
 .proposal-status { min-height: 1.4em; color: var(--muted); font-family: sans-serif; }
 .proposal-results { display: grid; gap: 12px; margin-top: 14px; }
 .proposal-card { border: 1px solid var(--border-soft); border-radius: 6px; padding: 12px; background: var(--surface); min-width: 0; }
@@ -1167,6 +1303,7 @@ PROPOSAL_UI_JS = """
   if (!form) return;
   var statusEl = document.querySelector('[data-proposal-status]');
   var resultsEl = document.querySelector('[data-proposal-results]');
+  var sourceListEl = document.querySelector('[data-proposal-sources]');
 
   function setStatus(text) {
     if (statusEl) statusEl.textContent = text || '';
@@ -1184,6 +1321,50 @@ PROPOSAL_UI_JS = """
     return (items || []).map(function(item) {
       return item.name || item.title || '';
     }).filter(Boolean).join(', ');
+  }
+
+  function renderSources(data) {
+    if (!sourceListEl) return;
+    sourceListEl.textContent = '';
+    if (!data || !data.sources || !data.sources.length) {
+      addText(sourceListEl, 'p', 'summary', 'No local raw text sources found yet.');
+      return;
+    }
+    data.sources.forEach(function(source) {
+      var card = document.createElement('article');
+      card.className = 'proposal-source-card';
+      addText(card, 'strong', '', source.title || source.path || 'raw source');
+      addText(card, 'div', 'memory-meta', [
+        source.path || '',
+        source.size ? source.size + ' bytes' : '',
+        source.warning_count ? source.warning_count + ' warning' + (source.warning_count === 1 ? '' : 's') : ''
+      ].filter(Boolean).join(' · '));
+      if (source.snippet) addText(card, 'p', 'summary', source.snippet);
+      if (source.secret_warnings && source.secret_warnings.length) {
+        addText(card, 'p', 'proposal-warning', 'Secret-looking values: ' + source.secret_warnings.join(', '));
+      }
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = source.loadable ? 'Use in form' : (source.warning_count ? 'Redact first' : 'Too large');
+      button.disabled = !source.loadable;
+      button.setAttribute('data-proposal-source', source.path || '');
+      card.appendChild(button);
+      sourceListEl.appendChild(card);
+    });
+  }
+
+  async function loadSource(path) {
+    setStatus('Loading ' + path + '...');
+    try {
+      var response = await fetch('/api/proposal-source?path=' + encodeURIComponent(path));
+      var data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'source load failed');
+      form.elements.text.value = data.text || '';
+      form.elements.source.value = data.source || path;
+      setStatus('Loaded ' + (data.path || path) + '. Nothing was written.');
+    } catch (error) {
+      setStatus(error.message || 'source load failed');
+    }
   }
 
   function approvalPrompt(proposal) {
@@ -1256,6 +1437,20 @@ PROPOSAL_UI_JS = """
       setStatus(error.message || 'proposal failed');
     }
   });
+
+  if (sourceListEl) {
+    sourceListEl.addEventListener('click', function(event) {
+      var button = event.target.closest('[data-proposal-source]');
+      if (!button || button.disabled) return;
+      loadSource(button.getAttribute('data-proposal-source') || '');
+    });
+    fetch('/api/proposal-sources')
+      .then(function(response) { return response.json(); })
+      .then(renderSources)
+      .catch(function() {
+        renderSources({sources: []});
+      });
+  }
 })();
 """
 
@@ -1803,6 +1998,8 @@ def _render_propose(project: str | None = None):
         f'<p class="summary">Paste source notes, session notes, or a raw excerpt. Link returns memory candidates without writing anything.</p>'
         f'<div class="memory-next"><strong>Trust rule</strong>'
         f'<p>Source-backed wiki knowledge and durable agent memory are separate. Save only preferences, decisions, or project facts you approve.</p></div>'
+        f'<section><div class="section-heading"><h2>Local Raw Sources</h2><a href="/captures">captures</a></div>'
+        f'<div class="proposal-source-list" data-proposal-sources aria-live="polite"></div></section>'
         f'<form class="proposal-form" data-proposal-form>'
         f'<label>Source or session notes'
         f'<textarea name="text" placeholder="Paste notes here. Example: I prefer short release notes. We decided to keep Link local-first."></textarea>'
@@ -2921,6 +3118,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     limit=limit,
                     project=query.get("project", [""])[0],
                 ))
+        elif path == "/api/proposal-sources":
+            limit, error = _parse_search_limit(query.get("limit", ["50"])[0])
+            if error:
+                self._json({"error": error, "sources": []}, status=400)
+            else:
+                self._json(_proposal_sources(limit=min(limit, 100)))
+        elif path == "/api/proposal-source":
+            source_path = query.get("path", [""])[0]
+            payload, status = _proposal_source_payload(source_path)
+            self._json(payload, status=status)
         elif path == "/api/propose-memories":
             self._json({"error": "use POST with JSON body: {\"text\": \"...\"}"}, status=405)
         elif path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:

@@ -515,7 +515,9 @@ Common endpoints:
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |
 | `GET /api/query-link?q=<query>&budget=small\|medium\|large` | Compact context packet with relevant memory, ranked wiki results, graph context, budget reports, follow-up actions, and selection reasons. |
 | `GET /api/validate?strict=true` | Validate generated wiki pages; failed gates return HTTP 422 with structured findings. |
-| `POST /api/propose-memories` | Returns memory proposals without writing pages; used by `/propose`. |
+| `GET /api/proposal-sources` | Local raw text sources that can be loaded into `/propose`; snippets are redacted when secret-looking values are present. |
+| `GET /api/proposal-source?path=raw/file.md` | Load one safe raw text source into the proposal workflow; secret-warning files are refused until redacted. |
+| `POST /api/propose-memories` | Returns memory proposals from pasted or loaded notes without writing pages; used by `/propose`. |
 | `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; marks a memory reviewed. |
 | `POST /api/archive-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "reason": "optional" }`; hides a memory from default recall. |
 | `POST /api/restore-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name" }`; restores an archived memory to active recall. |
