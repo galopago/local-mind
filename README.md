@@ -386,10 +386,11 @@ Most agents should start with:
 | `capture_session` | You want to save long session notes locally before approving memory writes; results include secret-looking content warnings. |
 | `accept_capture` | The user approves one proposal from a saved raw capture. |
 | `redact_capture` | The user approves redacting secret-looking values from a saved raw capture. |
+| `delete_capture` | The user explicitly confirms deleting a saved raw capture. |
 
 Full tool set: `memory_brief`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
-`propose_memories`, `capture_session`, `accept_capture`, `redact_capture`,
+`propose_memories`, `capture_session`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`,
 `get_context`, `get_pages`, `get_backlinks`, `get_graph`, `rebuild_backlinks`.
 

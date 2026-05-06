@@ -292,7 +292,7 @@ Rules:
 - For long chat/session notes, prefer `python3 link.py capture-session "<file-or-text>" .` or MCP `capture_session`; it stores the raw note locally and returns proposal-only memory candidates. If you do not need to keep the raw note, run `python3 link.py propose-memories "<file-or-text>" .` or MCP `propose_memories` instead. Do not write proposals until the human confirms.
 - When the human approves a captured proposal, run `python3 link.py accept-capture "<raw-capture-path>" . --index <n>` or MCP `accept_capture`. If it reports a duplicate or conflict, stop and ask whether to update/archive the existing memory instead.
 - If capture results report `secret_warnings`, ask the human whether to redact the raw capture. Use `python3 link.py redact-capture "<raw-capture-path>" .` or MCP `redact_capture`; it replaces secret-looking values and logs labels/counts only.
-- If the human asks to remove a raw capture, run `python3 link.py delete-capture "<raw-capture-path>" . --confirm`. Never delete captures without explicit confirmation.
+- If the human asks to remove a raw capture, run `python3 link.py delete-capture "<raw-capture-path>" . --confirm` or MCP `delete_capture` with `confirm: true`. Never delete captures without explicit confirmation.
 - Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
 - Run `python3 link.py profile .` when the human asks what Link knows or when you need a quick overview of remembered preferences, decisions, and project context.
 - Run `python3 link.py memory-inbox .` to find pending, stale, invalid, or underspecified memories and follow each item's primary action.

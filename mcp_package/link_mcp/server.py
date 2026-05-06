@@ -497,6 +497,31 @@ def _redact_capture(capture: str, replacement: str = "[redacted-secret]") -> dic
     }
 
 
+def _delete_capture(capture: str, confirm: bool = False) -> dict[str, object]:
+    root = WIKI_DIR.parent
+    capture_path = _resolve_capture_file(capture)
+    if capture_path is None:
+        raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
+    rel_path = capture_path.relative_to(root).as_posix()
+    payload = {
+        "deleted": False,
+        "path": rel_path,
+        "confirmation_required": not confirm,
+    }
+    if not confirm:
+        return payload
+    capture_path.unlink()
+    _append_log(
+        _utc_timestamp(),
+        "delete-capture",
+        f"Deleted raw capture {rel_path}",
+        ["Deleted file only; capture contents were not logged."],
+    )
+    payload["deleted"] = True
+    payload["confirmation_required"] = False
+    return payload
+
+
 def _append_log(timestamp: str, operation: str, description: str, lines: list[str]) -> None:
     log_path = WIKI_DIR / "log.md"
     if not log_path.exists():
@@ -769,6 +794,20 @@ def redact_capture(capture: str, replacement: str = "[redacted-secret]") -> str:
         result = _redact_capture(capture, replacement=replacement)
     except ValueError as exc:
         return json.dumps({"redacted": False, "error": str(exc)})
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
+def delete_capture(capture: str, confirm: bool = False) -> str:
+    """Delete a saved raw session capture after explicit user confirmation.
+
+    The tool refuses to delete unless confirm is true. It logs the capture path
+    and deletion operation only, never the capture contents.
+    """
+    try:
+        result = _delete_capture(capture, confirm=confirm)
+    except ValueError as exc:
+        return json.dumps({"deleted": False, "error": str(exc)})
     return json.dumps(result, ensure_ascii=False)
 
 

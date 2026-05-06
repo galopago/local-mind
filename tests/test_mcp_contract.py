@@ -292,6 +292,26 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("redact-capture", log_text)
         self.assertNotIn(fake_key, log_text)
 
+    def test_delete_capture_contract(self):
+        capture = json.loads(self.server.capture_session(
+            "Remember that MCP capture deletion requires confirmation.",
+            title="MCP capture deletion session",
+        ))
+        capture_path = self.target / capture["path"]
+
+        denied = json.loads(self.server.delete_capture(capture["path"]))
+        self.assertFalse(denied["deleted"])
+        self.assertTrue(denied["confirmation_required"])
+        self.assertTrue(capture_path.exists())
+
+        deleted = json.loads(self.server.delete_capture(capture["path"], confirm=True))
+        log_text = (self.target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertTrue(deleted["deleted"])
+        self.assertFalse(capture_path.exists())
+        self.assertIn("delete-capture", log_text)
+        self.assertNotIn("MCP capture deletion requires confirmation", log_text)
+
     def test_memory_inbox_and_review_memory_contract(self):
         inbox = json.loads(self.server.memory_inbox())
         reviewed = json.loads(self.server.review_memory(
