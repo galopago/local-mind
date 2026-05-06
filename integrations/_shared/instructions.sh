@@ -34,3 +34,29 @@ target.write_text(updated, encoding="utf-8")
 PYEOF
     echo "$label → $target"
 }
+
+link_print_next_steps() {
+    local mode="${1:---global}"
+
+    echo ""
+    echo "Done."
+    if [ "$mode" = "--project" ]; then
+        echo "  Drop sources into raw/."
+        echo "  View wiki: python3 link.py serve"
+        echo "  Try in your agent:"
+        echo "    is Link ready?"
+        echo "    brief me from Link before we continue"
+        echo "    remember that this project uses Link for local agent memory"
+        echo "    query Link for what this project remembers"
+        echo "    ingest raw/<file> into Link"
+    else
+        echo "  Drop sources into ~/link/raw/."
+        echo "  View wiki: link serve"
+        echo "  Try in your agent:"
+        echo "    is Link ready?"
+        echo "    brief me from Link before we continue"
+        echo "    remember that I prefer local-first agent memory"
+        echo "    query Link for what you know about me"
+        echo "    ingest raw/<file> into Link"
+    fi
+}

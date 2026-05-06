@@ -68,20 +68,4 @@ else
     echo "  { \"mcpServers\": { \"link\": { \"command\": \"$MCP_PYTHON\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
 fi
 
-echo ""
-echo "Done."
-if [ "$MODE" = "--project" ]; then
-    echo "  Drop sources into raw/ and say 'ingest' to process them."
-    echo "  View wiki: python3 link.py serve"
-    echo "  Try in your agent:"
-    echo "    brief me from Link before we continue"
-    echo "    remember that this project uses Link for local agent memory"
-    echo "    query Link for what this project remembers"
-else
-    echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
-    echo "  View wiki: link serve"
-    echo "  Try in your agent:"
-    echo "    brief me from Link before we continue"
-    echo "    remember that I prefer local-first agent memory"
-    echo "    query Link for what you know about me"
-fi
+link_print_next_steps "$MODE"

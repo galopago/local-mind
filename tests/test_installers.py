@@ -49,16 +49,24 @@ class InstallerTests(unittest.TestCase):
                 self.assertIn(".link-mcp-python", text)
 
     def test_installers_print_mode_specific_next_steps(self):
+        instructions = (ROOT / "integrations/_shared/instructions.sh").read_text(encoding="utf-8")
+
+        self.assertIn("link_print_next_steps()", instructions)
+        self.assertIn('if [ "$mode" = "--project" ]; then', instructions)
+        self.assertIn("View wiki: python3 link.py serve", instructions)
+        self.assertIn("View wiki: link serve", instructions)
+        self.assertIn("Try in your agent:", instructions)
+        self.assertIn("is Link ready?", instructions)
+        self.assertIn("brief me from Link before we continue", instructions)
+        self.assertIn("ingest raw/<file> into Link", instructions)
+        self.assertIn("query Link for what you know about me", instructions)
+        self.assertIn("query Link for what this project remembers", instructions)
+
         for installer in INSTALLERS:
             with self.subTest(installer=installer.name):
                 text = installer.read_text(encoding="utf-8")
-                self.assertIn('if [ "$MODE" = "--project" ]; then', text)
-                self.assertIn("View wiki: python3 link.py serve", text)
-                self.assertIn("View wiki: link serve", text)
-                self.assertIn("Try in your agent:", text)
-                self.assertIn("brief me from Link before we continue", text)
-                self.assertIn("query Link for what you know about me", text)
-                self.assertIn("query Link for what this project remembers", text)
+                self.assertIn('. "$SCRIPT_DIR/../_shared/instructions.sh"', text)
+                self.assertIn('link_print_next_steps "$MODE"', text)
 
     def test_codex_and_kiro_update_existing_mcp_registration(self):
         codex = (ROOT / "integrations/codex/install.sh").read_text(encoding="utf-8")
