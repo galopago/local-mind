@@ -14,6 +14,7 @@ from link_core.memory import (
     count_values as _core_count_values,
     is_active_memory as _core_is_active_memory,
     memory_action_hints as _core_memory_action_hints,
+    memory_brief as _core_memory_brief,
     memory_explanation as _core_memory_explanation,
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
@@ -435,6 +436,43 @@ def _capture_inbox(limit: int = 20, project: str | None = None) -> dict[str, obj
     }
 
 
+def _capture_review_summary(project: str | None = None, limit: int = 3) -> dict[str, object]:
+    project_name = _core_normalize_project(project)
+    captures = _capture_records(limit=50, project=project_name)
+    project_query = f"?project={urllib.parse.quote(project_name, safe='')}" if project_name else ""
+    project_arg = f' --project "{project_name}"' if project_name else ""
+    return {
+        "count": len(captures),
+        "warning_count": sum(1 for capture in captures if capture["warning_count"]),
+        "project": project_name,
+        "href": f"/captures{project_query}",
+        "command": f"python3 link.py capture-inbox .{project_arg}",
+        "items": captures[:max(1, min(limit, 10))],
+    }
+
+
+def _memory_brief(query: str = "", limit: int = 6, project: str | None = None) -> dict[str, object]:
+    limit = max(1, min(limit, 20))
+    project_name = _core_normalize_project(project)
+    payload = _core_memory_brief(
+        _memory_records(),
+        query=query,
+        limit=limit,
+        review_command="review-memory",
+        project=project_name,
+    )
+    captures = _capture_review_summary(project=project_name, limit=min(limit, 10))
+    payload["captures"] = captures
+    if captures["count"]:
+        capture_count = captures["count"]
+        payload["agent_guidance"].append(
+            f"Review {capture_count} saved raw capture{'s' if capture_count != 1 else ''} before accepting or deleting capture state."
+        )
+    if captures["warning_count"]:
+        payload["agent_guidance"].append("Redact raw captures with secret warnings before sharing snippets or using their contents.")
+    return payload
+
+
 def _memory_dashboard(limit: int = 12, project: str | None = None) -> dict[str, object]:
     limit = max(1, min(limit, 50))
     project_name = _core_normalize_project(project)
@@ -854,6 +892,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .memory-profile { margin: 18px 0; }
 .memory-profile .summary { color: var(--muted); font-family: sans-serif; margin-bottom: 16px; }
 .memory-profile .memory-meta { color: var(--subtle); font-size: 12px; font-family: sans-serif; }
+.brief-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; font-family: sans-serif; }
+.brief-form input { flex: 1 1 220px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border);
+                    border-radius: 4px; background: var(--surface); color: var(--text); }
+.brief-form button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
+                     border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+.brief-form button:hover { background: var(--button-hover); }
 .memory-issues { margin-top: 6px; }
 .memory-issues li { border: none; padding: 0; color: var(--muted); font-size: 13px; }
 .memory-issues .severity { font-family: sans-serif; font-size: 11px; text-transform: uppercase; color: #8a6d3b; }
@@ -1068,6 +1112,7 @@ def _header_html():
   <div class="logo"><a href="/"><img src="/logo.svg" alt="">Link</a><small>agent memory</small></div>
   <nav>
     <a href="/">home</a>
+    <a href="/brief">brief</a>
     <a href="/memory">memory</a>
     <a href="/audit">audit</a>
     <a href="/inbox">inbox</a>
@@ -1371,6 +1416,46 @@ def _render_memory_next_actions(actions: list[dict[str, str]]) -> str:
             f'<br><code>{html.escape(action["command"])}</code></li>'
         )
     return f'<div class="memory-next"><strong>Next actions</strong><ul>{items}</ul></div>'
+
+
+def _render_brief(query: str = "", project: str | None = None):
+    brief = _memory_brief(query=query, limit=8, project=project)
+    profile = brief["profile"]
+    captures = brief["captures"]
+    stats = (
+        f'<div class="home-stats">'
+        f'<div class="stat"><span class="num">{profile["active_count"]}</span><span class="label">active</span></div>'
+        f'<div class="stat"><span class="num">{brief["relevant_count"]}</span><span class="label">relevant</span></div>'
+        f'<div class="stat"><span class="num">{brief["review"]["count"]}</span><span class="label">review</span></div>'
+        f'<div class="stat"><span class="num">{captures["count"]}</span><span class="label">captures</span></div>'
+        f'</div>'
+    )
+    guidance = "".join(
+        f"<li>{html.escape(str(item))}</li>"
+        for item in brief["agent_guidance"]
+    )
+    query_value = html.escape(str(query), quote=True)
+    project_field = (
+        f'<input type="hidden" name="project" value="{html.escape(str(brief["project"]), quote=True)}">'
+        if brief["project"] else ""
+    )
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / brief</div>'
+        f'<h1>Memory Brief</h1>'
+        f'<div class="memory-profile">'
+        f'<p class="summary">Startup context for local agents before answering, coding, or planning.</p>'
+        f'<form class="brief-form" action="/brief" method="get">'
+        f'<input type="text" name="q" value="{query_value}" placeholder="task or question">'
+        f'{project_field}<button type="submit">Brief</button></form>'
+        f'{"<p><strong>Project:</strong> " + html.escape(str(brief["project"])) + "</p>" if brief["project"] else ""}'
+        f'{stats}'
+        f'<h2>Agent Guidance</h2><ul>{guidance}</ul>'
+        f'{_render_memory_section("Relevant memories", brief["relevant_memories"], "No relevant memories yet.")}'
+        f'{_render_memory_section("Review queue", brief["review"]["items"], "No memory review items.", href="/inbox", include_issues=True)}'
+        f'{_render_capture_section(captures["items"])}'
+        f'</div>'
+    )
+    return _layout("Memory Brief", body)
 
 
 def _render_memory_dashboard(project: str | None = None):
@@ -2391,6 +2476,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._err("file")
         elif path in ("/", ""):
             self._ok(_render_home())
+        elif path == "/brief":
+            brief_query = query.get("q", [""])[0] or query.get("query", [""])[0]
+            self._ok(_render_brief(query=brief_query, project=query.get("project", [""])[0]))
         elif path == "/memory":
             self._ok(_render_memory_dashboard(project=query.get("project", [""])[0]))
         elif path == "/audit":
@@ -2438,6 +2526,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": error}, status=400)
             else:
                 self._json(_memory_dashboard(limit=limit, project=query.get("project", [""])[0]))
+        elif path == "/api/memory-brief":
+            limit, error = _parse_search_limit(query.get("limit", ["6"])[0])
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                brief_query = query.get("q", [""])[0] or query.get("query", [""])[0]
+                self._json(_memory_brief(
+                    query=brief_query,
+                    limit=limit,
+                    project=query.get("project", [""])[0],
+                ))
         elif path == "/api/memory-audit":
             limit, error = _parse_search_limit(query.get("limit", ["10"])[0])
             if error:

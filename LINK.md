@@ -565,6 +565,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
+| `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context: relevant memories, review warnings, capture status, and safe rules |
 | `POST /api/propose-memories` | Propose memories from JSON `{ "text": "..." }` without writing pages |
 | `POST /api/review-memory` | JSON `{ "memory": "name", "note": "optional" }`; mark a memory reviewed |
 | `POST /api/archive-memory` | JSON `{ "memory": "name", "reason": "optional" }`; archive a memory from default recall |

@@ -54,6 +54,7 @@ python3 serve.py
 Open:
 
 - `http://localhost:3000`
+- `http://localhost:3000/brief`
 - `http://localhost:3000/memory`
 - `http://localhost:3000/audit`
 - `http://localhost:3000/captures`
@@ -88,6 +89,11 @@ See what agents can remember, what needs review, and what changed recently.
 <p align="center">
   <img src="docs/assets/link-memory-dashboard-dark.png" alt="Link Memory Dashboard in dark mode" width="860">
 </p>
+
+### Memory Brief
+
+Prime an agent before work with relevant memories, review warnings, raw capture
+status, and safe memory rules.
 
 ### Memory Audit
 
@@ -441,6 +447,7 @@ Common endpoints:
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |
+| `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context for an agent, including relevant memories, review warnings, and capture status. |
 | `GET /api/memory-audit?project=<slug>` | Read-only memory health report with backlog, capture risks, and next actions. |
 | `GET /api/memory-profile?project=<slug>` | Counts and recent memories for the local memory profile. |
 | `GET /api/memory-inbox?project=<slug>` | Memories that need review or metadata cleanup. |

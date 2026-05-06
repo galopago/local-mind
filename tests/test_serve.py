@@ -92,6 +92,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("window.location.href = '/search?q=' + encodeURIComponent(q);", html)
         self.assertIn("data-theme-toggle", html)
         self.assertIn("localStorage.getItem('link-theme')", html)
+        self.assertIn('<a href="/brief">brief</a>', html)
         self.assertIn('<a href="/audit">audit</a>', html)
         self.assertIn('<a href="/captures">captures</a>', html)
 
@@ -330,6 +331,61 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Alpha capture", html)
         self.assertNotIn("Beta capture", html)
         self.assertIn("redact-capture", html)
+        self.assertNotIn(fake_key, html)
+
+    def test_memory_brief_page_and_api_include_capture_status(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "memories/alpha-brief.md",
+            (
+                "---\n"
+                "type: memory\n"
+                "title: \"Alpha brief\"\n"
+                "memory_type: project\n"
+                "scope: project\n"
+                "project: \"alpha\"\n"
+                "status: active\n"
+                "date_captured: \"2026-05-05T00:00:00Z\"\n"
+                "source: \"unit test\"\n"
+                "review_status: pending\n"
+                "---\n\n"
+                "# Alpha brief\n\n"
+                "> **TLDR:** Alpha project uses memory brief before work.\n\n"
+                "## Memory\n\nAlpha project uses memory brief before work.\n"
+            ),
+        )
+        capture_dir = wiki.parent / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        fake_key = "sk-" + ("L" * 24)
+        (capture_dir / "alpha.md").write_text(
+            "---\n"
+            "title: \"Alpha brief capture\"\n"
+            "source_type: conversation\n"
+            "date_captured: \"2026-05-05T00:00:00Z\"\n"
+            "project: \"alpha\"\n"
+            "---\n\n"
+            "# Alpha brief capture\n\n"
+            "## Notes\n\n"
+            f"Remember that brief surfaces capture status. Test key {fake_key}\n",
+            encoding="utf-8",
+        )
+
+        status, payload = run_handler("GET", "/api/memory-brief?q=brief&project=alpha")
+        html = serve._render_brief(query="brief", project="alpha")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["query"], "brief")
+        self.assertEqual(payload["project"], "alpha")
+        self.assertEqual(payload["relevant_count"], 1)
+        self.assertEqual(payload["captures"]["count"], 1)
+        self.assertEqual(payload["captures"]["warning_count"], 1)
+        self.assertIn("Redact raw captures", "\n".join(payload["agent_guidance"]))
+        self.assertNotIn(fake_key, json.dumps(payload))
+        self.assertIn("Memory Brief", html)
+        self.assertIn("Agent Guidance", html)
+        self.assertIn("Alpha brief", html)
+        self.assertIn("Alpha brief capture", html)
         self.assertNotIn(fake_key, html)
 
     def test_memory_inbox_and_explain_render_action_commands(self):
