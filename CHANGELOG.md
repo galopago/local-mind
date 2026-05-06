@@ -13,6 +13,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added Memory Profile views through `link.py profile`, MCP `memory_profile`, `/profile`, and `/api/memory-profile`.
 - Added reversible memory lifecycle controls with `archive-memory`/`restore-memory` and MCP `archive_memory`/`restore_memory`; archived memories are hidden from recall by default.
 - Added confirmed permanent memory deletion with `forget-memory` and MCP `forget_memory` for user-requested local forgetting.
+- Added low-priority forget actions to memory review/explanation payloads so permanent deletion is discoverable but never the default next step.
 - Added Memory Review Inbox with `memory-inbox`, `review-memory`, MCP `memory_inbox`/`review_memory`, `/inbox`, and `/api/memory-inbox`.
 - Added Explain Memory views with `explain-memory`, MCP `explain_memory`, `/explain-memory`, and `/api/explain-memory` for provenance, review state, lifecycle, graph links, and recall readiness.
 - Added duplicate protection for `remember`/`remember_memory`; strong duplicate memories are refused unless explicitly allowed.

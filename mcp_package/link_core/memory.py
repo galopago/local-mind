@@ -397,6 +397,15 @@ def memory_action_hints(
             arguments={"identifier": name},
             priority="medium",
         ))
+        add(_memory_action(
+            kind="forget",
+            label="Forget",
+            description="Permanently delete only after explicit user confirmation.",
+            command=f'python3 link.py forget-memory "{name}" . --confirm',
+            tool="forget_memory",
+            arguments={"identifier": name, "confirm": True},
+            priority="low",
+        ))
         return actions
 
     if issue_codes & {"invalid_review_status", "invalid_memory_type", "invalid_scope", "missing_source", "missing_date_captured"}:
@@ -471,6 +480,15 @@ def memory_action_hints(
             arguments={"identifier": name, "reason": "why"},
             priority="medium",
         ))
+    add(_memory_action(
+        kind="forget",
+        label="Forget",
+        description="Permanently delete only after explicit user confirmation.",
+        command=f'python3 link.py forget-memory "{name}" . --confirm',
+        tool="forget_memory",
+        arguments={"identifier": name, "confirm": True},
+        priority="low",
+    ))
     return actions
 
 

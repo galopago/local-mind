@@ -117,6 +117,9 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertIn("review-memory", item["primary_action"]["command"])
         self.assertEqual(inbox["next_actions"][0]["kind"], "review")
         self.assertIn("actions", item)
+        forget_action = next(action for action in item["actions"] if action["kind"] == "forget")
+        self.assertEqual(forget_action["tool"], "forget_memory")
+        self.assertTrue(forget_action["arguments"]["confirm"])
 
     def test_memory_inbox_filters_project_scoped_memories(self):
         base = {
