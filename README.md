@@ -56,6 +56,7 @@ Open:
 - `http://localhost:3000`
 - `http://localhost:3000/memory`
 - `http://localhost:3000/audit`
+- `http://localhost:3000/captures`
 - `http://localhost:3000/graph`
 
 Then check the demo:
@@ -92,6 +93,11 @@ See what agents can remember, what needs review, and what changed recently.
 
 Check memory health in one place: review backlog, saved raw captures,
 secret-warning captures, and the next safe commands to run.
+
+### Raw Capture Inbox
+
+Review proposal-only session notes before they become durable memory. Secret-like
+values are redacted in snippets and called out for local cleanup.
 
 ### Knowledge Graph
 
@@ -438,6 +444,7 @@ Common endpoints:
 | `GET /api/memory-audit?project=<slug>` | Read-only memory health report with backlog, capture risks, and next actions. |
 | `GET /api/memory-profile?project=<slug>` | Counts and recent memories for the local memory profile. |
 | `GET /api/memory-inbox?project=<slug>` | Memories that need review or metadata cleanup. |
+| `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, secret-warning labels, and review commands. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |
 | `POST /api/propose-memories` | Returns memory proposals without writing pages. |
 | `POST /api/review-memory` | JSON `{ "memory": "name", "note": "optional" }`; marks a memory reviewed. |

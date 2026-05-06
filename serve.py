@@ -322,7 +322,7 @@ def _memory_dashboard_next_actions(
         actions.append({
             "label": "Redact capture warnings",
             "detail": f"{capture_warning_count} raw capture{'s' if capture_warning_count != 1 else ''} contain secret-looking values.",
-            "href": "/memory",
+            "href": "/captures",
             "command": "python3 link.py redact-capture raw/memory-captures/<capture>.md .",
             "priority": "high",
         })
@@ -356,7 +356,7 @@ def _memory_dashboard_next_actions(
         actions.append({
             "label": "Review raw captures",
             "detail": f"{capture_count} saved raw capture{'s' if capture_count != 1 else ''} can be accepted, redacted, or deleted.",
-            "href": "/memory",
+            "href": "/captures",
             "command": "python3 link.py accept-capture raw/memory-captures/<capture>.md . --index 1",
             "priority": "medium",
         })
@@ -421,6 +421,18 @@ def _capture_records(limit: int = 12, project: str | None = None) -> list[dict[s
         })
     records.sort(key=lambda item: (str(item["date_captured"]), str(item["path"])), reverse=True)
     return records[:limit]
+
+
+def _capture_inbox(limit: int = 20, project: str | None = None) -> dict[str, object]:
+    limit = max(1, min(limit, 50))
+    project_name = _core_normalize_project(project)
+    captures = _capture_records(limit=limit, project=project_name)
+    return {
+        "count": len(captures),
+        "warning_count": sum(1 for capture in captures if capture["warning_count"]),
+        "project": project_name,
+        "captures": captures,
+    }
 
 
 def _memory_dashboard(limit: int = 12, project: str | None = None) -> dict[str, object]:
@@ -526,7 +538,7 @@ def _memory_audit(limit: int = 10, project: str | None = None) -> dict[str, obje
             {
                 "label": "Review raw captures",
                 "detail": "Accept, redact, or delete saved proposal-only raw captures.",
-                "href": f"/memory{project_query}",
+                "href": f"/captures{project_query}",
                 "command": f"python3 link.py capture-inbox .{project_arg}",
                 "recommended": bool(captures),
             },
@@ -1059,6 +1071,7 @@ def _header_html():
     <a href="/memory">memory</a>
     <a href="/audit">audit</a>
     <a href="/inbox">inbox</a>
+    <a href="/captures">captures</a>
     <a href="/profile">profile</a>
     <a href="/page/log">log</a>
     <a href="/all">all pages</a>
@@ -1490,6 +1503,36 @@ def _render_memory_audit(project: str | None = None):
         f'</div>'
     )
     return _layout("Memory Audit", body)
+
+
+def _render_captures(project: str | None = None):
+    inbox = _capture_inbox(limit=50, project=project)
+    stats = (
+        f'<div class="home-stats">'
+        f'<div class="stat"><span class="num">{inbox["count"]}</span><span class="label">captures</span></div>'
+        f'<div class="stat"><span class="num">{inbox["warning_count"]}</span><span class="label">warnings</span></div>'
+        f'</div>'
+    )
+    warning_html = ""
+    if inbox["warning_count"]:
+        warning_html = (
+            f'<div class="memory-next"><strong>Needs redaction</strong>'
+            f'<p>{inbox["warning_count"]} raw capture'
+            f'{"s contain" if inbox["warning_count"] != 1 else " contains"} secret-looking values.</p>'
+            f'<code>python3 link.py redact-capture raw/memory-captures/&lt;capture&gt;.md .</code></div>'
+        )
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / captures</div>'
+        f'<h1>Raw Capture Inbox</h1>'
+        f'<div class="memory-profile">'
+        f'<p class="summary">Saved proposal-only session notes waiting for human review before they become durable memory.</p>'
+        f'{"<p><strong>Project:</strong> " + html.escape(str(inbox["project"])) + "</p>" if inbox["project"] else ""}'
+        f'{stats}'
+        f'{warning_html}'
+        f'{_render_capture_section(inbox["captures"])}'
+        f'</div>'
+    )
+    return _layout("Raw Capture Inbox", body)
 
 
 def _render_inbox(project: str | None = None):
@@ -2354,6 +2397,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._ok(_render_memory_audit(project=query.get("project", [""])[0]))
         elif path == "/inbox":
             self._ok(_render_inbox(project=query.get("project", [""])[0]))
+        elif path == "/captures":
+            self._ok(_render_captures(project=query.get("project", [""])[0]))
         elif path == "/explain-memory":
             identifier = query.get("memory", [""])[0].strip() or query.get("name", [""])[0].strip()
             self._ok(_render_explain_memory(identifier))
@@ -2408,6 +2453,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(_memory_inbox(
                     limit=limit,
                     include_archived=include_archived,
+                    project=query.get("project", [""])[0],
+                ))
+        elif path == "/api/capture-inbox":
+            limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                self._json(_capture_inbox(
+                    limit=limit,
                     project=query.get("project", [""])[0],
                 ))
         elif path == "/api/propose-memories":

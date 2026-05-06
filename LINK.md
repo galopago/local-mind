@@ -569,6 +569,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 | `POST /api/review-memory` | JSON `{ "memory": "name", "note": "optional" }`; mark a memory reviewed |
 | `POST /api/archive-memory` | JSON `{ "memory": "name", "reason": "optional" }`; archive a memory from default recall |
 | `POST /api/restore-memory` | JSON `{ "memory": "name" }`; restore archived memory to active recall |
+| `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, warnings, and commands |
 | `GET /api/search?q=<query>` | Ranked search — title, alias, tag, fulltext. Returns scores + snippets |
 | `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call |
 | `GET /api/graph` | All nodes + edges for graph visualization |

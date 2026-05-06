@@ -93,6 +93,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("data-theme-toggle", html)
         self.assertIn("localStorage.getItem('link-theme')", html)
         self.assertIn('<a href="/audit">audit</a>', html)
+        self.assertIn('<a href="/captures">captures</a>', html)
 
     def test_css_has_mobile_overflow_guards(self):
         self.assertIn("* { box-sizing: border-box; margin: 0; padding: 0; }", serve.CSS)
@@ -282,6 +283,52 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Redact capture warnings", dashboard["next_actions"][0]["label"])
         self.assertIn("accept-capture", dashboard["captures"][0]["commands"]["accept"])
         self.assertIn("Raw captures", html)
+        self.assertIn("redact-capture", html)
+        self.assertNotIn(fake_key, html)
+
+    def test_capture_inbox_page_and_api_redact_secret_values(self):
+        wiki = self.make_wiki()
+        capture_dir = wiki.parent / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        fake_key = "sk-" + ("K" * 24)
+        (capture_dir / "alpha.md").write_text(
+            "---\n"
+            "title: \"Alpha capture\"\n"
+            "source_type: conversation\n"
+            "date_captured: \"2026-05-05T00:00:00Z\"\n"
+            "project: \"alpha\"\n"
+            "---\n\n"
+            "# Alpha capture\n\n"
+            "## Notes\n\n"
+            f"Remember that capture inbox is first class. Test key {fake_key}\n",
+            encoding="utf-8",
+        )
+        (capture_dir / "beta.md").write_text(
+            "---\n"
+            "title: \"Beta capture\"\n"
+            "source_type: conversation\n"
+            "date_captured: \"2026-05-05T00:00:00Z\"\n"
+            "project: \"beta\"\n"
+            "---\n\n"
+            "# Beta capture\n\n"
+            "## Notes\n\n"
+            "Remember that beta capture stays separate.\n",
+            encoding="utf-8",
+        )
+
+        status, payload = run_handler("GET", "/api/capture-inbox?project=alpha")
+        html = serve._render_captures(project="alpha")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["project"], "alpha")
+        self.assertEqual(payload["count"], 1)
+        self.assertEqual(payload["warning_count"], 1)
+        self.assertEqual(payload["captures"][0]["secret_warnings"], ["OpenAI API key"])
+        self.assertIn("[redacted-secret]", payload["captures"][0]["snippet"])
+        self.assertNotIn(fake_key, json.dumps(payload))
+        self.assertIn("Raw Capture Inbox", html)
+        self.assertIn("Alpha capture", html)
+        self.assertNotIn("Beta capture", html)
         self.assertIn("redact-capture", html)
         self.assertNotIn(fake_key, html)
 
