@@ -1036,17 +1036,7 @@ def _render_memory_card(record: dict[str, object], include_issues: bool = False)
             f'{html.escape(str(issue["code"]))}: {html.escape(str(issue["message"]))}</li>'
             for issue in record["issues"]
         ) + "</ul>"
-    actions = ""
-    for action in record.get("actions") or _memory_action_hints(record):
-        label = html.escape(str(action.get("label") or ""))
-        if action.get("href"):
-            label_html = f'<a href="{html.escape(str(action["href"]))}">{label}</a>'
-        else:
-            label_html = label
-        actions += (
-            f'<div><strong>{label_html}</strong>'
-            f'<code>{html.escape(str(action.get("command") or ""))}</code></div>'
-        )
+    actions = _render_memory_action_commands(record.get("actions") or _memory_action_hints(record))
     summary_html = f'<p class="summary">{html.escape(summary)}</p>' if summary else ""
     return (
         '<article class="memory-card">'
@@ -1054,9 +1044,29 @@ def _render_memory_card(record: dict[str, object], include_issues: bool = False)
         f'<div class="memory-meta">{html.escape(meta)}</div>'
         f'{summary_html}'
         f'{issues_html}'
-        f'<div class="memory-actions">{actions}</div>'
+        f'{actions}'
         '</article>'
     )
+
+
+def _render_memory_action_commands(actions: list[dict[str, object]] | tuple[dict[str, object], ...]) -> str:
+    if not actions:
+        return ""
+    rows = ""
+    for action in actions:
+        label = html.escape(str(action.get("label") or ""))
+        if action.get("href"):
+            label_html = f'<a href="{html.escape(str(action["href"]))}">{label}</a>'
+        else:
+            label_html = label
+        priority = str(action.get("priority") or "")
+        priority_html = f'<span class="memory-meta">{html.escape(priority)}</span>' if priority else ""
+        rows += (
+            f'<div><strong>{label_html}</strong>'
+            f'{priority_html}'
+            f'<code>{html.escape(str(action.get("command") or ""))}</code></div>'
+        )
+    return f'<div class="memory-actions">{rows}</div>'
 
 
 def _render_memory_section(title: str, records: list[dict[str, object]], empty: str, href: str = "", include_issues: bool = False) -> str:
@@ -1253,12 +1263,22 @@ def _render_inbox():
                 f'{html.escape(str(issue["code"]))}: {html.escape(str(issue["message"]))}</li>'
                 for issue in item["issues"]
             )
+            primary = item.get("primary_action") or {}
+            primary_html = ""
+            if primary:
+                primary_html = (
+                    f'<p class="summary"><strong>Next:</strong> {html.escape(str(primary.get("label") or ""))} '
+                    f'- {html.escape(str(primary.get("description") or ""))}</p>'
+                )
+            actions_html = _render_memory_action_commands(item.get("actions") or [])
             items += (
                 f'<li><a href="{_page_href(str(item["name"]))}">{html.escape(str(item["title"]))}</a>'
                 f'<div class="memory-meta">{html.escape(meta)}</div>'
                 f'<div class="memory-meta"><a href="/explain-memory?memory={urllib.parse.quote(str(item["name"]), safe="")}">explain</a></div>'
                 f'{f"<small>{html.escape(str(summary))}</small>" if summary else ""}'
-                f'<ul class="memory-issues">{issues}</ul></li>'
+                f'<ul class="memory-issues">{issues}</ul>'
+                f'{primary_html}'
+                f'{actions_html}</li>'
             )
         content = f"<ul class='page-list'>{items}</ul>"
 
@@ -1297,6 +1317,14 @@ def _render_explain_memory(identifier: str):
         f'<h2>Review Issues</h2><ul class="memory-issues">{issues}</ul>'
         if issues else "<h2>Review Issues</h2><p>No detected issues.</p>"
     )
+    primary = review.get("primary_action") or {}
+    primary_html = ""
+    if primary:
+        primary_html = (
+            f'<p class="summary"><strong>Next:</strong> {html.escape(str(primary.get("label") or ""))} '
+            f'- {html.escape(str(primary.get("description") or ""))}</p>'
+        )
+    action_html = f'<h2>Actions</h2>{primary_html}{_render_memory_action_commands(review.get("actions") or [])}'
     graph_html = (
         f'<h2>Graph</h2>'
         f'<p><strong>Forward:</strong> {html.escape(", ".join(graph["forward"]) or "none")}</p>'
@@ -1322,6 +1350,7 @@ def _render_explain_memory(identifier: str):
         f'<div><strong>Path</strong>{html.escape(str(provenance["path"]))}</div>'
         f'</div>'
         f'{issue_html}'
+        f'{action_html}'
         f'{graph_html}'
         f'{log_html}'
         f'<h2>Memory Body</h2>{body_html}'

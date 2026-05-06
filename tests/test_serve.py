@@ -271,6 +271,39 @@ class ServeTests(unittest.TestCase):
         self.assertIn("redact-capture", html)
         self.assertNotIn(fake_key, html)
 
+    def test_memory_inbox_and_explain_render_action_commands(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "memories/prefer-reviewable-memory.md",
+            (
+                "---\n"
+                "type: memory\n"
+                "title: \"Prefer reviewable memory\"\n"
+                "memory_type: preference\n"
+                "scope: user\n"
+                "status: active\n"
+                "date_captured: \"2026-05-05T00:00:00Z\"\n"
+                "source: \"unit test\"\n"
+                "review_status: pending\n"
+                "---\n\n"
+                "# Prefer reviewable memory\n\n"
+                "> **TLDR:** User prefers visible memory actions.\n\n"
+                "## Memory\n\nUser prefers visible memory actions.\n"
+            ),
+        )
+
+        inbox_html = serve._render_inbox()
+        explain_html = serve._render_explain_memory("prefer-reviewable-memory")
+
+        self.assertIn("Next:</strong> Review", inbox_html)
+        self.assertIn("review-memory", inbox_html)
+        self.assertIn("archive-memory", inbox_html)
+        self.assertIn("forget-memory", inbox_html)
+        self.assertIn("<h2>Actions</h2>", explain_html)
+        self.assertIn("Next:</strong> Review", explain_html)
+        self.assertIn("forget-memory", explain_html)
+
     def test_memory_dashboard_filters_project_memory_and_captures(self):
         wiki = self.make_wiki()
         write_page(
