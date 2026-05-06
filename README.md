@@ -23,7 +23,7 @@ compound over time.
 Release notes: [CHANGELOG.md](CHANGELOG.md)
 
 <p align="center">
-  <img src="docs/assets/link-demo-flow.gif" alt="Link demo flow: wiki, memory dashboard, graph, and memory explanation" width="860">
+  <img src="docs/assets/link-demo-flow-dark.gif" alt="Link demo flow: wiki, memory dashboard, graph, and memory explanation" width="860">
 </p>
 
 ## Why Link
@@ -75,7 +75,7 @@ Browse pages by type, search locally, and open the same Markdown pages your
 agents use.
 
 <p align="center">
-  <img src="docs/assets/link-home.png" alt="Link wiki home" width="860">
+  <img src="docs/assets/link-home-dark.png" alt="Link wiki home in dark mode" width="860">
 </p>
 
 ### Memory Dashboard
@@ -83,7 +83,7 @@ agents use.
 See what agents can remember, what needs review, and what changed recently.
 
 <p align="center">
-  <img src="docs/assets/link-memory-dashboard.png" alt="Link Memory Dashboard" width="860">
+  <img src="docs/assets/link-memory-dashboard-dark.png" alt="Link Memory Dashboard in dark mode" width="860">
 </p>
 
 ### Knowledge Graph
@@ -92,7 +92,7 @@ Inspect relationships between source pages, concepts, entities, explorations, an
 memories. Dragging a node places it; double-clicking opens it.
 
 <p align="center">
-  <img src="docs/assets/link-graph.png" alt="Link Knowledge Graph" width="860">
+  <img src="docs/assets/link-graph-dark.png" alt="Link Knowledge Graph in dark mode" width="860">
 </p>
 
 ### Explain Memory
@@ -101,7 +101,7 @@ Every memory can explain why it exists, whether it is review-ready, and what
 source or log evidence supports it.
 
 <p align="center">
-  <img src="docs/assets/link-explain-memory.png" alt="Link Explain Memory view" width="860">
+  <img src="docs/assets/link-explain-memory-dark.png" alt="Link Explain Memory view in dark mode" width="860">
 </p>
 
 ## First 10 Minutes
