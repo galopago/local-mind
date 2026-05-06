@@ -21,6 +21,45 @@ else
     mkdir -p "$TARGET_DIR"
 fi
 
+shell_quote() {
+    printf "'%s'" "$(printf "%s" "$1" | sed "s/'/'\\\\''/g")"
+}
+
+install_link_cli_wrapper() {
+    if [ "$MODE" = "--project" ] || [ ! -f "$TARGET_DIR/link.py" ]; then
+        return
+    fi
+
+    LINK_CLI_DIR="${LINK_CLI_DIR:-$HOME/.local/bin}"
+    LINK_CLI_BIN="$LINK_CLI_DIR/link"
+    LINK_CLI_MARKER="# Link command wrapper"
+
+    mkdir -p "$LINK_CLI_DIR"
+
+    if [ -e "$LINK_CLI_BIN" ] && ! grep -q "$LINK_CLI_MARKER" "$LINK_CLI_BIN" 2>/dev/null; then
+        echo "  · $LINK_CLI_BIN already exists and is not a Link wrapper; not overwriting."
+        echo "    Fallback: cd \"$TARGET_DIR\" && python3 link.py status --validate"
+        return
+    fi
+
+    TARGET_DIR_Q="$(shell_quote "$TARGET_DIR")"
+    LINK_PY_Q="$(shell_quote "$TARGET_DIR/link.py")"
+    cat > "$LINK_CLI_BIN" <<EOF
+#!/bin/sh
+$LINK_CLI_MARKER
+cd $TARGET_DIR_Q || exit 1
+exec python3 $LINK_PY_Q "\$@"
+EOF
+    chmod +x "$LINK_CLI_BIN"
+
+    echo "  ✓ Link command: $LINK_CLI_BIN"
+
+    RESOLVED_LINK="$(command -v link 2>/dev/null || true)"
+    if [ "$RESOLVED_LINK" != "$LINK_CLI_BIN" ]; then
+        echo "  · Add $LINK_CLI_DIR to the front of PATH to run: link status --validate"
+    fi
+}
+
 # ── Detect: fresh install or update? ─────────────────────────────────
 # A wiki exists if wiki/index.md is present (created on first ingest or scaffold)
 IS_UPDATE=false
@@ -95,6 +134,8 @@ else
 fi
 
 echo "  Wiki ready at $TARGET_DIR"
+
+install_link_cli_wrapper
 
 # ── MCP server: install link-mcp package ─────────────────────────────
 echo ""
@@ -172,14 +213,27 @@ fi
 
 if [ -f "$TARGET_DIR/link.py" ]; then
     echo ""
-    echo "  Check Link readiness:"
-    echo "    python3 \"$TARGET_DIR/link.py\" status \"$TARGET_DIR\" --validate"
-    echo "  Check wiki health:"
-    echo "    python3 \"$TARGET_DIR/link.py\" doctor \"$TARGET_DIR\""
-    echo "  Validate ingest output:"
-    echo "    python3 \"$TARGET_DIR/link.py\" validate \"$TARGET_DIR\""
-    echo "  Verify MCP setup:"
-    echo "    python3 \"$TARGET_DIR/link.py\" verify-mcp \"$TARGET_DIR\""
-    echo "  Repair stale graph index:"
-    echo "    python3 \"$TARGET_DIR/link.py\" rebuild-backlinks \"$TARGET_DIR\""
+    if [ "$MODE" = "--project" ]; then
+        echo "  Check Link readiness:"
+        echo "    python3 link.py status --validate"
+        echo "  Check wiki health:"
+        echo "    python3 link.py doctor"
+        echo "  Validate ingest output:"
+        echo "    python3 link.py validate"
+        echo "  Verify MCP setup:"
+        echo "    python3 link.py verify-mcp"
+        echo "  Repair stale graph index:"
+        echo "    python3 link.py rebuild-backlinks"
+    else
+        echo "  Check Link readiness:"
+        echo "    link status --validate"
+        echo "  Check wiki health:"
+        echo "    link doctor"
+        echo "  Validate ingest output:"
+        echo "    link validate"
+        echo "  Verify MCP setup:"
+        echo "    link verify-mcp"
+        echo "  Repair stale graph index:"
+        echo "    link rebuild-backlinks"
+    fi
 fi

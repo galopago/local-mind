@@ -26,6 +26,15 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("LINK_MCP_INSTALLED=false", scaffold)
         self.assertIn('[ "$LINK_MCP_INSTALLED" = true ]', scaffold)
 
+    def test_scaffold_installs_short_global_link_command(self):
+        scaffold = (ROOT / "integrations/_shared/scaffold.sh").read_text(encoding="utf-8")
+
+        self.assertIn('LINK_CLI_BIN="$LINK_CLI_DIR/link"', scaffold)
+        self.assertIn("Link command wrapper", scaffold)
+        self.assertIn("not overwriting", scaffold)
+        self.assertIn("link status --validate", scaffold)
+        self.assertIn('if [ "$MODE" = "--project" ]', scaffold)
+
     def test_scaffold_project_mode_uses_absolute_target(self):
         scaffold = (ROOT / "integrations/_shared/scaffold.sh").read_text(encoding="utf-8")
 

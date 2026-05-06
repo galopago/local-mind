@@ -63,9 +63,9 @@ Open:
 Then check the demo:
 
 ```bash
-python3 link.py memory-audit .
-python3 link.py doctor .
-python3 link.py ingest-status .
+python3 link.py memory-audit
+python3 link.py doctor
+python3 link.py ingest-status
 ```
 
 The demo includes source pages, concept pages, a memory page, backlinks, search,
@@ -147,8 +147,9 @@ bash integrations/vscode/install.sh        # VS Code
 bash integrations/antigravity/install.sh   # Google Antigravity
 ```
 
-This creates `~/link/`, installs or upgrades `link-mcp`, writes lightweight agent
-instructions, and leaves existing wiki data untouched on reinstall.
+This creates `~/link/`, installs or upgrades `link-mcp`, installs a short
+`link` command, writes lightweight agent instructions, and leaves existing wiki
+data untouched on reinstall.
 
 Use `--project` for a repo-local Link install. Project-scoped memories then get a
 project key, and recall/profile/brief include global user memory plus that
@@ -174,20 +175,27 @@ EOF
 Check what is pending:
 
 ```bash
-python3 ~/link/link.py ingest-status ~/link
+link ingest-status
 ```
 
 ### 3. Save One Direct Memory
 
-Use direct memories for preferences, decisions, and project facts future agents
-should recall:
+You can ask your agent naturally:
+
+```text
+remember that I am testing Link as local personal memory for agents
+brief me from Link before we continue
+what does Link remember about local personal memory?
+```
+
+Or use the local command:
 
 ```bash
-python3 ~/link/link.py remember "I am testing Link as local personal memory for agents." ~/link --type preference --scope user --tags onboarding
-python3 ~/link/link.py brief "local personal memory" ~/link
-python3 ~/link/link.py recall "local personal memory" ~/link
-python3 ~/link/link.py profile ~/link
-python3 ~/link/link.py memory-audit ~/link
+link remember "I am testing Link as local personal memory for agents." --type preference --scope user --tags onboarding
+link brief "local personal memory"
+link recall "local personal memory"
+link profile
+link memory-audit
 ```
 
 ### 4. Ask Your Agent To Ingest
@@ -205,12 +213,12 @@ creates or updates concept/entity pages, updates `wiki/index.md`, appends
 ### 5. Verify The Loop
 
 ```bash
-python3 ~/link/link.py doctor ~/link --fix
-python3 ~/link/link.py status ~/link --validate
-python3 ~/link/link.py ingest-status ~/link
-python3 ~/link/link.py validate ~/link
-python3 ~/link/link.py memory-audit ~/link
-python3 ~/link/link.py verify-mcp ~/link
+link doctor --fix
+link status --validate
+link ingest-status
+link validate
+link memory-audit
+link verify-mcp
 ```
 
 Then ask your MCP-enabled agent:
@@ -262,6 +270,10 @@ bash integrations/codex/install.sh
 
 Re-run the same installer after `git pull` to refresh code, instructions, and
 MCP setup without replacing your wiki pages.
+
+Global installs also create `~/.local/bin/link`, so local checks become
+`link status --validate`, `link query "..."`, and `link brief "..."`. If your
+shell cannot find `link`, add `~/.local/bin` to the front of `PATH` once.
 
 The installers try the current `python3` first. If that Python is externally
 managed, they create `~/.link-mcp-venv`, install `link-mcp` there, and register
@@ -321,7 +333,7 @@ Add source material:
 
 ```bash
 cp notes.md ~/link/raw/
-python3 ~/link/link.py ingest-status ~/link
+link ingest-status
 ```
 
 Ask your agent:
@@ -333,11 +345,11 @@ ingest raw/notes.md into Link
 Remember preferences and decisions directly:
 
 ```bash
-python3 ~/link/link.py remember "User prefers feature branches for Link work." ~/link --title "Prefer feature branches" --type preference --scope project --project link
-python3 ~/link/link.py recall "branch preference" ~/link --project link
-python3 ~/link/link.py explain-memory prefer-feature-branches ~/link
-python3 ~/link/link.py update-memory prefer-feature-branches "Use focused branches for public PR work." ~/link --project link
-python3 ~/link/link.py review-memory prefer-feature-branches ~/link --note "confirmed"
+link remember "User prefers feature branches for Link work." --title "Prefer feature branches" --type preference --scope project --project link
+link recall "branch preference" --project link
+link explain-memory prefer-feature-branches
+link update-memory prefer-feature-branches "Use focused branches for public PR work." --project link
+link review-memory prefer-feature-branches --note "confirmed"
 ```
 
 If a new memory may contradict an active memory, Link reports conflict candidates
@@ -351,7 +363,7 @@ specific memories.
 Capture longer session notes without silently writing memories:
 
 ```bash
-python3 ~/link/link.py capture-session session-notes.md ~/link --project link
+link capture-session session-notes.md --project link
 ```
 
 This stores the note under `raw/memory-captures/`, logs the capture locally, and
@@ -361,30 +373,30 @@ secret-looking pasted values so you can redact the local raw note.
 Review saved captures before approving or deleting them:
 
 ```bash
-python3 ~/link/link.py capture-inbox ~/link --project link
+link capture-inbox --project link
 ```
 
 Approve one proposal when it is right:
 
 ```bash
-python3 ~/link/link.py accept-capture raw/memory-captures/<capture>.md ~/link --index 1
+link accept-capture raw/memory-captures/<capture>.md --index 1
 ```
 
 Redact a capture if Link warns about pasted secrets:
 
 ```bash
-python3 ~/link/link.py redact-capture raw/memory-captures/<capture>.md ~/link
-python3 ~/link/link.py delete-capture raw/memory-captures/<capture>.md ~/link --confirm
+link redact-capture raw/memory-captures/<capture>.md
+link delete-capture raw/memory-captures/<capture>.md --confirm
 ```
 
 Maintain the wiki:
 
 ```bash
-python3 ~/link/link.py doctor ~/link --fix
-python3 ~/link/link.py memory-audit ~/link
-python3 ~/link/link.py rebuild-backlinks ~/link
-python3 ~/link/link.py validate ~/link
-python3 ~/link/link.py verify-mcp ~/link
+link doctor --fix
+link memory-audit
+link rebuild-backlinks
+link validate
+link verify-mcp
 ```
 
 View the wiki:
@@ -474,35 +486,38 @@ Common endpoints:
 
 ## Command Reference
 
+After a global installer run, use `link <command>` from any directory. From a
+repo-local or source checkout, use `python3 link.py <command>` in that directory.
+
 | Command | What it does |
 |---------|-------------|
-| `python3 link.py demo` | Create `./link-demo` with a pre-ingested sample wiki. |
-| `python3 link.py status <dir> [--validate]` | Show local readiness, page/memory counts, optional validation summary, and next actions. |
-| `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
-| `python3 link.py remember "text" <dir> [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
-| `python3 link.py propose-memories <file-or-text> <dir> [--project slug]` | Propose durable memories from notes without writing them. |
-| `python3 link.py capture-session <file-or-text> <dir> [--project slug]` | Save chat/session notes under `raw/memory-captures/` and return proposal-only memory candidates. |
-| `python3 link.py capture-inbox <dir> [--project slug]` | List saved raw captures with secret warnings and accept/redact/delete commands. |
-| `python3 link.py accept-capture <capture> <dir> [--index N]` | Accept one proposal from a saved raw capture using duplicate/conflict-safe memory writes. |
-| `python3 link.py redact-capture <capture> <dir>` | Replace secret-looking values in a saved raw capture and log labels/counts only. |
-| `python3 link.py delete-capture <capture> <dir> --confirm` | Delete a saved raw capture after explicit confirmation. |
-| `python3 link.py query "task" <dir> [--budget small\|medium\|large] [--project slug]` | Build a compact answer-ready packet from memory, wiki search, and graph context. |
-| `python3 link.py brief "task" <dir> [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
-| `python3 link.py memory-audit <dir> [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |
-| `python3 link.py recall "query" <dir> [--project slug]` | Search local agent memories with recall readiness. |
-| `python3 link.py profile <dir> [--project slug]` | Show what Link remembers by type, scope, status, and recency. |
-| `python3 link.py memory-inbox <dir> [--project slug]` | Show memories that need review or stronger metadata with next-step commands. |
-| `python3 link.py review-memory <name> <dir>` | Mark a confirmed memory as reviewed. |
-| `python3 link.py explain-memory <name> <dir>` | Explain provenance, lifecycle, graph links, review issues, and recall readiness. |
-| `python3 link.py update-memory <name> "text" <dir> [--project slug]` | Merge new text into an existing memory, blocking likely conflicts with other active memories by default. |
-| `python3 link.py archive-memory <name> <dir>` | Reversibly hide a stale or wrong memory from default recall. |
-| `python3 link.py restore-memory <name> <dir>` | Restore an archived memory to active recall. |
-| `python3 link.py forget-memory <name> <dir> --confirm` | Permanently delete a memory after explicit confirmation; archive first if you may need it later. |
-| `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, memory review state, raw capture backlog, and secret-looking content. |
-| `python3 link.py doctor <dir> --fix` | Create missing structure and repair backlinks safely. |
-| `python3 link.py validate <dir> [--strict]` | Validate agent-generated wiki pages after ingest: frontmatter, type/directory alignment, required sections, dead links, and backlink freshness. |
-| `python3 link.py rebuild-backlinks <dir>` | Regenerate `wiki/_backlinks.json`. |
-| `python3 link.py verify-mcp <dir>` | Verify `link-mcp` import and print MCP config. |
+| `link status [--validate]` | Show local readiness, page/memory counts, optional validation summary, and next actions. |
+| `link ingest-status` | Show pending raw files and graph index status. |
+| `link remember "text" [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
+| `link propose-memories <file-or-text> [--project slug]` | Propose durable memories from notes without writing them. |
+| `link capture-session <file-or-text> [--project slug]` | Save chat/session notes under `raw/memory-captures/` and return proposal-only memory candidates. |
+| `link capture-inbox [--project slug]` | List saved raw captures with secret warnings and accept/redact/delete commands. |
+| `link accept-capture <capture> [--index N]` | Accept one proposal from a saved raw capture using duplicate/conflict-safe memory writes. |
+| `link redact-capture <capture>` | Replace secret-looking values in a saved raw capture and log labels/counts only. |
+| `link delete-capture <capture> --confirm` | Delete a saved raw capture after explicit confirmation. |
+| `link query "task" [--budget small\|medium\|large] [--project slug]` | Build a compact answer-ready packet from memory, wiki search, and graph context. |
+| `link brief "task" [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
+| `link memory-audit [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |
+| `link recall "query" [--project slug]` | Search local agent memories with recall readiness. |
+| `link profile [--project slug]` | Show what Link remembers by type, scope, status, and recency. |
+| `link memory-inbox [--project slug]` | Show memories that need review or stronger metadata with next-step commands. |
+| `link review-memory <name>` | Mark a confirmed memory as reviewed. |
+| `link explain-memory <name>` | Explain provenance, lifecycle, graph links, review issues, and recall readiness. |
+| `link update-memory <name> "text" [--project slug]` | Merge new text into an existing memory, blocking likely conflicts with other active memories by default. |
+| `link archive-memory <name>` | Reversibly hide a stale or wrong memory from default recall. |
+| `link restore-memory <name>` | Restore an archived memory to active recall. |
+| `link forget-memory <name> --confirm` | Permanently delete a memory after explicit confirmation; archive first if you may need it later. |
+| `link doctor` | Check structure, graph health, source hygiene, memory review state, raw capture backlog, and secret-looking content. |
+| `link doctor --fix` | Create missing structure and repair backlinks safely. |
+| `link validate [--strict]` | Validate agent-generated wiki pages after ingest: frontmatter, type/directory alignment, required sections, dead links, and backlink freshness. |
+| `link rebuild-backlinks` | Regenerate `wiki/_backlinks.json`. |
+| `link verify-mcp` | Verify `link-mcp` import and print MCP config. |
+| `python3 link.py demo` | From a source checkout, create `./link-demo` with a pre-ingested sample wiki. |
 
 ## Privacy And Safety
 
@@ -517,8 +532,8 @@ Link is local-first:
 Before sharing a repo, demo, or wiki:
 
 ```bash
-python3 link.py doctor .
-python3 link.py validate .
+python3 link.py doctor
+python3 link.py validate
 python3 scripts/check_release_hygiene.py
 ```
 
