@@ -52,9 +52,10 @@ except ImportError:
 mcp = FastMCP(
     "link",
     instructions=(
-        "Link is local personal memory for agents. Start with query_link when "
-        "the user asks a substantive question that may need both memory and "
-        "wiki context. Use memory_brief at "
+        "Link is local personal memory for agents. Use link_status when "
+        "connecting to Link or troubleshooting setup/readiness. Start with "
+        "query_link when the user asks a substantive question that may need "
+        "both memory and wiki context. Use memory_brief at "
         "session start or before personalized/project work; pass the user's "
         "task as the query when available. Use recall_memory for focused user "
         "preferences, decisions, and project context, memory_profile to inspect "

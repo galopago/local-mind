@@ -60,6 +60,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added an explicit `system`/`dark`/`light` theme toggle for the local web UI; dark mode now uses a black page background.
 - Added a real MCP stdio smoke test for the built `link-mcp` wheel in CI.
 - Added release hygiene checks that protect the public agent instruction contract for `query_link`, `validate_wiki`, and `memory_brief`.
+- Updated agent contract checks and installed instructions to include `link_status` for setup/readiness checks.
 - Changed CI to run on pull requests and manual dispatch only, preserving GitHub minutes for the develop-branch workflow.
 - Added CLI validation to the CI demo health smoke path so PRs catch broken generated wiki templates.
 - Updated the PyPI package README with the current MCP tool contract, validation workflow, capture inbox, and permanent-forget guidance.

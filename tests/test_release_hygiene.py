@@ -51,23 +51,24 @@ class ReleaseHygieneTests(unittest.TestCase):
 
         self.assertEqual(findings, [])
 
-    def test_agent_contract_requires_query_validate_and_brief_terms(self):
+    def test_agent_contract_requires_status_query_validate_and_brief_terms(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-agent-contract-test-"))
         good = tmp / "good.md"
         bad = tmp / "bad.md"
-        good.write_text("Use query_link, validate_wiki, and memory_brief.\n", encoding="utf-8")
+        good.write_text("Use link_status, query_link, validate_wiki, and memory_brief.\n", encoding="utf-8")
         bad.write_text("Use query_link only.\n", encoding="utf-8")
         findings: list[str] = []
 
         release_hygiene.check_agent_contract(
             findings,
             {
-                good: ("query_link", "validate_wiki", "memory_brief"),
-                bad: ("query_link", "validate_wiki", "memory_brief"),
+                good: ("link_status", "query_link", "validate_wiki", "memory_brief"),
+                bad: ("link_status", "query_link", "validate_wiki", "memory_brief"),
                 tmp / "missing.md": ("query_link",),
             },
         )
 
+        self.assertIn(f"agent contract missing 'link_status' in {bad}", findings)
         self.assertIn(f"agent contract missing 'validate_wiki' in {bad}", findings)
         self.assertIn(f"agent contract missing 'memory_brief' in {bad}", findings)
         self.assertIn(f"agent contract file missing: {tmp / 'missing.md'}", findings)
