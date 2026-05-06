@@ -8,6 +8,7 @@ Usage:
   python link.py remember "memory text" [target]
   python link.py propose-memories <file-or-text> [target]
   python link.py update-memory <name-or-title> "new memory text" [target]
+  python link.py brief ["task or question"] [target]
   python link.py recall "query" [target]
   python link.py profile [target]
   python link.py archive-memory <name-or-title> [target]
@@ -102,6 +103,7 @@ if (_BUNDLED_CORE / "link_core").exists():
 from link_core.memory import (
     count_values as _core_count_values,
     mark_memory_reviewed as _core_mark_memory_reviewed,
+    memory_brief as _core_memory_brief,
     memory_explanation as _core_memory_explanation,
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
@@ -754,6 +756,15 @@ def _recent_memories(records: list[dict[str, object]]) -> list[dict[str, object]
 
 def _memory_profile(wiki_dir: Path, limit: int = 10) -> dict[str, object]:
     return _core_memory_profile(_memory_records(wiki_dir), limit=limit, review_command="review-memory")
+
+
+def _memory_brief(wiki_dir: Path, query: str = "", limit: int = 6) -> dict[str, object]:
+    return _core_memory_brief(
+        _memory_records(wiki_dir),
+        query=query,
+        limit=limit,
+        review_command="review-memory",
+    )
 
 
 def _recall_memories(
@@ -1818,6 +1829,48 @@ def _print_memory_list(title: str, records: list[dict[str, object]], empty: str 
             print(f"  {summary}")
 
 
+def brief(target: Path, query: str = "", limit: int = 6, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    payload = _memory_brief(wiki_dir, query=query, limit=limit)
+
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    title = "Link memory brief"
+    if query:
+        title += f": {query}"
+    print(title)
+    print("")
+    profile_data = payload["profile"]
+    print(
+        f"{profile_data['active_count']} active memories · "
+        f"{payload['relevant_count']} relevant · "
+        f"{payload['review']['count']} need review"
+    )
+    print(f"Types: {_format_counts(profile_data['by_type'])}")
+    print(f"Scopes: {_format_counts(profile_data['by_scope'])}")
+    print("")
+
+    _print_memory_list("Relevant memories", payload["relevant_memories"])
+    if payload["review"]["items"]:
+        print("")
+        print("Review queue")
+        for item in payload["review"]["items"][:3]:
+            print(f"- {item['title']} ({item['memory_type']} · {item['scope']})")
+            first_issue = item["issues"][0]
+            print(f"  [{first_issue['severity']}] {first_issue['code']}: {first_issue['message']}")
+    print("")
+    print("Agent guidance")
+    for item in payload["agent_guidance"]:
+        print(f"- {item}")
+    return 0
+
+
 def profile(target: Path, limit: int = 10, json_output: bool = False) -> int:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
@@ -2101,6 +2154,12 @@ def main(argv: list[str] | None = None) -> int:
     recall_cmd.add_argument("--include-archived", action="store_true", help="include archived and stale memories")
     recall_cmd.add_argument("--json", action="store_true", help="print machine-readable results")
 
+    brief_cmd = sub.add_parser("brief", help="prime an agent with relevant local memory")
+    brief_cmd.add_argument("query", nargs="?", default="", help="optional task or question to retrieve memory for")
+    brief_cmd.add_argument("target", nargs="?", default=".")
+    brief_cmd.add_argument("--limit", type=int, default=6)
+    brief_cmd.add_argument("--json", action="store_true", help="print machine-readable memory brief")
+
     profile_cmd = sub.add_parser("profile", help="show what Link remembers")
     profile_cmd.add_argument("target", nargs="?", default=".")
     profile_cmd.add_argument("--limit", type=int, default=10)
@@ -2185,6 +2244,8 @@ def main(argv: list[str] | None = None) -> int:
             json_output=args.json,
             include_archived=args.include_archived,
         )
+    if args.command == "brief":
+        return brief(Path(args.target), query=args.query, limit=args.limit, json_output=args.json)
     if args.command == "profile":
         return profile(Path(args.target), limit=args.limit, json_output=args.json)
     if args.command == "archive-memory":

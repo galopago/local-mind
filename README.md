@@ -164,6 +164,7 @@ should recall:
 
 ```bash
 python3 ~/link/link.py remember "I am testing Link as local personal memory for agents." ~/link --type preference --scope user --tags onboarding
+python3 ~/link/link.py brief "local personal memory" ~/link
 python3 ~/link/link.py recall "local personal memory" ~/link
 python3 ~/link/link.py profile ~/link
 ```
@@ -341,6 +342,7 @@ Most agents should start with:
 
 | Tool | Use it when |
 |------|-------------|
+| `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory. |
 | `memory_profile` | You need to know what Link remembers about the user/project. |
 | `recall_memory` | You need preferences, decisions, facts, or project context. |
 | `get_context` | You need a topic plus its graph neighborhood. |
@@ -349,7 +351,7 @@ Most agents should start with:
 | `remember_memory` | The user explicitly approves saving a durable memory. |
 | `propose_memories` | You want memory candidates from chat/session notes without writing. |
 
-Full tool set: `memory_profile`, `memory_inbox`, `review_memory`,
+Full tool set: `memory_brief`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `update_memory`, `archive_memory`, `restore_memory`,
 `get_context`, `get_pages`, `get_backlinks`, `get_graph`, `rebuild_backlinks`.
@@ -386,6 +388,7 @@ Common endpoints:
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
 | `python3 link.py remember "text" <dir>` | Save a local agent memory; strong duplicates are refused unless `--allow-duplicate` is set. |
 | `python3 link.py propose-memories <file-or-text> <dir>` | Propose durable memories from notes without writing them. |
+| `python3 link.py brief "task" <dir>` | Prime an agent with profile counts, relevant memories, review warnings, and safe memory rules. |
 | `python3 link.py recall "query" <dir>` | Search local agent memories. |
 | `python3 link.py profile <dir>` | Show what Link remembers by type, scope, status, and recency. |
 | `python3 link.py memory-inbox <dir>` | Show memories that need review or stronger metadata. |

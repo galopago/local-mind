@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 from link_core.memory import (  # noqa: E402
     extract_wikilinks,
     mark_memory_reviewed,
+    memory_brief,
     memory_explanation,
     memory_inbox,
     memory_log_entries,
@@ -67,6 +68,7 @@ class MemoryCoreTests(unittest.TestCase):
 
         records = memory_records(wiki)
         profile = memory_profile(records)
+        brief = memory_brief(records, query="release branches")
         inbox = memory_inbox(records)
         recalled = recall_memories(records, "release branches")
 
@@ -75,6 +77,10 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(profile["memory_count"], 2)
         self.assertEqual(profile["active_count"], 1)
         self.assertEqual(profile["archived"][0]["name"], "old-branch-rule")
+        self.assertEqual(brief["selection"], "query")
+        self.assertEqual(brief["relevant_memories"][0]["name"], "prefer-release-branches")
+        self.assertNotIn("body", brief["relevant_memories"][0])
+        self.assertIn("agent_guidance", brief)
         self.assertEqual(inbox["review_count"], 0)
         self.assertEqual(recalled[0]["name"], "prefer-release-branches")
         self.assertNotIn("body", recalled[0])

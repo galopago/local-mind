@@ -368,6 +368,36 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["preferences"][0]["name"], "prefer-local-personal-memory")
         self.assertEqual(payload["review_count"], 1)
 
+    def test_brief_primes_agent_memory(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.brief(target, "local personal memory")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link memory brief: local personal memory", out.getvalue())
+        self.assertIn("Prefer local personal memory", out.getvalue())
+        self.assertIn("Agent guidance", out.getvalue())
+
+    def test_brief_json(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.brief(target, "local personal memory", json_output=True)
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["selection"], "query")
+        self.assertEqual(payload["profile"]["memory_count"], 1)
+        self.assertEqual(payload["relevant_memories"][0]["name"], "prefer-local-personal-memory")
+        self.assertNotIn("body", payload["relevant_memories"][0])
+
     def test_memory_inbox_and_review_memory(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

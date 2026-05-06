@@ -52,9 +52,11 @@ except ImportError:
 mcp = FastMCP(
     "link",
     instructions=(
-        "Link is local personal memory for agents. Use memory_profile to inspect "
-        "what Link remembers, recall_memory for user preferences, decisions, and "
-        "project context, memory_inbox to find memories needing review, and "
+        "Link is local personal memory for agents. Start with memory_brief at "
+        "session start or before personalized/project work; pass the user's "
+        "task as the query when available. Use recall_memory for focused user "
+        "preferences, decisions, and project context, memory_profile to inspect "
+        "what Link remembers, memory_inbox to find memories needing review, and "
         "explain_memory to audit why a memory exists. Use propose_memories for "
         "chat or session notes before writing memory. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
@@ -73,6 +75,7 @@ MAX_TEXT_INPUT = 200
 from link_core.memory import (
     count_values as _core_count_values,
     mark_memory_reviewed as _core_mark_memory_reviewed,
+    memory_brief as _core_memory_brief,
     memory_explanation as _core_memory_explanation,
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
@@ -193,6 +196,15 @@ def _recent_memories(records: list[dict[str, object]]) -> list[dict[str, object]
 
 def _memory_profile(limit: int = 10) -> dict[str, object]:
     return _core_memory_profile(_memory_records(), limit=limit, review_command="review_memory")
+
+
+def _memory_brief(query: str = "", limit: int = 6) -> dict[str, object]:
+    return _core_memory_brief(
+        _memory_records(),
+        query=_clean_text_input(query, max_len=500),
+        limit=limit,
+        review_command="review_memory",
+    )
 
 
 def _recall_memories(query: str, limit: int = 10, include_archived: bool = False) -> list[dict[str, object]]:
@@ -329,6 +341,19 @@ def _write_memory_page(
 
 
 # ── MCP Tools ─────────────────────────────────────────────────────────
+
+@mcp.tool()
+def memory_brief(query: str = "", limit: int = 6) -> str:
+    """Prime the agent with local memory before answering or coding.
+
+    Call this at the start of a session or before a user task that may depend
+    on preferences, project decisions, or personal context. It returns profile
+    counts, relevant memories for the query, review warnings, and rules for
+    safe memory use.
+    """
+    limit = _parse_limit(limit, default=6, max_limit=20)
+    return json.dumps(_memory_brief(query=query, limit=limit), ensure_ascii=False)
+
 
 @mcp.tool()
 def search_wiki(query: str, limit: int = 20) -> str:

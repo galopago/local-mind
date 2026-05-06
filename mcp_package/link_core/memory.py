@@ -857,6 +857,78 @@ def memory_profile(
     }
 
 
+def memory_brief(
+    records: Iterable[Mapping[str, object]],
+    query: str = "",
+    limit: int = 6,
+    review_command: str = "review-memory",
+) -> dict[str, object]:
+    """Return the compact memory payload an agent should read before work."""
+    limit = max(1, min(limit, 20))
+    q = query.strip()
+    record_list = [dict(record) for record in records]
+    profile = memory_profile(record_list, limit=limit, review_command=review_command)
+    inbox = memory_inbox(record_list, limit=limit, review_command=review_command)
+
+    if q:
+        relevant = recall_memories(record_list, q, limit=limit)
+        selection = "query"
+    else:
+        relevant = []
+        seen: set[str] = set()
+        for memory_type in ("preference", "decision", "project"):
+            for record in recent_memories(record_list):
+                name = str(record.get("name") or "")
+                if name in seen:
+                    continue
+                if not is_active_memory(record):
+                    continue
+                if str(record.get("memory_type") or "") != memory_type:
+                    continue
+                relevant.append(slim_memory(record))
+                seen.add(name)
+                if len(relevant) >= limit:
+                    break
+            if len(relevant) >= limit:
+                break
+        if len(relevant) < limit:
+            for record in recent_memories(record_list):
+                name = str(record.get("name") or "")
+                if name in seen or not is_active_memory(record):
+                    continue
+                relevant.append(slim_memory(record))
+                seen.add(name)
+                if len(relevant) >= limit:
+                    break
+        selection = "startup"
+
+    guidance = [
+        "Use relevant_memories as durable local context before answering or coding.",
+        "Call explain_memory before relying on a surprising, stale, or high-impact memory.",
+        "Only write memory after explicit user approval; use propose_memories for candidates first.",
+        "If a new memory duplicates an existing one, update the existing memory instead of creating another page.",
+    ]
+    if inbox["review_count"]:
+        guidance.insert(
+            1,
+            "Some memories need review; treat them as provisional when they affect an important decision.",
+        )
+
+    return {
+        "query": q,
+        "selection": selection,
+        "profile": profile,
+        "relevant_count": len(relevant),
+        "relevant_memories": relevant,
+        "review": {
+            "count": inbox["review_count"],
+            "counts_by_severity": inbox["counts_by_severity"],
+            "items": inbox["items"],
+        },
+        "agent_guidance": guidance,
+    }
+
+
 def score_memory(record: Mapping[str, object], query: str) -> int:
     q = query.lower().strip()
     tokens = [token for token in re.split(r"\W+", q) if len(token) >= 3]

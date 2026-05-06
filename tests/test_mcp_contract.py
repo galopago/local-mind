@@ -193,6 +193,17 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["recent"][0]["name"], "prefer-local-personal-memory")
         self.assertEqual(payload["preferences"][0]["memory_type"], "preference")
 
+    def test_memory_brief_contract(self):
+        payload = json.loads(self.server.memory_brief("local personal memory"))
+
+        self.assertEqual(payload["selection"], "query")
+        self.assertEqual(payload["query"], "local personal memory")
+        self.assertEqual(payload["profile"]["memory_count"], 1)
+        self.assertEqual(payload["review"]["count"], 1)
+        self.assertEqual(payload["relevant_memories"][0]["name"], "prefer-local-personal-memory")
+        self.assertNotIn("body", payload["relevant_memories"][0])
+        self.assertIn("agent_guidance", payload)
+
     def test_memory_inbox_and_review_memory_contract(self):
         inbox = json.loads(self.server.memory_inbox())
         reviewed = json.loads(self.server.review_memory(

@@ -81,6 +81,7 @@ Custom wiki path:
 
 | Tool | Description |
 |------|-------------|
+| `memory_brief(query?, limit?)` | Prime the agent before answering or coding with profile counts, relevant memories, review warnings, and safe memory rules. |
 | `memory_profile(limit?)` | Summarize what Link remembers by type, scope, status, recency, preferences, decisions, and project context. |
 | `memory_inbox(limit?, include_archived?)` | List memories that need user review, cleanup, or stronger metadata. |
 | `review_memory(identifier, note?)` | Mark a confirmed memory as reviewed. |
@@ -98,7 +99,7 @@ Custom wiki path:
 | `get_graph()` | All nodes + edges for graph reasoning. |
 | `rebuild_backlinks()` | Rebuild `_backlinks.json` after ingest or lint. |
 
-Use `memory_profile` to inspect the user/project memory shape, `memory_inbox` to find memories needing human review, `explain_memory` to audit why a memory exists, then `recall_memory` for user preferences, decisions, and project context. Use `propose_memories` for long chat/session notes; it only returns candidates. If `remember_memory` returns duplicate candidates, use `update_memory` on the existing memory unless the user confirms a separate memory. Use `archive_memory`, not deletion, when a memory is stale or wrong. Use `get_context` for source-backed topic answers — one call returns the primary page plus all related pages via graph traversal.
+Start with `memory_brief`, passing the user's task as `query` when available. Use `memory_profile` to inspect the user/project memory shape, `memory_inbox` to find memories needing human review, `explain_memory` to audit why a memory exists, then `recall_memory` for focused preferences, decisions, and project context. Use `propose_memories` for long chat/session notes; it only returns candidates. If `remember_memory` returns duplicate candidates, use `update_memory` on the existing memory unless the user confirms a separate memory. Use `archive_memory`, not deletion, when a memory is stale or wrong. Use `get_context` for source-backed topic answers — one call returns the primary page plus all related pages via graph traversal.
 
 ## Wiki location
 

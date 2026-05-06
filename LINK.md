@@ -286,6 +286,7 @@ Rules:
 - Keep memories specific and actionable. "User likes quality" is too vague; "User prefers release/* branches over codex/* branches" is useful.
 - Use `memory_type: preference` for user preferences, `decision` for choices made, `project` for project context, `fact` for stable facts, and `note` for everything else.
 - Use `scope: user` for broad personal preferences, `project` for the current project, and `global` for agent-wide principles.
+- At the start of a session or substantial task, run `python3 link.py brief "<task or question>" .` or MCP `memory_brief` when available. Treat this as the default way to prime yourself with local memory.
 - For long chat/session notes, run `python3 link.py propose-memories "<file-or-text>" .` first. Treat proposals as candidates only; do not write them until the human confirms.
 - Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
 - Run `python3 link.py profile .` when the human asks what Link knows or when you need a quick overview of remembered preferences, decisions, and project context.
@@ -337,7 +338,7 @@ When the human adds a new source to `raw/` and asks you to process it:
 
 When the human asks a question:
 
-1. If the question may depend on user preferences, project decisions, or personal context, inspect `python3 link.py profile .` or MCP `memory_profile` when you need the memory overview, then run `python3 link.py recall "<question>" .` or MCP `recall_memory` for focused recall.
+1. If the question may depend on user preferences, project decisions, or personal context, start with `python3 link.py brief "<question>" .` or MCP `memory_brief`. Use `profile`/`memory_profile` and `recall`/`recall_memory` afterward only when you need deeper detail.
 2. **If `serve.py` is running:** call `GET /api/context?topic=<question>` — returns the best matching page plus all related pages via graph traversal in one call. This is faster and uses fewer tokens than reading index.md manually.
 3. **If server is not running:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
 4. Read the relevant pages and synthesize an answer.
