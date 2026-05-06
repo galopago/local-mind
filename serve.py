@@ -1013,6 +1013,11 @@ mark { background: var(--mark-bg); color: inherit; border-radius: 2px; padding: 
                         border-radius: 4px; padding: 5px 9px; cursor: pointer; }
 .graph-toolbar button:hover { background: var(--button-hover); }
 .graph-toolbar button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.graph-control { display: grid; gap: 3px; color: var(--muted); font-size: 11px; }
+.graph-control input,
+.graph-control select { border: 1px solid var(--border); background: var(--surface); color: var(--text);
+                        border-radius: 4px; padding: 5px 8px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; }
+.graph-control input { width: 180px; }
 .graph-status { color: var(--muted); margin-left: auto; }
 .graph-inspector { border: 1px solid var(--border-soft); border-radius: 4px; padding: 12px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; color: var(--muted); background: var(--surface); }
 .graph-inspector strong { display: block; color: var(--text-strong); font-size: 15px; margin-bottom: 6px; overflow-wrap: anywhere; }
@@ -2004,6 +2009,11 @@ def _render_graph():
     cat_colors = {"concepts": "#4e79a7", "entities": "#f28e2b", "memories": "#edc948",
                   "sources": "#59a14f", "comparisons": "#e15759",
                   "explorations": "#76b7b2", "root": "#bab0ac"}
+    categories = sorted({str(n["category"]) for n in visible_nodes if n["category"] != "root"})
+    category_options = '<option value="all">all types</option>' + "".join(
+        f'<option value="{html.escape(category, quote=True)}">{html.escape(category)}</option>'
+        for category in categories
+    )
 
     graph_js = f"""
 <script>
@@ -2019,6 +2029,9 @@ def _render_graph():
   var labelsButton = document.getElementById('graph-labels');
   var motionButton = document.getElementById('graph-motion');
   var fullscreenButton = document.getElementById('graph-fullscreen');
+  var searchInput = document.getElementById('graph-search');
+  var categoryFilter = document.getElementById('graph-category');
+  var depthFilter = document.getElementById('graph-depth');
   var frameEl = document.getElementById('graph-frame');
   var status = document.getElementById('graph-status');
   var inspector = document.getElementById('graph-inspector');
@@ -2073,6 +2086,10 @@ def _render_graph():
   var showAllLabels = false;
   var motionPaused = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var SETTLE = 200; // frames of physics
+  var searchTerm = '';
+  var categoryValue = 'all';
+  var depthValue = 'all';
+  var visibleCache = null;
 
   function resize() {{
     W = canvas.clientWidth; H = canvas.clientHeight;
@@ -2082,6 +2099,54 @@ def _render_graph():
 
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
   function pageHref(id) {{ return '/page/' + encodeURIComponent(id); }}
+  function invalidateFilters() {{ visibleCache = null; }}
+  function nodeSearchText(n) {{
+    return (n.title + ' ' + n.id + ' ' + n.category).toLowerCase();
+  }}
+  function searchMatches(n) {{
+    return searchTerm && nodeSearchText(n).indexOf(searchTerm) !== -1;
+  }}
+  function depthMap() {{
+    if (!selectedNode || depthValue === 'all') return null;
+    var maxDepth = parseInt(depthValue, 10);
+    if (!Number.isFinite(maxDepth)) return null;
+    var seen = {{}};
+    var queue = [selectedNode.id];
+    seen[selectedNode.id] = 0;
+    while (queue.length) {{
+      var current = queue.shift();
+      var nextDepth = seen[current] + 1;
+      if (nextDepth > maxDepth) continue;
+      (adj[current] || []).forEach(function(next) {{
+        if (seen[next] === undefined) {{
+          seen[next] = nextDepth;
+          queue.push(next);
+        }}
+      }});
+    }}
+    return seen;
+  }}
+  function visibleIds() {{
+    if (visibleCache) return visibleCache;
+    var byDepth = depthMap();
+    var ids = {{}};
+    nodes.forEach(function(n) {{
+      var categoryOk = categoryValue === 'all' || n.category === categoryValue;
+      var depthOk = !byDepth || byDepth[n.id] !== undefined;
+      var keepSelected = selectedNode && selectedNode.id === n.id;
+      ids[n.id] = (categoryOk || keepSelected) && depthOk;
+    }});
+    visibleCache = ids;
+    return ids;
+  }}
+  function visibleNodes() {{
+    var ids = visibleIds();
+    return nodes.filter(function(n) {{ return ids[n.id]; }});
+  }}
+  function visibleEdges() {{
+    var ids = visibleIds();
+    return edges.filter(function(e) {{ return ids[e.source] && ids[e.target]; }});
+  }}
   function nodeRadius(n) {{
     if (n.category === 'sources') return 4.5;
     if (n.category === 'memories') return 6.4;
@@ -2101,11 +2166,19 @@ def _render_graph():
   }}
   function updateStatus() {{
     if (!status) return;
+    var currentNodes = visibleNodes();
+    var currentEdges = visibleEdges();
     var parts = [
-      nodes.length + ' nodes',
-      edges.length + ' edges',
+      currentNodes.length + '/' + nodes.length + ' nodes',
+      currentEdges.length + '/' + edges.length + ' edges',
       Math.round(zoom * 100) + '%'
     ];
+    if (categoryValue !== 'all') parts.push(categoryValue);
+    if (depthValue !== 'all') parts.push('depth ' + depthValue);
+    if (searchTerm) {{
+      var matches = currentNodes.filter(searchMatches).length;
+      parts.push(matches + ' match' + (matches === 1 ? '' : 'es'));
+    }}
     var locked = pinnedCount();
     if (locked) parts.push(locked + ' placed');
     if (selectedNode) parts.push('selected ' + selectedNode.id);
@@ -2144,6 +2217,7 @@ def _render_graph():
   function selectNode(node) {{
     selectedNode = node;
     hoverNode = node;
+    invalidateFilters();
     updateInspector();
     updateStatus();
     draw();
@@ -2199,9 +2273,10 @@ def _render_graph():
 
   // Auto-fit: after physics settles, zoom/pan so all nodes are visible and centered
   function autoFit() {{
-    if (nodes.length === 0) return;
+    var currentNodes = visibleNodes();
+    if (currentNodes.length === 0) return;
     var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    nodes.forEach(function(n) {{
+    currentNodes.forEach(function(n) {{
       minX = Math.min(minX, pos[n.id].x); maxX = Math.max(maxX, pos[n.id].x);
       minY = Math.min(minY, pos[n.id].y); maxY = Math.max(maxY, pos[n.id].y);
     }});
@@ -2218,9 +2293,11 @@ def _render_graph():
   function draw() {{
     ctx.clearRect(0, 0, W, H);
     var time = frame * 0.018;
+    var currentNodes = visibleNodes();
+    var currentEdges = visibleEdges();
 
     // Edges — double draw: blurred glow + sharp line + flow particle
-    edges.forEach(function(e) {{
+    currentEdges.forEach(function(e) {{
       var a = toScreen(pos[e.source].x, pos[e.source].y);
       var b = toScreen(pos[e.target].x, pos[e.target].y);
       var activeEdge = !hoverNode || e.source === hoverNode.id || e.target === hoverNode.id;
@@ -2254,15 +2331,16 @@ def _render_graph():
     }});
 
     // Nodes
-    nodes.forEach(function(n) {{
+    currentNodes.forEach(function(n) {{
       var s = toScreen(pos[n.id].x, pos[n.id].y);
       var r = nodeRadius(n) * Math.max(0.65, Math.min(1.2, zoom));
       var color = nodeColor(n);
       var pulse = Math.sin(time * 1.2 + (pos[n.id].x + pos[n.id].y) * 0.01) * 0.12 + 0.88;
       var activeNode = isActiveNode(n);
       var selected = selectedNode && selectedNode.id === n.id;
+      var matched = searchMatches(n);
       ctx.save();
-      ctx.globalAlpha = hoverNode && !activeNode ? 0.28 : 1;
+      ctx.globalAlpha = (hoverNode && !activeNode) || (searchTerm && !matched) ? 0.28 : 1;
 
       // Radial glow
       var glowR = r * 3.5 * pulse;
@@ -2278,7 +2356,7 @@ def _render_graph():
 
       // Node border
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
-      ctx.strokeStyle = selected ? '#ffffff' : color; ctx.lineWidth = selected ? 2.4 : 1.5;
+      ctx.strokeStyle = selected || matched ? '#ffffff' : color; ctx.lineWidth = selected || matched ? 2.4 : 1.5;
       ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1;
 
       // Inner bright core
@@ -2287,7 +2365,7 @@ def _render_graph():
 
       // Labels stay sparse until a node is hovered.
       var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
-      var showLabel = showAllLabels || (hoverNode ? activeNode : (n.category !== 'sources' && degree[n.id] >= 2));
+      var showLabel = showAllLabels || matched || (hoverNode ? activeNode : (n.category !== 'sources' && degree[n.id] >= 2));
       if (showLabel) {{
         ctx.font = LABEL_FONT;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -2315,8 +2393,9 @@ def _render_graph():
 
   function hitTest(sx, sy) {{
     var w = toWorld(sx, sy);
-    for (var i = nodes.length - 1; i >= 0; i--) {{
-      var n = nodes[i];
+    var currentNodes = visibleNodes();
+    for (var i = currentNodes.length - 1; i >= 0; i--) {{
+      var n = currentNodes[i];
       var p = pos[n.id];
       var r = nodeRadius(n) + 6; // slightly larger hit area
       var dx = w.x - p.x, dy = w.y - p.y;
@@ -2334,6 +2413,13 @@ def _render_graph():
     pinned = {{}};
     selectedNode = null;
     hoverNode = null;
+    searchTerm = '';
+    categoryValue = 'all';
+    depthValue = 'all';
+    if (searchInput) searchInput.value = '';
+    if (categoryFilter) categoryFilter.value = 'all';
+    if (depthFilter) depthFilter.value = 'all';
+    invalidateFilters();
     frame = SETTLE;
     autoFit();
     updateInspector();
@@ -2460,7 +2546,7 @@ def _render_graph():
       if (frameEl && frameEl.classList.contains('is-fullscreen')) {{
         setFullscreen(false);
       }} else {{
-        selectedNode = null; updateInspector(); updateStatus();
+        selectedNode = null; invalidateFilters(); updateInspector(); updateStatus(); draw();
       }}
       e.preventDefault();
     }}
@@ -2483,6 +2569,33 @@ def _render_graph():
     setFullscreen(!frameEl.classList.contains('is-fullscreen'));
   }});
   if (inspectorOpen) inspectorOpen.addEventListener('click', function() {{ openNode(selectedNode); }});
+  if (searchInput) {{
+    searchInput.addEventListener('input', function() {{
+      searchTerm = searchInput.value.trim().toLowerCase();
+      updateStatus();
+      draw();
+    }});
+    searchInput.addEventListener('keydown', function(e) {{
+      if (e.key !== 'Enter') return;
+      var match = visibleNodes().find(searchMatches);
+      if (match) selectNode(match);
+      e.preventDefault();
+    }});
+  }}
+  if (categoryFilter) categoryFilter.addEventListener('change', function() {{
+    categoryValue = categoryFilter.value || 'all';
+    invalidateFilters();
+    autoFit();
+    updateStatus();
+    draw();
+  }});
+  if (depthFilter) depthFilter.addEventListener('change', function() {{
+    depthValue = depthFilter.value || 'all';
+    invalidateFilters();
+    autoFit();
+    updateStatus();
+    draw();
+  }});
 
   window.addEventListener('resize', function() {{ resize(); if (fitted) autoFit(); updateStatus(); }});
   resize();
@@ -2510,6 +2623,13 @@ def _render_graph():
         f'<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
         f'<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
         f'<button id="graph-fullscreen" type="button" aria-pressed="false">Fullscreen</button>'
+        f'<label class="graph-control">Find'
+        f'<input id="graph-search" type="search" placeholder="node title"></label>'
+        f'<label class="graph-control">Type'
+        f'<select id="graph-category">{category_options}</select></label>'
+        f'<label class="graph-control">Neighborhood'
+        f'<select id="graph-depth"><option value="all">all</option><option value="1">1 hop</option>'
+        f'<option value="2">2 hops</option><option value="3">3 hops</option></select></label>'
         f'<span id="graph-status" class="graph-status" aria-live="polite">'
         f'{node_count} nodes · {edge_count} edges</span>'
         f'</div>'

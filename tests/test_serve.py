@@ -973,11 +973,18 @@ class ServeTests(unittest.TestCase):
         self.assertLess(html.index('id="graph-reset"'), html.index("var resetButton ="))
         self.assertLess(html.index('id="graph-labels"'), html.index("var labelsButton ="))
         self.assertLess(html.index('id="graph-motion"'), html.index("var motionButton ="))
+        self.assertLess(html.index('id="graph-search"'), html.index("var searchInput ="))
+        self.assertLess(html.index('id="graph-category"'), html.index("var categoryFilter ="))
+        self.assertLess(html.index('id="graph-depth"'), html.index("var depthFilter ="))
         self.assertLess(html.index('id="graph-inspector"'), html.index("var inspector ="))
         self.assertIn('id="graph-status"', html)
         self.assertIn('id="graph-open"', html)
         self.assertIn('tabindex="0"', html)
         self.assertIn('role="img"', html)
+        self.assertIn('<option value="concepts">concepts</option>', html)
+        self.assertIn("function visibleNodes()", html)
+        self.assertIn("function visibleEdges()", html)
+        self.assertIn("searchInput.addEventListener('input'", html)
 
     def test_graph_empty_state_when_no_visible_pages(self):
         wiki = self.make_wiki()

@@ -27,6 +27,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added guided `link ingest-status` output with structured JSON guidance, exact agent prompts, and follow-up validation commands.
 - Added clearer product framing in the README and local home page for the distinction between source-backed wiki knowledge and explicit agent memory.
 - Added a wider graph page layout with fullscreen mode so larger wikis can be explored without being squeezed into the reading column.
+- Added large-graph controls for node search, type filtering, and selected-node neighborhood depth.
 - Added duplicate protection for `remember`/`remember_memory`; strong duplicate memories are refused unless explicitly allowed.
 - Added memory merge/update workflow with `update-memory` and MCP `update_memory`, including update counts, audit logs, backlink rebuilds, and review reset.
 - Added proposal-only memory extraction with `propose-memories` and MCP `propose_memories` for chat/session notes.
