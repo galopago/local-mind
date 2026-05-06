@@ -1432,6 +1432,25 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Result: healthy", out.getvalue())
         self.assertIn("agent-memory", rebuilt["backlinks"])
 
+    def test_doctor_fix_repairs_index_drift(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        index_path = target / "wiki/index.md"
+        index_path.write_text("# Broken Index\n", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.doctor(target, fix=True)
+
+        index_text = index_path.read_text(encoding="utf-8")
+        backlinks = json.loads((target / "wiki/_backlinks.json").read_text(encoding="utf-8"))
+        self.assertEqual(code, 0)
+        self.assertIn("rebuilt wiki/index.md", out.getvalue())
+        self.assertIn("rebuilt wiki/_backlinks.json", out.getvalue())
+        self.assertIn("[[agent-memory]]", index_text)
+        self.assertIn("agent-memory", backlinks["backlinks"])
+
     def test_doctor_fix_creates_missing_structure(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
         target = tmp / "empty"

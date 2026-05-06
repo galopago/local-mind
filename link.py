@@ -1179,18 +1179,6 @@ def _required_paths(target: Path) -> list[Path]:
     ]
 
 
-def _write_default_index(path: Path) -> None:
-    path.write_text(
-        "# Link Wiki Index\n\n"
-        "> Last updated: not yet ingested | 0 pages | 0 sources\n\n"
-        "## Categories\n\n"
-        "## Recent\n\n"
-        "| Date | Operation | Pages Touched |\n"
-        "|------|-----------|---------------|\n",
-        encoding="utf-8",
-    )
-
-
 def _write_default_log(path: Path) -> None:
     _core_write_default_log(path)
 
@@ -1207,17 +1195,19 @@ def _apply_doctor_fixes(target: Path) -> list[str]:
             path.mkdir(parents=True, exist_ok=True)
             fixes.append(f"created {path.relative_to(target)}")
 
-    index_path = wiki_dir / "index.md"
-    if not index_path.exists():
-        _write_default_index(index_path)
-        fixes.append("created wiki/index.md")
-
     log_path = wiki_dir / "log.md"
     if not log_path.exists():
         _write_default_log(log_path)
         fixes.append("created wiki/log.md")
 
     if wiki_dir.exists():
+        index_path = wiki_dir / "index.md"
+        index_missing = not index_path.exists()
+        unindexed = [] if index_missing else _find_unindexed_pages(wiki_dir)
+        if index_missing or unindexed:
+            _core_rebuild_index(wiki_dir)
+            fixes.append("created wiki/index.md" if index_missing else "rebuilt wiki/index.md")
+
         backlinks_path = wiki_dir / "_backlinks.json"
         current, load_error = _load_backlinks(backlinks_path)
         expected = _build_backlinks(wiki_dir)
