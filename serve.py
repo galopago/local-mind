@@ -105,6 +105,20 @@ def _get_all_pages() -> list:
     return _pages_cache
 
 
+def _current_wiki_cache() -> dict[str, object]:
+    _get_all_pages()
+    return {
+        "pages": _pages_cache or [],
+        "page_index": _page_index,
+        "fulltext": _fulltext_index,
+        "normalized_fulltext": _normalized_fulltext_index,
+        "snippet_index": _snippet_index,
+        "token_index": _token_index,
+        "meta_token_index": _meta_token_index,
+        "page_map": _page_map,
+    }
+
+
 def _find_page(name: str) -> Path | None:
     # Ensure cache is warm — _get_all_pages populates _page_index as a side effect
     _get_all_pages()
@@ -2314,36 +2328,14 @@ def _search_pages(q: str, limit: int = 20) -> list:
     """Search pages by title, alias, tag, and full-text body.
     Uses token index to pre-filter candidates, snippet index for zero file I/O.
     """
-    _get_all_pages()
-    cache = {
-        "pages": _pages_cache or [],
-        "page_index": _page_index,
-        "fulltext": _fulltext_index,
-        "normalized_fulltext": _normalized_fulltext_index,
-        "snippet_index": _snippet_index,
-        "token_index": _token_index,
-        "meta_token_index": _meta_token_index,
-        "page_map": _page_map,
-    }
-    return _core_search_pages(q, cache, limit=limit)
+    return _core_search_pages(q, _current_wiki_cache(), limit=limit)
 
 
 def _query_link(query: str, budget: str = "medium", project: str | None = None) -> dict[str, object]:
-    _get_all_pages()
-    cache = {
-        "pages": _pages_cache or [],
-        "page_index": _page_index,
-        "fulltext": _fulltext_index,
-        "normalized_fulltext": _normalized_fulltext_index,
-        "snippet_index": _snippet_index,
-        "token_index": _token_index,
-        "meta_token_index": _meta_token_index,
-        "page_map": _page_map,
-    }
     return _core_query_link(
         WIKI_DIR,
         query,
-        cache,
+        _current_wiki_cache(),
         _memory_records(),
         budget=budget,
         project=project,
@@ -2359,18 +2351,7 @@ def _get_context(topic: str) -> dict:
     - Its forward links (pages it references)
     - Related pages (shared tags or backlink overlap)
     """
-    _get_all_pages()
-    cache = {
-        "pages": _pages_cache or [],
-        "page_index": _page_index,
-        "fulltext": _fulltext_index,
-        "normalized_fulltext": _normalized_fulltext_index,
-        "snippet_index": _snippet_index,
-        "token_index": _token_index,
-        "meta_token_index": _meta_token_index,
-        "page_map": _page_map,
-    }
-    return _core_context_for_topic(WIKI_DIR, topic, cache)
+    return _core_context_for_topic(WIKI_DIR, topic, _current_wiki_cache())
 
 
 # ---------------------------------------------------------------------------
@@ -2388,18 +2369,7 @@ def _get_graph_data() -> dict:
     """Return graph nodes and edges for visualization.
     Uses in-memory fulltext index — no separate rglob scan.
     """
-    _get_all_pages()
-    cache = {
-        "pages": _pages_cache or [],
-        "page_index": _page_index,
-        "fulltext": _fulltext_index,
-        "normalized_fulltext": _normalized_fulltext_index,
-        "snippet_index": _snippet_index,
-        "token_index": _token_index,
-        "meta_token_index": _meta_token_index,
-        "page_map": _page_map,
-    }
-    return _core_graph_data(cache)
+    return _core_graph_data(_current_wiki_cache())
 
 
 def _rebuild_backlinks_payload() -> dict[str, object]:
