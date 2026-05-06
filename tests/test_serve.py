@@ -1076,6 +1076,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn('<option value="concepts">concepts</option>', html)
         self.assertIn("function visibleNodes()", html)
         self.assertIn("function visibleEdges()", html)
+        self.assertIn("var LARGE_GRAPH_LIMIT = 350;", html)
+        self.assertIn("function graphTooLargeForMotion()", html)
         self.assertIn("searchInput.addEventListener('input'", html)
 
     def test_graph_empty_state_when_no_visible_pages(self):
@@ -1102,6 +1104,21 @@ class ServeTests(unittest.TestCase):
         self.assertIn("canvas.addEventListener('dblclick'", html)
         self.assertIn("if (hit) openNode(hit);", html)
         self.assertIn("panX += after.x - before.x;", html)
+
+    def test_graph_motion_is_capped_for_large_visible_sets(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n",
+        )
+
+        html = serve._render_graph()
+
+        self.assertIn("var simNodes = visibleNodes();", html)
+        self.assertIn("if (simNodes.length > LARGE_GRAPH_LIMIT) return;", html)
+        self.assertIn("if (graphTooLargeForMotion()) parts.push('motion capped');", html)
+        self.assertIn("motionButton.textContent = graphTooLargeForMotion() ? 'Motion capped'", html)
 
     def test_graph_script_embeds_titles_safely(self):
         wiki = self.make_wiki()

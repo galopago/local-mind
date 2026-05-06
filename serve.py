@@ -2294,6 +2294,7 @@ def _render_graph():
   // Compact neural-map sizing: concepts lead, sources recede.
   var NODE_R = 6;
   var LABEL_FONT = '11px -apple-system, sans-serif';
+  var LARGE_GRAPH_LIMIT = 350;
   var nodeById = {{}};
   nodes.forEach(function(n) {{ nodeById[n.id] = n; }});
 
@@ -2334,7 +2335,7 @@ def _render_graph():
   var zoom = 1;
   var frame = 0;
   var showAllLabels = false;
-  var motionPaused = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var motionPaused = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || nodes.length > LARGE_GRAPH_LIMIT;
   var SETTLE = 200; // frames of physics
   var searchTerm = '';
   var categoryValue = 'all';
@@ -2397,6 +2398,9 @@ def _render_graph():
     var ids = visibleIds();
     return edges.filter(function(e) {{ return ids[e.source] && ids[e.target]; }});
   }}
+  function graphTooLargeForMotion() {{
+    return visibleNodes().length > LARGE_GRAPH_LIMIT;
+  }}
   function nodeRadius(n) {{
     if (n.category === 'sources') return 4.5;
     if (n.category === 'memories') return 6.4;
@@ -2425,6 +2429,7 @@ def _render_graph():
     ];
     if (categoryValue !== 'all') parts.push(categoryValue);
     if (depthValue !== 'all') parts.push('depth ' + depthValue);
+    if (graphTooLargeForMotion()) parts.push('motion capped');
     if (searchTerm) {{
       var matches = currentNodes.filter(searchMatches).length;
       parts.push(matches + ' match' + (matches === 1 ? '' : 'es'));
@@ -2485,14 +2490,17 @@ def _render_graph():
   }}
 
   function simulate() {{
+    var simNodes = visibleNodes();
+    if (simNodes.length > LARGE_GRAPH_LIMIT) return;
+    var simIds = visibleIds();
     // Tuned for a brain-like neural map: broad lobes, readable spacing, gentle drift.
     var springLen = 135, springK = 0.032, repel = 13500, gravity = 0.005, damp = 0.84;
-    nodes.forEach(function(n) {{
+    simNodes.forEach(function(n) {{
       if (pinned[n.id]) return;
       var fx = 0, fy = 0;
       var p = pos[n.id];
       // Repulsion between all pairs
-      nodes.forEach(function(m) {{
+      simNodes.forEach(function(m) {{
         if (m.id === n.id) return;
         var q = pos[m.id];
         var dx = p.x - q.x, dy = p.y - q.y;
@@ -2503,6 +2511,7 @@ def _render_graph():
       }});
       // Spring attraction along edges (toward natural length)
       (adj[n.id] || []).forEach(function(mid) {{
+        if (!simIds[mid]) return;
         var q = pos[mid];
         var dx = q.x - p.x, dy = q.y - p.y;
         var d = Math.sqrt(dx*dx + dy*dy) + 0.01;
@@ -2677,10 +2686,10 @@ def _render_graph():
   }}
 
   function setMotionPaused(next) {{
-    motionPaused = next;
+    motionPaused = next || graphTooLargeForMotion();
     if (motionButton) {{
       motionButton.setAttribute('aria-pressed', motionPaused ? 'true' : 'false');
-      motionButton.textContent = motionPaused ? 'Motion paused' : 'Motion on';
+      motionButton.textContent = graphTooLargeForMotion() ? 'Motion capped' : (motionPaused ? 'Motion paused' : 'Motion on');
     }}
     updateStatus();
   }}
@@ -2835,6 +2844,7 @@ def _render_graph():
   if (categoryFilter) categoryFilter.addEventListener('change', function() {{
     categoryValue = categoryFilter.value || 'all';
     invalidateFilters();
+    setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
     draw();
@@ -2842,6 +2852,7 @@ def _render_graph():
   if (depthFilter) depthFilter.addEventListener('change', function() {{
     depthValue = depthFilter.value || 'all';
     invalidateFilters();
+    setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
     draw();

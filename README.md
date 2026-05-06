@@ -144,8 +144,8 @@ values are redacted in snippets and called out for local cleanup.
 ### Knowledge Graph
 
 Inspect relationships between source pages, concepts, entities, explorations, and
-memories. Use fullscreen, search, type filters, and neighborhood depth for large
-wikis. Dragging a node places it; double-clicking opens it.
+memories. Use fullscreen, search, type filters, neighborhood depth, and automatic
+motion capping for large wikis. Dragging a node places it; double-clicking opens it.
 
 <p align="center">
   <img src="docs/assets/link-graph-dark.png" alt="Link Knowledge Graph in dark mode" width="860">
