@@ -332,7 +332,8 @@ python3 ~/link/link.py capture-session session-notes.md ~/link --project link
 ```
 
 This stores the note under `raw/memory-captures/`, logs the capture locally, and
-returns memory proposals for human approval.
+returns memory proposals for human approval. Capture results warn on
+secret-looking pasted values so you can redact the local raw note.
 
 Maintain the wiki:
 
@@ -369,7 +370,7 @@ Most agents should start with:
 | `explain_memory` | You need provenance and review state for a memory. |
 | `remember_memory` | The user explicitly approves saving a durable memory. |
 | `propose_memories` | You want memory candidates from chat/session notes without writing. |
-| `capture_session` | You want to save long session notes locally before approving memory writes. |
+| `capture_session` | You want to save long session notes locally before approving memory writes; results include secret-looking content warnings. |
 
 Full tool set: `memory_brief`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,

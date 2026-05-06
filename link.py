@@ -56,17 +56,6 @@ SECRET_NAME_PATTERNS = (
     "id_ed25519",
     "service-account*.json",
 )
-SECRET_VALUE_PATTERNS = (
-    ("Anthropic API key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b")),
-    ("OpenAI API key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
-    ("GitHub token", re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")),
-    ("AWS access key", re.compile(r"\bA[SK]IA[0-9A-Z]{16}\b")),
-    ("PyPI token", re.compile(r"\bpypi-[A-Za-z0-9_-]{20,}\b")),
-    ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
-    ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{20,}\b")),
-    ("Stripe live secret key", re.compile(r"\bsk_live_[A-Za-z0-9]{20,}\b")),
-    ("Private key block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
-)
 SKIP_SCAN_DIRS = {
     ".git",
     "__pycache__",
@@ -122,6 +111,9 @@ from link_core.memory import (
 from link_core.frontmatter import (
     frontmatter_string as _frontmatter_string,
     parse_frontmatter as _parse_frontmatter,
+)
+from link_core.security import (
+    secret_value_warnings as _secret_value_warnings,
 )
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
@@ -1215,10 +1207,9 @@ def _find_sensitive_values(target: Path) -> list[str]:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        for label, pattern in SECRET_VALUE_PATTERNS:
-            if pattern.search(text):
-                matches.append(f"{path.relative_to(target)} ({label})")
-                break
+        warnings = _secret_value_warnings(text)
+        if warnings:
+            matches.append(f"{path.relative_to(target)} ({warnings[0]})")
     return sorted(matches)
 
 
@@ -1674,6 +1665,7 @@ def capture_session(
     timestamp = _utc_timestamp()
     project_name = project or _default_project(root)
     capture_title = _capture_title(text, source, title)
+    secret_warnings = _secret_value_warnings(text)
     capture_dir = root / "raw" / "memory-captures"
     capture_dir.mkdir(parents=True, exist_ok=True)
     capture_path = _capture_filename(timestamp, capture_title, capture_dir)
@@ -1713,6 +1705,7 @@ Captured locally for Link memory review. This raw note is proposal-only until th
         "source_input": source,
         "title": capture_title,
         "project": project_name,
+        "secret_warnings": secret_warnings,
         "proposals": result,
     }
     _append_log(
@@ -1723,6 +1716,7 @@ Captured locally for Link memory review. This raw note is proposal-only until th
         [
             f"Source input: {source}",
             f"Project: {project_name or 'none'}",
+            f"Secret warnings: {', '.join(secret_warnings) if secret_warnings else 'none'}",
             f"Proposals: {result['count']}",
         ],
     )
@@ -1735,6 +1729,8 @@ Captured locally for Link memory review. This raw note is proposal-only until th
     print(f"Path: {rel_path}")
     if project_name:
         print(f"Project: {project_name}")
+    if secret_warnings:
+        print("Secret-looking content: " + ", ".join(secret_warnings))
     print(f"Proposals: {result['count']}")
     if not result["proposals"]:
         print("No durable memory candidates found.")

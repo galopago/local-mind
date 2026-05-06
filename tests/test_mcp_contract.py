@@ -233,9 +233,10 @@ class McpContractTests(unittest.TestCase):
 
     def test_capture_session_contract(self):
         before_memories = list((self.target / "wiki/memories").glob("*.md"))
+        fake_key = "sk-" + ("A" * 24)
 
         payload = json.loads(self.server.capture_session(
-            "Remember that the user prefers release branches for Link work.",
+            f"Remember that the user prefers release branches for Link work. Test key {fake_key}",
             title="Release workflow session",
             project="link",
         ))
@@ -249,6 +250,7 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["project"], "link")
         self.assertTrue(payload["path"].startswith("raw/memory-captures/"))
         self.assertIn('project: "link"', capture_text)
+        self.assertEqual(payload["secret_warnings"], ["OpenAI API key"])
         self.assertGreaterEqual(payload["proposals"]["count"], 1)
         self.assertEqual(len(after_memories), len(before_memories))
         self.assertIn("capture-session", log_text)

@@ -89,7 +89,7 @@ Custom wiki path:
 | `recall_memory(query, limit?, include_archived?, project?)` | Search durable local memories for preferences, decisions, and project context. |
 | `remember_memory(memory, title?, memory_type?, scope?, tags?, source?, allow_duplicate?, allow_conflict?, project?)` | Save an explicit user-approved local memory under `wiki/memories/`; strong duplicates and likely conflicts require explicit override. |
 | `propose_memories(text, source?, limit?, project?)` | Propose durable memories from chat/session notes without writing them. |
-| `capture_session(text, title?, source?, limit?, project?)` | Save long chat/session notes under `raw/memory-captures/` and return proposal-only memory candidates. |
+| `capture_session(text, title?, source?, limit?, project?)` | Save long chat/session notes under `raw/memory-captures/` and return proposal-only memory candidates plus secret-looking content warnings. |
 | `update_memory(identifier, memory, source?, allow_conflict?, project?)` | Merge new information into an existing memory, blocking likely conflicts with other active memories by default. |
 | `archive_memory(identifier, reason?)` | Archive stale or wrong memory without deleting the Markdown page. |
 | `restore_memory(identifier)` | Restore archived memory to active status. |

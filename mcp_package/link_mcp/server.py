@@ -100,6 +100,9 @@ from link_core.frontmatter import (
     frontmatter_string as _frontmatter_string,
     parse_frontmatter as _parse_frontmatter,
 )
+from link_core.security import (
+    secret_value_warnings as _secret_value_warnings,
+)
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
@@ -298,6 +301,7 @@ def _capture_session(
     project_name = _resolve_project(project)
     timestamp = _utc_timestamp()
     capture_title = _capture_title(clean_text, clean_source, _clean_text_input(title, max_len=200))
+    secret_warnings = _secret_value_warnings(clean_text)
     root = WIKI_DIR.parent
     capture_dir = root / "raw" / "memory-captures"
     capture_dir.mkdir(parents=True, exist_ok=True)
@@ -338,6 +342,7 @@ Captured locally for Link memory review. This raw note is proposal-only until th
         [
             f"Source input: {clean_source}",
             f"Project: {project_name or 'none'}",
+            f"Secret warnings: {', '.join(secret_warnings) if secret_warnings else 'none'}",
             f"Proposals: {proposals['count']}",
         ],
     )
@@ -348,6 +353,7 @@ Captured locally for Link memory review. This raw note is proposal-only until th
         "source": clean_source,
         "title": capture_title,
         "project": project_name,
+        "secret_warnings": secret_warnings,
         "proposals": proposals,
     }
 

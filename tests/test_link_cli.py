@@ -464,10 +464,11 @@ class LinkCliTests(unittest.TestCase):
         before_memories = list((target / "wiki/memories").glob("*.md"))
 
         out = StringIO()
+        fake_key = "sk-" + ("A" * 24)
         with redirect_stdout(out):
             code = link_cli.capture_session(
                 target,
-                "Remember that the user prefers release branches for Link work.",
+                f"Remember that the user prefers release branches for Link work. Test key {fake_key}",
                 title="Release workflow session",
                 project="link",
                 json_output=True,
@@ -485,6 +486,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertTrue(payload["path"].startswith("raw/memory-captures/"))
         self.assertIn('project: "link"', capture_text)
         self.assertIn("proposal-only", capture_text)
+        self.assertEqual(payload["secret_warnings"], ["OpenAI API key"])
         self.assertGreaterEqual(payload["proposals"]["count"], 1)
         self.assertEqual(len(after_memories), len(before_memories))
         self.assertIn("capture-session", log_text)
