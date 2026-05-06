@@ -529,6 +529,37 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("session capture approval", memory_text)
         self.assertIn("accept-capture", log_text)
 
+    def test_redact_capture_replaces_secret_like_values(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        fake_key = "sk-" + ("B" * 24)
+
+        capture_out = StringIO()
+        with redirect_stdout(capture_out):
+            link_cli.capture_session(
+                target,
+                f"Remember that capture redaction stays local. Test key {fake_key}",
+                title="Capture redaction session",
+                json_output=True,
+            )
+        capture = json.loads(capture_out.getvalue())
+
+        redact_out = StringIO()
+        with redirect_stdout(redact_out):
+            code = link_cli.redact_capture(target, capture["path"], json_output=True)
+        redacted = json.loads(redact_out.getvalue())
+        capture_text = (target / capture["path"]).read_text(encoding="utf-8")
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertEqual(code, 0)
+        self.assertTrue(redacted["redacted"])
+        self.assertEqual(redacted["labels"], ["OpenAI API key"])
+        self.assertNotIn(fake_key, capture_text)
+        self.assertIn("[redacted-secret]", capture_text)
+        self.assertIn("redact-capture", log_text)
+        self.assertNotIn(fake_key, log_text)
+
     def test_memory_inbox_and_review_memory(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

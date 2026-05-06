@@ -6,6 +6,7 @@ When starting project-specific work, prime yourself with Link first: use MCP `me
 
 For long session notes, use `python3 link.py capture-session "<file-or-text>" .` to store a local raw capture and produce memory proposals without writing durable memories.
 When the human approves a proposal from a capture, use `python3 link.py accept-capture "<raw-capture-path>" . --index <n>`.
+If a capture reports secret warnings, ask before running `python3 link.py redact-capture "<raw-capture-path>" .`.
 
 When the user says **"remember"**, **"recall"**, **"ingest"**, **"query"**, **"lint"**, or **"research"**, read `LINK.md` for instructions and follow the protocol.
 

@@ -24,3 +24,16 @@ def secret_value_warnings(text: str) -> list[str]:
         if pattern.search(text):
             warnings.append(label)
     return warnings
+
+
+def redact_secret_values(text: str, replacement: str = "[redacted-secret]") -> tuple[str, list[str], int]:
+    """Replace secret-looking values and return redacted text, labels, and count."""
+    labels: list[str] = []
+    total = 0
+    redacted = text
+    for label, pattern in SECRET_VALUE_PATTERNS:
+        redacted, count = pattern.subn(replacement, redacted)
+        if count:
+            labels.append(label)
+            total += count
+    return redacted, labels, total

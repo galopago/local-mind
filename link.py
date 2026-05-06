@@ -113,6 +113,7 @@ from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
 )
 from link_core.security import (
+    redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
 from link_core.wiki import (
@@ -1889,6 +1890,59 @@ def accept_capture(
     return 0
 
 
+def redact_capture(
+    target: Path,
+    capture: str,
+    replacement: str = "[redacted-secret]",
+    json_output: bool = False,
+) -> int:
+    target = target.expanduser().resolve()
+    root = _resolve_link_root(target)
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    capture_path = _resolve_capture_file(root, capture)
+    if capture_path is None:
+        print(f"Capture not found under {root}: {capture}", file=sys.stderr)
+        return 1
+
+    original = capture_path.read_text(encoding="utf-8", errors="replace")
+    redacted, labels, replacement_count = _redact_secret_values(original, replacement=replacement)
+    rel_path = capture_path.relative_to(root).as_posix()
+    if replacement_count:
+        capture_path.write_text(redacted, encoding="utf-8")
+        _append_log(
+            wiki_dir,
+            _utc_timestamp(),
+            "redact-capture",
+            f"Redacted secret-looking values from {rel_path}",
+            [
+                f"Labels: {', '.join(labels)}",
+                f"Replacement count: {replacement_count}",
+            ],
+        )
+    payload = {
+        "redacted": bool(replacement_count),
+        "path": rel_path,
+        "labels": labels,
+        "replacement_count": replacement_count,
+    }
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    if replacement_count:
+        print("Capture redacted")
+        print(f"Path: {rel_path}")
+        print("Labels: " + ", ".join(labels))
+        print(f"Replacement count: {replacement_count}")
+    else:
+        print("No secret-looking values found.")
+        print(f"Path: {rel_path}")
+    return 0
+
+
 def update_memory(
     target: Path,
     identifier: str,
@@ -2550,6 +2604,12 @@ def main(argv: list[str] | None = None) -> int:
     accept_capture_cmd.add_argument("--allow-conflict", action="store_true", help="create a memory even if it may conflict with an active memory")
     accept_capture_cmd.add_argument("--json", action="store_true", help="print machine-readable acceptance details")
 
+    redact_capture_cmd = sub.add_parser("redact-capture", help="redact secret-looking values from a raw session capture")
+    redact_capture_cmd.add_argument("capture", help="raw capture path or filename")
+    redact_capture_cmd.add_argument("target", nargs="?", default=".")
+    redact_capture_cmd.add_argument("--replacement", default="[redacted-secret]", help="replacement text")
+    redact_capture_cmd.add_argument("--json", action="store_true", help="print machine-readable redaction details")
+
     update_memory_cmd = sub.add_parser("update-memory", help="merge new text into an existing memory")
     update_memory_cmd.add_argument("identifier", help="memory page name, title, or path")
     update_memory_cmd.add_argument("text", help="new memory text to merge")
@@ -2667,6 +2727,13 @@ def main(argv: list[str] | None = None) -> int:
             project=args.project,
             allow_duplicate=args.allow_duplicate,
             allow_conflict=args.allow_conflict,
+            json_output=args.json,
+        )
+    if args.command == "redact-capture":
+        return redact_capture(
+            Path(args.target),
+            args.capture,
+            replacement=args.replacement,
             json_output=args.json,
         )
     if args.command == "update-memory":
