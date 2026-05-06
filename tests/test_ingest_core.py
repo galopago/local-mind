@@ -45,6 +45,9 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["pending_raw"][0]["raw"], "raw/new-note.md")
         self.assertEqual(payload["guidance"]["state"], "pending_raw")
         self.assertEqual(payload["guidance"]["agent_prompt"], "ingest raw/new-note.md into Link")
+        self.assertEqual(payload["plan"]["title"], "Ingest pending raw sources")
+        self.assertEqual(payload["plan"]["batch"][0]["suggested_source_page"], "wiki/sources/new-note.md")
+        self.assertIn("link rebuild-index", payload["plan"]["post_checks"])
 
     def test_collect_ingest_status_reports_represented_raw(self):
         root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))
@@ -68,6 +71,7 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["pending_count"], 0)
         self.assertEqual(payload["represented_count"], 1)
         self.assertEqual(payload["guidance"]["state"], "ready")
+        self.assertEqual(payload["plan"]["title"], "Ready for new sources")
 
 
 if __name__ == "__main__":

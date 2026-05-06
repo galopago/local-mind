@@ -462,7 +462,7 @@ Most agents should start with:
 |------|-------------|
 | `link_status` | You are connecting to Link or troubleshooting setup and need version, readiness, counts, validation summary, and safe next actions. |
 | `migrate_wiki` | `link_status` reports a missing or old schema marker and you need a safe, idempotent local migration. |
-| `ingest_status` | The user dropped files into `raw/` or asks to ingest, and you need pending raw files plus the next prompt/checks. |
+| `ingest_status` | The user dropped files into `raw/` or asks to ingest, and you need pending raw files plus the next prompt/checks and guided ingest plan. |
 | `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, graph context, budget limits, and follow-up actions without reading the whole wiki. |
 | `validate_wiki` | You just ingested sources or substantially edited pages and need to verify page shape, links, and backlink freshness before reporting done. |
 | `backup_wiki` | You are about to run broad repair work or risky local wiki edits and want a local `.link-backups/` archive first. |
@@ -512,7 +512,7 @@ Common endpoints:
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions. |
-| `GET /api/ingest-status` | Raw ingest state with pending files, graph health, exact agent prompt, and follow-up commands. |
+| `GET /api/ingest-status` | Raw ingest state with pending files, graph health, exact agent prompt, guided plan, and follow-up commands. |
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |
 | `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context for an agent, including relevant memories, review warnings, and capture status. |
@@ -546,7 +546,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link serve [dir] [--port 3000]` | Start the local web viewer for a Link wiki. |
 | `link status [--validate]` | Show local readiness, page/memory counts, optional validation summary, and next actions. |
 | `link backup [--label name] [--include-raw]` | Create a timestamped local `.link-backups/` archive of `wiki/`; raw sources are excluded unless explicitly requested. |
-| `link ingest-status` | Show pending raw files, graph index status, the next agent prompt, and follow-up checks. |
+| `link ingest-status` | Show pending raw files, graph index status, the next agent prompt, guided plan, and follow-up checks. |
 | `link remember "text" [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
 | `link propose-memories <file-or-text> [--project slug]` | Propose durable memories from notes without writing them. |
 | `link capture-session <file-or-text> [--project slug]` | Save chat/session notes under `raw/memory-captures/` and return proposal-only memory candidates. |

@@ -1569,6 +1569,22 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
         for note in notes[:2]:
             print(f"  Note: {note}")
 
+    plan = status.get("plan") if isinstance(status.get("plan"), dict) else {}
+    steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
+    batch = plan.get("batch") if isinstance(plan.get("batch"), list) else []
+    if plan:
+        print("")
+        print(f"Suggested workflow: {plan.get('title')}")
+        summary = plan.get("summary")
+        if summary:
+            print(f"  {summary}")
+        for index, step in enumerate(steps[:6], start=1):
+            print(f"  {index}. {step}")
+        if batch:
+            print("  Batch:")
+            for item in batch[:5]:
+                print(f"  - {item['raw']} -> {item['suggested_source_page']}")
+
     return 0
 
 

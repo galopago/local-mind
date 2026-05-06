@@ -932,7 +932,10 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(api_status, 200)
         self.assertEqual(payload["pending_count"], 1)
         self.assertEqual(payload["guidance"]["state"], "pending_raw")
+        self.assertEqual(payload["plan"]["batch"][0]["suggested_source_page"], "wiki/sources/new-source.md")
         self.assertIn("ingest raw/new-source.md into Link", html)
+        self.assertIn("Ingest pending raw sources", html)
+        self.assertIn("wiki/sources/new-source.md", html)
         self.assertIn("Pending Raw Files", html)
 
     def test_rebuild_backlinks_requires_json_post(self):

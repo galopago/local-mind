@@ -167,6 +167,7 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["guidance"]["state"], "ready")
         self.assertEqual(payload["pending_count"], 0)
         self.assertEqual(payload["backlinks_status"], "current")
+        self.assertEqual(payload["plan"]["title"], "Ready for new sources")
 
     def test_validate_wiki_contract(self):
         payload = json.loads(self.server.validate_wiki())

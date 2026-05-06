@@ -55,7 +55,7 @@ mcp = FastMCP(
         "Link is local personal memory for agents. Use link_status when "
         "connecting to Link or troubleshooting setup/readiness. Start with "
         "migrate_wiki if link_status reports a missing or old schema marker. "
-        "Use ingest_status to check pending raw files and the next ingest prompt. "
+        "Use ingest_status to check pending raw files, the guided ingest plan, and the next ingest prompt. "
         "query_link when the user asks a substantive question that may need "
         "both memory and wiki context. Use memory_brief at "
         "session start or before personalized/project work; pass the user's "

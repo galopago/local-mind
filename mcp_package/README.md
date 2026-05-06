@@ -83,7 +83,7 @@ Custom wiki path:
 |------|-------------|
 | `link_status(include_validation?)` | Readiness summary with package version, wiki path, page/memory counts, optional validation summary, and safe next actions. |
 | `migrate_wiki()` | Apply safe, idempotent wiki schema migrations when `link_status` reports a missing or old schema marker. |
-| `ingest_status()` | Raw source ingest state with pending files, graph health, the next agent prompt, and follow-up checks. |
+| `ingest_status()` | Raw source ingest state with pending files, graph health, the next agent prompt, guided plan, and follow-up checks. |
 | `query_link(query, budget?, project?)` | Build a compact answer-ready packet from local memory, ranked wiki search, graph-neighborhood context, budget reports, and follow-up actions. |
 | `validate_wiki(strict?)` | Validate agent-generated wiki pages after ingest or large edits: frontmatter, type/directory alignment, required sections, dead links, and backlink freshness. |
 | `backup_wiki(label?, include_raw?, list_only?)` | Create or list local `.link-backups/` archives before broad repairs or risky wiki edits; raw sources are excluded by default. |

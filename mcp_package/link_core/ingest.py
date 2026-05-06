@@ -1,6 +1,7 @@
 """Shared Link ingest status helpers."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .wiki import build_backlinks, load_backlinks_index
@@ -71,6 +72,110 @@ def backlinks_health(wiki_dir: Path) -> tuple[str, str]:
     return "stale", "wiki/_backlinks.json is stale"
 
 
+def _source_page_suggestion(raw_rel: str) -> str:
+    stem = Path(raw_rel).stem.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", stem).strip("-") or "source"
+    return f"wiki/sources/{slug}.md"
+
+
+def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, object]:
+    """Build a short, actionable ingest workflow for agents and humans."""
+    guidance = status.get("guidance") if isinstance(status.get("guidance"), dict) else {}
+    state = str(guidance.get("state") or "unknown")
+    pending_raw = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
+    batch: list[dict[str, object]] = []
+    for item in pending_raw[: max(limit, 1)]:
+        raw_rel = str(item.get("raw") or "")
+        if not raw_rel:
+            continue
+        batch.append({
+            "raw": raw_rel,
+            "size_bytes": int(item.get("size_bytes") or 0),
+            "suggested_source_page": _source_page_suggestion(raw_rel),
+        })
+
+    if state == "pending_raw" and batch:
+        first = batch[0]
+        batch_count = len(batch)
+        file_label = "file" if batch_count == 1 else "files"
+        return {
+            "state": state,
+            "title": "Ingest pending raw sources",
+            "summary": f"Start with {first['raw']} and process at most {batch_count} {file_label} in this pass.",
+            "batch": batch,
+            "steps": [
+                "Read each raw file completely before writing wiki pages.",
+                "Create or update one source page per raw file and include the exact raw path.",
+                "Update existing concept/entity/memory pages before creating new thin pages.",
+                "Keep durable memories proposal-only until the human approves them.",
+                "Rebuild index and backlinks, then validate before reporting ingest complete.",
+            ],
+            "agent_prompt": guidance.get("agent_prompt"),
+            "post_checks": [
+                "link rebuild-index",
+                "link rebuild-backlinks",
+                "link validate",
+                "link status --validate",
+            ],
+        }
+
+    if state == "stale_graph":
+        return {
+            "state": state,
+            "title": "Repair graph index",
+            "summary": "Raw sources are represented, but the graph index is stale.",
+            "batch": [],
+            "steps": [
+                "Run the graph repair before relying on search, context, or graph views.",
+                "Validate the wiki after rebuilding backlinks.",
+            ],
+            "agent_prompt": guidance.get("agent_prompt"),
+            "post_checks": ["link rebuild-backlinks", "link validate", "link status --validate"],
+        }
+
+    if state == "empty":
+        return {
+            "state": state,
+            "title": "Add first sources",
+            "summary": "Drop notes, articles, transcripts, screenshots, or project files into raw/.",
+            "batch": [],
+            "steps": [
+                "Add one or more source files to raw/.",
+                "Ask your agent to ingest the specific raw file.",
+                "Review generated pages before relying on them as memory.",
+            ],
+            "agent_prompt": None,
+            "post_checks": ["link ingest-status", "link status --validate"],
+        }
+
+    if state == "ready":
+        return {
+            "state": state,
+            "title": "Ready for new sources",
+            "summary": "All current raw sources are represented and the graph index is current.",
+            "batch": [],
+            "steps": [
+                "Use query or brief for retrieval.",
+                "Add new files to raw/ when Link should learn new source-backed context.",
+            ],
+            "agent_prompt": None,
+            "post_checks": ["link doctor", "link status --validate"],
+        }
+
+    return {
+        "state": state,
+        "title": "Initialize Link",
+        "summary": "Link needs its raw/ and wiki/ structure before ingest can start.",
+        "batch": [],
+        "steps": [
+            "Run link init or rerun an installer.",
+            "Check readiness before adding sources.",
+        ],
+        "agent_prompt": None,
+        "post_checks": ["link init", "link status --validate"],
+    }
+
+
 def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
     has_raw_dir = bool(status.get("has_raw_dir"))
     has_wiki_dir = bool(status.get("has_wiki_dir"))
@@ -101,10 +206,10 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "pending_raw",
             "summary": summary,
             "agent_prompt": f"ingest {first} into Link",
-            "commands": ["link validate", "link doctor", "link status --validate"],
+            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link status --validate"],
             "notes": [
                 "If the source contains user preferences, decisions, or project context, ask for memory proposals before saving durable memories.",
-                "After ingest, rebuild backlinks if your agent did not already do it.",
+                "After ingest, rebuild index/backlinks if your agent did not already do it.",
             ],
         }
 
@@ -181,4 +286,5 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
         "has_wiki_dir": wiki_dir.exists(),
     }
     payload["guidance"] = build_ingest_guidance(payload)
+    payload["plan"] = build_ingest_plan(payload)
     return payload

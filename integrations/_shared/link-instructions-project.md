@@ -6,7 +6,7 @@ If you are unsure whether this project Link wiki is ready, use MCP `link_status`
 
 If status reports a missing or old schema marker, use MCP `migrate_wiki` when available, or run `python3 link.py migrate`, before other writes.
 
-When the user asks to ingest or drops files into `raw/`, use MCP `ingest_status` when available, or run `python3 link.py ingest-status`, before deciding what to process.
+When the user asks to ingest or drops files into `raw/`, use MCP `ingest_status` when available, or run `python3 link.py ingest-status`, then follow its guided plan before deciding what to process.
 
 When answering a substantive project question, start with MCP `query_link` when available, or run `python3 link.py query "<task or question>"`.
 

@@ -2023,6 +2023,7 @@ def _render_ingest():
     agent_prompt = str(guidance.get("agent_prompt") or "")
     commands = guidance.get("commands") if isinstance(guidance.get("commands"), list) else []
     notes = guidance.get("notes") if isinstance(guidance.get("notes"), list) else []
+    plan = status.get("plan") if isinstance(status.get("plan"), dict) else {}
     pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
     represented = status.get("represented_raw") if isinstance(status.get("represented_raw"), list) else []
 
@@ -2072,12 +2073,33 @@ def _render_ingest():
     if notes:
         notes_html = "<ul>" + "".join(f"<li>{html.escape(str(note))}</li>" for note in notes) + "</ul>"
 
+    plan_html = ""
+    if plan:
+        steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
+        batch = plan.get("batch") if isinstance(plan.get("batch"), list) else []
+        step_html = "".join(f"<li>{html.escape(str(step))}</li>" for step in steps[:6])
+        batch_html = ""
+        if batch:
+            rows = ""
+            for item in batch[:5]:
+                rows += (
+                    f'<li><code>{html.escape(str(item.get("raw") or ""))}</code>'
+                    f'<span class="type">{html.escape(str(item.get("suggested_source_page") or ""))}</span></li>'
+                )
+            batch_html = f'<h3>Batch</h3><ul class="page-list">{rows}</ul>'
+        plan_html = (
+            f'<section><h2>{html.escape(str(plan.get("title") or "Suggested Workflow"))}</h2>'
+            f'<p class="summary">{html.escape(str(plan.get("summary") or ""))}</p>'
+            f'<ol>{step_html}</ol>{batch_html}</section>'
+        )
+
     body = (
         f'<div class="breadcrumb"><a href="/">Link</a> / ingest</div>'
         f'<h1>Ingest</h1>'
         f'<p class="summary">{html.escape(str(guidance.get("summary") or "Check raw source ingest state."))}</p>'
         f'{stats}'
         f'{actions}'
+        f'{plan_html}'
         f'{pending_html}'
         f'{notes_html}'
     )

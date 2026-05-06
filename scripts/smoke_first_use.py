@@ -125,6 +125,7 @@ def run_smoke(work_dir: Path, python: str = sys.executable) -> None:
     ingest = run_json("ingest-status", str(demo_target), "--json", python=python)
     require(ingest.get("pending_count") == 1, "ingest-status did not report the pending raw source")
     require(ingest.get("guidance", {}).get("agent_prompt"), "ingest-status did not include the next agent prompt")
+    require(ingest.get("plan", {}).get("batch"), "ingest-status did not include a guided ingest batch")
 
     run_link("rebuild-index", str(demo_target), python=python)
     require("[[first-use-smoke-memory]]" in (demo_target / "wiki/index.md").read_text(encoding="utf-8"), "rebuild-index did not catalog the remembered memory")
