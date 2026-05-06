@@ -457,6 +457,38 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["relevant_memories"][0]["name"], "prefer-local-personal-memory")
         self.assertNotIn("body", payload["relevant_memories"][0])
 
+    def test_capture_session_writes_raw_note_and_proposes_only(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        before_memories = list((target / "wiki/memories").glob("*.md"))
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.capture_session(
+                target,
+                "Remember that the user prefers release branches for Link work.",
+                title="Release workflow session",
+                project="link",
+                json_output=True,
+            )
+
+        payload = json.loads(out.getvalue())
+        capture_path = target / payload["path"]
+        after_memories = list((target / "wiki/memories").glob("*.md"))
+        capture_text = capture_path.read_text(encoding="utf-8")
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertEqual(code, 0)
+        self.assertTrue(payload["captured"])
+        self.assertEqual(payload["project"], "link")
+        self.assertTrue(payload["path"].startswith("raw/memory-captures/"))
+        self.assertIn('project: "link"', capture_text)
+        self.assertIn("proposal-only", capture_text)
+        self.assertGreaterEqual(payload["proposals"]["count"], 1)
+        self.assertEqual(len(after_memories), len(before_memories))
+        self.assertIn("capture-session", log_text)
+
     def test_memory_inbox_and_review_memory(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

@@ -120,6 +120,7 @@ from link_core.memory import (
     write_memory_page as _core_write_memory_page,
 )
 from link_core.frontmatter import (
+    frontmatter_string as _frontmatter_string,
     parse_frontmatter as _parse_frontmatter,
 )
 from link_core.wiki import (
@@ -712,10 +713,15 @@ def _resolve_wiki_dir(target: Path) -> Path:
     return target / "wiki"
 
 
+def _resolve_link_root(target: Path) -> Path:
+    target = target.expanduser().resolve()
+    if target.name == "wiki" and (target / "index.md").exists():
+        return target.parent
+    return target
+
+
 def _default_project(target: Path) -> str:
-    root = target.expanduser().resolve()
-    if root.name == "wiki":
-        root = root.parent
+    root = _resolve_link_root(target)
     if (root / ".git").exists():
         return _core_slugify(root.name, fallback="")
     return ""
@@ -1620,6 +1626,133 @@ def propose_memories(
     return 0
 
 
+def _capture_title(text: str, source: str, title: str | None = None) -> str:
+    if title and title.strip():
+        return " ".join(title.split())
+    if source != "inline":
+        stem = Path(source).stem.replace("-", " ").replace("_", " ").strip()
+        if stem:
+            return f"Memory capture: {stem.title()}"
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "Session notes")
+    words = first_line.split()
+    short = " ".join(words[:10]).strip(" .")
+    return f"Memory capture: {short or 'Session notes'}"
+
+
+def _capture_filename(timestamp: str, title: str, raw_dir: Path) -> Path:
+    safe_stamp = timestamp.replace("-", "").replace(":", "")
+    slug = _core_slugify(title.replace("Memory capture:", ""), fallback="session-notes")
+    base = f"{safe_stamp}-{slug}"
+    candidate = raw_dir / f"{base}.md"
+    counter = 2
+    while candidate.exists():
+        candidate = raw_dir / f"{base}-{counter}.md"
+        counter += 1
+    return candidate
+
+
+def capture_session(
+    target: Path,
+    source_input: str,
+    title: str | None = None,
+    limit: int = 10,
+    project: str | None = None,
+    json_output: bool = False,
+) -> int:
+    target = target.expanduser().resolve()
+    root = _resolve_link_root(target)
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+
+    text, source = _read_proposal_input(root, source_input)
+    if not text.strip():
+        print("Session capture input is required", file=sys.stderr)
+        return 1
+
+    timestamp = _utc_timestamp()
+    project_name = project or _default_project(root)
+    capture_title = _capture_title(text, source, title)
+    capture_dir = root / "raw" / "memory-captures"
+    capture_dir.mkdir(parents=True, exist_ok=True)
+    capture_path = _capture_filename(timestamp, capture_title, capture_dir)
+    project_line = f'project: "{_frontmatter_string(project_name)}"\n' if project_name else ""
+    capture_path.write_text(
+        f"""---
+title: "{_frontmatter_string(capture_title)}"
+source_type: conversation
+date_captured: "{timestamp}"
+{project_line}---
+
+# {capture_title}
+
+Captured locally for Link memory review. This raw note is proposal-only until the user approves durable memories.
+
+## Source Input
+
+{source}
+
+## Notes
+
+{text.strip()}
+""",
+        encoding="utf-8",
+    )
+    rel_path = capture_path.relative_to(root).as_posix()
+    result = _propose_memories_from_text(
+        wiki_dir,
+        text,
+        source=rel_path,
+        limit=max(1, min(limit, 20)),
+        project=project_name,
+    )
+    payload = {
+        "captured": True,
+        "path": rel_path,
+        "source_input": source,
+        "title": capture_title,
+        "project": project_name,
+        "proposals": result,
+    }
+    _append_log(
+        wiki_dir,
+        timestamp,
+        "capture-session",
+        f"Captured proposal-only session notes at {rel_path}",
+        [
+            f"Source input: {source}",
+            f"Project: {project_name or 'none'}",
+            f"Proposals: {result['count']}",
+        ],
+    )
+
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print("Session captured")
+    print(f"Path: {rel_path}")
+    if project_name:
+        print(f"Project: {project_name}")
+    print(f"Proposals: {result['count']}")
+    if not result["proposals"]:
+        print("No durable memory candidates found.")
+        return 0
+    for index, proposal in enumerate(result["proposals"], start=1):
+        print("")
+        print(f"{index}. {proposal['title']} [{proposal['confidence']}]")
+        print(f"   Type: {proposal['memory_type']} | Scope: {proposal['scope']}")
+        if proposal.get("project"):
+            print(f"   Project: {proposal['project']}")
+        print(f"   Action: {proposal['suggested_action']}")
+        print(f"   Memory: {proposal['memory']}")
+    print("")
+    print("Next:")
+    print("  Ask the user which proposals to remember, update, or discard.")
+    return 0
+
+
 def update_memory(
     target: Path,
     identifier: str,
@@ -2260,6 +2393,14 @@ def main(argv: list[str] | None = None) -> int:
     propose_cmd.add_argument("--project", default=None, help="project key for duplicate/conflict checks")
     propose_cmd.add_argument("--json", action="store_true", help="print machine-readable proposals")
 
+    capture_cmd = sub.add_parser("capture-session", help="save session notes to raw/ and propose memories")
+    capture_cmd.add_argument("source_input", help="text or path to a chat/session note")
+    capture_cmd.add_argument("target", nargs="?", default=".")
+    capture_cmd.add_argument("--title", default=None, help="title for the raw capture note")
+    capture_cmd.add_argument("--limit", type=int, default=10)
+    capture_cmd.add_argument("--project", default=None, help="project key for proposal checks")
+    capture_cmd.add_argument("--json", action="store_true", help="print machine-readable capture details")
+
     update_memory_cmd = sub.add_parser("update-memory", help="merge new text into an existing memory")
     update_memory_cmd.add_argument("identifier", help="memory page name, title, or path")
     update_memory_cmd.add_argument("text", help="new memory text to merge")
@@ -2352,6 +2493,15 @@ def main(argv: list[str] | None = None) -> int:
         return propose_memories(
             Path(args.target),
             args.source_input,
+            limit=args.limit,
+            project=args.project,
+            json_output=args.json,
+        )
+    if args.command == "capture-session":
+        return capture_session(
+            Path(args.target),
+            args.source_input,
+            title=args.title,
             limit=args.limit,
             project=args.project,
             json_output=args.json,

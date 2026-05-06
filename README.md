@@ -325,6 +325,15 @@ For project installs, Link infers the project key from the repo directory. For a
 global `~/link` wiki, pass `--project <slug>` when saving or recalling repo
 specific memories.
 
+Capture longer session notes without silently writing memories:
+
+```bash
+python3 ~/link/link.py capture-session session-notes.md ~/link --project link
+```
+
+This stores the note under `raw/memory-captures/`, logs the capture locally, and
+returns memory proposals for human approval.
+
 Maintain the wiki:
 
 ```bash
@@ -406,6 +415,7 @@ Common endpoints:
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
 | `python3 link.py remember "text" <dir> [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
 | `python3 link.py propose-memories <file-or-text> <dir> [--project slug]` | Propose durable memories from notes without writing them. |
+| `python3 link.py capture-session <file-or-text> <dir> [--project slug]` | Save chat/session notes under `raw/memory-captures/` and return proposal-only memory candidates. |
 | `python3 link.py brief "task" <dir> [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, and safe memory rules. |
 | `python3 link.py recall "query" <dir> [--project slug]` | Search local agent memories. |
 | `python3 link.py profile <dir> [--project slug]` | Show what Link remembers by type, scope, status, and recency. |
