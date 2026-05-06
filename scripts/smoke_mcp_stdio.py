@@ -70,6 +70,19 @@ async def _run_smoke(wiki_dir: Path, python: str) -> None:
             if search.get("count", 0) < 1 or search["results"][0]["name"] != "agent-memory":
                 raise RuntimeError("search_wiki did not return the expected demo result")
 
+            packet = _json_text(
+                await session.call_tool(
+                    "query_link",
+                    {"query": "agent memory", "budget": "small"},
+                    read_timeout_seconds=timedelta(seconds=10),
+                ),
+                "query_link",
+            )
+            if not packet.get("found") or packet.get("wiki", {}).get("primary") != "agent-memory":
+                raise RuntimeError("query_link did not return the expected demo packet")
+            if not packet.get("context_packet"):
+                raise RuntimeError("query_link returned an empty context packet")
+
             context = _json_text(
                 await session.call_tool(
                     "get_context",
