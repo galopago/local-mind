@@ -363,6 +363,7 @@ Then use that Python in your MCP config:
 ```bash
 python3 -m unittest discover -s tests
 python3 scripts/check_release_hygiene.py
+python3 scripts/check_runtime_duplication.py
 git diff --check
 ```
 

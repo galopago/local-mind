@@ -22,7 +22,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Compile Python
-        run: python -m py_compile serve.py link.py scripts/check_release_hygiene.py scripts/prepare_release.py scripts/smoke_mcp_stdio.py mcp_package/link_core/*.py mcp_package/link_mcp/server.py mcp_package/link_mcp/__main__.py mcp_package/link_mcp/__init__.py
+        run: python -m py_compile serve.py link.py scripts/check_release_hygiene.py scripts/check_runtime_duplication.py scripts/prepare_release.py scripts/smoke_mcp_stdio.py mcp_package/link_core/*.py mcp_package/link_mcp/server.py mcp_package/link_mcp/__main__.py mcp_package/link_mcp/__init__.py
 
       - name: Run tests
         run: python -m unittest discover -s tests
@@ -55,6 +55,9 @@ jobs:
 
       - name: Check tracked files for secret-looking data
         run: python scripts/check_release_hygiene.py
+
+      - name: Check runtime duplication
+        run: python scripts/check_runtime_duplication.py
 
   package:
     runs-on: ubuntu-latest
