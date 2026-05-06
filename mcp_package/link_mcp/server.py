@@ -25,7 +25,6 @@ Add to your MCP client config:
 """
 from __future__ import annotations
 import argparse, json, re, sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 # ── Resolve wiki directory ────────────────────────────────────────────
@@ -106,6 +105,10 @@ from link_core.frontmatter import (
     frontmatter_string as _frontmatter_string,
     parse_frontmatter as _parse_frontmatter,
 )
+from link_core.log import (
+    append_log as _core_append_log,
+    utc_timestamp as _core_utc_timestamp,
+)
 from link_core.security import (
     redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
@@ -175,7 +178,7 @@ def _get_context(topic: str) -> dict:
 
 
 def _utc_timestamp() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return _core_utc_timestamp()
 
 
 def _memory_records() -> list[dict[str, object]]:
@@ -679,14 +682,7 @@ def _delete_capture(capture: str, confirm: bool = False) -> dict[str, object]:
 
 
 def _append_log(timestamp: str, operation: str, description: str, lines: list[str]) -> None:
-    log_path = WIKI_DIR / "log.md"
-    if not log_path.exists():
-        log_path.write_text("# Link Wiki Log\n\n*Append-only record of wiki operations.*\n", encoding="utf-8")
-    entry = [f"## [{timestamp}] {operation} | {description}", ""]
-    entry.extend(f"- {line}" for line in lines)
-    entry.extend(["", "---", ""])
-    with log_path.open("a", encoding="utf-8") as handle:
-        handle.write("\n".join(entry))
+    _core_append_log(WIKI_DIR, timestamp, operation, description, lines)
 
 
 def _resolve_memory_page(identifier: str) -> tuple[Path | None, dict[str, object] | None, str | None]:
