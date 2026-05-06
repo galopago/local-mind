@@ -22,6 +22,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added proposal-only memory extraction with `propose-memories` and MCP `propose_memories` for chat/session notes.
 - Added agent memory briefs with `link.py brief` and MCP `memory_brief` so agents can prime themselves with relevant local memory before a task.
 - Added raw capture status to CLI and MCP memory briefs so session priming surfaces saved captures and secret-warning captures.
+- Added `/brief` and `/api/memory-brief` so the local web UI and HTTP clients can get startup memory context, review warnings, and raw capture status.
 - Added `memory-audit` and MCP `memory_audit` for a read-only health report covering memory backlog, raw captures, risk factors, and next actions.
 - Added `/audit` and `/api/memory-audit` so the local web UI exposes the same read-only memory audit report.
 - Added memory review and raw capture backlog checks to `link.py doctor`, while excluding proposal-only raw captures from ingest-status pending source counts.
@@ -41,10 +42,13 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `link.py capture-inbox` to list saved raw captures, secret warnings, and accept/redact/delete commands.
 - Added MCP `capture_inbox` to review saved raw captures with redacted snippets before accepting, redacting, or deleting them.
 - Added raw capture visibility to `/memory` and `/api/memory-dashboard`, including accept/redact/delete commands and secret-warning counts.
+- Added `/captures` and `/api/capture-inbox` for a dedicated local web/API raw capture inbox.
 - Added project filtering to `/memory`, `/profile`, `/api/memory-dashboard`, `/api/memory-profile`, and `/api/memory-inbox`.
 - Added project filtering to CLI and MCP memory inbox workflows.
 - Added read-only web Memory Dashboard at `/memory` and `/api/memory-dashboard` for active memories, review queue, recent updates, archived memories, and next-action commands.
-- Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; memory write operations remain CLI/MCP-only.
+- Added recall readiness metadata to recalled memories so CLI, MCP, and brief payloads expose whether memory is ready, provisional, unsafe, or disabled.
+- Added local web review/archive/restore memory actions backed by guarded HTTP POST endpoints; permanent forget remains command/tool-only.
+- Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; HTTP memory mutations are limited to local review/archive/restore actions.
 - Added a graph node inspector so moving nodes no longer accidentally opens pages; double-click or Open page still navigates.
 - Added an explicit `system`/`dark`/`light` theme toggle for the local web UI; dark mode now uses a black page background.
 - Added a real MCP stdio smoke test for the built `link-mcp` wheel in CI.
@@ -66,6 +70,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Fixed search/context matching for natural queries against hyphenated page slugs, e.g. `local first software` now finds `local-first-software`.
 - Hardened backlink rebuild over HTTP so local web rebuilds require JSON POST instead of a mutating GET.
 - Hardened `/raw/` static serving so the local web viewer only serves supported media/PDF source assets.
+- Hardened HTTP memory mutation endpoints with an explicit `X-Link-Local-Action: true` header required by non-UI clients.
 - Refreshed the checked-in demo backlink index so `link.py doctor .` reports a healthy graph.
 
 ## [1.0.7] - 2026-05-04
