@@ -58,6 +58,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added a real MCP stdio smoke test for the built `link-mcp` wheel in CI.
 - Added Memory Dashboard next actions so the web UI and API surface the most important memory maintenance step.
 - Extracted shared memory proposal logic into `link_core` so CLI, HTTP, and MCP proposal behavior stays aligned.
+- Extracted shared raw capture path resolution and notes parsing into `link_core` so CLI and MCP capture operations use the same root-escape guard.
 - Extracted shared frontmatter parsing and typed update helpers into `link_core` for safer memory metadata writes.
 - Extracted shared memory record loading, review inbox, profile, and recall helpers into `link_core`.
 - Extracted shared memory resolution, log lookup, and recall-state helpers into `link_core`.

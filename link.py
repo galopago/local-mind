@@ -114,6 +114,10 @@ from link_core.memory import (
     update_memory_page as _core_update_memory_page,
     write_memory_page as _core_write_memory_page,
 )
+from link_core.capture import (
+    capture_notes_from_markdown as _core_capture_notes_from_markdown,
+    resolve_capture_file as _core_resolve_capture_file,
+)
 from link_core.frontmatter import (
     frontmatter_string as _frontmatter_string,
     parse_frontmatter as _parse_frontmatter,
@@ -1825,36 +1829,11 @@ Captured locally for Link memory review. This raw note is proposal-only until th
 
 
 def _resolve_capture_file(root: Path, capture: str) -> Path | None:
-    raw = capture.strip()
-    if not raw:
-        return None
-    candidates = [Path(raw).expanduser()]
-    if not Path(raw).is_absolute():
-        candidates.extend([
-            root / raw,
-            root / "raw" / "memory-captures" / raw,
-            root / "raw" / "memory-captures" / f"{raw}.md",
-        ])
-    for candidate in candidates:
-        try:
-            resolved = candidate.resolve()
-        except OSError:
-            continue
-        if not resolved.is_file():
-            continue
-        try:
-            resolved.relative_to(root)
-        except ValueError:
-            continue
-        return resolved
-    return None
+    return _core_resolve_capture_file(root, capture)
 
 
 def _capture_notes_from_markdown(text: str) -> tuple[dict[str, object], str]:
-    meta, body = _parse_frontmatter(text)
-    match = re.search(r"^## Notes\s*(.*?)(?=^## |\Z)", body, flags=re.MULTILINE | re.DOTALL)
-    notes = match.group(1).strip() if match else body.strip()
-    return meta, notes
+    return _core_capture_notes_from_markdown(text)
 
 
 def _capture_records(target: Path, limit: int = 20, project: str | None = None) -> list[dict[str, object]]:
