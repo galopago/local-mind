@@ -55,17 +55,19 @@ Open:
 
 - `http://localhost:3000`
 - `http://localhost:3000/memory`
+- `http://localhost:3000/audit`
 - `http://localhost:3000/graph`
 
 Then check the demo:
 
 ```bash
+python3 link.py memory-audit .
 python3 link.py doctor .
 python3 link.py ingest-status .
 ```
 
 The demo includes source pages, concept pages, a memory page, backlinks, search,
-a graph view, and MCP-ready retrieval.
+a graph view, memory audit, and MCP-ready retrieval.
 
 ## What You Get
 
@@ -85,6 +87,11 @@ See what agents can remember, what needs review, and what changed recently.
 <p align="center">
   <img src="docs/assets/link-memory-dashboard-dark.png" alt="Link Memory Dashboard in dark mode" width="860">
 </p>
+
+### Memory Audit
+
+Check memory health in one place: review backlog, saved raw captures,
+secret-warning captures, and the next safe commands to run.
 
 ### Knowledge Graph
 
@@ -168,6 +175,7 @@ python3 ~/link/link.py remember "I am testing Link as local personal memory for 
 python3 ~/link/link.py brief "local personal memory" ~/link
 python3 ~/link/link.py recall "local personal memory" ~/link
 python3 ~/link/link.py profile ~/link
+python3 ~/link/link.py memory-audit ~/link
 ```
 
 ### 4. Ask Your Agent To Ingest
@@ -187,6 +195,7 @@ creates or updates concept/entity pages, updates `wiki/index.md`, appends
 ```bash
 python3 ~/link/link.py doctor ~/link --fix
 python3 ~/link/link.py ingest-status ~/link
+python3 ~/link/link.py memory-audit ~/link
 python3 ~/link/link.py verify-mcp ~/link
 ```
 
@@ -358,6 +367,7 @@ Maintain the wiki:
 
 ```bash
 python3 ~/link/link.py doctor ~/link --fix
+python3 ~/link/link.py memory-audit ~/link
 python3 ~/link/link.py rebuild-backlinks ~/link
 python3 ~/link/link.py verify-mcp ~/link
 ```
