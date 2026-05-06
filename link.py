@@ -7,6 +7,7 @@ Usage:
   python link.py demo [target]
   python link.py status [target]
   python link.py doctor [target]
+  python link.py migrate [target]
   python link.py validate [target]
   python link.py ingest-status [target]
   python link.py remember "memory text" [target]
@@ -133,6 +134,10 @@ from link_core.log import (
     append_log as _core_append_log,
     utc_timestamp as _core_utc_timestamp,
     write_default_log as _core_write_default_log,
+)
+from link_core.schema import (
+    migrate_wiki as _core_migrate_wiki,
+    schema_status as _core_schema_status,
 )
 from link_core.security import (
     redact_secret_values as _redact_secret_values,
@@ -1390,6 +1395,12 @@ def _apply_doctor_fixes(target: Path) -> list[str]:
             backlinks_path.write_text(json.dumps(expected, indent=2) + "\n", encoding="utf-8")
             fixes.append("rebuilt wiki/_backlinks.json")
 
+        migration = _core_migrate_wiki(wiki_dir)
+        if not migration["ok"]:
+            fixes.append(f"schema migration skipped: {migration['error']}")
+        else:
+            fixes.extend(f"schema: {item}" for item in migration["changes"])
+
     return fixes
 
 
@@ -1445,6 +1456,16 @@ def doctor(target: Path, fix: bool = False) -> int:
                 errors.append("wiki/_backlinks.json is stale; run: python3 link.py rebuild-backlinks .")
             else:
                 print("OK backlinks are current")
+
+        schema = _core_schema_status(wiki_dir)
+        if schema["status"] == "current":
+            print(f"OK wiki schema v{schema['version']}")
+        elif schema["status"] in {"missing", "old"}:
+            warnings.append("wiki schema marker needs migration; run: link migrate")
+        elif schema["status"] == "newer":
+            errors.append(str(schema["error"]))
+        else:
+            errors.append(str(schema["error"] or "invalid wiki schema marker"))
 
         missing_summaries = _find_pages_missing_summaries(wiki_dir)
         if missing_summaries:
@@ -1548,6 +1569,38 @@ def validate(target: Path, strict: bool = False, json_output: bool = False) -> i
     return 0 if payload["passed"] else 1
 
 
+def migrate(target: Path, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    payload = _core_migrate_wiki(wiki_dir)
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0 if payload["ok"] else 1
+
+    print(f"Link migrate: {wiki_dir}")
+    print("")
+    previous = payload["previous"]
+    schema = payload["schema"]
+    print(f"Previous schema: {previous['status']}")
+    print(f"Current schema: {schema['status']} v{schema.get('version')}")
+    changes = payload["changes"]
+    if changes:
+        print("")
+        print("Changes:")
+        for item in changes:
+            print(f"- {item}")
+    else:
+        print("")
+        print("Changes: none")
+    if payload["ok"]:
+        print("")
+        print("Result: current")
+        return 0
+    print("")
+    print(f"Result: failed ({payload['error']})")
+    return 1
+
+
 def status(target: Path, include_validation: bool = False, json_output: bool = False) -> int:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
@@ -1565,6 +1618,14 @@ def status(target: Path, include_validation: bool = False, json_output: bool = F
         f"{payload['active_memory_count']} active · "
         f"{payload['needs_review_count']} need review"
     )
+    schema = payload.get("schema") or {}
+    if isinstance(schema, dict):
+        schema_status = schema.get("status", "unknown")
+        schema_version = schema.get("version")
+        if schema_status == "current":
+            print(f"Schema: current v{schema_version}")
+        else:
+            print(f"Schema: {schema_status}")
     if payload["missing"]:
         print("Missing: " + ", ".join(str(item) for item in payload["missing"]))
     validation = payload["validation"]
@@ -3084,6 +3145,7 @@ def create_demo(target: Path, force: bool = False) -> None:
     (target / "wiki/_backlinks.json").write_text(
         json.dumps(backlinks, indent=2), encoding="utf-8"
     )
+    _core_migrate_wiki(target / "wiki")
 
     print(f"Link demo created at {target}")
     print("")
@@ -3118,6 +3180,10 @@ def main(argv: list[str] | None = None) -> int:
     doctor_cmd = sub.add_parser("doctor", help="check a Link wiki for common health issues")
     doctor_cmd.add_argument("target", nargs="?", default=".")
     doctor_cmd.add_argument("--fix", action="store_true", help="repair safe structural and backlink issues")
+
+    migrate_cmd = sub.add_parser("migrate", help="apply safe Link wiki schema migrations")
+    migrate_cmd.add_argument("target", nargs="?", default=".")
+    migrate_cmd.add_argument("--json", action="store_true", help="print machine-readable migration status")
 
     validate_cmd = sub.add_parser("validate", help="validate wiki pages before accepting ingest output")
     validate_cmd.add_argument("target", nargs="?", default=".")
@@ -3285,6 +3351,8 @@ def main(argv: list[str] | None = None) -> int:
         return status(Path(args.target), include_validation=args.validate, json_output=args.json)
     if args.command == "doctor":
         return doctor(Path(args.target), fix=args.fix)
+    if args.command == "migrate":
+        return migrate(Path(args.target), json_output=args.json)
     if args.command == "validate":
         return validate(Path(args.target), strict=args.strict, json_output=args.json)
     if args.command == "ingest-status":

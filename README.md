@@ -457,6 +457,7 @@ Most agents should start with:
 | Tool | Use it when |
 |------|-------------|
 | `link_status` | You are connecting to Link or troubleshooting setup and need version, readiness, counts, validation summary, and safe next actions. |
+| `migrate_wiki` | `link_status` reports a missing or old schema marker and you need a safe, idempotent local migration. |
 | `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, graph context, budget limits, and follow-up actions without reading the whole wiki. |
 | `validate_wiki` | You just ingested sources or substantially edited pages and need to verify page shape, links, and backlink freshness before reporting done. |
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory, review warnings, and saved capture status. |
@@ -476,7 +477,7 @@ Most agents should start with:
 | `delete_capture` | The user explicitly confirms deleting a saved raw capture. |
 | `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
 
-Full tool set: `link_status`, `query_link`, `validate_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
+Full tool set: `link_status`, `migrate_wiki`, `query_link`, `validate_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
@@ -555,6 +556,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link forget-memory <name> --confirm` | Permanently delete a memory after explicit confirmation; archive first if you may need it later. |
 | `link doctor` | Check structure, graph health, source hygiene, memory review state, raw capture backlog, and secret-looking content. |
 | `link doctor --fix` | Create missing structure and repair backlinks safely. |
+| `link migrate` | Apply safe wiki schema migrations and write the local schema marker. |
 | `link validate [--strict]` | Validate agent-generated wiki pages after ingest: frontmatter, type/directory alignment, required sections, dead links, and backlink freshness. |
 | `link rebuild-backlinks` | Regenerate `wiki/_backlinks.json`. |
 | `link verify-mcp` | Verify `link-mcp` import and print MCP config. |

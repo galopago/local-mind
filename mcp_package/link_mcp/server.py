@@ -54,6 +54,7 @@ mcp = FastMCP(
     instructions=(
         "Link is local personal memory for agents. Use link_status when "
         "connecting to Link or troubleshooting setup/readiness. Start with "
+        "migrate_wiki if link_status reports a missing or old schema marker. "
         "query_link when the user asks a substantive question that may need "
         "both memory and wiki context. Use memory_brief at "
         "session start or before personalized/project work; pass the user's "
@@ -131,6 +132,9 @@ from link_core.validation import (
 )
 from link_core.status import (
     link_status as _core_link_status,
+)
+from link_core.schema import (
+    migrate_wiki as _core_migrate_wiki,
 )
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
@@ -307,6 +311,14 @@ def _link_status(include_validation: bool = False) -> dict[str, object]:
         records=_memory_records(),
         include_validation=include_validation,
     )
+
+
+def _migrate_wiki() -> dict[str, object]:
+    global _cache, _cache_mtime
+    payload = _core_migrate_wiki(WIKI_DIR)
+    _cache = {}
+    _cache_mtime = 0.0
+    return payload
 
 
 def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
@@ -843,6 +855,17 @@ def validate_wiki(strict: bool = False) -> str:
     strict=true also fails on warnings such as missing TLDR/Query summaries.
     """
     return json.dumps(_validate_wiki(strict=strict), ensure_ascii=False)
+
+
+@mcp.tool()
+def migrate_wiki() -> str:
+    """Apply safe Link wiki schema migrations.
+
+    Use this when link_status reports a missing or old schema marker. The
+    operation is idempotent and only creates missing canonical wiki directories
+    plus the local schema marker; it does not rewrite user pages.
+    """
+    return json.dumps(_migrate_wiki(), ensure_ascii=False)
 
 
 @mcp.tool()

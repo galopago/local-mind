@@ -39,6 +39,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertTrue((target / "wiki/index.md").exists())
         self.assertTrue((target / "wiki/log.md").exists())
         self.assertTrue((target / "wiki/_backlinks.json").exists())
+        self.assertTrue((target / "wiki/_link_schema.json").exists())
         self.assertTrue((target / "wiki/sources").is_dir())
         self.assertTrue((target / "wiki/memories").is_dir())
 
@@ -115,6 +116,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertTrue((target / "raw/agent-memory-session.md").exists())
         self.assertTrue((target / "wiki/concepts/agent-memory.md").exists())
         self.assertTrue((target / "wiki/entities/link.md").exists())
+        self.assertTrue((target / "wiki/_link_schema.json").exists())
 
         backlinks = json.loads((target / "wiki/_backlinks.json").read_text(encoding="utf-8"))
         self.assertIn("backlinks", backlinks)
@@ -265,8 +267,38 @@ class LinkCliTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("Ready: yes", out.getvalue())
+        self.assertIn("Schema: current", out.getvalue())
         self.assertIn("Validation: passed", out.getvalue())
         self.assertIn("query_link", out.getvalue())
+
+    def test_migrate_repairs_schema_marker(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-migrate-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / "wiki/_link_schema.json").unlink()
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.migrate(target)
+
+        self.assertEqual(code, 0)
+        self.assertTrue((target / "wiki/_link_schema.json").exists())
+        self.assertIn("Previous schema: missing", out.getvalue())
+        self.assertIn("Result: current", out.getvalue())
+
+    def test_migrate_json_reports_current_schema(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-migrate-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.migrate(target, json_output=True)
+        payload = json.loads(out.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["schema"]["status"], "current")
+        self.assertFalse(payload["migrated"])
 
     def test_status_json_reports_missing_structure(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))

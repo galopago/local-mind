@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.status import link_status  # noqa: E402
+from link_core.schema import write_schema  # noqa: E402
 from link_core.wiki import build_backlinks, build_wiki_cache  # noqa: E402
 
 
@@ -45,6 +46,7 @@ class StatusCoreTests(unittest.TestCase):
             "## Source\n\nunit-test\n",
         )
         (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki, body_only=False)), encoding="utf-8")
+        write_schema(wiki)
         return wiki
 
     def test_link_status_reports_ready_wiki(self):
@@ -57,6 +59,7 @@ class StatusCoreTests(unittest.TestCase):
         self.assertEqual(payload["page_count"], 3)
         self.assertEqual(payload["memory_count"], 1)
         self.assertEqual(payload["active_memory_count"], 1)
+        self.assertEqual(payload["schema"]["status"], "current")
         self.assertTrue(payload["validation"]["passed"])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
 
@@ -67,6 +70,7 @@ class StatusCoreTests(unittest.TestCase):
 
         self.assertFalse(payload["ready"])
         self.assertIn("wiki", payload["missing"])
+        self.assertEqual(payload["schema"]["status"], "missing")
         self.assertEqual(payload["page_count"], 0)
         self.assertEqual(payload["next_actions"][0]["tool"], "doctor")
 

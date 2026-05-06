@@ -7,6 +7,7 @@ from io import BytesIO
 from pathlib import Path
 
 import serve
+from link_core.schema import write_schema
 
 
 def reset_wiki(wiki_dir: Path) -> None:
@@ -79,6 +80,7 @@ class ServeTests(unittest.TestCase):
         write_page(wiki, "index.md", "# Index\n")
         write_page(wiki, "log.md", "# Log\n")
         (wiki / "_backlinks.json").write_text("{}", encoding="utf-8")
+        write_schema(wiki)
         reset_wiki(wiki)
         return wiki
 

@@ -13,6 +13,7 @@ from typing import Any
 
 EXPECTED_TOOLS = {
     "link_status",
+    "migrate_wiki",
     "query_link",
     "validate_wiki",
     "search_wiki",

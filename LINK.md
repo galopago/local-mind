@@ -349,15 +349,16 @@ When the human adds a new source to `raw/` and asks you to process it:
 When the human asks a question:
 
 1. If you are connecting to Link for the first time or troubleshooting setup, call MCP `link_status`, run `python3 link.py status . --validate`, or call `GET /api/status?validate=true`.
-2. Start with the smart query path when available: MCP `query_link`, `python3 link.py query "<question>" .`, or `GET /api/query-link?q=<question>`. This returns a compact context packet with relevant memory, ranked wiki results, graph context, selection reasons, budget reports, and follow-up tool actions. Do not read the whole wiki unless the packet is insufficient; if it is budget-limited, use the returned `follow_up` action first.
-3. If the question only needs session priming or personal/project preferences, use `python3 link.py brief "<question>" .` or MCP `memory_brief`. Use `profile`/`memory_profile` and `recall`/`recall_memory` afterward only when you need deeper detail.
-4. **If you need full source-backed context for one topic:** call `GET /api/context?topic=<question>` or MCP `get_context` — returns the best matching page plus related pages via graph traversal.
-5. **If server/MCP is not available:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
-6. Read only the relevant pages or packet items and synthesize an answer.
-7. Cite your sources with [[wiki-links]].
-8. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
-9. If yes, create a page in the appropriate directory following its template.
-10. Append to `wiki/log.md`.
+2. If status reports a missing or old schema marker, run MCP `migrate_wiki` when available or `python3 link.py migrate .` before other writes.
+3. Start with the smart query path when available: MCP `query_link`, `python3 link.py query "<question>" .`, or `GET /api/query-link?q=<question>`. This returns a compact context packet with relevant memory, ranked wiki results, graph context, selection reasons, budget reports, and follow-up tool actions. Do not read the whole wiki unless the packet is insufficient; if it is budget-limited, use the returned `follow_up` action first.
+4. If the question only needs session priming or personal/project preferences, use `python3 link.py brief "<question>" .` or MCP `memory_brief`. Use `profile`/`memory_profile` and `recall`/`recall_memory` afterward only when you need deeper detail.
+5. **If you need full source-backed context for one topic:** call `GET /api/context?topic=<question>` or MCP `get_context` — returns the best matching page plus related pages via graph traversal.
+6. **If server/MCP is not available:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
+7. Read only the relevant pages or packet items and synthesize an answer.
+8. Cite your sources with [[wiki-links]].
+9. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
+10. If yes, create a page in the appropriate directory following its template.
+11. Append to `wiki/log.md`.
 
 ### 4. Lint
 

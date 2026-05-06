@@ -24,6 +24,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added a managed `~/.local/bin/link` command for global installs so users can run `link status --validate`, `link query`, and `link brief` without remembering wiki paths.
 - Added `link init` to create or repair a normal Link wiki without loading demo content.
 - Added `link serve` to start the local web viewer without remembering `serve.py` paths.
+- Added wiki schema markers with safe `link migrate`/MCP `migrate_wiki` migrations for future local format changes.
 - Added guided `link ingest-status` output with structured JSON guidance, exact agent prompts, and follow-up validation commands.
 - Added clearer product framing in the README and local home page for the distinction between source-backed wiki knowledge and explicit agent memory.
 - Added a wider graph page layout with fullscreen mode so larger wikis can be explored without being squeezed into the reading column.

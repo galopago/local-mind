@@ -132,8 +132,19 @@ class McpContractTests(unittest.TestCase):
         self.assertTrue(payload["ready"])
         self.assertEqual(payload["page_count"], 13)
         self.assertEqual(payload["memory_count"], 1)
+        self.assertEqual(payload["schema"]["status"], "current")
         self.assertTrue(payload["validation"]["passed"])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
+
+    def test_migrate_wiki_contract(self):
+        (self.target / "wiki/_link_schema.json").unlink()
+
+        payload = json.loads(self.server.migrate_wiki())
+
+        self.assertTrue(payload["ok"])
+        self.assertTrue((self.target / "wiki/_link_schema.json").exists())
+        self.assertEqual(payload["previous"]["status"], "missing")
+        self.assertEqual(payload["schema"]["status"], "current")
 
     def test_validate_wiki_contract(self):
         payload = json.loads(self.server.validate_wiki())

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from .memory import memory_records
+from .schema import schema_status
 from .validation import validate_wiki
 from .wiki import build_wiki_cache
 
@@ -68,10 +69,17 @@ def link_status(
     ready = not missing and bool(pages) and (
         not include_validation or bool(validation_summary.get("passed"))
     )
+    schema = schema_status(wiki_dir)
 
     next_actions: list[dict[str, object]] = []
     if missing:
         next_actions.append(_action("repair or scaffold Link structure", "doctor", {"fix": True}))
+    if schema.get("status") in {"missing", "old"}:
+        next_actions.append(_action("write current Link wiki schema marker", "migrate_wiki"))
+    elif schema.get("status") == "invalid":
+        next_actions.append(_action("inspect invalid Link wiki schema marker", "doctor"))
+    elif schema.get("status") == "newer":
+        next_actions.append(_action("upgrade Link before writing this wiki", "upgrade_link"))
     if include_validation and validation_summary.get("checked") and not validation_summary.get("passed"):
         next_actions.append(_action("rebuild graph index", "rebuild_backlinks"))
         next_actions.append(_action("rerun validation gate", "validate_wiki"))
@@ -90,6 +98,7 @@ def link_status(
         "memory_count": len(record_list),
         "active_memory_count": active_memory_count,
         "needs_review_count": needs_review_count,
+        "schema": schema,
         "validation": validation_summary,
         "next_actions": next_actions,
     }
