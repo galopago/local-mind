@@ -2,6 +2,7 @@
 """Link — local wiki viewer. python serve.py → http://localhost:3000"""
 from __future__ import annotations
 import html, http.server, json, re, socketserver, sys, urllib.parse
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -20,8 +21,10 @@ from link_core.memory import (
     memory_review_issues as _core_memory_review_issues,
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
     memory_visible_for_project as _core_memory_visible_for_project,
+    mark_memory_reviewed as _core_mark_memory_reviewed,
     normalize_project as _core_normalize_project,
     propose_memories_from_text as _core_propose_memories_from_text,
+    set_memory_status as _core_set_memory_status,
 )
 from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
@@ -67,6 +70,11 @@ _snippet_index: dict[str, str] = {}  # stem.lower() → pre-extracted first snip
 _token_index: dict[str, set[str]] = {}  # token → set of page stems that contain it
 _page_map: dict[str, dict] = {}  # stem.lower() → page dict (for O(1) lookup in search)
 _meta_token_index: dict[str, set[str]] = {}  # token → stems with that token in title/alias/tag/tldr
+
+def _invalidate_pages_cache() -> None:
+    global _pages_cache, _pages_cache_mtime
+    _pages_cache = None
+    _pages_cache_mtime = 0.0
 
 
 def _wiki_mtime() -> float:
@@ -114,6 +122,27 @@ def _parse_search_limit(raw: str) -> tuple[int | None, str | None]:
     if limit < 1:
         return None, "limit must be at least 1"
     return min(limit, 50), None
+
+
+def _clean_text_input(value, max_len: int = 500) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()[:max_len]
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _append_log(timestamp: str, operation: str, description: str, lines: list[str]) -> None:
+    log_path = WIKI_DIR / "log.md"
+    if not log_path.exists():
+        log_path.write_text("# Link Wiki Log\n\n*Append-only record of wiki operations.*\n", encoding="utf-8")
+    entry = [f"## [{timestamp}] {operation} | {description}", ""]
+    entry.extend(f"- {line}" for line in lines)
+    entry.extend(["", "---", ""])
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(entry))
 
 
 def _page_href(name: str) -> str:
@@ -217,6 +246,36 @@ def _memory_profile(limit: int = 10, project: str | None = None) -> dict[str, ob
     return _core_memory_profile(_memory_records(), limit=limit, review_command="review-memory", project=project)
 
 
+def _mark_memory_reviewed(identifier: str, note: str = "") -> dict[str, object]:
+    result = _core_mark_memory_reviewed(
+        WIKI_DIR,
+        _clean_text_input(identifier, max_len=300),
+        note=_clean_text_input(note, max_len=500),
+        timestamp=_utc_timestamp(),
+        records=_memory_records(),
+        review_command="review-memory",
+        log_writer=_append_log,
+    )
+    if result["updated"]:
+        _invalidate_pages_cache()
+    return result
+
+
+def _set_memory_status(identifier: str, status: str, reason: str = "") -> dict[str, object]:
+    result = _core_set_memory_status(
+        WIKI_DIR,
+        _clean_text_input(identifier, max_len=300),
+        status,
+        reason=_clean_text_input(reason, max_len=500),
+        timestamp=_utc_timestamp(),
+        records=_memory_records(),
+        log_writer=_append_log,
+    )
+    if result["updated"]:
+        _invalidate_pages_cache()
+    return result
+
+
 def _memory_activity_key(record: dict[str, object]) -> tuple[str, str, str]:
     return (
         str(record.get("updated_at") or record.get("date_captured") or ""),
@@ -225,14 +284,17 @@ def _memory_activity_key(record: dict[str, object]) -> tuple[str, str, str]:
     )
 
 
-def _memory_action_hints(record: dict[str, object]) -> list[dict[str, str]]:
-    hints: list[dict[str, str]] = []
+def _memory_action_hints(record: dict[str, object]) -> list[dict[str, object]]:
+    hints: list[dict[str, object]] = []
     for action in _core_memory_action_hints(record, review_command="review-memory"):
         item = {
+            "kind": str(action.get("kind") or ""),
             "label": str(action.get("label") or ""),
             "href": "",
             "command": str(action.get("command") or ""),
             "description": str(action.get("description") or ""),
+            "priority": str(action.get("priority") or ""),
+            "arguments": action.get("arguments") if isinstance(action.get("arguments"), dict) else {},
         }
         if action.get("kind") == "explain":
             name = str(record.get("name") or "")
@@ -798,6 +860,13 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .memory-actions { margin-top: 10px; display: grid; gap: 6px; }
 .memory-actions div { font-size: 12px; font-family: sans-serif; }
 .memory-actions code { display: block; margin-top: 2px; white-space: normal; overflow-wrap: anywhere; }
+.memory-action-row { display: grid; gap: 4px; }
+.memory-action-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.memory-actions button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
+                         border-radius: 4px; padding: 4px 8px; cursor: pointer; font: inherit; }
+.memory-actions button:hover { background: var(--button-hover); }
+.memory-actions button:disabled { color: var(--button-disabled); cursor: default; }
+.memory-action-result { color: var(--muted); min-height: 1em; }
 .trust-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
 .trust-grid div { border: 1px solid var(--border-soft); border-radius: 4px; padding: 10px; font-family: sans-serif; background: var(--surface); }
 .trust-grid strong { display: block; font-size: 12px; color: var(--subtle); margin-bottom: 4px; }
@@ -920,6 +989,68 @@ THEME_CONTROL_JS = """
 """
 
 
+MEMORY_ACTION_JS = """
+(function() {
+  var endpoints = {
+    review: '/api/review-memory',
+    archive: '/api/archive-memory',
+    restore: '/api/restore-memory'
+  };
+  var buttons = Array.from(document.querySelectorAll('[data-memory-action]'));
+  if (!buttons.length) return;
+
+  function resultFor(button) {
+    var row = button.closest('.memory-action-row') || button.parentElement;
+    var result = row ? row.querySelector('.memory-action-result') : null;
+    if (!result && row) {
+      result = document.createElement('span');
+      result.className = 'memory-action-result';
+      row.appendChild(result);
+    }
+    return result;
+  }
+
+  buttons.forEach(function(button) {
+    button.addEventListener('click', async function() {
+      var action = button.getAttribute('data-memory-action') || '';
+      var endpoint = endpoints[action];
+      var memory = button.getAttribute('data-memory') || '';
+      var result = resultFor(button);
+      if (!endpoint || !memory) return;
+
+      var payload = {memory: memory};
+      if (action === 'review' && !window.confirm('Mark this memory as reviewed?')) return;
+      if (action === 'archive') {
+        var reason = window.prompt('Archive reason', 'stale');
+        if (reason === null) return;
+        payload.reason = reason;
+      }
+      if (action === 'restore' && !window.confirm('Restore this memory to active recall?')) return;
+
+      button.disabled = true;
+      if (result) result.textContent = 'Updating...';
+      try {
+        var response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        var data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'memory action failed');
+        }
+        if (result) result.textContent = 'Updated. Refreshing...';
+        window.setTimeout(function() { window.location.reload(); }, 450);
+      } catch (err) {
+        if (result) result.textContent = err.message || 'memory action failed';
+        button.disabled = false;
+      }
+    });
+  });
+})();
+"""
+
+
 def _header_html():
     return f"""<header>
   <div class="logo"><a href="/"><img src="/logo.svg" alt="">Link</a><small>agent memory</small></div>
@@ -996,6 +1127,7 @@ document.addEventListener('keydown', function(e) {{
 }});
 </script>
 <script>{THEME_CONTROL_JS}</script>
+<script>{MEMORY_ACTION_JS}</script>
 </body>
 </html>"""
 
@@ -1127,12 +1259,33 @@ def _render_memory_action_commands(actions: list[dict[str, object]] | tuple[dict
             label_html = label
         priority = str(action.get("priority") or "")
         priority_html = f'<span class="memory-meta">{html.escape(priority)}</span>' if priority else ""
+        button_html = _render_memory_action_button(action)
         rows += (
-            f'<div><strong>{label_html}</strong>'
-            f'{priority_html}'
+            f'<div class="memory-action-row"><span class="memory-action-head"><strong>{label_html}</strong>'
+            f'{priority_html}{button_html}</span>'
             f'<code>{html.escape(str(action.get("command") or ""))}</code></div>'
         )
     return f'<div class="memory-actions">{rows}</div>'
+
+
+def _render_memory_action_button(action: dict[str, object]) -> str:
+    kind = str(action.get("kind") or "")
+    if kind not in {"review", "archive", "restore"}:
+        return ""
+    arguments = action.get("arguments") if isinstance(action.get("arguments"), dict) else {}
+    identifier = str(arguments.get("identifier") or "")
+    if not identifier:
+        return ""
+    labels = {
+        "review": "Mark reviewed",
+        "archive": "Archive",
+        "restore": "Restore",
+    }
+    return (
+        f'<button type="button" data-memory-action="{html.escape(kind, quote=True)}" '
+        f'data-memory="{html.escape(identifier, quote=True)}">'
+        f'{html.escape(labels[kind])}</button>'
+    )
 
 
 def _render_memory_section(title: str, records: list[dict[str, object]], empty: str, href: str = "", include_issues: bool = False) -> str:
@@ -2098,9 +2251,7 @@ def _rebuild_backlinks_payload() -> dict[str, object]:
     bl_path = WIKI_DIR / "_backlinks.json"
     bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     # Invalidate pages cache so next request picks up the new backlinks mtime.
-    global _pages_cache, _pages_cache_mtime
-    _pages_cache = None
-    _pages_cache_mtime = 0.0
+    _invalidate_pages_cache()
     return {"rebuilt": True, "pages": len(result.get("backlinks", {}))}
 
 
@@ -2147,6 +2298,35 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 source=source,
                 limit=min(limit, 20),
             )
+            self._json(result)
+            return
+        if path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:
+            payload, error, status = self._read_json_body()
+            if error:
+                self._json({"updated": False, "error": error}, status=status)
+                return
+            assert payload is not None
+            identifier = _clean_text_input(payload.get("memory") or payload.get("identifier"), max_len=300)
+            if not identifier:
+                self._json({"updated": False, "error": "memory required"}, status=400)
+                return
+            try:
+                if path == "/api/review-memory":
+                    result = _mark_memory_reviewed(
+                        identifier,
+                        note=_clean_text_input(payload.get("note"), max_len=500),
+                    )
+                elif path == "/api/archive-memory":
+                    result = _set_memory_status(
+                        identifier,
+                        "archived",
+                        reason=_clean_text_input(payload.get("reason"), max_len=500),
+                    )
+                else:
+                    result = _set_memory_status(identifier, "active")
+            except ValueError as exc:
+                self._json({"updated": False, "error": str(exc)}, status=404)
+                return
             self._json(result)
             return
         self._json({"error": "POST endpoint not found"}, status=404)
@@ -2232,6 +2412,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 ))
         elif path == "/api/propose-memories":
             self._json({"error": "use POST with JSON body: {\"text\": \"...\"}"}, status=405)
+        elif path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:
+            self._json({"error": "use POST with JSON body: {\"memory\": \"...\"}"}, status=405)
         elif path == "/api/explain-memory":
             identifier = query.get("memory", [""])[0].strip() or query.get("name", [""])[0].strip()
             if not identifier:

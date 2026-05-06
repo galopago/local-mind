@@ -55,6 +55,19 @@ def run_handler(method: str, path: str, body: bytes = b"", headers: dict[str, st
     return status, payload
 
 
+def post_json(path: str, payload: dict[str, object]):
+    body = json.dumps(payload).encode("utf-8")
+    return run_handler(
+        "POST",
+        path,
+        body,
+        {
+            "Content-Type": "application/json",
+            "Content-Length": str(len(body)),
+        },
+    )
+
+
 class ServeTests(unittest.TestCase):
     def make_wiki(self) -> Path:
         tmp = Path(tempfile.mkdtemp(prefix="link-test-"))
@@ -299,11 +312,73 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn("Next:</strong> Review", inbox_html)
         self.assertIn("review-memory", inbox_html)
+        self.assertIn('data-memory-action="review"', inbox_html)
+        self.assertIn('data-memory="prefer-reviewable-memory"', inbox_html)
         self.assertIn("archive-memory", inbox_html)
+        self.assertIn('data-memory-action="archive"', inbox_html)
         self.assertIn("forget-memory", inbox_html)
         self.assertIn("<h2>Actions</h2>", explain_html)
         self.assertIn("Next:</strong> Review", explain_html)
         self.assertIn("forget-memory", explain_html)
+
+    def test_memory_action_post_endpoints_update_pages(self):
+        wiki = self.make_wiki()
+        page = write_page(
+            wiki,
+            "memories/prefer-web-review.md",
+            (
+                "---\n"
+                "type: memory\n"
+                "title: \"Prefer web review\"\n"
+                "memory_type: preference\n"
+                "scope: user\n"
+                "status: active\n"
+                "date_captured: \"2026-05-05T00:00:00Z\"\n"
+                "source: \"unit test\"\n"
+                "review_status: pending\n"
+                "---\n\n"
+                "# Prefer web review\n\n"
+                "> **TLDR:** User prefers safe web memory review.\n\n"
+                "## Memory\n\nUser prefers safe web memory review.\n"
+            ),
+        )
+
+        review_status, review_payload = post_json(
+            "/api/review-memory",
+            {"memory": "prefer-web-review", "note": "confirmed from web"},
+        )
+        archive_status, archive_payload = post_json(
+            "/api/archive-memory",
+            {"memory": "prefer-web-review", "reason": "validated archive"},
+        )
+        restore_status, restore_payload = post_json(
+            "/api/restore-memory",
+            {"memory": "Prefer web review"},
+        )
+        text = page.read_text(encoding="utf-8")
+        log_text = (wiki / "log.md").read_text(encoding="utf-8")
+
+        self.assertEqual(review_status, 200)
+        self.assertTrue(review_payload["updated"])
+        self.assertEqual(review_payload["review_status"], "reviewed")
+        self.assertEqual(archive_status, 200)
+        self.assertEqual(archive_payload["status"], "archived")
+        self.assertEqual(restore_status, 200)
+        self.assertEqual(restore_payload["status"], "active")
+        self.assertIn("review_status: reviewed", text)
+        self.assertIn('review_note: "confirmed from web"', text)
+        self.assertIn("status: active", text)
+        self.assertIn("review-memory", log_text)
+        self.assertIn("archive-memory", log_text)
+        self.assertIn("restore-memory", log_text)
+
+    def test_memory_action_post_requires_memory_identifier(self):
+        wiki = self.make_wiki()
+        status, payload = post_json("/api/review-memory", {})
+
+        self.assertEqual(status, 400)
+        self.assertFalse(payload["updated"])
+        self.assertEqual(payload["error"], "memory required")
 
     def test_memory_audit_page_and_api_report_backlog(self):
         wiki = self.make_wiki()
