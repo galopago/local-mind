@@ -268,6 +268,72 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Raw captures", html)
         self.assertIn("redact-capture", html)
 
+    def test_memory_dashboard_filters_project_memory_and_captures(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "memories/global-style.md",
+            (
+                "---\n"
+                "type: memory\n"
+                "title: \"Global style\"\n"
+                "memory_type: preference\n"
+                "scope: user\n"
+                "status: active\n"
+                "date_captured: \"2026-05-05T00:00:00Z\"\n"
+                "source: \"unit test\"\n"
+                "review_status: reviewed\n"
+                "---\n\n"
+                "# Global style\n\n"
+                "> **TLDR:** User prefers concise updates.\n"
+            ),
+        )
+        for project in ("alpha", "beta"):
+            write_page(
+                wiki,
+                f"memories/{project}-imports.md",
+                (
+                    "---\n"
+                    "type: memory\n"
+                    f"title: \"{project.title()} imports\"\n"
+                    "memory_type: project\n"
+                    "scope: project\n"
+                    f"project: \"{project}\"\n"
+                    "status: active\n"
+                    "date_captured: \"2026-05-05T00:00:00Z\"\n"
+                    "source: \"unit test\"\n"
+                    "review_status: reviewed\n"
+                    "---\n\n"
+                    f"# {project.title()} imports\n\n"
+                    f"> **TLDR:** {project.title()} has project-specific imports.\n"
+                ),
+            )
+        capture_dir = wiki.parent / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        for project in ("alpha", "beta"):
+            (capture_dir / f"{project}.md").write_text(
+                "---\n"
+                f"title: \"{project.title()} capture\"\n"
+                "source_type: conversation\n"
+                "date_captured: \"2026-05-05T00:00:00Z\"\n"
+                f"project: \"{project}\"\n"
+                "---\n\n"
+                "# Capture\n\n## Notes\n\nMemory capture.\n",
+                encoding="utf-8",
+            )
+
+        dashboard = serve._memory_dashboard(limit=8, project="alpha")
+        status, payload = run_handler("GET", "/api/memory-dashboard?project=alpha")
+        html = serve._render_memory_dashboard(project="alpha")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(dashboard["project"], "alpha")
+        self.assertEqual(payload["project"], "alpha")
+        self.assertEqual({record["name"] for record in dashboard["active"]}, {"global-style", "alpha-imports"})
+        self.assertEqual([capture["project"] for capture in dashboard["captures"]], ["alpha"])
+        self.assertIn("Project:</strong> alpha", html)
+        self.assertNotIn("Beta imports", html)
+
     def test_cache_invalidation_sees_existing_page_edits(self):
         wiki = self.make_wiki()
         page = write_page(

@@ -19,6 +19,8 @@ from link_core.memory import (
     memory_records as _core_memory_records,
     memory_review_issues as _core_memory_review_issues,
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
+    memory_visible_for_project as _core_memory_visible_for_project,
+    normalize_project as _core_normalize_project,
     propose_memories_from_text as _core_propose_memories_from_text,
 )
 from link_core.frontmatter import (
@@ -140,9 +142,18 @@ def _memory_review_issues(record: dict[str, object]) -> list[dict[str, str]]:
     return _core_memory_review_issues(record, review_command="review-memory")
 
 
-def _memory_inbox(limit: int = 20, include_archived: bool = False) -> dict[str, object]:
+def _project_visible_records(project: str | None = None) -> list[dict[str, object]]:
+    project_name = _core_normalize_project(project)
+    return [
+        record
+        for record in _memory_records()
+        if _core_memory_visible_for_project(record, project_name)
+    ]
+
+
+def _memory_inbox(limit: int = 20, include_archived: bool = False, project: str | None = None) -> dict[str, object]:
     return _core_memory_inbox(
-        _memory_records(),
+        _project_visible_records(project),
         limit=limit,
         include_archived=include_archived,
         review_command="review-memory",
@@ -200,8 +211,8 @@ def _memory_explanation(identifier: str) -> dict[str, object]:
     )
 
 
-def _memory_profile(limit: int = 10) -> dict[str, object]:
-    return _core_memory_profile(_memory_records(), limit=limit, review_command="review-memory")
+def _memory_profile(limit: int = 10, project: str | None = None) -> dict[str, object]:
+    return _core_memory_profile(_memory_records(), limit=limit, review_command="review-memory", project=project)
 
 
 def _memory_activity_key(record: dict[str, object]) -> tuple[str, str, str]:
@@ -304,7 +315,8 @@ def _memory_dashboard_next_actions(
     return actions[:3]
 
 
-def _capture_records(limit: int = 12) -> list[dict[str, object]]:
+def _capture_records(limit: int = 12, project: str | None = None) -> list[dict[str, object]]:
+    project_name = _core_normalize_project(project)
     root = WIKI_DIR.parent
     capture_dir = RAW_DIR / "memory-captures"
     if not capture_dir.exists():
@@ -320,12 +332,15 @@ def _capture_records(limit: int = 12) -> list[dict[str, object]]:
             continue
         meta, body = _parse_frontmatter(text)
         title = str(meta.get("title") or path.stem)
+        capture_project = _core_normalize_project(str(meta.get("project") or ""))
+        if project_name and capture_project and capture_project != project_name:
+            continue
         warnings = _secret_value_warnings(text)
         rel = path.relative_to(root).as_posix()
         records.append({
             "path": rel,
             "title": title,
-            "project": str(meta.get("project") or ""),
+            "project": capture_project,
             "date_captured": str(meta.get("date_captured") or ""),
             "size_bytes": stat.st_size,
             "secret_warnings": warnings,
@@ -341,9 +356,10 @@ def _capture_records(limit: int = 12) -> list[dict[str, object]]:
     return records[:limit]
 
 
-def _memory_dashboard(limit: int = 12) -> dict[str, object]:
+def _memory_dashboard(limit: int = 12, project: str | None = None) -> dict[str, object]:
     limit = max(1, min(limit, 50))
-    records = _memory_records()
+    project_name = _core_normalize_project(project)
+    records = _project_visible_records(project_name)
     active_records = [record for record in records if _is_active_memory(record)]
     archived_records = [
         record for record in records
@@ -359,11 +375,11 @@ def _memory_dashboard(limit: int = 12) -> dict[str, object]:
         reverse=True,
     )
     archived = sorted(archived_records, key=_memory_activity_key, reverse=True)
-    inbox = _memory_inbox(limit=limit)
+    inbox = _memory_inbox(limit=limit, project=project_name)
     review_count = inbox["review_count"]
     updated_count = len(recent_updates)
     archived_count = len(archived_records)
-    captures = _capture_records(limit=limit)
+    captures = _capture_records(limit=limit, project=project_name)
     capture_warning_count = sum(1 for capture in captures if capture["warning_count"])
     return {
         "memory_count": len(records),
@@ -373,6 +389,7 @@ def _memory_dashboard(limit: int = 12) -> dict[str, object]:
         "updated_count": updated_count,
         "capture_count": len(captures),
         "capture_warning_count": capture_warning_count,
+        "project": project_name,
         "by_type": _count_values(records, "memory_type"),
         "by_scope": _count_values(records, "scope"),
         "counts_by_severity": inbox["counts_by_severity"],
@@ -1109,8 +1126,8 @@ def _render_memory_next_actions(actions: list[dict[str, str]]) -> str:
     return f'<div class="memory-next"><strong>Next actions</strong><ul>{items}</ul></div>'
 
 
-def _render_memory_dashboard():
-    dashboard = _memory_dashboard(limit=8)
+def _render_memory_dashboard(project: str | None = None):
+    dashboard = _memory_dashboard(limit=8, project=project)
     stats = (
         f'<div class="home-stats">'
         f'<div class="stat"><span class="num">{dashboard["memory_count"]}</span><span class="label">memories</span></div>'
@@ -1135,6 +1152,7 @@ def _render_memory_dashboard():
         f'<h1>Memory Dashboard</h1>'
         f'<div class="memory-dashboard">'
         f'<p class="summary">Read-only command center for what local agents can remember, what needs review, and what changed recently.</p>'
+        f'{"<p><strong>Project:</strong> " + html.escape(str(dashboard["project"])) + "</p>" if dashboard["project"] else ""}'
         f'{stats}'
         f'{_render_memory_next_actions(dashboard["next_actions"])}'
         f'{counts}'
@@ -1148,8 +1166,8 @@ def _render_memory_dashboard():
     return _layout("Memory Dashboard", body)
 
 
-def _render_profile():
-    profile = _memory_profile(limit=12)
+def _render_profile(project: str | None = None):
+    profile = _memory_profile(limit=12, project=project)
     memory_count = profile["memory_count"]
     active_count = profile["active_count"]
     stats = (
@@ -1186,6 +1204,7 @@ def _render_profile():
         f'<h1>Memory Profile</h1>'
         f'<div class="memory-profile">'
         f'<p class="summary">What Link currently remembers about the user, projects, decisions, and preferences.</p>'
+        f'{"<p><strong>Project:</strong> " + html.escape(str(profile["project"])) + "</p>" if profile["project"] else ""}'
         f'{stats}'
         f'{counts_line("Types", profile["by_type"])}'
         f'{counts_line("Scopes", profile["by_scope"])}'
@@ -2010,14 +2029,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path in ("/", ""):
             self._ok(_render_home())
         elif path == "/memory":
-            self._ok(_render_memory_dashboard())
+            self._ok(_render_memory_dashboard(project=query.get("project", [""])[0]))
         elif path == "/inbox":
             self._ok(_render_inbox())
         elif path == "/explain-memory":
             identifier = query.get("memory", [""])[0].strip() or query.get("name", [""])[0].strip()
             self._ok(_render_explain_memory(identifier))
         elif path == "/profile":
-            self._ok(_render_profile())
+            self._ok(_render_profile(project=query.get("project", [""])[0]))
         elif path == "/all":
             self._ok(_render_all())
         elif path == "/graph":
@@ -2045,20 +2064,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if error:
                 self._json({"error": error}, status=400)
             else:
-                self._json(_memory_profile(limit=limit))
+                self._json(_memory_profile(limit=limit, project=query.get("project", [""])[0]))
         elif path == "/api/memory-dashboard":
             limit, error = _parse_search_limit(query.get("limit", ["12"])[0])
             if error:
                 self._json({"error": error}, status=400)
             else:
-                self._json(_memory_dashboard(limit=limit))
+                self._json(_memory_dashboard(limit=limit, project=query.get("project", [""])[0]))
         elif path == "/api/memory-inbox":
             limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
             if error:
                 self._json({"error": error}, status=400)
             else:
                 include_archived = query.get("include_archived", ["false"])[0].lower() in {"1", "true", "yes"}
-                self._json(_memory_inbox(limit=limit, include_archived=include_archived))
+                self._json(_memory_inbox(
+                    limit=limit,
+                    include_archived=include_archived,
+                    project=query.get("project", [""])[0],
+                ))
         elif path == "/api/propose-memories":
             self._json({"error": "use POST with JSON body: {\"text\": \"...\"}"}, status=405)
         elif path == "/api/explain-memory":
