@@ -116,6 +116,27 @@ class ServeTests(unittest.TestCase):
         self.assertIn("background: var(--bg); color: var(--text);", serve.CSS)
         self.assertNotIn("background: #1a1a1a", serve.CSS)
 
+    def test_raw_static_paths_stay_under_raw_directory(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        asset = raw / "asset.png"
+        asset.write_bytes(b"not really a png")
+
+        good_path, good_type = serve._resolve_raw_static_path("asset.png")
+        parent_path, parent_type = serve._resolve_raw_static_path("../logo.png")
+        encoded_path, encoded_type = serve._resolve_raw_static_path("%2e%2e/logo.png")
+        wiki_path, wiki_type = serve._resolve_raw_static_path("../wiki/index.png")
+
+        self.assertEqual(good_path, asset.resolve())
+        self.assertEqual(good_type, "image/png")
+        self.assertIsNone(parent_path)
+        self.assertIsNone(parent_type)
+        self.assertIsNone(encoded_path)
+        self.assertIsNone(encoded_type)
+        self.assertIsNone(wiki_path)
+        self.assertIsNone(wiki_type)
+
     def test_graph_labels_are_clamped_inside_canvas(self):
         wiki = self.make_wiki()
         write_page(

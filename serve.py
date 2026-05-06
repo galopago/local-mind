@@ -649,6 +649,17 @@ def _is_allowed_static_file(path: Path) -> bool:
     )
 
 
+def _resolve_raw_static_path(url_fragment: str) -> tuple[Path | None, str | None]:
+    decoded = urllib.parse.unquote(url_fragment).lstrip("/")
+    resolved = _safe_resolve(RAW_DIR / decoded)
+    if not resolved or not _is_relative_to(resolved, RAW_DIR.resolve()):
+        return None, None
+    content_type = RAW_STATIC_TYPES.get(resolved.suffix.lower())
+    if not content_type:
+        return None, None
+    return resolved, content_type
+
+
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
@@ -2471,9 +2482,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/logo.png":
             self._file(Path(__file__).parent / "logo.png", "image/png")
         elif path.startswith("/raw/"):
-            raw_path = Path(__file__).parent / "raw" / urllib.parse.unquote(path[5:])
-            content_type = RAW_STATIC_TYPES.get(raw_path.suffix.lower())
-            if content_type:
+            raw_path, content_type = _resolve_raw_static_path(path[5:])
+            if raw_path and content_type:
                 self._file(raw_path, content_type)
             else:
                 self._err("file")
