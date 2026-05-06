@@ -25,6 +25,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `link.py capture-session` to save long session notes under `raw/memory-captures/` and return proposal-only memory candidates for human approval.
 - Added MCP `capture_session` so agents can preserve long session notes locally before asking which memory proposals to write.
 - Added secret-looking content warnings to CLI and MCP session capture results so pasted tokens can be redacted from local raw notes.
+- Added `link.py accept-capture` to turn an approved raw-capture proposal into a durable memory through duplicate/conflict-safe writes.
 - Added read-only web Memory Dashboard at `/memory` and `/api/memory-dashboard` for active memories, review queue, recent updates, archived memories, and next-action commands.
 - Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; memory write operations remain CLI/MCP-only.
 - Added a graph node inspector so moving nodes no longer accidentally opens pages; double-click or Open page still navigates.

@@ -335,6 +335,12 @@ This stores the note under `raw/memory-captures/`, logs the capture locally, and
 returns memory proposals for human approval. Capture results warn on
 secret-looking pasted values so you can redact the local raw note.
 
+Approve one proposal when it is right:
+
+```bash
+python3 ~/link/link.py accept-capture raw/memory-captures/<capture>.md ~/link --index 1
+```
+
 Maintain the wiki:
 
 ```bash
@@ -418,6 +424,7 @@ Common endpoints:
 | `python3 link.py remember "text" <dir> [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
 | `python3 link.py propose-memories <file-or-text> <dir> [--project slug]` | Propose durable memories from notes without writing them. |
 | `python3 link.py capture-session <file-or-text> <dir> [--project slug]` | Save chat/session notes under `raw/memory-captures/` and return proposal-only memory candidates. |
+| `python3 link.py accept-capture <capture> <dir> [--index N]` | Accept one proposal from a saved raw capture using duplicate/conflict-safe memory writes. |
 | `python3 link.py brief "task" <dir> [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, and safe memory rules. |
 | `python3 link.py recall "query" <dir> [--project slug]` | Search local agent memories. |
 | `python3 link.py profile <dir> [--project slug]` | Show what Link remembers by type, scope, status, and recency. |

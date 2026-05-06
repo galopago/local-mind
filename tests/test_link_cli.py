@@ -491,6 +491,44 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(len(after_memories), len(before_memories))
         self.assertIn("capture-session", log_text)
 
+    def test_accept_capture_writes_approved_proposal(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        capture_out = StringIO()
+        with redirect_stdout(capture_out):
+            capture_code = link_cli.capture_session(
+                target,
+                "We decided to keep session capture approval local and explicit.",
+                title="Capture approval session",
+                project="link",
+                json_output=True,
+            )
+        capture = json.loads(capture_out.getvalue())
+
+        accept_out = StringIO()
+        with redirect_stdout(accept_out):
+            accept_code = link_cli.accept_capture(
+                target,
+                capture["path"],
+                index=1,
+                json_output=True,
+            )
+        accepted = json.loads(accept_out.getvalue())
+        memory_path = target / accepted["result"]["path"]
+        memory_text = memory_path.read_text(encoding="utf-8")
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertEqual(capture_code, 0)
+        self.assertEqual(accept_code, 0)
+        self.assertTrue(accepted["accepted"])
+        self.assertEqual(accepted["capture"], capture["path"])
+        self.assertTrue(accepted["result"]["created"])
+        self.assertIn(f'source: "{capture["path"]}"', memory_text)
+        self.assertIn("session capture approval", memory_text)
+        self.assertIn("accept-capture", log_text)
+
     def test_memory_inbox_and_review_memory(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

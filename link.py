@@ -1749,6 +1749,146 @@ Captured locally for Link memory review. This raw note is proposal-only until th
     return 0
 
 
+def _resolve_capture_file(root: Path, capture: str) -> Path | None:
+    raw = capture.strip()
+    if not raw:
+        return None
+    candidates = [Path(raw).expanduser()]
+    if not Path(raw).is_absolute():
+        candidates.extend([
+            root / raw,
+            root / "raw" / "memory-captures" / raw,
+            root / "raw" / "memory-captures" / f"{raw}.md",
+        ])
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        if not resolved.is_file():
+            continue
+        try:
+            resolved.relative_to(root)
+        except ValueError:
+            continue
+        return resolved
+    return None
+
+
+def _capture_notes_from_markdown(text: str) -> tuple[dict[str, object], str]:
+    meta, body = _parse_frontmatter(text)
+    match = re.search(r"^## Notes\s*(.*?)(?=^## |\Z)", body, flags=re.MULTILINE | re.DOTALL)
+    notes = match.group(1).strip() if match else body.strip()
+    return meta, notes
+
+
+def accept_capture(
+    target: Path,
+    capture: str,
+    index: int = 1,
+    title: str | None = None,
+    memory_type: str | None = None,
+    scope: str | None = None,
+    tags: str | None = None,
+    project: str | None = None,
+    allow_duplicate: bool = False,
+    allow_conflict: bool = False,
+    json_output: bool = False,
+) -> int:
+    target = target.expanduser().resolve()
+    root = _resolve_link_root(target)
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    capture_path = _resolve_capture_file(root, capture)
+    if capture_path is None:
+        print(f"Capture not found under {root}: {capture}", file=sys.stderr)
+        return 1
+    if index < 1:
+        print("Proposal index must be 1 or greater", file=sys.stderr)
+        return 1
+
+    raw_text = capture_path.read_text(encoding="utf-8", errors="replace")
+    meta, notes = _capture_notes_from_markdown(raw_text)
+    if not notes:
+        print(f"Capture has no notes: {capture_path}", file=sys.stderr)
+        return 1
+
+    rel_path = capture_path.relative_to(root).as_posix()
+    project_name = project or str(meta.get("project") or "") or _default_project(root)
+    proposals = _propose_memories_from_text(
+        wiki_dir,
+        notes,
+        source=rel_path,
+        limit=max(1, min(max(index, 10), 50)),
+        project=project_name,
+    )
+    if index > len(proposals["proposals"]):
+        print(f"Capture has {len(proposals['proposals'])} proposal(s); index {index} is unavailable", file=sys.stderr)
+        return 1
+    proposal = proposals["proposals"][index - 1]
+    chosen_scope = scope or str(proposal["scope"])
+    chosen_project = project_name if chosen_scope == "project" else ""
+    result = _write_memory_page(
+        target,
+        str(proposal["memory"]),
+        title=title or str(proposal["title"]),
+        memory_type=memory_type or str(proposal["memory_type"]),
+        scope=chosen_scope,
+        tags=tags,
+        source=rel_path,
+        allow_duplicate=allow_duplicate,
+        allow_conflict=allow_conflict,
+        project=chosen_project,
+    )
+    payload = {
+        "accepted": bool(result.get("created")),
+        "capture": rel_path,
+        "proposal_index": index,
+        "proposal": proposal,
+        "result": result,
+    }
+    if result.get("created"):
+        _append_log(
+            wiki_dir,
+            _utc_timestamp(),
+            "accept-capture",
+            f"Accepted proposal {index} from {rel_path}",
+            [
+                f"Memory: {result['path']}",
+                f"Project: {result.get('project') or 'none'}",
+            ],
+        )
+
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0 if payload["accepted"] else 1
+
+    if not payload["accepted"]:
+        duplicate_candidates = result.get("duplicate_candidates") or result.get("candidates")
+        if duplicate_candidates:
+            first = duplicate_candidates[0]
+            print(f"Duplicate candidate: {first['title']} ({first['path']})")
+        elif result.get("conflict_candidates"):
+            first = result["conflict_candidates"][0]
+            print(f"Conflict candidate: {first['title']} ({first['path']})")
+        else:
+            print("Capture proposal was not accepted.")
+        return 1
+
+    print("Capture proposal accepted")
+    print(f"Capture: {rel_path}")
+    print(f"Proposal: {index}")
+    print(f"Memory: {result['path']}")
+    if result.get("project"):
+        print(f"Project: {result['project']}")
+    print("")
+    print("Next:")
+    print(f"  python3 link.py review-memory \"{result['name']}\" .")
+    return 0
+
+
 def update_memory(
     target: Path,
     identifier: str,
@@ -2397,6 +2537,19 @@ def main(argv: list[str] | None = None) -> int:
     capture_cmd.add_argument("--project", default=None, help="project key for proposal checks")
     capture_cmd.add_argument("--json", action="store_true", help="print machine-readable capture details")
 
+    accept_capture_cmd = sub.add_parser("accept-capture", help="accept one proposal from a raw session capture")
+    accept_capture_cmd.add_argument("capture", help="raw capture path or filename")
+    accept_capture_cmd.add_argument("target", nargs="?", default=".")
+    accept_capture_cmd.add_argument("--index", type=int, default=1, help="1-based proposal index to accept")
+    accept_capture_cmd.add_argument("--title", default=None, help="override accepted memory title")
+    accept_capture_cmd.add_argument("--type", dest="memory_type", choices=MEMORY_TYPES, default=None)
+    accept_capture_cmd.add_argument("--scope", choices=MEMORY_SCOPES, default=None)
+    accept_capture_cmd.add_argument("--tags", default=None, help="comma-separated tags")
+    accept_capture_cmd.add_argument("--project", default=None, help="project key for accepted project memory")
+    accept_capture_cmd.add_argument("--allow-duplicate", action="store_true", help="create a new memory even if a strong duplicate exists")
+    accept_capture_cmd.add_argument("--allow-conflict", action="store_true", help="create a memory even if it may conflict with an active memory")
+    accept_capture_cmd.add_argument("--json", action="store_true", help="print machine-readable acceptance details")
+
     update_memory_cmd = sub.add_parser("update-memory", help="merge new text into an existing memory")
     update_memory_cmd.add_argument("identifier", help="memory page name, title, or path")
     update_memory_cmd.add_argument("text", help="new memory text to merge")
@@ -2500,6 +2653,20 @@ def main(argv: list[str] | None = None) -> int:
             title=args.title,
             limit=args.limit,
             project=args.project,
+            json_output=args.json,
+        )
+    if args.command == "accept-capture":
+        return accept_capture(
+            Path(args.target),
+            args.capture,
+            index=args.index,
+            title=args.title,
+            memory_type=args.memory_type,
+            scope=args.scope,
+            tags=args.tags,
+            project=args.project,
+            allow_duplicate=args.allow_duplicate,
+            allow_conflict=args.allow_conflict,
             json_output=args.json,
         )
     if args.command == "update-memory":
