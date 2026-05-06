@@ -560,6 +560,42 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("redact-capture", log_text)
         self.assertNotIn(fake_key, log_text)
 
+    def test_delete_capture_requires_confirmation_and_removes_file(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        capture_out = StringIO()
+        with redirect_stdout(capture_out):
+            link_cli.capture_session(
+                target,
+                "Remember that raw capture deletion requires confirmation.",
+                title="Capture deletion session",
+                json_output=True,
+            )
+        capture = json.loads(capture_out.getvalue())
+        capture_path = target / capture["path"]
+
+        denied_out = StringIO()
+        with redirect_stdout(denied_out):
+            denied_code = link_cli.delete_capture(target, capture["path"], json_output=True)
+        denied = json.loads(denied_out.getvalue())
+        self.assertTrue(capture_path.exists())
+
+        delete_out = StringIO()
+        with redirect_stdout(delete_out):
+            delete_code = link_cli.delete_capture(target, capture["path"], confirm=True, json_output=True)
+        deleted = json.loads(delete_out.getvalue())
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertEqual(denied_code, 1)
+        self.assertFalse(denied["deleted"])
+        self.assertEqual(delete_code, 0)
+        self.assertTrue(deleted["deleted"])
+        self.assertFalse(capture_path.exists())
+        self.assertIn("delete-capture", log_text)
+        self.assertNotIn("raw capture deletion requires confirmation", log_text)
+
     def test_memory_inbox_and_review_memory(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

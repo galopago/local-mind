@@ -1943,6 +1943,54 @@ def redact_capture(
     return 0
 
 
+def delete_capture(
+    target: Path,
+    capture: str,
+    confirm: bool = False,
+    json_output: bool = False,
+) -> int:
+    target = target.expanduser().resolve()
+    root = _resolve_link_root(target)
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    capture_path = _resolve_capture_file(root, capture)
+    if capture_path is None:
+        print(f"Capture not found under {root}: {capture}", file=sys.stderr)
+        return 1
+    rel_path = capture_path.relative_to(root).as_posix()
+    payload = {
+        "deleted": False,
+        "path": rel_path,
+        "confirmation_required": not confirm,
+    }
+    if not confirm:
+        if json_output:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("Confirmation required.")
+            print(f"Run: python3 link.py delete-capture \"{rel_path}\" . --confirm")
+        return 1
+
+    capture_path.unlink()
+    _append_log(
+        wiki_dir,
+        _utc_timestamp(),
+        "delete-capture",
+        f"Deleted raw capture {rel_path}",
+        ["Deleted file only; capture contents were not logged."],
+    )
+    payload["deleted"] = True
+    payload["confirmation_required"] = False
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+    print("Capture deleted")
+    print(f"Path: {rel_path}")
+    return 0
+
+
 def update_memory(
     target: Path,
     identifier: str,
@@ -2610,6 +2658,12 @@ def main(argv: list[str] | None = None) -> int:
     redact_capture_cmd.add_argument("--replacement", default="[redacted-secret]", help="replacement text")
     redact_capture_cmd.add_argument("--json", action="store_true", help="print machine-readable redaction details")
 
+    delete_capture_cmd = sub.add_parser("delete-capture", help="delete a raw session capture after explicit confirmation")
+    delete_capture_cmd.add_argument("capture", help="raw capture path or filename")
+    delete_capture_cmd.add_argument("target", nargs="?", default=".")
+    delete_capture_cmd.add_argument("--confirm", action="store_true", help="required to delete the capture")
+    delete_capture_cmd.add_argument("--json", action="store_true", help="print machine-readable deletion details")
+
     update_memory_cmd = sub.add_parser("update-memory", help="merge new text into an existing memory")
     update_memory_cmd.add_argument("identifier", help="memory page name, title, or path")
     update_memory_cmd.add_argument("text", help="new memory text to merge")
@@ -2734,6 +2788,13 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.target),
             args.capture,
             replacement=args.replacement,
+            json_output=args.json,
+        )
+    if args.command == "delete-capture":
+        return delete_capture(
+            Path(args.target),
+            args.capture,
+            confirm=args.confirm,
             json_output=args.json,
         )
     if args.command == "update-memory":
