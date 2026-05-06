@@ -255,6 +255,36 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(len(after_memories), len(before_memories))
         self.assertIn("capture-session", log_text)
 
+    def test_capture_inbox_contract(self):
+        fake_key = "sk-" + ("B" * 24)
+        alpha = json.loads(self.server.capture_session(
+            f"Remember that MCP Alpha captures need review. Test key {fake_key}",
+            title="MCP Alpha capture",
+            project="alpha",
+        ))
+        beta = json.loads(self.server.capture_session(
+            "Remember that MCP Beta captures stay separate.",
+            title="MCP Beta capture",
+            project="beta",
+        ))
+
+        raw_payload = self.server.capture_inbox(project="alpha")
+        payload = json.loads(raw_payload)
+
+        self.assertTrue(alpha["captured"])
+        self.assertTrue(beta["captured"])
+        self.assertEqual(payload["project"], "alpha")
+        self.assertEqual(payload["count"], 1)
+        self.assertEqual(payload["warning_count"], 1)
+        self.assertEqual(payload["captures"][0]["project"], "alpha")
+        self.assertEqual(payload["captures"][0]["secret_warnings"], ["OpenAI API key"])
+        self.assertIn("[redacted-secret]", payload["captures"][0]["snippet"])
+        self.assertIn("accept_capture", payload["captures"][0]["commands"]["accept"])
+        self.assertIn("redact_capture", payload["captures"][0]["commands"]["redact"])
+        self.assertIn("delete_capture", payload["captures"][0]["commands"]["delete"])
+        self.assertNotIn(fake_key, raw_payload)
+        self.assertNotIn("MCP Beta capture", raw_payload)
+
     def test_accept_capture_contract(self):
         capture = json.loads(self.server.capture_session(
             "We decided to keep MCP capture approval local and explicit.",

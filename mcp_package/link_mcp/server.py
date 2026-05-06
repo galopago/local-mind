@@ -59,7 +59,8 @@ mcp = FastMCP(
         "what Link remembers, memory_inbox to find memories needing review, and "
         "explain_memory to audit why a memory exists. Use capture_session for "
         "long chat or session notes that should be stored locally before memory "
-        "approval; use propose_memories when no raw capture is needed. Use search_wiki to find "
+        "approval, and capture_inbox to review saved captures before accepting, "
+        "redacting, or deleting them; use propose_memories when no raw capture is needed. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
         "neighborhood. Only call remember_memory when the user explicitly asks "
         "you to remember something; if it returns duplicate candidates, use "
@@ -84,6 +85,7 @@ from link_core.memory import (
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
     memory_records as _core_memory_records,
+    normalize_project as _core_normalize_project,
     memory_review_issues as _core_memory_review_issues,
     propose_memories_from_text as _core_propose_memories_from_text,
     recall_memories as _core_recall_memories,
@@ -391,6 +393,58 @@ def _capture_notes_from_markdown(text: str) -> tuple[dict[str, object], str]:
     match = re.search(r"^## Notes\s*(.*?)(?=^## |\Z)", body, flags=re.MULTILINE | re.DOTALL)
     notes = match.group(1).strip() if match else body.strip()
     return meta, notes
+
+
+def _capture_records(limit: int = 20, project: str = "") -> list[dict[str, object]]:
+    root = WIKI_DIR.parent
+    capture_dir = root / "raw" / "memory-captures"
+    if not capture_dir.exists():
+        return []
+    project_name = _core_normalize_project(project)
+    records: list[dict[str, object]] = []
+    for path in sorted(capture_dir.rglob("*.md")):
+        if path.name.startswith("."):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            stat = path.stat()
+        except OSError:
+            continue
+        meta, notes = _capture_notes_from_markdown(text)
+        capture_project = _core_normalize_project(str(meta.get("project") or ""))
+        if project_name and capture_project and capture_project != project_name:
+            continue
+        rel = path.relative_to(root).as_posix()
+        warnings = _secret_value_warnings(text)
+        safe_notes, _, _ = _redact_secret_values(notes)
+        records.append({
+            "path": rel,
+            "title": str(meta.get("title") or path.stem),
+            "project": capture_project,
+            "date_captured": str(meta.get("date_captured") or ""),
+            "size_bytes": stat.st_size,
+            "secret_warnings": warnings,
+            "warning_count": len(warnings),
+            "snippet": re.sub(r"\s+", " ", safe_notes).strip()[:180],
+            "commands": {
+                "accept": f'accept_capture(capture="{rel}", index=1)',
+                "redact": f'redact_capture(capture="{rel}")',
+                "delete": f'delete_capture(capture="{rel}", confirm=true)',
+            },
+        })
+    records.sort(key=lambda item: (str(item["date_captured"]), str(item["path"])), reverse=True)
+    return records[:max(1, min(limit, 50))]
+
+
+def _capture_inbox(limit: int = 20, project: str = "") -> dict[str, object]:
+    project_name = _core_normalize_project(project)
+    captures = _capture_records(limit=limit, project=project_name)
+    return {
+        "count": len(captures),
+        "warning_count": sum(1 for capture in captures if capture["warning_count"]),
+        "project": project_name,
+        "captures": captures,
+    }
 
 
 def _accept_capture(
@@ -747,6 +801,17 @@ def capture_session(text: str, title: str = "", source: str = "mcp", limit: int 
             "proposals": {"proposed": False, "count": 0, "proposals": []},
         })
     return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
+def capture_inbox(limit: int = 20, project: str = "") -> str:
+    """List saved raw session captures without changing them.
+
+    Returns saved captures, secret-warning labels, redacted snippets, and the
+    next MCP tool calls for accepting, redacting, or deleting a capture.
+    """
+    limit = _parse_limit(limit, default=20, max_limit=50)
+    return json.dumps(_capture_inbox(limit=limit, project=project), ensure_ascii=False)
 
 
 @mcp.tool()

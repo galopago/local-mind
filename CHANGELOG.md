@@ -32,6 +32,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `link.py delete-capture` with explicit confirmation for removing saved raw captures without logging capture contents.
 - Added MCP `delete_capture` with explicit confirmation for removing saved raw captures.
 - Added `link.py capture-inbox` to list saved raw captures, secret warnings, and accept/redact/delete commands.
+- Added MCP `capture_inbox` to review saved raw captures with redacted snippets before accepting, redacting, or deleting them.
 - Added raw capture visibility to `/memory` and `/api/memory-dashboard`, including accept/redact/delete commands and secret-warning counts.
 - Added project filtering to `/memory`, `/profile`, `/api/memory-dashboard`, `/api/memory-profile`, and `/api/memory-inbox`.
 - Added read-only web Memory Dashboard at `/memory` and `/api/memory-dashboard` for active memories, review queue, recent updates, archived memories, and next-action commands.
