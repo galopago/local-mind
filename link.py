@@ -6,6 +6,7 @@ Usage:
   python link.py serve [target]
   python link.py demo [target]
   python link.py status [target]
+  python link.py backup [target]
   python link.py doctor [target]
   python link.py migrate [target]
   python link.py validate [target]
@@ -68,6 +69,7 @@ SECRET_NAME_PATTERNS = (
 )
 SKIP_SCAN_DIRS = {
     ".git",
+    ".link-backups",
     "__pycache__",
     ".pytest_cache",
     ".ruff_cache",
@@ -121,6 +123,10 @@ from link_core.memory import (
     top_tags as _core_top_tags,
     update_memory_page as _core_update_memory_page,
     write_memory_page as _core_write_memory_page,
+)
+from link_core.backup import (
+    create_backup as _core_create_backup,
+    list_backups as _core_list_backups,
 )
 from link_core.capture import (
     capture_inbox as _core_capture_inbox,
@@ -1464,6 +1470,53 @@ def status(target: Path, include_validation: bool = False, json_output: bool = F
         suffix = f" {json.dumps(args, ensure_ascii=False)}" if args else ""
         print(f"- {action['tool']}: {action['label']}{suffix}")
     return 0 if payload["ready"] else 1
+
+
+def backup(
+    target: Path,
+    *,
+    label: str = "manual",
+    include_raw: bool = False,
+    list_only: bool = False,
+    json_output: bool = False,
+) -> int:
+    target = _resolve_link_root(target)
+    if list_only:
+        payload = _core_list_backups(target)
+        if json_output:
+            print(json.dumps(payload, indent=2))
+            return 0
+        print(f"Link backups: {payload['backup_dir']}")
+        print("")
+        if not payload["backups"]:
+            print("No backups found.")
+            return 0
+        for item in payload["backups"]:
+            print(f"- {item['name']} ({item['bytes']} bytes)")
+        return 0
+
+    try:
+        payload = _core_create_backup(target, label=label, include_raw=include_raw)
+    except FileNotFoundError as exc:
+        if json_output:
+            print(json.dumps({"created": False, "error": str(exc)}, indent=2))
+        else:
+            print(str(exc), file=sys.stderr)
+        return 1
+
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print(f"Link backup created: {payload['path']}")
+    print(f"Included: {', '.join(payload['included'])}")
+    print(f"Files: {payload['file_count']}")
+    print(f"Size: {payload['bytes']} bytes")
+    if not include_raw:
+        print("Note: raw/ was excluded by default because it may contain sensitive source material.")
+    if payload["pruned"]:
+        print("Pruned old backups: " + ", ".join(payload["pruned"]))
+    return 0
 
 
 def ingest_status(target: Path, json_output: bool = False) -> int:
@@ -2999,6 +3052,13 @@ def main(argv: list[str] | None = None) -> int:
     status_cmd.add_argument("--validate", action="store_true", help="include the ingest validation gate summary")
     status_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
+    backup_cmd = sub.add_parser("backup", help="create or list local wiki backup archives")
+    backup_cmd.add_argument("target", nargs="?", default=".")
+    backup_cmd.add_argument("--label", default="manual", help="short label for the backup filename")
+    backup_cmd.add_argument("--include-raw", action="store_true", help="also include raw/ sources and captures")
+    backup_cmd.add_argument("--list", action="store_true", dest="list_only", help="list recent backups instead of creating one")
+    backup_cmd.add_argument("--json", action="store_true", help="print machine-readable backup status")
+
     doctor_cmd = sub.add_parser("doctor", help="check a Link wiki for common health issues")
     doctor_cmd.add_argument("target", nargs="?", default=".")
     doctor_cmd.add_argument("--fix", action="store_true", help="repair safe structural and backlink issues")
@@ -3174,6 +3234,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "status":
         return status(Path(args.target), include_validation=args.validate, json_output=args.json)
+    if args.command == "backup":
+        return backup(
+            Path(args.target),
+            label=args.label,
+            include_raw=args.include_raw,
+            list_only=args.list_only,
+            json_output=args.json,
+        )
     if args.command == "doctor":
         return doctor(Path(args.target), fix=args.fix)
     if args.command == "migrate":

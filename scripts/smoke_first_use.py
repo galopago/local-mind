@@ -75,6 +75,11 @@ def run_smoke(work_dir: Path, python: str = sys.executable) -> None:
     require(demo_status.get("validation", {}).get("passed") is True, "demo validation did not pass")
     require(int(demo_status.get("memory_count") or 0) >= 1, "demo did not include a starter memory")
 
+    backup = run_json("backup", str(demo_target), "--label", "first-use-smoke", "--json", python=python)
+    require(backup.get("created") is True, "backup did not create an archive")
+    require(backup.get("included") == ["wiki"], "backup did not default to wiki-only")
+    require((demo_target / ".link-backups" / str(backup["name"])).exists(), "backup archive is missing")
+
     query = run_json("query", "what is Link agent memory?", str(demo_target), "--budget", "small", "--json", python=python)
     require(query.get("found") is True, "query did not find demo context")
     require(bool(query.get("context_packet")), "query returned an empty context packet")

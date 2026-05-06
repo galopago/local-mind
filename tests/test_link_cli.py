@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import sys
+import tarfile
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -270,6 +271,47 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Schema: current", out.getvalue())
         self.assertIn("Validation: passed", out.getvalue())
         self.assertIn("query_link", out.getvalue())
+
+    def test_backup_creates_local_archive_without_raw_by_default(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-backup-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / "raw/private-note.md").write_text("secret source", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.backup(target, label="cli test")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link backup created:", out.getvalue())
+        archives = list((target / ".link-backups").glob("*.tar.gz"))
+        self.assertEqual(len(archives), 1)
+        with tarfile.open(archives[0], "r:gz") as tar:
+            names = set(tar.getnames())
+        self.assertIn("wiki/index.md", names)
+        self.assertNotIn("raw/private-note.md", names)
+
+    def test_backup_json_can_include_raw_and_list_archives(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-backup-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / "raw/private-note.md").write_text("source", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.backup(target, label="with raw", include_raw=True, json_output=True)
+        payload = json.loads(out.getvalue())
+
+        list_out = StringIO()
+        with redirect_stdout(list_out):
+            list_code = link_cli.backup(target, list_only=True, json_output=True)
+        listing = json.loads(list_out.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(list_code, 0)
+        self.assertIn("raw", payload["included"])
+        self.assertEqual(listing["count"], 1)
+        self.assertEqual(listing["backups"][0]["name"], payload["name"])
 
     def test_migrate_repairs_schema_marker(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-migrate-test-"))

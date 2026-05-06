@@ -434,6 +434,7 @@ link delete-capture raw/memory-captures/<capture>.md --confirm
 Maintain the wiki:
 
 ```bash
+link backup
 link doctor --fix
 link memory-audit
 link rebuild-index
@@ -464,6 +465,7 @@ Most agents should start with:
 | `ingest_status` | The user dropped files into `raw/` or asks to ingest, and you need pending raw files plus the next prompt/checks. |
 | `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, graph context, budget limits, and follow-up actions without reading the whole wiki. |
 | `validate_wiki` | You just ingested sources or substantially edited pages and need to verify page shape, links, and backlink freshness before reporting done. |
+| `backup_wiki` | You are about to run broad repair work or risky local wiki edits and want a local `.link-backups/` archive first. |
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory, review warnings, and saved capture status. |
 | `memory_audit` | You need one read-only health report for memory review backlog, raw captures, and next actions. |
 | `memory_profile` | You need to know what Link remembers about the user/project. |
@@ -482,7 +484,7 @@ Most agents should start with:
 | `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
 | `rebuild_index` | You ingested or edited pages and need `wiki/index.md` to reflect the current wiki. |
 
-Full tool set: `link_status`, `migrate_wiki`, `ingest_status`, `query_link`, `validate_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
+Full tool set: `link_status`, `migrate_wiki`, `ingest_status`, `query_link`, `validate_wiki`, `backup_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
@@ -543,6 +545,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link init [dir]` | Create or repair a normal Link wiki without demo content. |
 | `link serve [dir] [--port 3000]` | Start the local web viewer for a Link wiki. |
 | `link status [--validate]` | Show local readiness, page/memory counts, optional validation summary, and next actions. |
+| `link backup [--label name] [--include-raw]` | Create a timestamped local `.link-backups/` archive of `wiki/`; raw sources are excluded unless explicitly requested. |
 | `link ingest-status` | Show pending raw files, graph index status, the next agent prompt, and follow-up checks. |
 | `link remember "text" [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
 | `link propose-memories <file-or-text> [--project slug]` | Propose durable memories from notes without writing them. |
@@ -580,6 +583,8 @@ Link is local-first:
 - No hosted backend.
 - No external API calls from `serve.py` or `link-mcp`.
 - Raw sources and generated wiki pages are ignored by git by default.
+- `link backup` and MCP `backup_wiki` write local `.link-backups/` archives;
+  `raw/` is excluded unless you explicitly pass `--include-raw`.
 - Registry token files and common secret-looking files are ignored and checked by release hygiene.
 
 Before sharing a repo, demo, or wiki:

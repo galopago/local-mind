@@ -12,6 +12,8 @@ When answering a substantive project question, start with MCP `query_link` when 
 
 When starting project-specific work, prime yourself with Link first: use MCP `memory_brief` when available, or run `python3 link.py brief "<task or question>"`. Project installs infer the current repo as the memory project key, so project-scoped memories stay separate from other repos while broad user memories still apply.
 
+Before broad repairs or risky local wiki edits, create a local backup with MCP `backup_wiki` when available, or run `python3 link.py backup`. Do not include `raw/` unless the user explicitly asks.
+
 For long session notes, use `python3 link.py capture-session "<file-or-text>"` to store a local raw capture and produce memory proposals without writing durable memories.
 Use MCP `capture_inbox` when available, or `python3 link.py capture-inbox`, to review saved captures, warnings, and next-step commands.
 When the human approves a proposal from a capture, use `python3 link.py accept-capture "<raw-capture-path>" --index <n>`.

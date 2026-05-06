@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import sys
+import tarfile
 import tempfile
 import types
 import unittest
@@ -145,6 +146,20 @@ class McpContractTests(unittest.TestCase):
         self.assertTrue((self.target / "wiki/_link_schema.json").exists())
         self.assertEqual(payload["previous"]["status"], "missing")
         self.assertEqual(payload["schema"]["status"], "current")
+
+    def test_backup_wiki_contract_excludes_raw_by_default(self):
+        (self.target / "raw/private-note.md").write_text("secret source", encoding="utf-8")
+
+        payload = json.loads(self.server.backup_wiki(label="mcp test"))
+        listing = json.loads(self.server.backup_wiki(list_only=True))
+
+        self.assertTrue(payload["created"])
+        self.assertEqual(payload["included"], ["wiki"])
+        self.assertEqual(listing["count"], 1)
+        with tarfile.open(payload["path"], "r:gz") as tar:
+            names = set(tar.getnames())
+        self.assertIn("wiki/index.md", names)
+        self.assertNotIn("raw/private-note.md", names)
 
     def test_ingest_status_contract(self):
         payload = json.loads(self.server.ingest_status())

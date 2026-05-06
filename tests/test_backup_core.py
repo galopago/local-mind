@@ -1,0 +1,74 @@
+import os
+import sys
+import tarfile
+import tempfile
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "mcp_package"))
+
+from link_core.backup import create_backup, list_backups
+
+
+class BackupCoreTests(unittest.TestCase):
+    def make_root(self) -> Path:
+        root = Path(tempfile.mkdtemp(prefix="link-backup-core-"))
+        (root / "wiki/concepts").mkdir(parents=True)
+        (root / "raw").mkdir()
+        (root / "wiki/index.md").write_text("# Index\n", encoding="utf-8")
+        (root / "wiki/concepts/agent-memory.md").write_text("# Agent Memory\n", encoding="utf-8")
+        (root / "raw/secret-session.md").write_text("api key: test-secret\n", encoding="utf-8")
+        return root
+
+    def test_backup_includes_wiki_and_excludes_raw_by_default(self):
+        root = self.make_root()
+
+        result = create_backup(root, label="unit test")
+
+        self.assertTrue(result["created"])
+        self.assertEqual(result["included"], ["wiki"])
+        self.assertFalse(result["include_raw"])
+        archive = Path(result["path"])
+        self.assertTrue(archive.exists())
+        with tarfile.open(archive, "r:gz") as tar:
+            names = set(tar.getnames())
+        self.assertIn("wiki/index.md", names)
+        self.assertIn("wiki/concepts/agent-memory.md", names)
+        self.assertNotIn("raw/secret-session.md", names)
+
+    def test_backup_can_include_raw_when_requested_and_lists_archives(self):
+        root = self.make_root()
+
+        result = create_backup(root, label="with raw", include_raw=True)
+        listing = list_backups(root)
+
+        with tarfile.open(result["path"], "r:gz") as tar:
+            names = set(tar.getnames())
+        self.assertIn("raw/secret-session.md", names)
+        self.assertEqual(listing["count"], 1)
+        self.assertEqual(listing["backups"][0]["name"], result["name"])
+
+    def test_backup_requires_wiki(self):
+        root = Path(tempfile.mkdtemp(prefix="link-backup-core-"))
+
+        with self.assertRaises(FileNotFoundError):
+            create_backup(root)
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlinks are not available")
+    def test_backup_skips_symlinks(self):
+        root = self.make_root()
+        outside = root.parent / "outside-secret.txt"
+        outside.write_text("outside", encoding="utf-8")
+        os.symlink(outside, root / "wiki/concepts/outside-link.md")
+
+        result = create_backup(root)
+
+        with tarfile.open(result["path"], "r:gz") as tar:
+            names = set(tar.getnames())
+        self.assertNotIn("wiki/concepts/outside-link.md", names)
+
+
+if __name__ == "__main__":
+    unittest.main()

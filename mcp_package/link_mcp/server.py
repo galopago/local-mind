@@ -68,8 +68,11 @@ mcp = FastMCP(
         "redacting, or deleting them; use propose_memories when no raw capture is needed. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
         "neighborhood. After ingesting sources or substantially editing wiki "
-        "pages, call rebuild_index, rebuild_backlinks, then validate_wiki before saying the "
-        "wiki is updated. Only call remember_memory when the user explicitly asks "
+        "pages, call rebuild_index, rebuild_backlinks, then validate_wiki "
+        "before saying the "
+        "wiki is updated. Use backup_wiki before broad repairs or risky local "
+        "wiki edits; raw/ is excluded unless explicitly requested. Only call "
+        "remember_memory when the user explicitly asks "
         "you to remember something; if it returns duplicate candidates, use "
         "update_memory on the existing memory instead of forcing a duplicate. "
         "If it returns conflict candidates, ask the user whether to update or "
@@ -108,6 +111,10 @@ from link_core.memory import (
     top_tags as _core_top_tags,
     update_memory_page as _core_update_memory_page,
     write_memory_page as _core_write_memory_page,
+)
+from link_core.backup import (
+    create_backup as _core_create_backup,
+    list_backups as _core_list_backups,
 )
 from link_core.capture import (
     capture_inbox as _core_capture_inbox,
@@ -809,6 +816,29 @@ def link_status(include_validation: bool = False) -> str:
     optional validation summary, and safe next actions.
     """
     return json.dumps(_link_status(include_validation=include_validation), ensure_ascii=False)
+
+
+@mcp.tool()
+def backup_wiki(label: str = "mcp", include_raw: bool = False, list_only: bool = False) -> str:
+    """Create or list local backup archives for this Link wiki.
+
+    Use before broad repairs or risky local wiki edits. Backups stay under
+    .link-backups/ next to the wiki. raw/ is excluded by default because it may
+    contain sensitive source material; include_raw should only be true after
+    explicit user approval.
+    """
+    link_root = WIKI_DIR.parent
+    if list_only:
+        return json.dumps(_core_list_backups(link_root), ensure_ascii=False)
+    try:
+        result = _core_create_backup(
+            link_root,
+            label=_clean_text_input(label, max_len=80) or "mcp",
+            include_raw=include_raw,
+        )
+    except FileNotFoundError as exc:
+        return json.dumps({"created": False, "error": str(exc)}, ensure_ascii=False)
+    return json.dumps(result, ensure_ascii=False)
 
 
 @mcp.tool()

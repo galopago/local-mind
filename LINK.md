@@ -304,7 +304,8 @@ Rules:
 - After the human confirms a memory is accurate, run `python3 link.py review-memory "<name-or-title>" .`.
 - Run `python3 link.py explain-memory "<name-or-title>" .` when the human asks why an agent knows something or whether a memory is safe to use.
 - If a memory is stale or wrong, archive it with `python3 link.py archive-memory "<name-or-title>" . --reason "why"`. Do not delete memory pages unless the human explicitly asks for permanent removal.
-- If the human explicitly asks Link to permanently forget a memory, use `python3 link.py forget-memory "<name-or-title>" . --confirm` or MCP `forget_memory` with `confirm: true`. Prefer archive when reversible cleanup is enough.
+- Before broad repair work or risky local wiki edits, create a local backup with `python3 link.py backup .` or MCP `backup_wiki`. Do not include `raw/` unless the human explicitly asks because raw sources and captures can contain sensitive material.
+- If the human explicitly asks Link to permanently forget a memory, use `python3 link.py forget-memory "<name-or-title>" . --confirm` or MCP `forget_memory` with `confirm: true`. Prefer archive when reversible cleanup is enough, and do not create a backup that preserves the memory unless the human explicitly asks for one.
 - Restore an archived memory with `python3 link.py restore-memory "<name-or-title>" .`.
 
 ### 2. Ingest
@@ -394,7 +395,7 @@ Run these checks and report findings:
 
 For each finding, suggest a specific action. Then ask the human which ones to execute.
 
-Rebuild `wiki/index.md` and `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-index .` and `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `POST /api/rebuild-index` and `POST /api/rebuild-backlinks` with JSON `{}` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
+Create a local backup before broad repairs with `python3 link.py backup .` or MCP `backup_wiki`. Rebuild `wiki/index.md` and `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-index .` and `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `POST /api/rebuild-index` and `POST /api/rebuild-backlinks` with JSON `{}` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
 
 
 ### 5. Research

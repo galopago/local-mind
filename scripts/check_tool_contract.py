@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_CLI_COMMANDS = {
     "accept-capture",
     "archive-memory",
+    "backup",
     "brief",
     "capture-inbox",
     "capture-session",
@@ -45,6 +46,7 @@ EXPECTED_CLI_COMMANDS = {
 EXPECTED_MCP_TOOLS = {
     "accept_capture",
     "archive_memory",
+    "backup_wiki",
     "capture_inbox",
     "capture_session",
     "delete_capture",

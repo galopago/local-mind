@@ -17,6 +17,7 @@ EXPECTED_TOOLS = {
     "ingest_status",
     "query_link",
     "validate_wiki",
+    "backup_wiki",
     "search_wiki",
     "get_context",
     "get_graph",
@@ -110,6 +111,17 @@ async def _run_smoke(wiki_dir: Path, python: str) -> None:
             if not validation.get("passed") or validation.get("error_count") != 0:
                 raise RuntimeError("validate_wiki did not accept the demo wiki")
 
+            backup = _json_text(
+                await session.call_tool(
+                    "backup_wiki",
+                    {"label": "mcp-smoke"},
+                    read_timeout_seconds=timedelta(seconds=10),
+                ),
+                "backup_wiki",
+            )
+            if not backup.get("created") or "wiki" not in backup.get("included", []):
+                raise RuntimeError("backup_wiki did not create a wiki backup")
+
             context = _json_text(
                 await session.call_tool(
                     "get_context",
@@ -142,6 +154,17 @@ async def _run_smoke(wiki_dir: Path, python: str) -> None:
             )
             if not rebuilt_index.get("rebuilt") or rebuilt_index.get("page_count", 0) < 1:
                 raise RuntimeError("rebuild_index did not rebuild the demo catalog")
+
+            rebuilt_backlinks = _json_text(
+                await session.call_tool(
+                    "rebuild_backlinks",
+                    {},
+                    read_timeout_seconds=timedelta(seconds=10),
+                ),
+                "rebuild_backlinks",
+            )
+            if not rebuilt_backlinks.get("rebuilt"):
+                raise RuntimeError("rebuild_backlinks did not repair the demo graph")
 
 
 def main() -> int:
