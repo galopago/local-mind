@@ -169,6 +169,68 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Backlinks: stale", out.getvalue())
         self.assertIn("Repair graph index", out.getvalue())
 
+    def test_validate_accepts_demo_wiki(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-validate-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.validate(target)
+
+        self.assertEqual(code, 0)
+        self.assertIn("OK wiki pages satisfy the ingest validation gate", out.getvalue())
+        self.assertIn("Result: passed", out.getvalue())
+
+    def test_validate_reports_agent_format_errors_as_json(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-validate-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        page = target / "wiki/concepts/agent-memory.md"
+        page.write_text(
+            page.read_text(encoding="utf-8")
+            .replace("type: concept", "type: source", 1)
+            .replace("## Sources", "## References", 1),
+            encoding="utf-8",
+        )
+        with redirect_stdout(StringIO()):
+            link_cli.rebuild_backlinks(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.validate(target, json_output=True)
+        payload = json.loads(out.getvalue())
+        codes = {finding["code"] for finding in payload["findings"]}
+
+        self.assertEqual(code, 1)
+        self.assertFalse(payload["passed"])
+        self.assertIn("type_directory_mismatch", codes)
+        self.assertIn("missing_required_section", codes)
+        self.assertNotIn("stale_backlinks", codes)
+
+    def test_validate_strict_fails_on_warnings(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-validate-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        page = target / "wiki/concepts/agent-memory.md"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace("> **TLDR:**", "> **Summary:**", 1),
+            encoding="utf-8",
+        )
+
+        normal_out = StringIO()
+        with redirect_stdout(normal_out):
+            normal_code = link_cli.validate(target)
+
+        strict_out = StringIO()
+        with redirect_stdout(strict_out):
+            strict_code = link_cli.validate(target, strict=True)
+
+        self.assertEqual(normal_code, 0)
+        self.assertEqual(strict_code, 1)
+        self.assertIn("WARNING", strict_out.getvalue())
+        self.assertIn("Result: failed (0 errors, 1 warnings)", strict_out.getvalue())
+
     def test_remember_creates_memory_page_and_updates_backlinks(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

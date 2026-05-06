@@ -4,6 +4,7 @@
 Usage:
   python link.py demo [target]
   python link.py doctor [target]
+  python link.py validate [target]
   python link.py ingest-status [target]
   python link.py remember "memory text" [target]
   python link.py propose-memories <file-or-text> [target]
@@ -128,6 +129,9 @@ from link_core.security import (
 )
 from link_core.query import (
     query_link as _core_query_link,
+)
+from link_core.validation import (
+    validate_wiki as _core_validate_wiki,
 )
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
@@ -1440,6 +1444,30 @@ def doctor(target: Path, fix: bool = False) -> int:
     return 0
 
 
+def validate(target: Path, strict: bool = False, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    payload = _core_validate_wiki(wiki_dir, strict=strict)
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0 if payload["passed"] else 1
+
+    print(f"Link validate: {wiki_dir}")
+    print("")
+    if payload["findings"]:
+        for finding in payload["findings"]:
+            label = str(finding["severity"]).upper()
+            print(f"{label} {finding['path']} [{finding['code']}] {finding['message']}")
+    else:
+        print("OK wiki pages satisfy the ingest validation gate")
+    print("")
+    print(
+        f"Result: {'passed' if payload['passed'] else 'failed'} "
+        f"({payload['error_count']} errors, {payload['warning_count']} warnings)"
+    )
+    return 0 if payload["passed"] else 1
+
+
 def ingest_status(target: Path, json_output: bool = False) -> int:
     target = target.expanduser().resolve()
     status = _collect_ingest_status(target)
@@ -1481,9 +1509,11 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
         first_pending = pending_raw[0]["raw"]
         print(f"  Ask your agent: ingest {first_pending}")
         print("  After ingest: python3 link.py rebuild-backlinks .")
-        print("  Then check:  python3 link.py doctor .")
+        print("  Then validate: python3 link.py validate .")
+        print("  Then check:    python3 link.py doctor .")
     elif status["backlinks_status"] != "current":
         print("  Repair graph index: python3 link.py rebuild-backlinks .")
+        print("  Then validate:       python3 link.py validate .")
         print("  Then check:          python3 link.py doctor .")
     else:
         print("  No pending raw files. Run: python3 link.py doctor .")
@@ -2982,6 +3012,11 @@ def main(argv: list[str] | None = None) -> int:
     doctor_cmd.add_argument("target", nargs="?", default=".")
     doctor_cmd.add_argument("--fix", action="store_true", help="repair safe structural and backlink issues")
 
+    validate_cmd = sub.add_parser("validate", help="validate wiki pages before accepting ingest output")
+    validate_cmd.add_argument("target", nargs="?", default=".")
+    validate_cmd.add_argument("--strict", action="store_true", help="fail on warnings as well as errors")
+    validate_cmd.add_argument("--json", action="store_true", help="print machine-readable validation findings")
+
     ingest_status_cmd = sub.add_parser("ingest-status", help="show raw files pending wiki ingestion")
     ingest_status_cmd.add_argument("target", nargs="?", default=".")
     ingest_status_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
@@ -3137,6 +3172,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "doctor":
         return doctor(Path(args.target), fix=args.fix)
+    if args.command == "validate":
+        return validate(Path(args.target), strict=args.strict, json_output=args.json)
     if args.command == "ingest-status":
         return ingest_status(Path(args.target), json_output=args.json)
     if args.command == "remember":

@@ -331,6 +331,7 @@ When the human adds a new source to `raw/` and asks you to process it:
 - Watch for page bloat: if a sub-topic is growing past 2-3 paragraphs within an article, it likely deserves its own page. Split proactively.
 - Conversely, a new page must have enough substance to stand alone. If you cannot write at least a meaningful TLDR + Overview, fold the information into an existing page instead.
 - After ingest completes, rebuild `wiki/_backlinks.json` by scanning all `[[wikilinks]]` across the wiki.
+- After rebuilding backlinks, run `python3 link.py validate .` when `link.py` is available. Treat validation errors as blockers before reporting ingest complete.
 
 **Image ingest rules:**
 - Images in `raw/` (png, jpg, webp, gif, svg) are valid sources. Use vision to understand what the image IS.
@@ -368,6 +369,8 @@ python3 link.py doctor .
 ```
 
 Use `python3 link.py doctor . --fix` only for safe mechanical repairs: creating missing Link directories/files and rebuilding `_backlinks.json`. Do not use it as a substitute for content review.
+
+Run `python3 link.py validate .` after ingest or large page edits. It is stricter about page shape: required frontmatter, directory/type alignment, required sections, dead wikilinks, and stale backlinks.
 
 Treat doctor errors as blockers. Doctor warnings are quality issues to triage with the human. It checks required structure, dead links, stale backlinks, index drift, TLDR/query summaries, Sources sections, `source_count` consistency, isolated graph pages, raw-source coverage, memory review state, raw capture backlog, and secret-looking filenames or file contents.
 

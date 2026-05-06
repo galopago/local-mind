@@ -200,13 +200,14 @@ ingest raw/first-memory.md into Link
 
 The agent reads `~/link/LINK.md`, creates a source page under `wiki/sources/`,
 creates or updates concept/entity pages, updates `wiki/index.md`, appends
-`wiki/log.md`, and rebuilds backlinks.
+`wiki/log.md`, rebuilds backlinks, and validates the generated pages.
 
 ### 5. Verify The Loop
 
 ```bash
 python3 ~/link/link.py doctor ~/link --fix
 python3 ~/link/link.py ingest-status ~/link
+python3 ~/link/link.py validate ~/link
 python3 ~/link/link.py memory-audit ~/link
 python3 ~/link/link.py verify-mcp ~/link
 ```
@@ -381,6 +382,7 @@ Maintain the wiki:
 python3 ~/link/link.py doctor ~/link --fix
 python3 ~/link/link.py memory-audit ~/link
 python3 ~/link/link.py rebuild-backlinks ~/link
+python3 ~/link/link.py validate ~/link
 python3 ~/link/link.py verify-mcp ~/link
 ```
 
@@ -492,6 +494,7 @@ Common endpoints:
 | `python3 link.py forget-memory <name> <dir> --confirm` | Permanently delete a memory after explicit confirmation; archive first if you may need it later. |
 | `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, memory review state, raw capture backlog, and secret-looking content. |
 | `python3 link.py doctor <dir> --fix` | Create missing structure and repair backlinks safely. |
+| `python3 link.py validate <dir> [--strict]` | Validate agent-generated wiki pages after ingest: frontmatter, type/directory alignment, required sections, dead links, and backlink freshness. |
 | `python3 link.py rebuild-backlinks <dir>` | Regenerate `wiki/_backlinks.json`. |
 | `python3 link.py verify-mcp <dir>` | Verify `link-mcp` import and print MCP config. |
 
@@ -509,6 +512,7 @@ Before sharing a repo, demo, or wiki:
 
 ```bash
 python3 link.py doctor .
+python3 link.py validate .
 python3 scripts/check_release_hygiene.py
 ```
 

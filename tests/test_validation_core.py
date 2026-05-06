@@ -1,0 +1,82 @@
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "mcp_package"))
+
+from link_core.validation import validate_wiki  # noqa: E402
+from link_core.wiki import build_backlinks  # noqa: E402
+
+
+def write_page(wiki: Path, rel: str, text: str) -> None:
+    path = wiki / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+class ValidationCoreTests(unittest.TestCase):
+    def make_wiki(self) -> Path:
+        root = Path(tempfile.mkdtemp(prefix="link-validation-core-"))
+        wiki = root / "wiki"
+        for dirname in ("sources", "concepts", "entities", "memories", "comparisons", "explorations"):
+            (wiki / dirname).mkdir(parents=True, exist_ok=True)
+        write_page(wiki, "index.md", "# Index\n")
+        write_page(wiki, "log.md", "# Log\n")
+        return wiki
+
+    def test_validate_wiki_accepts_well_formed_pages(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "sources/example-source.md",
+            "---\ntype: source\ntitle: Example Source\n---\n\n"
+            "# Example Source\n\n"
+            "> **TLDR:** A valid source page.\n\n"
+            "## Summary\n\nUseful source.\n\n"
+            "## Raw Source\n\n`raw/example.md`\n",
+        )
+        write_page(
+            wiki,
+            "concepts/example-concept.md",
+            "---\ntype: concept\ntitle: Example Concept\n---\n\n"
+            "# Example Concept\n\n"
+            "> **TLDR:** A valid concept page.\n\n"
+            "## Overview\n\nConcept overview cites [[example-source]].\n\n"
+            "## Sources\n\n- [[example-source]]\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki, body_only=False)), encoding="utf-8")
+
+        payload = validate_wiki(wiki)
+
+        self.assertTrue(payload["passed"])
+        self.assertEqual(payload["error_count"], 0)
+
+    def test_validate_wiki_rejects_malformed_agent_pages(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/bad-page.md",
+            "---\ntype: source\n---\n\n"
+            "# Bad Page\n\n"
+            "Mentions [[missing-page]].\n",
+        )
+        (wiki / "_backlinks.json").write_text("{}", encoding="utf-8")
+
+        payload = validate_wiki(wiki)
+        codes = {finding["code"] for finding in payload["findings"]}
+
+        self.assertFalse(payload["passed"])
+        self.assertIn("type_directory_mismatch", codes)
+        self.assertIn("missing_frontmatter_field", codes)
+        self.assertIn("missing_required_section", codes)
+        self.assertIn("dead_wikilink", codes)
+        self.assertIn("stale_backlinks", codes)
+
+
+if __name__ == "__main__":
+    unittest.main()
+

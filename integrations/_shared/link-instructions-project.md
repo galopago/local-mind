@@ -12,6 +12,8 @@ When the human approves a proposal from a capture, use `python3 link.py accept-c
 If a capture reports secret warnings, ask before running `python3 link.py redact-capture "<raw-capture-path>" .`.
 Only delete a raw capture after explicit confirmation: `python3 link.py delete-capture "<raw-capture-path>" . --confirm`.
 
+After ingesting raw sources or making substantial wiki edits, run `python3 link.py rebuild-backlinks .` and `python3 link.py validate .` before saying the wiki is updated.
+
 When the user says **"remember"**, **"recall"**, **"ingest"**, **"query"**, **"lint"**, or **"research"**, read `LINK.md` for instructions and follow the protocol.
 
 Otherwise, don't interfere — just be a normal assistant.
