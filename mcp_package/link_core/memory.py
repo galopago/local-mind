@@ -25,6 +25,74 @@ MEMORY_TYPES = ("preference", "decision", "project", "fact", "note")
 MEMORY_SCOPES = ("user", "project", "global")
 MEMORY_REVIEW_STATUSES = ("pending", "reviewed", "needs_update")
 MEMORY_PROPOSAL_MIN_SCORE = 70
+MEMORY_CONFLICT_TYPES = {"preference", "decision", "project"}
+MEMORY_STOPWORDS = {
+    "about",
+    "after",
+    "agent",
+    "agents",
+    "also",
+    "and",
+    "are",
+    "because",
+    "before",
+    "being",
+    "does",
+    "done",
+    "for",
+    "from",
+    "has",
+    "have",
+    "into",
+    "link",
+    "memory",
+    "more",
+    "not",
+    "now",
+    "our",
+    "prefer",
+    "prefers",
+    "project",
+    "should",
+    "that",
+    "the",
+    "their",
+    "this",
+    "use",
+    "user",
+    "users",
+    "want",
+    "wants",
+    "when",
+    "with",
+    "work",
+}
+NEGATION_TERMS = {
+    "avoid",
+    "disable",
+    "disabled",
+    "disallow",
+    "dont",
+    "don't",
+    "never",
+    "no",
+    "not",
+    "without",
+}
+CONFLICT_OPTION_GROUPS = {
+    "branch_policy": {"codex", "develop", "development", "direct", "feature", "main", "master", "release"},
+    "storage_policy": {"cloud", "hosted", "local", "offline", "remote"},
+    "theme": {"dark", "light", "system"},
+    "install_method": {"brew", "global", "homebrew", "pipx", "system", "venv", "virtualenv"},
+    "release_channel": {"github", "mcp", "pypi"},
+}
+CONFLICT_GROUP_CONTEXT = {
+    "branch_policy": {"branch", "branches", "commit", "commits", "git", "merge", "pr", "pull", "push"},
+    "storage_policy": {"agent", "agents", "backend", "data", "memory", "storage", "sync", "wiki"},
+    "theme": {"background", "mode", "theme", "ui"},
+    "install_method": {"install", "installer", "mcp", "package", "pip", "python", "setup"},
+    "release_channel": {"package", "publish", "registry", "release", "version"},
+}
 MemoryLogWriter = Callable[[str, str, str, list[str]], None]
 BacklinkRebuilder = Callable[[], bool]
 
@@ -58,6 +126,47 @@ def compact_memory_text(value: str) -> str:
         for token in re.split(r"[^a-z0-9]+", value.lower())
         if token
     )
+
+
+def significant_memory_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in memory_tokens(value)
+        if token not in MEMORY_STOPWORDS
+    }
+
+
+def has_negation(value: str) -> bool:
+    compact = compact_memory_text(value)
+    tokens = set(compact.split())
+    if tokens & NEGATION_TERMS:
+        return True
+    return bool(re.search(r"\b(?:do not|does not|did not|should not|don't|can't|cannot)\b", value, re.IGNORECASE))
+
+
+def _extract_option_groups(value: str) -> dict[str, set[str]]:
+    tokens = memory_tokens(value)
+    groups: dict[str, set[str]] = {}
+    for group, options in CONFLICT_OPTION_GROUPS.items():
+        matches = tokens & options
+        if matches:
+            groups[group] = matches
+    return groups
+
+
+def _extract_preference_pairs(value: str) -> list[tuple[set[str], set[str]]]:
+    pairs: list[tuple[set[str], set[str]]] = []
+    patterns = (
+        r"\bprefer(?:s|red)?\s+(?P<preferred>.+?)\s+over\s+(?P<rejected>.+?)(?:[.;]|$)",
+        r"\buse\s+(?P<preferred>.+?)\s+instead\s+of\s+(?P<rejected>.+?)(?:[.;]|$)",
+    )
+    for pattern in patterns:
+        for match in re.finditer(pattern, value, flags=re.IGNORECASE):
+            preferred = significant_memory_tokens(match.group("preferred"))
+            rejected = significant_memory_tokens(match.group("rejected"))
+            if preferred and rejected:
+                pairs.append((preferred, rejected))
+    return pairs
 
 
 def slim_memory(record: Mapping[str, object]) -> dict[str, object]:
@@ -571,6 +680,7 @@ def update_memory_page(
     timestamp: str,
     records: Iterable[Mapping[str, object]] | None = None,
     review_command: str = "review-memory",
+    allow_conflict: bool = False,
     log_writer: MemoryLogWriter | None = None,
     rebuild_backlinks: BacklinkRebuilder | None = None,
 ) -> dict[str, object]:
@@ -578,12 +688,31 @@ def update_memory_page(
     if not clean_text:
         raise ValueError("memory update text required")
     clean_source = source.strip() if source else "manual"
-    page_path, record, error = resolve_memory_page(wiki_dir, identifier, records=records)
+    record_list = [dict(item) for item in records] if records is not None else memory_records(wiki_dir)
+    page_path, record, error = resolve_memory_page(wiki_dir, identifier, records=record_list)
     if error:
         raise ValueError(error)
     assert page_path is not None and record is not None
     if not is_active_memory(record):
         raise ValueError("cannot update archived or stale memory; restore it first")
+    conflict_candidates = memory_conflict_candidates(
+        record_list,
+        clean_text,
+        str(record.get("title") or ""),
+        str(record.get("memory_type") or "note"),
+        str(record.get("scope") or "user"),
+        exclude_names=[str(record.get("name") or "")],
+    )
+    if conflict_candidates and not allow_conflict:
+        return {
+            "updated": False,
+            "conflict": True,
+            "message": "This update may conflict with another active memory. Explain, update, or archive the conflicting memory first, or pass allow_conflict if both should coexist.",
+            "name": record["name"],
+            "path": record["path"],
+            "title": record["title"],
+            "conflict_candidates": conflict_candidates,
+        }
 
     previous_review_status = str(record.get("review_status") or "pending")
     previous_update_count = frontmatter_int(record.get("update_count"))
@@ -630,6 +759,8 @@ def update_memory_page(
         "remaining_issue_count": len(issues),
         "remaining_issues": issues,
         "backlinks_rebuilt": bool(backlinks_rebuilt),
+        "conflict_override": bool(conflict_candidates and allow_conflict),
+        "conflict_candidates": conflict_candidates,
     }
 
 
@@ -644,6 +775,7 @@ def write_memory_page(
     timestamp: str,
     records: Iterable[Mapping[str, object]] | None = None,
     allow_duplicate: bool = False,
+    allow_conflict: bool = False,
     log_writer: MemoryLogWriter | None = None,
     rebuild_backlinks: BacklinkRebuilder | None = None,
 ) -> dict[str, object]:
@@ -677,6 +809,23 @@ def write_memory_page(
             "memory_type": memory_type,
             "scope": scope,
             "candidates": duplicate_candidates,
+        }
+    conflict_candidates = memory_conflict_candidates(
+        record_list,
+        clean_text,
+        title,
+        memory_type,
+        scope,
+    )
+    if conflict_candidates and not allow_conflict:
+        return {
+            "created": False,
+            "conflict": True,
+            "message": "This memory may conflict with an active memory. Review or update the existing memory, archive stale memory, or pass allow_conflict if both should coexist.",
+            "title": memory_title_value,
+            "memory_type": memory_type,
+            "scope": scope,
+            "conflict_candidates": conflict_candidates,
         }
 
     memories_dir = wiki_dir / "memories"
@@ -742,6 +891,8 @@ tags: {yaml_list(tag_values)}
         "backlinks_rebuilt": bool(backlinks_rebuilt),
         "duplicate_override": bool(duplicate_candidates and allow_duplicate),
         "duplicate_candidates": duplicate_candidates,
+        "conflict_override": bool(conflict_candidates and allow_conflict),
+        "conflict_candidates": conflict_candidates,
     }
 
 
@@ -1041,6 +1192,98 @@ def memory_duplicate_candidates(
     return [candidate for _, candidate in candidates[:limit]]
 
 
+def memory_conflict_candidates(
+    records: Iterable[Mapping[str, object]],
+    text: str,
+    title: str | None,
+    memory_type: str,
+    scope: str,
+    limit: int = 3,
+    exclude_names: Iterable[str] | None = None,
+) -> list[dict[str, object]]:
+    """Find active memories that may contradict the proposed memory."""
+    if memory_type not in MEMORY_CONFLICT_TYPES:
+        return []
+
+    title_value = memory_title(text, title)
+    new_text = f"{title_value} {text}"
+    new_all_tokens = memory_tokens(new_text)
+    new_tokens = significant_memory_tokens(new_text)
+    new_negated = has_negation(new_text)
+    new_groups = _extract_option_groups(new_text)
+    new_pairs = _extract_preference_pairs(new_text)
+    excluded = {name for name in (exclude_names or []) if name}
+    candidates: list[tuple[int, dict[str, object]]] = []
+
+    for record in records:
+        name = str(record.get("name") or "")
+        if name in excluded or not is_active_memory(record):
+            continue
+        record_type = str(record.get("memory_type") or "")
+        record_scope = str(record.get("scope") or "")
+        if record_type != memory_type:
+            continue
+        if scope != record_scope and "global" not in {scope, record_scope}:
+            continue
+
+        record_text = " ".join(
+            str(record.get(field) or "")
+            for field in ("title", "tldr", "snippet", "body")
+        )
+        record_all_tokens = memory_tokens(record_text)
+        record_tokens = significant_memory_tokens(record_text)
+        overlap = sorted(new_tokens & record_tokens)
+        union = new_tokens | record_tokens
+        overlap_ratio = (len(overlap) / len(union)) if union else 0.0
+        reasons: list[str] = []
+        score = 0
+
+        if new_negated != has_negation(record_text) and len(overlap) >= 1 and overlap_ratio >= 0.45:
+            score = max(score, 92)
+            reasons.append("opposite_negation")
+
+        record_groups = _extract_option_groups(record_text)
+        for group, new_options in new_groups.items():
+            record_options = record_groups.get(group)
+            if not record_options:
+                continue
+            if new_options == record_options:
+                continue
+            # Ambiguous memories that mention multiple options without a clear
+            # preference are left for review instead of automatic conflict.
+            if len(new_options) > 1 or len(record_options) > 1:
+                continue
+            context = CONFLICT_GROUP_CONTEXT.get(group, set())
+            context_matches = (
+                not context
+                or (
+                    bool(new_all_tokens & context)
+                    and bool(record_all_tokens & context)
+                )
+            )
+            if len(overlap) >= 2 or context_matches:
+                score = max(score, 88)
+                reasons.append(f"different_{group}")
+
+        record_pairs = _extract_preference_pairs(record_text)
+        for new_preferred, new_rejected in new_pairs:
+            for record_preferred, record_rejected in record_pairs:
+                if (new_preferred & record_rejected) and (new_rejected & record_preferred):
+                    score = max(score, 97)
+                    reasons.append("reversed_preference")
+
+        if score < 85:
+            continue
+        candidate = slim_memory(record)
+        candidate["conflict_score"] = min(score, 100)
+        candidate["conflict_reasons"] = sorted(set(reasons))
+        candidate["matching_terms"] = overlap[:12]
+        candidates.append((int(candidate["conflict_score"]), candidate))
+
+    candidates.sort(key=lambda item: (-item[0], str(item[1]["title"]).lower()))
+    return [candidate for _, candidate in candidates[:limit]]
+
+
 def memory_proposal_segments(text: str) -> list[str]:
     text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
     segments: list[str] = []
@@ -1180,6 +1423,7 @@ def propose_memories_from_text(
     limit: int = 10,
     writes_memory: bool = False,
 ) -> dict[str, object]:
+    record_list = [dict(record) for record in records]
     proposals: list[dict[str, object]] = []
     seen: set[str] = set()
     skipped = 0
@@ -1202,12 +1446,25 @@ def propose_memories_from_text(
         scope = str(classified["scope"])
         title = proposal_title(memory, memory_type)
         duplicate_candidates = memory_duplicate_candidates(
-            records,
+            record_list,
             memory,
             title,
             memory_type,
             scope,
         )
+        conflict_candidates = memory_conflict_candidates(
+            record_list,
+            memory,
+            title,
+            memory_type,
+            scope,
+        )
+        if duplicate_candidates:
+            suggested_action = "update-memory"
+        elif conflict_candidates:
+            suggested_action = "review-conflict"
+        else:
+            suggested_action = "remember"
         proposals.append({
             "title": title,
             "memory": memory,
@@ -1218,7 +1475,8 @@ def propose_memories_from_text(
             "reason": classified["reason"],
             "source": source,
             "duplicate_candidates": duplicate_candidates,
-            "suggested_action": "update-memory" if duplicate_candidates else "remember",
+            "conflict_candidates": conflict_candidates,
+            "suggested_action": suggested_action,
         })
         if len(proposals) >= limit:
             break

@@ -63,6 +63,8 @@ mcp = FastMCP(
         "neighborhood. Only call remember_memory when the user explicitly asks "
         "you to remember something; if it returns duplicate candidates, use "
         "update_memory on the existing memory instead of forcing a duplicate. "
+        "If it returns conflict candidates, ask the user whether to update or "
+        "archive the older memory before forcing a conflict. "
         "Use archive_memory instead of deleting stale or wrong memories."
     ),
 )
@@ -277,7 +279,12 @@ def _mark_memory_reviewed(identifier: str, note: str = "") -> dict[str, object]:
     return result
 
 
-def _update_memory_page(identifier: str, text: str, source: str = "mcp") -> dict[str, object]:
+def _update_memory_page(
+    identifier: str,
+    text: str,
+    source: str = "mcp",
+    allow_conflict: bool = False,
+) -> dict[str, object]:
     clean_text = _clean_text_input(text, max_len=4000)
     if not clean_text:
         raise ValueError("memory update text required")
@@ -295,6 +302,7 @@ def _update_memory_page(identifier: str, text: str, source: str = "mcp") -> dict
         timestamp=_utc_timestamp(),
         records=_memory_records(),
         review_command="review_memory",
+        allow_conflict=allow_conflict,
         log_writer=_append_log,
         rebuild_backlinks=rebuild_memory_backlinks,
     )
@@ -310,6 +318,7 @@ def _write_memory_page(
     tags: str = "",
     source: str = "mcp",
     allow_duplicate: bool = False,
+    allow_conflict: bool = False,
 ) -> dict[str, object]:
     clean_text = _clean_text_input(text, max_len=4000)
     if not clean_text:
@@ -332,6 +341,7 @@ def _write_memory_page(
         timestamp=_utc_timestamp(),
         records=_memory_records(),
         allow_duplicate=allow_duplicate,
+        allow_conflict=allow_conflict,
         log_writer=_append_log,
         rebuild_backlinks=rebuild_memory_backlinks,
     )
@@ -469,7 +479,12 @@ def explain_memory(identifier: str) -> str:
 
 
 @mcp.tool()
-def update_memory(identifier: str, memory: str, source: str = "mcp") -> str:
+def update_memory(
+    identifier: str,
+    memory: str,
+    source: str = "mcp",
+    allow_conflict: bool = False,
+) -> str:
     """Merge new information into an existing active memory.
 
     Use this when remember_memory returns a duplicate candidate or when the user
@@ -477,7 +492,7 @@ def update_memory(identifier: str, memory: str, source: str = "mcp") -> str:
     the memory body, logged, and marked pending review.
     """
     try:
-        result = _update_memory_page(identifier, memory, source=source)
+        result = _update_memory_page(identifier, memory, source=source, allow_conflict=allow_conflict)
     except ValueError as exc:
         return json.dumps({"updated": False, "error": str(exc)})
     return json.dumps(result, ensure_ascii=False)
@@ -517,12 +532,14 @@ def remember_memory(
     tags: str = "",
     source: str = "mcp",
     allow_duplicate: bool = False,
+    allow_conflict: bool = False,
 ) -> str:
     """Save a local agent memory as a Markdown page.
 
     Use only when the user explicitly asks you to remember something. The memory
     is written under wiki/memories/, indexed, logged, and kept local. Strong
     duplicates are refused unless allow_duplicate is true.
+    Potential conflicts are refused unless allow_conflict is true.
     memory_type: preference, decision, project, fact, or note.
     scope: user, project, or global.
     tags: optional comma-separated tags.
@@ -536,6 +553,7 @@ def remember_memory(
             tags=tags,
             source=source,
             allow_duplicate=allow_duplicate,
+            allow_conflict=allow_conflict,
         )
     except ValueError as exc:
         return json.dumps({"created": False, "error": str(exc)})

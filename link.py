@@ -872,6 +872,7 @@ def _update_memory_page(
     text: str,
     source: str = "manual",
     timestamp: str | None = None,
+    allow_conflict: bool = False,
 ) -> dict[str, object]:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
@@ -894,6 +895,7 @@ def _update_memory_page(
         timestamp=timestamp or _utc_timestamp(),
         records=_memory_records(wiki_dir),
         review_command="review-memory",
+        allow_conflict=allow_conflict,
         log_writer=lambda ts, operation, description, lines: _append_log(
             wiki_dir,
             ts,
@@ -915,6 +917,7 @@ def _write_memory_page(
     source: str = "manual",
     timestamp: str | None = None,
     allow_duplicate: bool = False,
+    allow_conflict: bool = False,
 ) -> dict[str, object]:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
@@ -940,6 +943,7 @@ def _write_memory_page(
         timestamp=timestamp or _utc_timestamp(),
         records=_memory_records(wiki_dir),
         allow_duplicate=allow_duplicate,
+        allow_conflict=allow_conflict,
         log_writer=lambda ts, operation, description, lines: _append_log(
             wiki_dir,
             ts,
@@ -1446,6 +1450,7 @@ def remember(
     tags: str | None = None,
     source: str = "manual",
     allow_duplicate: bool = False,
+    allow_conflict: bool = False,
     json_output: bool = False,
 ) -> int:
     if not text or not text.strip():
@@ -1461,6 +1466,7 @@ def remember(
             tags=tags,
             source=source,
             allow_duplicate=allow_duplicate,
+            allow_conflict=allow_conflict,
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"Could not remember: {exc}", file=sys.stderr)
@@ -1471,6 +1477,25 @@ def remember(
         return 0
 
     if not result.get("created"):
+        if result.get("conflict"):
+            print("Possible conflicting memory found")
+            print(f"Title requested: {result['title']}")
+            print(f"Type: {result['memory_type']}")
+            print(f"Scope: {result['scope']}")
+            print("")
+            print("Conflict candidates:")
+            for candidate in result.get("conflict_candidates", []):
+                reasons = ", ".join(candidate.get("conflict_reasons", []))
+                print(f"- {candidate['title']} ({candidate['path']})")
+                if reasons:
+                    print(f"  Reasons: {reasons}")
+            print("")
+            print("Next:")
+            first = next(iter(result.get("conflict_candidates", [])), None)
+            if first:
+                print(f"  python3 link.py explain-memory \"{first['name']}\" .")
+            print("  Update/archive the old memory, or use --allow-conflict only if both should coexist.")
+            return 0
         print("Similar memory already exists")
         print(f"Title requested: {result['title']}")
         print(f"Type: {result['memory_type']}")
@@ -1566,6 +1591,7 @@ def update_memory(
     identifier: str,
     text: str,
     source: str = "manual",
+    allow_conflict: bool = False,
     json_output: bool = False,
 ) -> int:
     if not text or not text.strip():
@@ -1577,6 +1603,7 @@ def update_memory(
             identifier,
             text,
             source=source,
+            allow_conflict=allow_conflict,
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"Could not update memory: {exc}", file=sys.stderr)
@@ -1584,6 +1611,24 @@ def update_memory(
 
     if json_output:
         print(json.dumps(result, indent=2))
+        return 0
+
+    if not result.get("updated") and result.get("conflict"):
+        print("Possible conflicting memory found")
+        print(f"Memory being updated: {result['title']} ({result['path']})")
+        print("")
+        print("Conflict candidates:")
+        for candidate in result.get("conflict_candidates", []):
+            reasons = ", ".join(candidate.get("conflict_reasons", []))
+            print(f"- {candidate['title']} ({candidate['path']})")
+            if reasons:
+                print(f"  Reasons: {reasons}")
+        print("")
+        print("Next:")
+        first = next(iter(result.get("conflict_candidates", [])), None)
+        if first:
+            print(f"  python3 link.py explain-memory \"{first['name']}\" .")
+        print("  Update/archive the conflicting memory, or use --allow-conflict only if both should coexist.")
         return 0
 
     print("Memory updated")
@@ -2132,6 +2177,7 @@ def main(argv: list[str] | None = None) -> int:
     remember_cmd.add_argument("--tags", default=None, help="comma-separated tags")
     remember_cmd.add_argument("--source", default="manual", help="where this memory came from")
     remember_cmd.add_argument("--allow-duplicate", action="store_true", help="create a new memory even if a strong duplicate exists")
+    remember_cmd.add_argument("--allow-conflict", action="store_true", help="create a memory even if it may conflict with an active memory")
     remember_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
     propose_cmd = sub.add_parser("propose-memories", help="propose durable memories from chat or session notes without writing them")
@@ -2145,6 +2191,7 @@ def main(argv: list[str] | None = None) -> int:
     update_memory_cmd.add_argument("text", help="new memory text to merge")
     update_memory_cmd.add_argument("target", nargs="?", default=".")
     update_memory_cmd.add_argument("--source", default="manual", help="where this update came from")
+    update_memory_cmd.add_argument("--allow-conflict", action="store_true", help="update even if the text may conflict with another active memory")
     update_memory_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
     recall_cmd = sub.add_parser("recall", help="search local agent memories")
@@ -2219,6 +2266,7 @@ def main(argv: list[str] | None = None) -> int:
             tags=args.tags,
             source=args.source,
             allow_duplicate=args.allow_duplicate,
+            allow_conflict=args.allow_conflict,
             json_output=args.json,
         )
     if args.command == "propose-memories":
@@ -2234,6 +2282,7 @@ def main(argv: list[str] | None = None) -> int:
             args.identifier,
             args.text,
             source=args.source,
+            allow_conflict=args.allow_conflict,
             json_output=args.json,
         )
     if args.command == "recall":

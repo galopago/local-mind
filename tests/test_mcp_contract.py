@@ -304,6 +304,28 @@ class McpContractTests(unittest.TestCase):
         self.assertTrue(override["duplicate_override"])
         self.assertEqual(override["name"], "prefer-release-branches-2")
 
+    def test_remember_memory_blocks_conflict(self):
+        conflict = json.loads(self.server.remember_memory(
+            "User prefers cloud personal memory for agents.",
+            title="Prefer cloud personal memory",
+            memory_type="preference",
+            scope="user",
+        ))
+        override = json.loads(self.server.remember_memory(
+            "User prefers cloud personal memory for agents.",
+            title="Prefer cloud personal memory",
+            memory_type="preference",
+            scope="user",
+            allow_conflict=True,
+        ))
+
+        self.assertFalse(conflict["created"])
+        self.assertTrue(conflict["conflict"])
+        self.assertEqual(conflict["conflict_candidates"][0]["name"], "prefer-local-personal-memory")
+        self.assertIn("different_storage_policy", conflict["conflict_candidates"][0]["conflict_reasons"])
+        self.assertTrue(override["created"])
+        self.assertTrue(override["conflict_override"])
+
     def test_update_memory_contract(self):
         reviewed = json.loads(self.server.review_memory("prefer-local-personal-memory", note="confirmed"))
         updated = json.loads(self.server.update_memory(
@@ -327,6 +349,31 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("update_count: 1", memory_text)
         self.assertNotIn("reviewed_at:", memory_text)
         self.assertIn("update-memory", log_text)
+
+    def test_update_memory_blocks_conflict_with_other_memory(self):
+        created = json.loads(self.server.remember_memory(
+            "User prefers release branches for Link work.",
+            title="Prefer release branches",
+            memory_type="preference",
+            scope="project",
+        ))
+        other = json.loads(self.server.remember_memory(
+            "User prefers dark mode for Link work.",
+            title="Prefer dark mode",
+            memory_type="preference",
+            scope="project",
+        ))
+        conflict = json.loads(self.server.update_memory(
+            "prefer-dark-mode",
+            "User prefers develop branches for Link work.",
+            source="unit test",
+        ))
+
+        self.assertTrue(created["created"])
+        self.assertTrue(other["created"])
+        self.assertFalse(conflict["updated"])
+        self.assertTrue(conflict["conflict"])
+        self.assertEqual(conflict["conflict_candidates"][0]["name"], "prefer-release-branches")
 
     def test_propose_memories_contract(self):
         created = json.loads(self.server.remember_memory(
@@ -353,6 +400,15 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["proposals"][0]["duplicate_candidates"][0]["name"], "prefer-release-branches")
         self.assertEqual(payload["proposals"][1]["memory_type"], "decision")
         self.assertEqual(payload["proposals"][1]["suggested_action"], "remember")
+
+    def test_propose_memories_reports_conflicts(self):
+        payload = json.loads(self.server.propose_memories(
+            "I prefer cloud personal memory for agents.",
+            source="unit test session",
+        ))
+
+        self.assertEqual(payload["proposals"][0]["suggested_action"], "review-conflict")
+        self.assertEqual(payload["proposals"][0]["conflict_candidates"][0]["name"], "prefer-local-personal-memory")
 
     def test_rebuild_backlinks_contract(self):
         backlinks_path = self.target / "wiki/_backlinks.json"

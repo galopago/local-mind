@@ -316,6 +316,10 @@ python3 ~/link/link.py update-memory prefer-feature-branches "Use focused branch
 python3 ~/link/link.py review-memory prefer-feature-branches ~/link --note "confirmed"
 ```
 
+If a new memory may contradict an active memory, Link reports conflict candidates
+instead of saving silently. Update or archive the old memory, or use
+`--allow-conflict` only when both memories should coexist.
+
 Maintain the wiki:
 
 ```bash
@@ -356,6 +360,10 @@ Full tool set: `memory_brief`, `memory_profile`, `memory_inbox`, `review_memory`
 `propose_memories`, `update_memory`, `archive_memory`, `restore_memory`,
 `get_context`, `get_pages`, `get_backlinks`, `get_graph`, `rebuild_backlinks`.
 
+Memory write tools return `duplicate_candidates` or `conflict_candidates` when
+the safer next step is review, update, or archive instead of creating another
+memory page.
+
 ## HTTP API
 
 `serve.py` exposes Link locally while the web viewer is running.
@@ -386,7 +394,7 @@ Common endpoints:
 |---------|-------------|
 | `python3 link.py demo` | Create `./link-demo` with a pre-ingested sample wiki. |
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
-| `python3 link.py remember "text" <dir>` | Save a local agent memory; strong duplicates are refused unless `--allow-duplicate` is set. |
+| `python3 link.py remember "text" <dir>` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
 | `python3 link.py propose-memories <file-or-text> <dir>` | Propose durable memories from notes without writing them. |
 | `python3 link.py brief "task" <dir>` | Prime an agent with profile counts, relevant memories, review warnings, and safe memory rules. |
 | `python3 link.py recall "query" <dir>` | Search local agent memories. |
@@ -394,7 +402,7 @@ Common endpoints:
 | `python3 link.py memory-inbox <dir>` | Show memories that need review or stronger metadata. |
 | `python3 link.py review-memory <name> <dir>` | Mark a confirmed memory as reviewed. |
 | `python3 link.py explain-memory <name> <dir>` | Explain provenance, lifecycle, graph links, review issues, and recall readiness. |
-| `python3 link.py update-memory <name> "text" <dir>` | Merge new text into an existing memory and reset review to pending. |
+| `python3 link.py update-memory <name> "text" <dir>` | Merge new text into an existing memory, blocking likely conflicts with other active memories by default. |
 | `python3 link.py archive-memory <name> <dir>` | Reversibly hide a stale or wrong memory from default recall. |
 | `python3 link.py restore-memory <name> <dir>` | Restore an archived memory to active recall. |
 | `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, and secret-looking content. |

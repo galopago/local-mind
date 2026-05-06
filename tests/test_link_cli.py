@@ -217,6 +217,34 @@ class LinkCliTests(unittest.TestCase):
         self.assertTrue(override["duplicate_override"])
         self.assertEqual(override["name"], "prefer-release-branches-2")
 
+    def test_remember_blocks_conflict_by_default(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.remember(
+                target,
+                "User prefers release branches for Link work.",
+                title="Prefer release branches",
+                memory_type="preference",
+                scope="project",
+            )
+
+        conflict_out = StringIO()
+        with redirect_stdout(conflict_out):
+            conflict_code = link_cli.remember(
+                target,
+                "User prefers develop branches for Link work.",
+                title="Prefer develop branches",
+                memory_type="preference",
+                scope="project",
+            )
+
+        self.assertEqual(conflict_code, 0)
+        self.assertIn("Possible conflicting memory found", conflict_out.getvalue())
+        self.assertIn("Prefer release branches", conflict_out.getvalue())
+        self.assertFalse((target / "wiki/memories/prefer-develop-branches.md").exists())
+
     def test_update_memory_merges_text_and_resets_review(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

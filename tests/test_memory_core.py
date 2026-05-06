@@ -11,6 +11,7 @@ from link_core.memory import (  # noqa: E402
     extract_wikilinks,
     mark_memory_reviewed,
     memory_brief,
+    memory_conflict_candidates,
     memory_explanation,
     memory_inbox,
     memory_log_entries,
@@ -119,6 +120,84 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(duplicate["name"], "prefer-release-branches")
         self.assertNotIn("body", duplicate)
         self.assertEqual(payload["proposals"][1]["memory_type"], "decision")
+
+    def test_memory_conflict_candidates_catch_branch_policy_changes(self):
+        records = [
+            {
+                "name": "prefer-release-branches",
+                "path": "wiki/memories/prefer-release-branches.md",
+                "title": "Prefer release branches",
+                "memory_type": "preference",
+                "scope": "project",
+                "status": "active",
+                "tldr": "User prefers release branches for Link work.",
+                "snippet": "User prefers release branches for Link work.",
+                "body": "User prefers release branches for Link work.",
+            }
+        ]
+
+        conflicts = memory_conflict_candidates(
+            records,
+            "User prefers develop branches for Link work.",
+            "Prefer develop branches",
+            "preference",
+            "project",
+        )
+
+        self.assertEqual(conflicts[0]["name"], "prefer-release-branches")
+        self.assertIn("different_branch_policy", conflicts[0]["conflict_reasons"])
+        self.assertNotIn("body", conflicts[0])
+
+    def test_memory_conflict_candidates_avoid_release_word_false_positive(self):
+        records = [
+            {
+                "name": "prefer-develop-branches",
+                "path": "wiki/memories/prefer-develop-branches.md",
+                "title": "Prefer develop branches",
+                "memory_type": "preference",
+                "scope": "project",
+                "status": "active",
+                "tldr": "User prefers develop branches for Link work.",
+                "snippet": "User prefers develop branches for Link work.",
+                "body": "User prefers develop branches for Link work.",
+            }
+        ]
+
+        conflicts = memory_conflict_candidates(
+            records,
+            "User wants release notes to include screenshots.",
+            "Prefer release notes screenshots",
+            "preference",
+            "project",
+        )
+
+        self.assertEqual(conflicts, [])
+
+    def test_memory_conflict_candidates_catch_negation(self):
+        records = [
+            {
+                "name": "want-screenshots",
+                "path": "wiki/memories/want-screenshots.md",
+                "title": "Want screenshots",
+                "memory_type": "preference",
+                "scope": "user",
+                "status": "active",
+                "tldr": "User wants screenshots in release notes.",
+                "snippet": "User wants screenshots in release notes.",
+                "body": "User wants screenshots in release notes.",
+            }
+        ]
+
+        conflicts = memory_conflict_candidates(
+            records,
+            "User does not want screenshots in release notes.",
+            "Avoid screenshots",
+            "preference",
+            "user",
+        )
+
+        self.assertEqual(conflicts[0]["name"], "want-screenshots")
+        self.assertIn("opposite_negation", conflicts[0]["conflict_reasons"])
 
     def test_memory_resolution_logs_and_recall_state(self):
         root = Path(tempfile.mkdtemp(prefix="link-memory-resolution-"))
@@ -439,6 +518,36 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertTrue(duplicate["duplicate"])
         self.assertEqual(duplicate["candidates"][0]["name"], "prefer-release-branches")
 
+        conflict = write_memory_page(
+            wiki,
+            "User prefers develop branches for Link work.",
+            title="Prefer develop branches",
+            memory_type="preference",
+            scope="project",
+            tags="git, develop",
+            source="unit test",
+            timestamp="2026-05-05T07:30:00Z",
+            records=memory_records(wiki),
+        )
+        self.assertFalse(conflict["created"])
+        self.assertTrue(conflict["conflict"])
+        self.assertEqual(conflict["conflict_candidates"][0]["name"], "prefer-release-branches")
+
+        conflict_override = write_memory_page(
+            wiki,
+            "User prefers develop branches for Link work.",
+            title="Prefer develop branches",
+            memory_type="preference",
+            scope="project",
+            tags="git, develop",
+            source="unit test",
+            timestamp="2026-05-05T07:45:00Z",
+            records=memory_records(wiki),
+            allow_conflict=True,
+        )
+        self.assertTrue(conflict_override["created"])
+        self.assertTrue(conflict_override["conflict_override"])
+
         duplicate_override = write_memory_page(
             wiki,
             "User prefers release branches for Link work.",
@@ -450,6 +559,7 @@ class MemoryCoreTests(unittest.TestCase):
             timestamp="2026-05-05T08:00:00Z",
             records=memory_records(wiki),
             allow_duplicate=True,
+            allow_conflict=True,
         )
         self.assertTrue(duplicate_override["created"])
         self.assertTrue(duplicate_override["duplicate_override"])
