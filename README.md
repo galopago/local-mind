@@ -287,7 +287,7 @@ Then use that Python in your MCP config:
 ```bash
 python3 -m unittest discover -s tests
 python3 scripts/check_release_hygiene.py
-python3 scripts/prepare_release.py 1.0.8 --dry-run
+git diff --check
 ```
 
 ## Daily Workflow
@@ -308,11 +308,11 @@ ingest raw/notes.md into Link
 Remember preferences and decisions directly:
 
 ```bash
-python3 ~/link/link.py remember "User prefers release/* branches for public release work." ~/link --title "Prefer release branches" --type preference --scope project
+python3 ~/link/link.py remember "User prefers feature branches for Link work." ~/link --title "Prefer feature branches" --type preference --scope project
 python3 ~/link/link.py recall "branch preference" ~/link
-python3 ~/link/link.py explain-memory prefer-release-branches ~/link
-python3 ~/link/link.py update-memory prefer-release-branches "Use release/* branches for public release work." ~/link
-python3 ~/link/link.py review-memory prefer-release-branches ~/link --note "confirmed"
+python3 ~/link/link.py explain-memory prefer-feature-branches ~/link
+python3 ~/link/link.py update-memory prefer-feature-branches "Use focused branches for public PR work." ~/link
+python3 ~/link/link.py review-memory prefer-feature-branches ~/link --note "confirmed"
 ```
 
 Maintain the wiki:
@@ -427,13 +427,13 @@ sources, and build outputs can be included by accident.
 ## Contributing
 
 Contributions should come through pull requests. Please target `develop` unless
-the maintainer asks for a different branch. `main` is the release branch.
+the maintainer asks for a different branch. `main` is the stable branch.
 
 Before opening a PR, run the local gate:
 
 ```bash
 python3 -m unittest discover -s tests
-python3 -m py_compile link.py serve.py scripts/check_release_hygiene.py scripts/prepare_release.py scripts/smoke_mcp_stdio.py mcp_package/link_mcp/server.py
+python3 -m py_compile link.py serve.py scripts/check_release_hygiene.py scripts/smoke_mcp_stdio.py mcp_package/link_mcp/server.py
 python3 scripts/check_release_hygiene.py
 bash -n integrations/*/install.sh integrations/*/uninstall.sh integrations/_shared/*.sh
 python3 link.py demo /tmp/link-mcp-smoke --force
@@ -445,39 +445,11 @@ In the PR description, include:
 
 - What changed.
 - How you tested it.
-- Whether it touches memory writes, installers, MCP behavior, HTTP endpoints, or release tooling.
+- Whether it touches memory writes, installers, MCP behavior, HTTP endpoints, or automation.
 - Screenshots or GIFs for UI changes.
 
 Do not include personal wiki data, raw sources, registry tokens, `.env` files, or
 local MCP credentials in a PR.
-
-## Maintainer Release
-
-Release publishing is maintainer-only. Contributors do not need PyPI or MCP
-Registry credentials.
-
-To prepare release files, run:
-
-```bash
-python3 scripts/prepare_release.py 1.0.8
-```
-
-This updates the package version files and moves `CHANGELOG.md` `Unreleased`
-notes into a dated release section.
-
-After the release PR merges to `main` and CI passes, the maintainer tags and
-publishes from a clean `main` checkout. The script prints the exact publish
-commands for the selected version:
-
-```bash
-git switch main
-git pull --ff-only
-git tag -a v1.0.8 -m "v1.0.8"
-git push origin v1.0.8
-```
-
-Never reuse a published PyPI version or move a public release tag. If a release
-needs another fix, bump to the next version.
 
 ## Project Structure
 
