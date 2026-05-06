@@ -2,6 +2,8 @@
 """Small Link command runner.
 
 Usage:
+  python link.py init [target]
+  python link.py serve [target]
   python link.py demo [target]
   python link.py status [target]
   python link.py doctor [target]
@@ -31,6 +33,7 @@ import argparse
 import fnmatch
 import json
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -2945,27 +2948,66 @@ def verify_mcp(
         print("    ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp")
         print("    Then rerun with: python3 link.py verify-mcp . --python ~/.link-mcp-venv/bin/python")
     if not wiki_exists:
-        print("  Create a wiki with an installer, or try: python3 link.py demo")
+        print("  Create a wiki with an installer, or try: python3 link.py init")
     print("")
     print("Result: needs attention")
     return 1
 
 
 def _copy_runtime_files(target: Path) -> None:
+    target.mkdir(parents=True, exist_ok=True)
     for name in ("serve.py", "link.py", "LINK.md", ".linkignore"):
         src = ROOT / name
-        if src.exists():
-            shutil.copy2(src, target / name)
+        dst = target / name
+        if src.exists() and src.resolve() != dst.resolve():
+            shutil.copy2(src, dst)
     core_src = ROOT / "mcp_package" / "link_core"
+    if not core_src.exists():
+        core_src = ROOT / "link_core"
     if core_src.exists():
         core_target = target / "link_core"
         core_target.mkdir(exist_ok=True)
         for src in core_src.glob("*.py"):
-            shutil.copy2(src, core_target / src.name)
+            dst = core_target / src.name
+            if src.resolve() != dst.resolve():
+                shutil.copy2(src, dst)
     for name in ("logo.png", "logo.svg"):
         src = ROOT / name
-        if src.exists():
-            shutil.copy2(src, target / name)
+        dst = target / name
+        if src.exists() and src.resolve() != dst.resolve():
+            shutil.copy2(src, dst)
+
+
+def init_wiki(target: Path) -> int:
+    target = target.expanduser().resolve()
+    target.mkdir(parents=True, exist_ok=True)
+    _copy_runtime_files(target)
+    fixes = _apply_doctor_fixes(target)
+
+    print(f"Link wiki ready at {target}")
+    if fixes:
+        print("")
+        print("Initialized:")
+        for item in fixes:
+            print(f"  - {item}")
+    print("")
+    print("Next:")
+    print("  link status --validate")
+    print("  link serve")
+    print("  Drop sources into raw/ and ask your agent: ingest raw/<file> into Link")
+    return 0
+
+
+def serve_wiki(target: Path, port: int = 3000) -> int:
+    target = target.expanduser().resolve()
+    serve_path = target / "serve.py"
+    if not serve_path.exists():
+        print(f"Link viewer missing: {serve_path}")
+        print("")
+        print("Next:")
+        print(f"  link init {shlex.quote(str(target))}")
+        return 1
+    return subprocess.run([sys.executable, str(serve_path), "--port", str(port)]).returncode
 
 
 def create_demo(target: Path, force: bool = False) -> None:
@@ -3012,8 +3054,7 @@ def create_demo(target: Path, force: bool = False) -> None:
     print(f"Link demo created at {target}")
     print("")
     print("View it:")
-    print(f"  cd {target}")
-    print("  python3 serve.py")
+    print(f"  python3 link.py serve {shlex.quote(str(target))}")
     print("")
     print("Then open:")
     print("  http://localhost:3000")
@@ -3023,6 +3064,13 @@ def create_demo(target: Path, force: bool = False) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="link.py", description="Link command runner")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    init_cmd = sub.add_parser("init", help="create or repair a normal Link wiki")
+    init_cmd.add_argument("target", nargs="?", default=".")
+
+    serve_cmd = sub.add_parser("serve", help="start the local Link web viewer")
+    serve_cmd.add_argument("target", nargs="?", default=".")
+    serve_cmd.add_argument("--port", type=int, default=3000)
 
     demo = sub.add_parser("demo", help="create a pre-ingested sample Link wiki")
     demo.add_argument("target", nargs="?", default=DEFAULT_DEMO_DIR)
@@ -3192,6 +3240,10 @@ def main(argv: list[str] | None = None) -> int:
     verify_mcp_cmd.add_argument("--python", default=None, help="Python executable to verify")
 
     args = parser.parse_args(argv)
+    if args.command == "init":
+        return init_wiki(Path(args.target))
+    if args.command == "serve":
+        return serve_wiki(Path(args.target), port=args.port)
     if args.command == "demo":
         create_demo(Path(args.target), force=args.force)
         return 0

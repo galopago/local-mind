@@ -1,10 +1,12 @@
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +22,84 @@ def create_demo_quiet(target: Path, force: bool = False) -> None:
 
 
 class LinkCliTests(unittest.TestCase):
+    def test_init_creates_empty_wiki(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-init-test-"))
+        target = tmp / "my-link"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.init_wiki(target)
+
+        self.assertEqual(code, 0)
+        self.assertTrue((target / "serve.py").exists())
+        self.assertTrue((target / "link.py").exists())
+        self.assertTrue((target / "LINK.md").exists())
+        self.assertTrue((target / "link_core/frontmatter.py").exists())
+        self.assertTrue((target / "raw").is_dir())
+        self.assertTrue((target / "wiki/index.md").exists())
+        self.assertTrue((target / "wiki/log.md").exists())
+        self.assertTrue((target / "wiki/_backlinks.json").exists())
+        self.assertTrue((target / "wiki/sources").is_dir())
+        self.assertTrue((target / "wiki/memories").is_dir())
+
+        backlinks = json.loads((target / "wiki/_backlinks.json").read_text(encoding="utf-8"))
+        self.assertIn("backlinks", backlinks)
+        self.assertIn("forward", backlinks)
+        self.assertIn("link status --validate", out.getvalue())
+        self.assertIn("link serve", out.getvalue())
+
+    def test_init_preserves_existing_pages(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-init-test-"))
+        target = tmp / "my-link"
+        page = target / "wiki/concepts/custom.md"
+        page.parent.mkdir(parents=True)
+        page.write_text("# Custom\n", encoding="utf-8")
+
+        with redirect_stdout(StringIO()):
+            code = link_cli.init_wiki(target)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(page.read_text(encoding="utf-8"), "# Custom\n")
+
+    def test_init_copies_core_from_installed_runtime_layout(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-init-test-"))
+        runtime = tmp / "runtime"
+        runtime.mkdir()
+        for name in ("serve.py", "link.py", "LINK.md", ".linkignore"):
+            (runtime / name).write_text(f"# {name}\n", encoding="utf-8")
+        (runtime / "link_core").mkdir()
+        (runtime / "link_core/frontmatter.py").write_text("# core\n", encoding="utf-8")
+        target = tmp / "my-link"
+
+        with patch.object(link_cli, "ROOT", runtime), redirect_stdout(StringIO()):
+            code = link_cli.init_wiki(target)
+
+        self.assertEqual(code, 0)
+        self.assertTrue((target / "link_core/frontmatter.py").exists())
+
+    def test_serve_runs_target_viewer(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-serve-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        with patch.object(link_cli.subprocess, "run") as run:
+            run.return_value.returncode = 0
+            code = link_cli.serve_wiki(target, port=3010)
+
+        self.assertEqual(code, 0)
+        run.assert_called_once_with([sys.executable, str(target.resolve() / "serve.py"), "--port", "3010"])
+
+    def test_serve_reports_missing_viewer(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-serve-test-"))
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.serve_wiki(tmp / "missing")
+
+        self.assertEqual(code, 1)
+        self.assertIn("Link viewer missing", out.getvalue())
+        self.assertIn("link init", out.getvalue())
+
     def test_demo_creates_preingested_wiki(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-demo-test-"))
         target = tmp / "demo"
@@ -1226,7 +1306,7 @@ class LinkCliTests(unittest.TestCase):
 
         self.assertEqual(code, 1)
         self.assertIn("Wiki: missing", out.getvalue())
-        self.assertIn("python3 link.py demo", out.getvalue())
+        self.assertIn("python3 link.py init", out.getvalue())
 
     def test_doctor_reports_dead_links(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))

@@ -21,6 +21,8 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.
 - Added `link.py status --validate` to installer next-step output so new users have one readiness command after setup.
 - Added a managed `~/.local/bin/link` command for global installs so users can run `link status --validate`, `link query`, and `link brief` without remembering wiki paths.
+- Added `link init` to create or repair a normal Link wiki without loading demo content.
+- Added `link serve` to start the local web viewer without remembering `serve.py` paths.
 - Added clearer product framing in the README and local home page for the distinction between source-backed wiki knowledge and explicit agent memory.
 - Added a wider graph page layout with fullscreen mode so larger wikis can be explored without being squeezed into the reading column.
 - Added duplicate protection for `remember`/`remember_memory`; strong duplicate memories are refused unless explicitly allowed.

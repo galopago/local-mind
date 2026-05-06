@@ -111,7 +111,7 @@ if [ "$IS_UPDATE" = false ]; then
     done
 
     if [ ! -f "$TARGET_DIR/wiki/_backlinks.json" ]; then
-        echo '{}' > "$TARGET_DIR/wiki/_backlinks.json"
+        printf '{\n  "backlinks": {},\n  "forward": {}\n}\n' > "$TARGET_DIR/wiki/_backlinks.json"
         echo "  Created wiki/_backlinks.json"
     fi
 

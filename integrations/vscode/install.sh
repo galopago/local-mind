@@ -65,10 +65,10 @@ echo ""
 echo "Done."
 if [ "$MODE" = "--project" ]; then
     echo "  Drop sources into raw/ and say 'ingest' to process them."
-    echo "  View wiki: python serve.py"
+    echo "  View wiki: python3 link.py serve"
 else
     echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
-    echo "  View wiki: python ~/link/serve.py"
+    echo "  View wiki: link serve"
 fi
 echo ""
 echo "  MCP: add to .vscode/mcp.json:"

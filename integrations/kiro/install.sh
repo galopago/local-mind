@@ -57,7 +57,7 @@ PYEOF
     echo ""
     echo "Done."
     echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
-    echo "  View wiki: python ~/link/serve.py"
+    echo "  View wiki: link serve"
 
 elif [ "$MODE" = "--project" ]; then
     INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
@@ -71,7 +71,7 @@ elif [ "$MODE" = "--project" ]; then
     echo ""
     echo "Done."
     echo "  Drop sources into raw/ and say 'ingest' to process them."
-    echo "  View wiki: python serve.py"
+    echo "  View wiki: python3 link.py serve"
 else
     echo "Usage: bash install.sh [--project]"
     exit 1

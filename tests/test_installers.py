@@ -53,7 +53,8 @@ class InstallerTests(unittest.TestCase):
             with self.subTest(installer=installer.name):
                 text = installer.read_text(encoding="utf-8")
                 self.assertIn('if [ "$MODE" = "--project" ]; then', text)
-                self.assertIn("View wiki: python serve.py", text)
+                self.assertIn("View wiki: python3 link.py serve", text)
+                self.assertIn("View wiki: link serve", text)
 
     def test_codex_and_kiro_update_existing_mcp_registration(self):
         codex = (ROOT / "integrations/codex/install.sh").read_text(encoding="utf-8")

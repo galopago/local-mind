@@ -79,8 +79,7 @@ Try Link with a finished, pre-ingested wiki:
 git clone https://github.com/gowtham0992/link.git
 cd link
 python3 link.py demo
-cd link-demo
-python3 serve.py
+python3 link.py serve link-demo
 ```
 
 Open:
@@ -95,9 +94,9 @@ Open:
 Then check the demo:
 
 ```bash
-python3 link.py memory-audit
-python3 link.py doctor
-python3 link.py ingest-status
+python3 link.py memory-audit link-demo
+python3 link.py doctor link-demo
+python3 link.py ingest-status link-demo
 ```
 
 The demo includes source pages, concept pages, a memory page, backlinks, search,
@@ -288,8 +287,7 @@ You own the files. Agents maintain them.
 git clone https://github.com/gowtham0992/link.git
 cd link
 python3 link.py demo
-cd link-demo
-python3 serve.py
+python3 link.py serve link-demo
 ```
 
 ### I Want My Agent To Use Link
@@ -434,8 +432,7 @@ link verify-mcp
 View the wiki:
 
 ```bash
-cd ~/link
-python3 serve.py
+link serve
 ```
 
 Obsidian also works: open `~/link/wiki/` as a vault.
@@ -523,6 +520,8 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 
 | Command | What it does |
 |---------|-------------|
+| `link init [dir]` | Create or repair a normal Link wiki without demo content. |
+| `link serve [dir] [--port 3000]` | Start the local web viewer for a Link wiki. |
 | `link status [--validate]` | Show local readiness, page/memory counts, optional validation summary, and next actions. |
 | `link ingest-status` | Show pending raw files and graph index status. |
 | `link remember "text" [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
