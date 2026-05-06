@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.memory import (  # noqa: E402
+    add_capture_review_to_brief,
     extract_wikilinks,
     forget_memory_page,
     mark_memory_reviewed,
@@ -140,6 +141,17 @@ class MemoryCoreTests(unittest.TestCase):
             ["memory_review_backlog", "raw_capture_backlog", "capture_secret_warnings"],
         )
         self.assertEqual(audit["next_actions"], actions)
+
+    def test_add_capture_review_to_brief_adds_capture_guidance(self):
+        payload = {"agent_guidance": ["Use memory first."]}
+        captures = {"count": 1, "warning_count": 1, "items": []}
+
+        brief = add_capture_review_to_brief(payload, captures)
+
+        self.assertEqual(brief["captures"], captures)
+        self.assertEqual(payload["agent_guidance"], ["Use memory first."])
+        self.assertIn("Review 1 saved raw capture", brief["agent_guidance"][1])
+        self.assertIn("Redact raw captures", brief["agent_guidance"][2])
 
     def test_memory_inbox_filters_project_scoped_memories(self):
         base = {

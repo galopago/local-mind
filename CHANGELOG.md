@@ -46,6 +46,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added a tool contract guard in CI to keep public CLI commands, MCP tools, and README references from drifting.
 - Tightened memory mutation adapters so CLI and MCP memory writes share more core behavior with fewer runtime-side exceptions.
 - Extracted shared memory audit risk-factor logic into core so CLI, web, and MCP report the same health semantics.
+- Extracted shared memory brief capture guidance into core and removed the last allowed large duplicate runtime helper.
 - Added raw capture status to CLI and MCP memory briefs so session priming surfaces saved captures and secret-warning captures.
 - Added `/brief` and `/api/memory-brief` so the local web UI and HTTP clients can get startup memory context, review warnings, and raw capture status.
 - Added `memory-audit` and MCP `memory_audit` for a read-only health report covering memory backlog, raw captures, risk factors, and next actions.

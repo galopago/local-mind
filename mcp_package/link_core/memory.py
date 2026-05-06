@@ -1349,6 +1349,28 @@ def memory_audit_report(
     }
 
 
+def add_capture_review_to_brief(
+    payload: Mapping[str, object],
+    captures: Mapping[str, object],
+) -> dict[str, object]:
+    """Attach raw-capture review state and guidance to a memory brief."""
+    result = dict(payload)
+    capture_payload = dict(captures)
+    guidance = [str(item) for item in result.get("agent_guidance", [])]
+    result["captures"] = capture_payload
+    capture_count = int(capture_payload.get("count") or 0)
+    warning_count = int(capture_payload.get("warning_count") or 0)
+    if capture_count:
+        plural = "s" if capture_count != 1 else ""
+        guidance.append(
+            f"Review {capture_count} saved raw capture{plural} before accepting or deleting capture state."
+        )
+    if warning_count:
+        guidance.append("Redact raw captures with secret warnings before sharing snippets or using their contents.")
+    result["agent_guidance"] = guidance
+    return result
+
+
 def memory_brief(
     records: Iterable[Mapping[str, object]],
     query: str = "",

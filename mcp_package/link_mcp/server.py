@@ -86,6 +86,7 @@ MAX_TEXT_INPUT = 200
 MAX_CAPTURE_INPUT = 12000
 
 from link_core.memory import (
+    add_capture_review_to_brief as _core_add_capture_review_to_brief,
     count_values as _core_count_values,
     forget_memory_page as _core_forget_memory_page,
     mark_memory_reviewed as _core_mark_memory_reviewed,
@@ -272,21 +273,10 @@ def _memory_profile(limit: int = 10, project: str = "") -> dict[str, object]:
 def _memory_brief(query: str = "", limit: int = 6, project: str = "") -> dict[str, object]:
     project_name = _resolve_project(project)
     payload = _core_memory_brief(
-        _memory_records(),
-        query=_clean_text_input(query, max_len=500),
-        limit=limit,
-        review_command="review_memory",
-        project=project_name,
+        _memory_records(), query=_clean_text_input(query, max_len=500),
+        limit=limit, review_command="review_memory", project=project_name,
     )
-    payload["captures"] = _capture_review_summary(project=project_name)
-    if payload["captures"]["count"]:
-        capture_count = payload["captures"]["count"]
-        payload["agent_guidance"].append(
-            f"Review {capture_count} saved raw capture{'s' if capture_count != 1 else ''} before accepting or deleting capture state."
-        )
-    if payload["captures"]["warning_count"]:
-        payload["agent_guidance"].append("Redact raw captures with secret warnings before sharing snippets or using their contents.")
-    return payload
+    return _core_add_capture_review_to_brief(payload, _capture_review_summary(project=project_name))
 
 
 def _query_link(query: str, budget: str = "medium", project: str = "") -> dict[str, object]:

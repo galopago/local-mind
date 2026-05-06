@@ -17,11 +17,8 @@ RUNTIME_FILES = (
 EXACT_DUPLICATE_LINE_THRESHOLD = 12
 LARGE_DUPLICATE_LINE_THRESHOLD = 20
 
-# These are still runtime-specific adapters around shared core calls. New large
-# duplicate helpers should be extracted instead of added here.
-ALLOWED_LARGE_DUPLICATE_NAMES = {
-    "_memory_brief",
-}
+# New large duplicate runtime helpers should be extracted instead of added here.
+ALLOWED_LARGE_DUPLICATE_NAMES: set[str] = set()
 
 
 @dataclass(frozen=True)

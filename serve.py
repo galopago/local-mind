@@ -10,6 +10,7 @@ if (_BUNDLED_CORE / "link_core").exists():
     sys.path.insert(0, str(_BUNDLED_CORE))
 
 from link_core.memory import (
+    add_capture_review_to_brief as _core_add_capture_review_to_brief,
     count_values as _core_count_values,
     is_active_memory as _core_is_active_memory,
     memory_action_hints as _core_memory_action_hints,
@@ -471,22 +472,13 @@ def _memory_brief(query: str = "", limit: int = 6, project: str | None = None) -
     limit = max(1, min(limit, 20))
     project_name = _core_normalize_project(project)
     payload = _core_memory_brief(
-        _memory_records(),
-        query=query,
-        limit=limit,
-        review_command="review-memory",
-        project=project_name,
+        _memory_records(), query=query, limit=limit,
+        review_command="review-memory", project=project_name,
     )
-    captures = _capture_review_summary(project=project_name, limit=min(limit, 10))
-    payload["captures"] = captures
-    if captures["count"]:
-        capture_count = captures["count"]
-        payload["agent_guidance"].append(
-            f"Review {capture_count} saved raw capture{'s' if capture_count != 1 else ''} before accepting or deleting capture state."
-        )
-    if captures["warning_count"]:
-        payload["agent_guidance"].append("Redact raw captures with secret warnings before sharing snippets or using their contents.")
-    return payload
+    return _core_add_capture_review_to_brief(
+        payload,
+        _capture_review_summary(project=project_name, limit=min(limit, 10)),
+    )
 
 
 def _memory_dashboard(limit: int = 12, project: str | None = None) -> dict[str, object]:

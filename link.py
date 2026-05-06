@@ -99,6 +99,7 @@ if (_BUNDLED_CORE / "link_core").exists():
     sys.path.insert(0, str(_BUNDLED_CORE))
 
 from link_core.memory import (
+    add_capture_review_to_brief as _core_add_capture_review_to_brief,
     count_values as _core_count_values,
     forget_memory_page as _core_forget_memory_page,
     mark_memory_reviewed as _core_mark_memory_reviewed,
@@ -2557,14 +2558,10 @@ def brief(
         return 1
     project_name = project or _default_project(target)
     payload = _memory_brief(wiki_dir, query=query, limit=limit, project=project_name)
-    payload["captures"] = _capture_review_summary(target, project=project_name)
-    if payload["captures"]["count"]:
-        capture_count = payload["captures"]["count"]
-        payload["agent_guidance"].append(
-            f"Review {capture_count} saved raw capture{'s' if capture_count != 1 else ''} before accepting or deleting capture state."
-        )
-    if payload["captures"]["warning_count"]:
-        payload["agent_guidance"].append("Redact raw captures with secret warnings before sharing snippets or using their contents.")
+    payload = _core_add_capture_review_to_brief(
+        payload,
+        _capture_review_summary(target, project=project_name),
+    )
 
     if json_output:
         print(json.dumps(payload, indent=2))
