@@ -62,6 +62,7 @@ CHANGELOG_VERSION_RE = re.compile(r"^## \[([^\]]+)\](?: - \d{4}-\d{2}-\d{2})?\s*
 AGENT_CONTRACT_REQUIREMENTS = {
     Path("LINK.md"): ("query_link", "validate_wiki", "memory_brief"),
     Path("README.md"): ("query_link", "validate_wiki", "memory_brief"),
+    Path("mcp_package/README.md"): ("query_link", "validate_wiki", "memory_brief"),
     Path("integrations/_shared/link-instructions.md"): ("query_link", "validate_wiki", "memory_brief"),
     Path("integrations/_shared/link-instructions-project.md"): ("query_link", "validate_wiki", "memory_brief"),
 }
