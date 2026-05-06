@@ -348,15 +348,16 @@ When the human adds a new source to `raw/` and asks you to process it:
 
 When the human asks a question:
 
-1. Start with the smart query path when available: MCP `query_link`, `python3 link.py query "<question>" .`, or `GET /api/query-link?q=<question>`. This returns a compact context packet with relevant memory, ranked wiki results, graph context, selection reasons, budget reports, and follow-up tool actions. Do not read the whole wiki unless the packet is insufficient; if it is budget-limited, use the returned `follow_up` action first.
-2. If the question only needs session priming or personal/project preferences, use `python3 link.py brief "<question>" .` or MCP `memory_brief`. Use `profile`/`memory_profile` and `recall`/`recall_memory` afterward only when you need deeper detail.
-3. **If you need full source-backed context for one topic:** call `GET /api/context?topic=<question>` or MCP `get_context` — returns the best matching page plus related pages via graph traversal.
-4. **If server/MCP is not available:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
-5. Read only the relevant pages or packet items and synthesize an answer.
-6. Cite your sources with [[wiki-links]].
-7. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
-8. If yes, create a page in the appropriate directory following its template.
-9. Append to `wiki/log.md`.
+1. If you are connecting to Link for the first time or troubleshooting setup, call MCP `link_status` or `GET /api/status?validate=true`.
+2. Start with the smart query path when available: MCP `query_link`, `python3 link.py query "<question>" .`, or `GET /api/query-link?q=<question>`. This returns a compact context packet with relevant memory, ranked wiki results, graph context, selection reasons, budget reports, and follow-up tool actions. Do not read the whole wiki unless the packet is insufficient; if it is budget-limited, use the returned `follow_up` action first.
+3. If the question only needs session priming or personal/project preferences, use `python3 link.py brief "<question>" .` or MCP `memory_brief`. Use `profile`/`memory_profile` and `recall`/`recall_memory` afterward only when you need deeper detail.
+4. **If you need full source-backed context for one topic:** call `GET /api/context?topic=<question>` or MCP `get_context` — returns the best matching page plus related pages via graph traversal.
+5. **If server/MCP is not available:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
+6. Read only the relevant pages or packet items and synthesize an answer.
+7. Cite your sources with [[wiki-links]].
+8. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
+9. If yes, create a page in the appropriate directory following its template.
+10. Append to `wiki/log.md`.
 
 ### 4. Lint
 
@@ -569,6 +570,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
+| `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions |
 | `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context: relevant memories, review warnings, capture status, and safe rules |
 | `POST /api/propose-memories` | Propose memories from JSON `{ "text": "..." }` without writing pages |
 | `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; mark a memory reviewed |

@@ -12,6 +12,7 @@ from typing import Any
 
 
 EXPECTED_TOOLS = {
+    "link_status",
     "query_link",
     "validate_wiki",
     "search_wiki",
@@ -59,6 +60,17 @@ async def _run_smoke(wiki_dir: Path, python: str) -> None:
             missing = sorted(EXPECTED_TOOLS - tool_names)
             if missing:
                 raise RuntimeError(f"missing MCP tools: {', '.join(missing)}")
+
+            status = _json_text(
+                await session.call_tool(
+                    "link_status",
+                    {"include_validation": True},
+                    read_timeout_seconds=timedelta(seconds=10),
+                ),
+                "link_status",
+            )
+            if not status.get("ready") or status.get("validation", {}).get("passed") is not True:
+                raise RuntimeError("link_status did not report the demo wiki as ready")
 
             search = _json_text(
                 await session.call_tool(

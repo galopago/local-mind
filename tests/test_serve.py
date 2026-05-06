@@ -460,6 +460,39 @@ class ServeTests(unittest.TestCase):
         self.assertIn("budget_report", payload)
         self.assertIn("follow_up", payload)
 
+    def test_status_api_returns_readiness_summary(self):
+        wiki = self.make_wiki()
+        for dirname in ("sources", "concepts", "entities", "memories", "comparisons", "explorations"):
+            (wiki / dirname).mkdir(exist_ok=True)
+        write_page(
+            wiki,
+            "memories/prefer-local-memory.md",
+            "---\n"
+            "type: memory\n"
+            "title: Prefer local memory\n"
+            "memory_type: preference\n"
+            "scope: user\n"
+            "status: active\n"
+            "date_captured: \"2026-05-05T00:00:00Z\"\n"
+            "source: unit-test\n"
+            "review_status: reviewed\n"
+            "---\n\n"
+            "# Prefer local memory\n\n"
+            "> **TLDR:** User prefers local memory.\n\n"
+            "## Memory\n\nUser prefers local memory.\n\n"
+            "## Source\n\nunit-test\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(serve._build_backlinks()), encoding="utf-8")
+        reset_wiki(wiki)
+
+        status, payload = run_handler("GET", "/api/status?validate=true")
+
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["memory_count"], 1)
+        self.assertTrue(payload["validation"]["passed"])
+        self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
+
     def test_memory_inbox_and_explain_render_action_commands(self):
         wiki = self.make_wiki()
         write_page(

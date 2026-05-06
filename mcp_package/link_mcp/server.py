@@ -25,6 +25,7 @@ Add to your MCP client config:
 """
 from __future__ import annotations
 import argparse, json, re, sys
+from importlib import metadata
 from pathlib import Path
 
 # ── Resolve wiki directory ────────────────────────────────────────────
@@ -123,6 +124,9 @@ from link_core.query import (
 )
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
+)
+from link_core.status import (
+    link_status as _core_link_status,
 )
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
@@ -280,6 +284,25 @@ def _query_link(query: str, budget: str = "medium", project: str = "") -> dict[s
 
 def _validate_wiki(strict: bool = False) -> dict[str, object]:
     return _core_validate_wiki(WIKI_DIR, strict=bool(strict))
+
+
+def _package_version() -> str:
+    try:
+        return metadata.version("link-mcp")
+    except metadata.PackageNotFoundError:
+        init_path = Path(__file__).with_name("__init__.py")
+        match = re.search(r'^__version__\s*=\s*"([^"]+)"', init_path.read_text(encoding="utf-8"), flags=re.MULTILINE)
+        return match.group(1) if match else "unknown"
+
+
+def _link_status(include_validation: bool = False) -> dict[str, object]:
+    return _core_link_status(
+        WIKI_DIR,
+        version=_package_version(),
+        cache=_build_cache(),
+        records=_memory_records(),
+        include_validation=include_validation,
+    )
 
 
 def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
@@ -817,6 +840,17 @@ def query_link(query: str, budget: str = "medium", project: str = "") -> str:
     budget: small, medium, or large.
     """
     return json.dumps(_query_link(query=query, budget=budget, project=project), ensure_ascii=False)
+
+
+@mcp.tool()
+def link_status(include_validation: bool = False) -> str:
+    """Return a compact Link readiness summary.
+
+    Use this when connecting to Link or troubleshooting setup. It reports the
+    wiki path, package version, page/memory counts, missing required paths,
+    optional validation summary, and safe next actions.
+    """
+    return json.dumps(_link_status(include_validation=include_validation), ensure_ascii=False)
 
 
 @mcp.tool()

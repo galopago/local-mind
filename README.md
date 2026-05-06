@@ -404,6 +404,7 @@ Most agents should start with:
 
 | Tool | Use it when |
 |------|-------------|
+| `link_status` | You are connecting to Link or troubleshooting setup and need version, readiness, counts, validation summary, and safe next actions. |
 | `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, graph context, budget limits, and follow-up actions without reading the whole wiki. |
 | `validate_wiki` | You just ingested sources or substantially edited pages and need to verify page shape, links, and backlink freshness before reporting done. |
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory, review warnings, and saved capture status. |
@@ -423,7 +424,7 @@ Most agents should start with:
 | `delete_capture` | The user explicitly confirms deleting a saved raw capture. |
 | `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
 
-Full tool set: `query_link`, `validate_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
+Full tool set: `link_status`, `query_link`, `validate_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
@@ -450,6 +451,7 @@ Common endpoints:
 
 | Endpoint | Description |
 |----------|-------------|
+| `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions. |
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |
 | `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context for an agent, including relevant memories, review warnings, and capture status. |

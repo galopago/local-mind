@@ -43,6 +43,9 @@ from link_core.query import (
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
 )
+from link_core.status import (
+    link_status as _core_link_status,
+)
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
@@ -2395,6 +2398,15 @@ def _validate_wiki_payload(strict: bool = False) -> dict[str, object]:
     return _core_validate_wiki(WIKI_DIR, strict=strict)
 
 
+def _link_status_payload(include_validation: bool = False) -> dict[str, object]:
+    return _core_link_status(
+        WIKI_DIR,
+        cache=_current_wiki_cache(),
+        records=_memory_records(),
+        include_validation=include_validation,
+    )
+
+
 # ---------------------------------------------------------------------------
 # HTTP handler
 # ---------------------------------------------------------------------------
@@ -2517,6 +2529,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else: self._err(urllib.parse.unquote(path[6:]))
         elif path == "/api/pages":
             self._json(_all_pages())
+        elif path == "/api/status":
+            include_validation = query.get("validate", ["false"])[0].lower() in {"1", "true", "yes"}
+            self._json(_link_status_payload(include_validation=include_validation))
         elif path == "/api/backlinks":
             data, error = _load_backlinks_index()
             if error:

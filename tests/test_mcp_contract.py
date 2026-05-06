@@ -126,6 +126,15 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("budget_report", payload)
         self.assertIn("follow_up", payload)
 
+    def test_link_status_contract(self):
+        payload = json.loads(self.server.link_status(include_validation=True))
+
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["page_count"], 13)
+        self.assertEqual(payload["memory_count"], 1)
+        self.assertTrue(payload["validation"]["passed"])
+        self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
+
     def test_validate_wiki_contract(self):
         payload = json.loads(self.server.validate_wiki())
 
