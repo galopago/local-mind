@@ -1239,7 +1239,7 @@ def memory_brief(
     inbox = memory_inbox(record_list, limit=limit, review_command=review_command)
 
     if q:
-        relevant = recall_memories(record_list, q, limit=limit)
+        relevant = recall_memories(record_list, q, limit=limit, project=project_name)
         selection = "query"
     else:
         relevant = []
@@ -1326,6 +1326,22 @@ def score_memory(record: Mapping[str, object], query: str) -> int:
     return score
 
 
+def memory_rank_score(record: Mapping[str, object], match_score: int, project: str | None = None) -> int:
+    rank_score = match_score
+    project_name = normalize_project(project)
+    record_scope = str(record.get("scope") or "").lower()
+    record_project = normalize_project(str(record.get("project") or ""))
+    if project_name and record_scope == "project" and record_project == project_name:
+        rank_score += 6
+    if str(record.get("review_status") or "").lower() == "reviewed":
+        rank_score += 3
+    if str(record.get("review_status") or "").lower() == "needs_update":
+        rank_score -= 3
+    if not is_active_memory(record):
+        rank_score -= 10
+    return max(1, rank_score)
+
+
 def recall_memories(
     records: Iterable[Mapping[str, object]],
     query: str,
@@ -1337,7 +1353,7 @@ def recall_memories(
     if not q:
         return []
     project_name = normalize_project(project)
-    scored: list[tuple[int, dict[str, object]]] = []
+    scored: list[tuple[int, int, str, dict[str, object]]] = []
     for record in records:
         if not memory_visible_for_project(record, project_name):
             continue
@@ -1345,11 +1361,16 @@ def recall_memories(
             continue
         score = score_memory(record, q)
         if score > 0:
+            rank_score = memory_rank_score(record, score, project=project_name)
             slim = slim_memory(record)
             slim["score"] = score
-            scored.append((score, slim))
-    scored.sort(key=lambda item: (-item[0], str(item[1]["title"]).lower()))
-    return [record for _, record in scored[:limit]]
+            slim["rank_score"] = rank_score
+            recency = str(record.get("updated_at") or record.get("date_captured") or "")
+            scored.append((rank_score, score, recency, slim))
+    scored.sort(key=lambda item: str(item[3]["title"]).lower())
+    scored.sort(key=lambda item: item[2], reverse=True)
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [record for _, _, _, record in scored[:limit]]
 
 
 def memory_duplicate_candidates(

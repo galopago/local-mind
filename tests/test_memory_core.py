@@ -190,6 +190,66 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(profile["by_scope"]["project"], 1)
         self.assertEqual(profile["by_project"]["link"], 1)
 
+    def test_recall_ranking_prefers_reviewed_project_context(self):
+        records = [
+            {
+                "name": "global-api-imports",
+                "path": "wiki/memories/global-api-imports.md",
+                "title": "API imports",
+                "memory_type": "project",
+                "scope": "user",
+                "project": "",
+                "status": "active",
+                "date_captured": "2026-05-03T00:00:00Z",
+                "review_status": "reviewed",
+                "tldr": "Use API imports.",
+                "snippet": "Use API imports.",
+                "body": "Use API imports.",
+            },
+            {
+                "name": "alpha-api-imports-pending",
+                "path": "wiki/memories/alpha-api-imports-pending.md",
+                "title": "API imports",
+                "memory_type": "project",
+                "scope": "project",
+                "project": "alpha",
+                "status": "active",
+                "date_captured": "2026-05-02T00:00:00Z",
+                "review_status": "pending",
+                "tldr": "Use API imports.",
+                "snippet": "Use API imports.",
+                "body": "Use API imports.",
+            },
+            {
+                "name": "alpha-api-imports-reviewed",
+                "path": "wiki/memories/alpha-api-imports-reviewed.md",
+                "title": "API imports",
+                "memory_type": "project",
+                "scope": "project",
+                "project": "alpha",
+                "status": "active",
+                "date_captured": "2026-05-01T00:00:00Z",
+                "review_status": "reviewed",
+                "tldr": "Use API imports.",
+                "snippet": "Use API imports.",
+                "body": "Use API imports.",
+            },
+        ]
+
+        recalled = recall_memories(records, "API imports", project="alpha")
+        brief = memory_brief(records, query="API imports", project="alpha")
+
+        self.assertEqual(
+            [record["name"] for record in recalled],
+            [
+                "alpha-api-imports-reviewed",
+                "alpha-api-imports-pending",
+                "global-api-imports",
+            ],
+        )
+        self.assertGreater(recalled[0]["rank_score"], recalled[0]["score"])
+        self.assertEqual(brief["relevant_memories"][0]["name"], "alpha-api-imports-reviewed")
+
     def test_proposals_are_duplicate_aware_and_write_free(self):
         records = [
             {
