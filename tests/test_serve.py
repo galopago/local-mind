@@ -55,16 +55,19 @@ def run_handler(method: str, path: str, body: bytes = b"", headers: dict[str, st
     return status, payload
 
 
-def post_json(path: str, payload: dict[str, object]):
+def post_json(path: str, payload: dict[str, object], local_action: bool = True):
     body = json.dumps(payload).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "Content-Length": str(len(body)),
+    }
+    if local_action:
+        headers["X-Link-Local-Action"] = "true"
     return run_handler(
         "POST",
         path,
         body,
-        {
-            "Content-Type": "application/json",
-            "Content-Length": str(len(body)),
-        },
+        headers,
     )
 
 
@@ -482,6 +485,18 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertFalse(payload["updated"])
         self.assertEqual(payload["error"], "memory required")
+
+    def test_memory_action_post_requires_local_action_header(self):
+        wiki = self.make_wiki()
+        status, payload = post_json(
+            "/api/review-memory",
+            {"memory": "prefer-web-review"},
+            local_action=False,
+        )
+
+        self.assertEqual(status, 403)
+        self.assertFalse(payload["updated"])
+        self.assertIn("X-Link-Local-Action", payload["error"])
 
     def test_memory_audit_page_and_api_report_backlog(self):
         wiki = self.make_wiki()

@@ -567,9 +567,9 @@ Used during query to find related pages, and during lint to detect orphans and b
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
 | `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context: relevant memories, review warnings, capture status, and safe rules |
 | `POST /api/propose-memories` | Propose memories from JSON `{ "text": "..." }` without writing pages |
-| `POST /api/review-memory` | JSON `{ "memory": "name", "note": "optional" }`; mark a memory reviewed |
-| `POST /api/archive-memory` | JSON `{ "memory": "name", "reason": "optional" }`; archive a memory from default recall |
-| `POST /api/restore-memory` | JSON `{ "memory": "name" }`; restore archived memory to active recall |
+| `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; mark a memory reviewed |
+| `POST /api/archive-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "reason": "optional" }`; archive a memory from default recall |
+| `POST /api/restore-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name" }`; restore archived memory to active recall |
 | `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, warnings, and commands |
 | `GET /api/search?q=<query>` | Ranked search — title, alias, tag, fulltext. Returns scores + snippets |
 | `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call |

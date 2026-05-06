@@ -49,6 +49,8 @@ WIKI_DIR = ROOT / "wiki"
 RAW_DIR = ROOT / "raw"
 PORT = 3000
 MAX_POST_BYTES = 64 * 1024
+LOCAL_ACTION_HEADER = "X-Link-Local-Action"
+LOCAL_ACTION_VALUES = {"1", "true", "yes"}
 RAW_STATIC_TYPES = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -1088,7 +1090,7 @@ MEMORY_ACTION_JS = """
       try {
         var response = await fetch(endpoint, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: {'Content-Type': 'application/json', 'X-Link-Local-Action': 'true'},
           body: JSON.stringify(payload)
         });
         var data = await response.json();
@@ -2429,6 +2431,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(result)
             return
         if path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:
+            if not self._require_local_action_header():
+                return
             payload, error, status = self._read_json_body()
             if error:
                 self._json({"updated": False, "error": error}, status=status)
@@ -2627,6 +2631,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
+
+    def _require_local_action_header(self) -> bool:
+        value = self.headers.get(LOCAL_ACTION_HEADER, "").strip().lower()
+        if value in LOCAL_ACTION_VALUES:
+            return True
+        self._json({
+            "updated": False,
+            "error": f"{LOCAL_ACTION_HEADER} header required for local memory mutations",
+        }, status=403)
+        return False
 
     def _read_json_body(self) -> tuple[dict | None, str | None, int]:
         content_type = self.headers.get("Content-Type", "")

@@ -439,7 +439,8 @@ from other explicit projects out of recall and duplicate/conflict checks.
 
 Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do not
 expose it to the internet without adding auth. HTTP memory writes are limited to
-review, archive, and restore actions; proposal analysis does not write pages.
+review, archive, and restore actions, and require
+`X-Link-Local-Action: true`; proposal analysis does not write pages.
 
 Common endpoints:
 
@@ -454,9 +455,9 @@ Common endpoints:
 | `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, secret-warning labels, and review commands. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |
 | `POST /api/propose-memories` | Returns memory proposals without writing pages. |
-| `POST /api/review-memory` | JSON `{ "memory": "name", "note": "optional" }`; marks a memory reviewed. |
-| `POST /api/archive-memory` | JSON `{ "memory": "name", "reason": "optional" }`; hides a memory from default recall. |
-| `POST /api/restore-memory` | JSON `{ "memory": "name" }`; restores an archived memory to active recall. |
+| `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; marks a memory reviewed. |
+| `POST /api/archive-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "reason": "optional" }`; hides a memory from default recall. |
+| `POST /api/restore-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name" }`; restores an archived memory to active recall. |
 | `GET /api/search?q=<query>` | Ranked search by title, alias, tag, TLDR, and full text. |
 | `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
 | `GET /api/graph` | Nodes and edges for graph visualization. |
