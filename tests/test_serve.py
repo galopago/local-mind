@@ -263,10 +263,13 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(dashboard["capture_count"], 1)
         self.assertEqual(dashboard["capture_warning_count"], 1)
         self.assertEqual(dashboard["captures"][0]["secret_warnings"], ["OpenAI API key"])
+        self.assertIn("[redacted-secret]", dashboard["captures"][0]["snippet"])
+        self.assertNotIn(fake_key, dashboard["captures"][0]["snippet"])
         self.assertIn("Redact capture warnings", dashboard["next_actions"][0]["label"])
         self.assertIn("accept-capture", dashboard["captures"][0]["commands"]["accept"])
         self.assertIn("Raw captures", html)
         self.assertIn("redact-capture", html)
+        self.assertNotIn(fake_key, html)
 
     def test_memory_dashboard_filters_project_memory_and_captures(self):
         wiki = self.make_wiki()

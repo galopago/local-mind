@@ -491,6 +491,58 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(len(after_memories), len(before_memories))
         self.assertIn("capture-session", log_text)
 
+    def test_capture_inbox_lists_captures_without_secret_values(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        fake_key = "sk-" + ("E" * 24)
+
+        alpha_out = StringIO()
+        with redirect_stdout(alpha_out):
+            alpha_code = link_cli.capture_session(
+                target,
+                f"Remember that Alpha project captures need review. Test key {fake_key}",
+                title="Alpha capture",
+                project="alpha",
+                json_output=True,
+            )
+        beta_out = StringIO()
+        with redirect_stdout(beta_out):
+            beta_code = link_cli.capture_session(
+                target,
+                "Remember that Beta project captures stay separate.",
+                title="Beta capture",
+                project="beta",
+                json_output=True,
+            )
+
+        inbox_out = StringIO()
+        with redirect_stdout(inbox_out):
+            inbox_code = link_cli.capture_inbox(target, project="alpha", json_output=True)
+        inbox = json.loads(inbox_out.getvalue())
+
+        text_out = StringIO()
+        with redirect_stdout(text_out):
+            text_code = link_cli.capture_inbox(target, project="alpha")
+        text = text_out.getvalue()
+
+        self.assertEqual(alpha_code, 0)
+        self.assertEqual(beta_code, 0)
+        self.assertEqual(inbox_code, 0)
+        self.assertEqual(text_code, 0)
+        self.assertEqual(inbox["project"], "alpha")
+        self.assertEqual(inbox["count"], 1)
+        self.assertEqual(inbox["warning_count"], 1)
+        self.assertEqual(inbox["captures"][0]["project"], "alpha")
+        self.assertEqual(inbox["captures"][0]["secret_warnings"], ["OpenAI API key"])
+        self.assertIn("[redacted-secret]", inbox["captures"][0]["snippet"])
+        self.assertNotIn(fake_key, inbox_out.getvalue())
+        self.assertIn("accept-capture", inbox["captures"][0]["commands"]["accept"])
+        self.assertIn("redact-capture", text)
+        self.assertIn("delete-capture", text)
+        self.assertNotIn("Beta capture", inbox_out.getvalue())
+        self.assertNotIn(fake_key, text)
+
     def test_accept_capture_writes_approved_proposal(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

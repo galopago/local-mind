@@ -27,6 +27,7 @@ from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
 )
 from link_core.security import (
+    redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
 from link_core.wiki import (
@@ -331,11 +332,14 @@ def _capture_records(limit: int = 12, project: str | None = None) -> list[dict[s
         except OSError:
             continue
         meta, body = _parse_frontmatter(text)
+        notes_match = re.search(r"^## Notes\s*(.*?)(?=^## |\Z)", body, flags=re.MULTILINE | re.DOTALL)
+        notes = notes_match.group(1).strip() if notes_match else body.strip()
         title = str(meta.get("title") or path.stem)
         capture_project = _core_normalize_project(str(meta.get("project") or ""))
         if project_name and capture_project and capture_project != project_name:
             continue
         warnings = _secret_value_warnings(text)
+        safe_notes, _, _ = _redact_secret_values(notes)
         rel = path.relative_to(root).as_posix()
         records.append({
             "path": rel,
@@ -345,7 +349,7 @@ def _capture_records(limit: int = 12, project: str | None = None) -> list[dict[s
             "size_bytes": stat.st_size,
             "secret_warnings": warnings,
             "warning_count": len(warnings),
-            "snippet": re.sub(r"\s+", " ", body).strip()[:180],
+            "snippet": re.sub(r"\s+", " ", safe_notes).strip()[:180],
             "commands": {
                 "accept": f'python3 link.py accept-capture "{rel}" . --index 1',
                 "redact": f'python3 link.py redact-capture "{rel}" .',

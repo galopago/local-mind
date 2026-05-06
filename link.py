@@ -7,6 +7,7 @@ Usage:
   python link.py ingest-status [target]
   python link.py remember "memory text" [target]
   python link.py propose-memories <file-or-text> [target]
+  python link.py capture-inbox [target]
   python link.py update-memory <name-or-title> "new memory text" [target]
   python link.py brief ["task or question"] [target]
   python link.py recall "query" [target]
@@ -97,6 +98,7 @@ from link_core.memory import (
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
     memory_records as _core_memory_records,
+    normalize_project as _core_normalize_project,
     memory_review_issues as _core_memory_review_issues,
     propose_memories_from_text as _core_propose_memories_from_text,
     recall_memories as _core_recall_memories,
@@ -1783,6 +1785,95 @@ def _capture_notes_from_markdown(text: str) -> tuple[dict[str, object], str]:
     return meta, notes
 
 
+def _capture_records(target: Path, limit: int = 20, project: str | None = None) -> list[dict[str, object]]:
+    root = _resolve_link_root(target)
+    capture_dir = root / "raw" / "memory-captures"
+    if not capture_dir.exists():
+        return []
+    project_name = _core_normalize_project(project)
+    records: list[dict[str, object]] = []
+    for path in sorted(capture_dir.rglob("*.md")):
+        if path.name.startswith("."):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            stat = path.stat()
+        except OSError:
+            continue
+        meta, notes = _capture_notes_from_markdown(text)
+        rel = path.relative_to(root).as_posix()
+        warnings = _secret_value_warnings(text)
+        safe_notes, _, _ = _redact_secret_values(notes)
+        capture_project = _core_normalize_project(str(meta.get("project") or ""))
+        if project_name and capture_project and capture_project != project_name:
+            continue
+        records.append({
+            "path": rel,
+            "title": str(meta.get("title") or path.stem),
+            "project": capture_project,
+            "date_captured": str(meta.get("date_captured") or ""),
+            "size_bytes": stat.st_size,
+            "secret_warnings": warnings,
+            "warning_count": len(warnings),
+            "snippet": re.sub(r"\s+", " ", safe_notes).strip()[:180],
+            "commands": {
+                "accept": f'python3 link.py accept-capture "{rel}" . --index 1',
+                "redact": f'python3 link.py redact-capture "{rel}" .',
+                "delete": f'python3 link.py delete-capture "{rel}" . --confirm',
+            },
+        })
+    records.sort(key=lambda item: (str(item["date_captured"]), str(item["path"])), reverse=True)
+    return records[:max(1, min(limit, 50))]
+
+
+def capture_inbox(
+    target: Path,
+    limit: int = 20,
+    project: str | None = None,
+    json_output: bool = False,
+) -> int:
+    target = target.expanduser().resolve()
+    root = _resolve_link_root(target)
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    project_name = _core_normalize_project(project)
+    captures = _capture_records(root, limit=limit, project=project_name)
+    warning_count = sum(1 for capture in captures if capture["warning_count"])
+    payload = {
+        "count": len(captures),
+        "warning_count": warning_count,
+        "project": project_name,
+        "captures": captures,
+    }
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print("Raw capture inbox")
+    if project_name:
+        print(f"Project: {project_name}")
+    print(f"{len(captures)} capture{'s' if len(captures) != 1 else ''} · {warning_count} with secret-looking warnings")
+    if not captures:
+        print("")
+        print("No saved raw captures.")
+        return 0
+    for index, capture in enumerate(captures, start=1):
+        print("")
+        print(f"{index}. {capture['title']}")
+        print(f"   Path: {capture['path']}")
+        if capture["project"]:
+            print(f"   Project: {capture['project']}")
+        if capture["secret_warnings"]:
+            print("   Secret-looking values: " + ", ".join(capture["secret_warnings"]))
+        print(f"   Accept: {capture['commands']['accept']}")
+        if capture["secret_warnings"]:
+            print(f"   Redact: {capture['commands']['redact']}")
+        print(f"   Delete: {capture['commands']['delete']}")
+    return 0
+
+
 def accept_capture(
     target: Path,
     capture: str,
@@ -2639,6 +2730,12 @@ def main(argv: list[str] | None = None) -> int:
     capture_cmd.add_argument("--project", default=None, help="project key for proposal checks")
     capture_cmd.add_argument("--json", action="store_true", help="print machine-readable capture details")
 
+    capture_inbox_cmd = sub.add_parser("capture-inbox", help="list saved raw session captures")
+    capture_inbox_cmd.add_argument("target", nargs="?", default=".")
+    capture_inbox_cmd.add_argument("--limit", type=int, default=20)
+    capture_inbox_cmd.add_argument("--project", default=None, help="include global captures plus this project")
+    capture_inbox_cmd.add_argument("--json", action="store_true", help="print machine-readable capture inbox")
+
     accept_capture_cmd = sub.add_parser("accept-capture", help="accept one proposal from a raw session capture")
     accept_capture_cmd.add_argument("capture", help="raw capture path or filename")
     accept_capture_cmd.add_argument("target", nargs="?", default=".")
@@ -2765,6 +2862,13 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.target),
             args.source_input,
             title=args.title,
+            limit=args.limit,
+            project=args.project,
+            json_output=args.json,
+        )
+    if args.command == "capture-inbox":
+        return capture_inbox(
+            Path(args.target),
             limit=args.limit,
             project=args.project,
             json_output=args.json,
