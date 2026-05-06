@@ -872,15 +872,17 @@ class ServeTests(unittest.TestCase):
     def test_propose_page_renders_read_only_workflow(self):
         wiki = self.make_wiki()
 
-        html = serve._render_propose(project="link")
+        html = serve._render_propose(project="link", source="raw/first-memory.md")
 
         self.assertIn('<a href="/propose">propose</a>', html)
         self.assertIn('data-proposal-sources', html)
         self.assertIn('data-proposal-form', html)
+        self.assertIn('data-initial-source="raw/first-memory.md"', html)
         self.assertIn('data-proposal-results', html)
         self.assertIn('value="link"', html)
         self.assertIn("without writing anything", html)
         self.assertIn("Save only preferences", html)
+        self.assertIn("var initialSource = form.getAttribute('data-initial-source')", html)
 
     def test_proposal_sources_api_lists_safe_raw_files(self):
         wiki = self.make_wiki()
@@ -936,6 +938,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("ingest raw/new-source.md into Link", html)
         self.assertIn("Ingest pending raw sources", html)
         self.assertIn("wiki/sources/new-source.md", html)
+        self.assertIn('/propose?source=raw/new-source.md', html)
         self.assertIn("Pending Raw Files", html)
 
     def test_rebuild_backlinks_requires_json_post(self):

@@ -71,8 +71,9 @@ propose memories from raw/file.md
 
 Then approve only the memories you want agents to carry forward.
 
-You can also open `/propose`, paste source or session notes, and review
-proposal-only candidates in the local UI. Nothing is written until you approve a
+You can also open `/propose`, paste source or session notes, or jump there from
+a pending raw file on `/ingest`. Link loads that source into the proposal form
+and returns proposal-only candidates. Nothing is written until you approve a
 memory through your agent or the CLI.
 
 ## Quick Start

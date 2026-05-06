@@ -1450,6 +1450,10 @@ PROPOSAL_UI_JS = """
         renderSources({sources: []});
       });
   }
+  var initialSource = form.getAttribute('data-initial-source') || '';
+  if (initialSource) {
+    loadSource(initialSource);
+  }
 })();
 """
 
@@ -1990,8 +1994,9 @@ def _render_captures(project: str | None = None):
     return _layout("Raw Capture Inbox", body)
 
 
-def _render_propose(project: str | None = None):
+def _render_propose(project: str | None = None, source: str | None = None):
     project_value = html.escape(str(project or ""), quote=True)
+    source_value = html.escape(str(source or ""), quote=True)
     body = (
         f'<div class="breadcrumb"><a href="/">Link</a> / propose</div>'
         f'<h1>Propose Memories</h1>'
@@ -2000,7 +2005,7 @@ def _render_propose(project: str | None = None):
         f'<p>Source-backed wiki knowledge and durable agent memory are separate. Save only preferences, decisions, or project facts you approve.</p></div>'
         f'<section><div class="section-heading"><h2>Local Raw Sources</h2><a href="/captures">captures</a></div>'
         f'<div class="proposal-source-list" data-proposal-sources aria-live="polite"></div></section>'
-        f'<form class="proposal-form" data-proposal-form>'
+        f'<form class="proposal-form" data-proposal-form data-initial-source="{source_value}">'
         f'<label>Source or session notes'
         f'<textarea name="text" placeholder="Paste notes here. Example: I prefer short release notes. We decided to keep Link local-first."></textarea>'
         f'</label>'
@@ -2052,9 +2057,12 @@ def _render_ingest():
     if pending:
         rows = ""
         for item in pending[:50]:
+            raw_path = str(item.get("raw") or "")
+            propose_href = "/propose?source=" + urllib.parse.quote(raw_path)
             rows += (
-                f'<li><code>{html.escape(str(item.get("raw") or ""))}</code>'
-                f'<span class="type">{int(item.get("size_bytes") or 0)} bytes</span></li>'
+                f'<li><code>{html.escape(raw_path)}</code>'
+                f'<span class="type">{int(item.get("size_bytes") or 0)} bytes · '
+                f'<a href="{html.escape(propose_href, quote=True)}">propose memories</a></span></li>'
             )
         if len(pending) > 50:
             rows += f'<li>... {len(pending) - 50} more</li>'
@@ -3132,7 +3140,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             brief_query = query.get("q", [""])[0] or query.get("query", [""])[0]
             self._ok(_render_brief(query=brief_query, project=query.get("project", [""])[0]))
         elif path == "/propose":
-            self._ok(_render_propose(project=query.get("project", [""])[0]))
+            self._ok(_render_propose(
+                project=query.get("project", [""])[0],
+                source=query.get("source", [""])[0],
+            ))
         elif path == "/memory":
             self._ok(_render_memory_dashboard(project=query.get("project", [""])[0]))
         elif path == "/audit":
