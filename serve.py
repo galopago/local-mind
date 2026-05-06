@@ -872,6 +872,7 @@ html { overflow-x: hidden; background: var(--bg); }
 body { font-family: Georgia, "Times New Roman", serif; background: var(--bg); color: var(--text);
        width: 100%; max-width: 760px; margin: 0 auto; padding: 20px;
        overflow-x: hidden; overflow-wrap: anywhere; }
+body.graph-page { max-width: min(1440px, 100%); }
 a { color: var(--link); }
 a, p, li, code { overflow-wrap: anywhere; }
 a:hover { text-decoration: underline; }
@@ -883,12 +884,17 @@ header .logo { font-size: 24px; font-weight: bold; letter-spacing: 0; }
 header .logo a { color: var(--text-strong); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
 header .logo img { width: 28px; height: 28px; border-radius: 7px; flex: none; }
 header .logo small { font-weight: normal; font-size: 13px; color: var(--subtle); margin-left: 8px; }
-header nav { display: flex; gap: 16px; font-size: 14px; font-family: sans-serif; flex-wrap: wrap; min-width: 0; }
-header form { display: inline; }
-header input { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; width: 160px; background: var(--surface); color: var(--text); }
+header nav { display: flex; gap: 16px; font-size: 14px; font-family: sans-serif; flex-wrap: wrap; min-width: 0; flex: 1 1 360px; align-items: center; }
+header .header-tools { display: grid; justify-items: end; gap: 6px; flex: 0 1 180px; min-width: 150px; }
+header form { display: block; width: 100%; }
+header input { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; width: 100%; background: var(--surface); color: var(--text); }
 header .theme-toggle { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
-                       border-radius: 4px; padding: 4px 8px; font: inherit; cursor: pointer; }
+                       border-radius: 999px; padding: 3px 8px; font: 12px -apple-system, BlinkMacSystemFont, sans-serif;
+                       cursor: pointer; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
 header .theme-toggle:hover { background: var(--button-hover); }
+header .theme-icon { width: 14px; height: 14px; border-radius: 50%; border: 1px solid currentColor;
+                     background: linear-gradient(90deg, currentColor 0 50%, transparent 50% 100%); flex: none; }
+header .theme-text { white-space: nowrap; }
 
 .breadcrumb { font-size: 13px; color: var(--subtle); margin-bottom: 12px; font-family: sans-serif; }
 .breadcrumb a { color: var(--link); }
@@ -916,6 +922,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .home-stats .stat { text-align: center; }
 .home-stats .stat .num { font-size: 28px; font-weight: bold; color: var(--accent-soft); display: block; }
 .home-stats .stat .label { color: var(--subtle); font-size: 12px; }
+.product-lanes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0 22px; }
+.product-lane { border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface); padding: 12px; font-family: sans-serif; }
+.product-lane h2 { border: 0; margin: 0 0 8px; padding: 0; font-size: 15px; font-family: sans-serif; }
+.product-lane p { margin: 0; color: var(--muted); line-height: 1.45; font-size: 13px; }
+.product-lane code { white-space: normal; overflow-wrap: anywhere; }
 
 .page-list { list-style: none; padding: 0; margin: 12px 0; }
 .page-list li { padding: 6px 0; border-bottom: 1px solid var(--border-soft); }
@@ -962,12 +973,18 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 
 mark { background: var(--mark-bg); color: inherit; border-radius: 2px; padding: 0 1px; }
 
-#graph-canvas { width: 100%; height: min(64vh, 620px); min-height: 420px;
+#graph-canvas { width: 100%; height: min(74vh, 860px); min-height: 560px;
                 border: 1px solid var(--border); border-radius: 4px; background: var(--surface-graph);
                 cursor: grab; display: block; margin: 0; }
 #graph-canvas:active { cursor: grabbing; }
 #graph-canvas:focus { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
-.graph-shell { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; align-items: stretch; margin: 12px 0; }
+.graph-frame { margin: 12px 0; }
+.graph-frame.is-fullscreen { position: fixed; inset: 0; z-index: 200; background: var(--bg); padding: 18px;
+                              display: flex; flex-direction: column; overflow: hidden; }
+.graph-frame.is-fullscreen .graph-shell { flex: 1; min-height: 0; }
+.graph-frame.is-fullscreen #graph-canvas { height: 100%; min-height: 0; }
+.graph-frame.is-fullscreen .graph-inspector { max-height: 100%; overflow: auto; }
+.graph-shell { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; align-items: stretch; margin: 12px 0; }
 .graph-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
                  margin: 12px 0 8px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; }
 .graph-toolbar button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
@@ -997,13 +1014,16 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--border
   body { padding: 20px; }
   header { align-items: flex-start; }
   header nav { gap: 10px 14px; }
-  header input { width: min(100%, 220px); }
+  header .header-tools { justify-items: stretch; flex-basis: 100%; }
+  header .theme-toggle { justify-self: end; }
   .home-stats { flex-wrap: wrap; gap: 14px 22px; }
+  .product-lanes { grid-template-columns: minmax(0, 1fr); }
   .memory-grid { grid-template-columns: minmax(0, 1fr); }
   .memory-dashboard .section-heading { flex-wrap: wrap; }
   .memory-actions code, .memory-next code { word-break: break-word; }
   .graph-shell { grid-template-columns: 1fr; }
-  #graph-canvas { min-height: 360px; }
+  #graph-canvas { min-height: 460px; }
+  .graph-frame.is-fullscreen { padding: 12px; }
 }
 """
 
@@ -1052,7 +1072,12 @@ THEME_CONTROL_JS = """
     }
     if (!button) return;
     var active = theme === 'system' ? systemTheme() : theme;
-    button.textContent = 'theme: ' + theme;
+    var text = button.querySelector('[data-theme-text]');
+    if (text) {
+      text.textContent = theme;
+    } else {
+      button.textContent = theme;
+    }
     button.title = 'Theme: ' + theme + ' (' + active + ')';
     button.setAttribute('aria-label', 'Theme: ' + theme + ' (' + active + '). Click to switch.');
   }
@@ -1153,11 +1178,15 @@ def _header_html():
     <a href="/page/log">log</a>
     <a href="/all">all pages</a>
     <a href="/graph">graph</a>
+  </nav>
+  <div class="header-tools">
+    <button type="button" class="theme-toggle" data-theme-toggle>
+      <span class="theme-icon" aria-hidden="true"></span><span class="theme-text" data-theme-text>system</span>
+    </button>
     <form action="/search" method="get">
       <input type="text" name="q" placeholder="search... (/)" autocomplete="off" id="search-input">
     </form>
-    <button type="button" class="theme-toggle" data-theme-toggle>theme: system</button>
-  </nav>
+  </div>
 </header>"""
 
 
@@ -1165,7 +1194,8 @@ def _footer_html():
     return '<footer>Link — local agent memory · <a href="https://github.com/gowtham0992/link">github</a></footer>'
 
 
-def _layout(title, body):
+def _layout(title, body, page_class: str = ""):
+    body_class = f' class="{html.escape(page_class, quote=True)}"' if page_class else ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1176,7 +1206,7 @@ def _layout(title, body):
 <script>{THEME_INIT_JS}</script>
 <style>{CSS}</style>
 </head>
-<body>
+<body{body_class}>
 {_header_html()}
 <div class="graph-tooltip" id="graph-tooltip"></div>
 {body}
@@ -1257,7 +1287,20 @@ def _render_home():
     if not cats:
         sections = "<p>Wiki is empty. Drop sources into <code>raw/</code> and tell your agent to ingest them.</p>"
 
-    return _layout("Link", f"<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>{stats}{sections}")
+    lanes = (
+        '<div class="product-lanes" aria-label="How Link stores context">'
+        '<section class="product-lane"><h2>1. Sources become wiki knowledge</h2>'
+        '<p>Drop files into <code>raw/</code> and say <code>ingest raw/file.md into Link</code>. '
+        'Link creates source-backed pages, concepts, backlinks, index entries, and logs.</p></section>'
+        '<section class="product-lane"><h2>2. Remember saves agent memory</h2>'
+        '<p>Say <code>remember that ...</code> when a preference, decision, or project fact should affect future agents. '
+        'Ingest alone does not silently personalize recall.</p></section>'
+        '<section class="product-lane"><h2>3. Query uses both safely</h2>'
+        '<p>Ask <code>query Link for ...</code> or open a memory brief. Link combines reviewed memory, wiki pages, and graph context.</p></section>'
+        '</div>'
+    )
+
+    return _layout("Link", f"<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>{lanes}{stats}{sections}")
 
 
 def _render_page(page_path):
@@ -1819,6 +1862,8 @@ def _render_graph():
   var resetButton = document.getElementById('graph-reset');
   var labelsButton = document.getElementById('graph-labels');
   var motionButton = document.getElementById('graph-motion');
+  var fullscreenButton = document.getElementById('graph-fullscreen');
+  var frameEl = document.getElementById('graph-frame');
   var status = document.getElementById('graph-status');
   var inspector = document.getElementById('graph-inspector');
   var inspectorTitle = document.getElementById('graph-inspector-title');
@@ -2148,6 +2193,19 @@ def _render_graph():
     updateStatus();
   }}
 
+  function setFullscreen(next) {{
+    if (!frameEl || !fullscreenButton) return;
+    frameEl.classList.toggle('is-fullscreen', next);
+    fullscreenButton.setAttribute('aria-pressed', next ? 'true' : 'false');
+    fullscreenButton.textContent = next ? 'Exit fullscreen' : 'Fullscreen';
+    window.setTimeout(function() {{
+      resize();
+      autoFit();
+      updateStatus();
+      draw();
+    }}, 0);
+  }}
+
   canvas.addEventListener('mousedown', function(e) {{
     var rect = canvas.getBoundingClientRect();
     var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
@@ -2242,7 +2300,14 @@ def _render_graph():
     if (e.key === '-' || e.key === '_') {{ zoom = Math.max(0.15, zoom * 0.9); updateStatus(); e.preventDefault(); }}
     if (e.key === '0') {{ resetView(); e.preventDefault(); }}
     if (e.key === 'Enter' && hoverNode) {{ openNode(hoverNode); e.preventDefault(); }}
-    if (e.key === 'Escape') {{ selectedNode = null; updateInspector(); updateStatus(); e.preventDefault(); }}
+    if (e.key === 'Escape') {{
+      if (frameEl && frameEl.classList.contains('is-fullscreen')) {{
+        setFullscreen(false);
+      }} else {{
+        selectedNode = null; updateInspector(); updateStatus();
+      }}
+      e.preventDefault();
+    }}
     if (e.key === 'l' || e.key === 'L') {{
       showAllLabels = !showAllLabels;
       if (labelsButton) labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
@@ -2257,6 +2322,9 @@ def _render_graph():
   }});
   if (motionButton) motionButton.addEventListener('click', function() {{
     setMotionPaused(!motionPaused);
+  }});
+  if (fullscreenButton) fullscreenButton.addEventListener('click', function() {{
+    setFullscreen(!frameEl.classList.contains('is-fullscreen'));
   }});
   if (inspectorOpen) inspectorOpen.addEventListener('click', function() {{ openNode(selectedNode); }});
 
@@ -2278,10 +2346,14 @@ def _render_graph():
     body = (
         f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
         f'<h1>Knowledge Graph</h1>'
+        f'<p class="meta">For large wikis, use fullscreen, zoom, pan, and sparse labels. '
+        f'The graph is for exploring neighborhoods, not reading every label at once.</p>'
+        f'<section id="graph-frame" class="graph-frame">'
         f'<div class="graph-toolbar" aria-label="Graph controls">'
         f'<button id="graph-reset" type="button">Reset</button>'
         f'<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
         f'<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
+        f'<button id="graph-fullscreen" type="button" aria-pressed="false">Fullscreen</button>'
         f'<span id="graph-status" class="graph-status" aria-live="polite">'
         f'{node_count} nodes · {edge_count} edges</span>'
         f'</div>'
@@ -2297,9 +2369,10 @@ def _render_graph():
         f'</aside>'
         f'</div>'
         f'<div class="graph-legend">{legend_items}</div>'
+        f'</section>'
         f'{graph_js}'
     )
-    return _layout("Knowledge Graph", body)
+    return _layout("Knowledge Graph", body, page_class="graph-page")
 
 
 def _render_search(query):

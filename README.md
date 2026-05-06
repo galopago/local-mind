@@ -39,6 +39,38 @@ project constraints, and why something matters. Link makes that context durable:
 - **Local-first:** no hosted backend, no telemetry, no cloud lock-in.
 - **Inspectable:** Markdown files, backlinks, logs, and review states are yours.
 
+## Sources, Wiki, And Memory
+
+Link has one simple rule:
+
+```text
+Sources become wiki knowledge.
+Explicit "remember" becomes agent memory.
+Queries use both.
+```
+
+That means raw files do not silently personalize future agents. When you add a
+source and ask Link to ingest it, Link creates source-backed wiki pages, updates
+concept/entity pages, rebuilds backlinks, and validates the graph. When you say
+`remember ...`, Link saves a durable memory that future agents may use as user
+or project context.
+
+Use these three moves:
+
+```text
+ingest raw/file.md into Link
+remember that I prefer short release notes
+query Link for the release process
+```
+
+If a source might contain preferences or decisions, ask for proposals first:
+
+```text
+propose memories from raw/file.md
+```
+
+Then approve only the memories you want agents to carry forward.
+
 ## Quick Start
 
 Try Link with a finished, pre-ingested wiki:
