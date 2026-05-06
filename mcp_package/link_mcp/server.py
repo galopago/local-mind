@@ -101,6 +101,7 @@ from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
 )
 from link_core.security import (
+    redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
 from link_core.wiki import (
@@ -466,6 +467,36 @@ def _accept_capture(
     return payload
 
 
+def _redact_capture(capture: str, replacement: str = "[redacted-secret]") -> dict[str, object]:
+    root = WIKI_DIR.parent
+    capture_path = _resolve_capture_file(capture)
+    if capture_path is None:
+        raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
+    original = capture_path.read_text(encoding="utf-8", errors="replace")
+    redacted, labels, replacement_count = _redact_secret_values(
+        original,
+        replacement=_clean_text_input(replacement, max_len=100) or "[redacted-secret]",
+    )
+    rel_path = capture_path.relative_to(root).as_posix()
+    if replacement_count:
+        capture_path.write_text(redacted, encoding="utf-8")
+        _append_log(
+            _utc_timestamp(),
+            "redact-capture",
+            f"Redacted secret-looking values from {rel_path}",
+            [
+                f"Labels: {', '.join(labels)}",
+                f"Replacement count: {replacement_count}",
+            ],
+        )
+    return {
+        "redacted": bool(replacement_count),
+        "path": rel_path,
+        "labels": labels,
+        "replacement_count": replacement_count,
+    }
+
+
 def _append_log(timestamp: str, operation: str, description: str, lines: list[str]) -> None:
     log_path = WIKI_DIR / "log.md"
     if not log_path.exists():
@@ -724,6 +755,20 @@ def accept_capture(
         )
     except ValueError as exc:
         return json.dumps({"accepted": False, "error": str(exc)})
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
+def redact_capture(capture: str, replacement: str = "[redacted-secret]") -> str:
+    """Redact secret-looking values from a saved raw session capture.
+
+    Use after capture_session returns secret_warnings and the user approves
+    redaction. Logs warning labels and counts only, never secret values.
+    """
+    try:
+        result = _redact_capture(capture, replacement=replacement)
+    except ValueError as exc:
+        return json.dumps({"redacted": False, "error": str(exc)})
     return json.dumps(result, ensure_ascii=False)
 
 

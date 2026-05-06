@@ -274,6 +274,24 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("MCP capture approval", memory_text)
         self.assertIn("accept-capture", log_text)
 
+    def test_redact_capture_contract(self):
+        fake_key = "sk-" + ("C" * 24)
+        capture = json.loads(self.server.capture_session(
+            f"Remember that MCP capture redaction stays local. Test key {fake_key}",
+            title="MCP capture redaction session",
+        ))
+
+        redacted = json.loads(self.server.redact_capture(capture["path"]))
+        capture_text = (self.target / capture["path"]).read_text(encoding="utf-8")
+        log_text = (self.target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertTrue(redacted["redacted"])
+        self.assertEqual(redacted["labels"], ["OpenAI API key"])
+        self.assertNotIn(fake_key, capture_text)
+        self.assertIn("[redacted-secret]", capture_text)
+        self.assertIn("redact-capture", log_text)
+        self.assertNotIn(fake_key, log_text)
+
     def test_memory_inbox_and_review_memory_contract(self):
         inbox = json.loads(self.server.memory_inbox())
         reviewed = json.loads(self.server.review_memory(
