@@ -169,6 +169,33 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Backlinks: stale", out.getvalue())
         self.assertIn("Repair graph index", out.getvalue())
 
+    def test_status_reports_demo_readiness(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.status(target, include_validation=True)
+
+        self.assertEqual(code, 0)
+        self.assertIn("Ready: yes", out.getvalue())
+        self.assertIn("Validation: passed", out.getvalue())
+        self.assertIn("query_link", out.getvalue())
+
+    def test_status_json_reports_missing_structure(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))
+        target = tmp / "empty"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.status(target, include_validation=True, json_output=True)
+        payload = json.loads(out.getvalue())
+
+        self.assertEqual(code, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("wiki", payload["missing"])
+
     def test_validate_accepts_demo_wiki(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-validate-test-"))
         target = tmp / "demo"

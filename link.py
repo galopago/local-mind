@@ -3,6 +3,7 @@
 
 Usage:
   python link.py demo [target]
+  python link.py status [target]
   python link.py doctor [target]
   python link.py validate [target]
   python link.py ingest-status [target]
@@ -136,6 +137,9 @@ from link_core.query import (
 )
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
+)
+from link_core.status import (
+    link_status as _core_link_status,
 )
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
@@ -1470,6 +1474,43 @@ def validate(target: Path, strict: bool = False, json_output: bool = False) -> i
         f"({payload['error_count']} errors, {payload['warning_count']} warnings)"
     )
     return 0 if payload["passed"] else 1
+
+
+def status(target: Path, include_validation: bool = False, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    payload = _core_link_status(wiki_dir, include_validation=include_validation)
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0 if payload["ready"] else 1
+
+    print(f"Link status: {wiki_dir}")
+    print("")
+    print(f"Ready: {'yes' if payload['ready'] else 'no'}")
+    print(f"Pages: {payload['page_count']}")
+    print(
+        f"Memories: {payload['memory_count']} total · "
+        f"{payload['active_memory_count']} active · "
+        f"{payload['needs_review_count']} need review"
+    )
+    if payload["missing"]:
+        print("Missing: " + ", ".join(str(item) for item in payload["missing"]))
+    validation = payload["validation"]
+    if validation.get("checked"):
+        print(
+            "Validation: "
+            f"{'passed' if validation.get('passed') else 'failed'} "
+            f"({validation.get('error_count', 0)} errors, {validation.get('warning_count', 0)} warnings)"
+        )
+    else:
+        print("Validation: not checked (use --validate)")
+    print("")
+    print("Next:")
+    for action in payload["next_actions"]:
+        args = action.get("arguments") or {}
+        suffix = f" {json.dumps(args, ensure_ascii=False)}" if args else ""
+        print(f"- {action['tool']}: {action['label']}{suffix}")
+    return 0 if payload["ready"] else 1
 
 
 def ingest_status(target: Path, json_output: bool = False) -> int:
@@ -2987,6 +3028,11 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("target", nargs="?", default=DEFAULT_DEMO_DIR)
     demo.add_argument("--force", action="store_true", help="replace an existing Link demo directory")
 
+    status_cmd = sub.add_parser("status", help="show Link readiness, counts, and next actions")
+    status_cmd.add_argument("target", nargs="?", default=".")
+    status_cmd.add_argument("--validate", action="store_true", help="include the ingest validation gate summary")
+    status_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
+
     doctor_cmd = sub.add_parser("doctor", help="check a Link wiki for common health issues")
     doctor_cmd.add_argument("target", nargs="?", default=".")
     doctor_cmd.add_argument("--fix", action="store_true", help="repair safe structural and backlink issues")
@@ -3149,6 +3195,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "demo":
         create_demo(Path(args.target), force=args.force)
         return 0
+    if args.command == "status":
+        return status(Path(args.target), include_validation=args.validate, json_output=args.json)
     if args.command == "doctor":
         return doctor(Path(args.target), fix=args.fix)
     if args.command == "validate":

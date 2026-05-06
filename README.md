@@ -206,6 +206,7 @@ creates or updates concept/entity pages, updates `wiki/index.md`, appends
 
 ```bash
 python3 ~/link/link.py doctor ~/link --fix
+python3 ~/link/link.py status ~/link --validate
 python3 ~/link/link.py ingest-status ~/link
 python3 ~/link/link.py validate ~/link
 python3 ~/link/link.py memory-audit ~/link
@@ -476,6 +477,7 @@ Common endpoints:
 | Command | What it does |
 |---------|-------------|
 | `python3 link.py demo` | Create `./link-demo` with a pre-ingested sample wiki. |
+| `python3 link.py status <dir> [--validate]` | Show local readiness, page/memory counts, optional validation summary, and next actions. |
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
 | `python3 link.py remember "text" <dir> [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
 | `python3 link.py propose-memories <file-or-text> <dir> [--project slug]` | Propose durable memories from notes without writing them. |
