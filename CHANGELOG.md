@@ -78,6 +78,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added a graph node inspector so moving nodes no longer accidentally opens pages; double-click or Open page still navigates.
 - Added an explicit `system`/`dark`/`light` theme toggle for the local web UI; dark mode now uses a black page background.
 - Added a real MCP stdio smoke test for the built `link-mcp` wheel in CI.
+- Added a first-use smoke test for init, demo, status, query, brief, remember, capture, ingest-status, and validation workflows.
 - Added large-wiki smoke coverage for smart query budgets and graph generation across hundreds of pages.
 - Added release hygiene checks that protect the public agent instruction contract for `query_link`, `validate_wiki`, and `memory_brief`.
 - Updated agent contract checks and installed instructions to include `link_status` for setup/readiness checks.

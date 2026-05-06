@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Exercise Link's first-use path the way a new local user would."""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class SmokeFailure(RuntimeError):
+    pass
+
+
+def run_link(*args: str, python: str = sys.executable) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        [python, str(ROOT / "link.py"), *args],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        command = " ".join([python, "link.py", *args])
+        raise SmokeFailure(
+            f"command failed ({result.returncode}): {command}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+    return result
+
+
+def run_json(*args: str, python: str = sys.executable) -> dict[str, Any]:
+    result = run_link(*args, python=python)
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        command = " ".join([python, "link.py", *args])
+        raise SmokeFailure(f"command returned invalid JSON: {command}\n{result.stdout}") from exc
+    if not isinstance(payload, dict):
+        command = " ".join([python, "link.py", *args])
+        raise SmokeFailure(f"command returned {type(payload).__name__}, expected JSON object: {command}")
+    return payload
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise SmokeFailure(message)
+
+
+def run_smoke(work_dir: Path, python: str = sys.executable) -> None:
+    work_dir.mkdir(parents=True, exist_ok=True)
+    init_target = work_dir / "new-user-link"
+    demo_target = work_dir / "demo-link"
+
+    run_link("init", str(init_target), python=python)
+    require((init_target / "link.py").exists(), "init did not copy link.py")
+    require((init_target / "serve.py").exists(), "init did not copy serve.py")
+    require((init_target / "wiki/_link_schema.json").exists(), "init did not write schema marker")
+
+    init_status = run_json("status", str(init_target), "--validate", "--json", python=python)
+    require(init_status.get("ready") is True, "initialized wiki did not report ready")
+    require(init_status.get("schema", {}).get("status") == "current", "initialized wiki schema is not current")
+
+    run_link("demo", str(demo_target), "--force", python=python)
+    demo_status = run_json("status", str(demo_target), "--validate", "--json", python=python)
+    require(demo_status.get("ready") is True, "demo wiki did not report ready")
+    require(demo_status.get("validation", {}).get("passed") is True, "demo validation did not pass")
+    require(int(demo_status.get("memory_count") or 0) >= 1, "demo did not include a starter memory")
+
+    query = run_json("query", "what is Link agent memory?", str(demo_target), "--budget", "small", "--json", python=python)
+    require(query.get("found") is True, "query did not find demo context")
+    require(bool(query.get("context_packet")), "query returned an empty context packet")
+    require(query.get("budget_report", {}).get("context_packet", {}).get("returned", 0) <= 6, "small query budget was not enforced")
+
+    brief = run_json("brief", "testing Link as local personal memory", str(demo_target), "--json", python=python)
+    require(brief.get("profile", {}).get("memory_count", 0) >= 1, "brief did not include memory profile")
+    require("agent_guidance" in brief, "brief did not include agent guidance")
+
+    remembered = run_json(
+        "remember",
+        "User is testing Link first-use smoke as local personal memory for agents.",
+        str(demo_target),
+        "--title",
+        "First-use smoke memory",
+        "--type",
+        "note",
+        "--source",
+        "first-use-smoke",
+        "--json",
+        python=python,
+    )
+    require(remembered.get("created") is True, "remember did not create a first-use memory")
+    require((demo_target / "wiki/memories/first-use-smoke-memory.md").exists(), "remembered memory page is missing")
+
+    recalled = run_json("recall", "first-use smoke", str(demo_target), "--json", python=python)
+    require(recalled.get("count", 0) >= 1, "recall did not find the remembered first-use memory")
+
+    capture_note = work_dir / "session-note.md"
+    capture_note.write_text(
+        "Remember that first-use smoke keeps memory approval local and explicit.",
+        encoding="utf-8",
+    )
+    captured = run_json("capture-session", str(capture_note), str(demo_target), "--json", python=python)
+    require(captured.get("captured") is True, "capture-session did not save the session note")
+    require(str(captured.get("path", "")).startswith("raw/memory-captures/"), "capture path was not under raw/memory-captures")
+
+    inbox = run_json("capture-inbox", str(demo_target), "--json", python=python)
+    require(inbox.get("count", 0) >= 1, "capture-inbox did not show the saved capture")
+
+    raw_source = demo_target / "raw/new-user-source.md"
+    raw_source.write_text("# New user source\n\nA pending raw source for first-use smoke.\n", encoding="utf-8")
+    ingest = run_json("ingest-status", str(demo_target), "--json", python=python)
+    require(ingest.get("pending_count") == 1, "ingest-status did not report the pending raw source")
+    require(ingest.get("guidance", {}).get("agent_prompt"), "ingest-status did not include the next agent prompt")
+
+    validation = run_json("validate", str(demo_target), "--strict", "--json", python=python)
+    require(validation.get("passed") is True, "validate --strict did not pass after first-use actions")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Smoke test Link's first-use local workflow.")
+    parser.add_argument("--work-dir", default="", help="directory for temporary smoke artifacts")
+    parser.add_argument("--python", default=sys.executable, help="Python executable used to run link.py")
+    args = parser.parse_args()
+
+    work_dir = Path(args.work_dir).expanduser().resolve() if args.work_dir else Path(tempfile.mkdtemp(prefix="link-first-use-"))
+    try:
+        run_smoke(work_dir, python=args.python)
+    except SmokeFailure as exc:
+        print(f"First-use smoke failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"First-use smoke passed in {work_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
