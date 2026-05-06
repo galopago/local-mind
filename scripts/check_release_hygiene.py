@@ -59,6 +59,13 @@ BINARY_SUFFIXES = {
 
 CHANGELOG_VERSION_RE = re.compile(r"^## \[([^\]]+)\](?: - \d{4}-\d{2}-\d{2})?\s*$", re.MULTILINE)
 
+AGENT_CONTRACT_REQUIREMENTS = {
+    Path("LINK.md"): ("query_link", "validate_wiki", "memory_brief"),
+    Path("README.md"): ("query_link", "validate_wiki", "memory_brief"),
+    Path("integrations/_shared/link-instructions.md"): ("query_link", "validate_wiki", "memory_brief"),
+    Path("integrations/_shared/link-instructions-project.md"): ("query_link", "validate_wiki", "memory_brief"),
+}
+
 
 def tracked_files() -> list[Path]:
     result = subprocess.run(
@@ -122,10 +129,25 @@ def check_changelog(findings: list[str], current_version: str | None, path: Path
         findings.append(f"CHANGELOG.md missing current package version: {current_version}")
 
 
+def check_agent_contract(
+    findings: list[str],
+    requirements: dict[Path, tuple[str, ...]] = AGENT_CONTRACT_REQUIREMENTS,
+) -> None:
+    for path, required_terms in requirements.items():
+        if not path.exists():
+            findings.append(f"agent contract file missing: {path}")
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for term in required_terms:
+            if term not in text:
+                findings.append(f"agent contract missing {term!r} in {path}")
+
+
 def main() -> int:
     findings: list[str] = []
     current_version = check_version_consistency(findings)
     check_changelog(findings, current_version)
+    check_agent_contract(findings)
 
     for path in tracked_files():
         name = path.name
