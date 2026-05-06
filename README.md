@@ -426,8 +426,10 @@ sources, and build outputs can be included by accident.
 
 ## Contributing
 
-Contributions should come through pull requests. Please target `develop` unless
-the maintainer asks for a different branch. `main` is the stable branch.
+Contributions should come through pull requests. Please target `main` unless the
+maintainer asks for a different branch. The `develop` branch is a maintainer
+integration branch for staging larger release work before it is proposed to
+`main`.
 
 Before opening a PR, run the local gate:
 
