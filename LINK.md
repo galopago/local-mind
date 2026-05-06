@@ -296,7 +296,7 @@ Rules:
 - If the human asks to remove a raw capture, run `python3 link.py delete-capture "<raw-capture-path>" . --confirm` or MCP `delete_capture` with `confirm: true`. Never delete captures without explicit confirmation.
 - Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
 - Run `python3 link.py profile .` when the human asks what Link knows or when you need a quick overview of remembered preferences, decisions, and project context.
-- Run `python3 link.py memory-inbox .` to find pending, stale, invalid, or underspecified memories and follow each item's primary action.
+- Run `python3 link.py memory-inbox .` or MCP `memory_inbox` to find pending, stale, invalid, or underspecified memories and follow each item's primary action. Pass `--project <slug>` or MCP `project` when reviewing a specific project.
 - If `remember` reports a duplicate candidate, inspect it with `python3 link.py explain-memory "<name-or-title>" .` and merge new information with `python3 link.py update-memory "<name-or-title>" "new detail" .` instead of creating another one. Use `--allow-duplicate` only when the human confirms it should be separate.
 - If `remember`, `update-memory`, or `propose-memories` reports conflict candidates, stop and ask the human whether the older memory should be updated, archived, or allowed to coexist. Use `--allow-conflict` only when the human confirms both memories are true in different contexts.
 - After updating a memory, review it again with the human because `update-memory` resets `review_status` to `pending`.

@@ -734,12 +734,18 @@ def _memory_review_issues(record: dict[str, object]) -> list[dict[str, str]]:
     return _core_memory_review_issues(record, review_command="review-memory")
 
 
-def _memory_inbox(wiki_dir: Path, limit: int = 20, include_archived: bool = False) -> dict[str, object]:
+def _memory_inbox(
+    wiki_dir: Path,
+    limit: int = 20,
+    include_archived: bool = False,
+    project: str | None = None,
+) -> dict[str, object]:
     return _core_memory_inbox(
         _memory_records(wiki_dir),
         limit=limit,
         include_archived=include_archived,
         review_command="review-memory",
+        project=project,
     )
 
 
@@ -2247,6 +2253,7 @@ def memory_inbox(
     target: Path,
     limit: int = 20,
     include_archived: bool = False,
+    project: str | None = None,
     json_output: bool = False,
 ) -> int:
     target = target.expanduser().resolve()
@@ -2254,13 +2261,15 @@ def memory_inbox(
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
-    inbox = _memory_inbox(wiki_dir, limit=limit, include_archived=include_archived)
+    inbox = _memory_inbox(wiki_dir, limit=limit, include_archived=include_archived, project=project)
 
     if json_output:
         print(json.dumps(inbox, indent=2))
         return 0
 
     print(f"Link memory inbox: {target}")
+    if inbox.get("project"):
+        print(f"Project: {inbox['project']}")
     if include_archived:
         print("Including archived memories")
     print("")
@@ -2806,6 +2815,7 @@ def main(argv: list[str] | None = None) -> int:
     inbox_cmd.add_argument("target", nargs="?", default=".")
     inbox_cmd.add_argument("--limit", type=int, default=20)
     inbox_cmd.add_argument("--include-archived", action="store_true", help="include archived memories")
+    inbox_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
     inbox_cmd.add_argument("--json", action="store_true", help="print machine-readable inbox")
 
     review_cmd = sub.add_parser("review-memory", help="mark a memory as reviewed")
@@ -2933,6 +2943,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.target),
             limit=args.limit,
             include_archived=args.include_archived,
+            project=args.project,
             json_output=args.json,
         )
     if args.command == "review-memory":

@@ -699,6 +699,49 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(clear_code, 0)
         self.assertEqual(clear["review_count"], 0)
 
+    def test_memory_inbox_filters_by_project(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.review_memory(target, "prefer-local-personal-memory", json_output=True)
+            alpha_code = link_cli.remember(
+                target,
+                "Alpha project stores deployment context in Link.",
+                title="Alpha deployment context",
+                memory_type="project",
+                scope="project",
+                project="alpha",
+                json_output=True,
+            )
+            beta_code = link_cli.remember(
+                target,
+                "Beta project stores design context in Link.",
+                title="Beta design context",
+                memory_type="project",
+                scope="project",
+                project="beta",
+                json_output=True,
+            )
+
+        inbox_out = StringIO()
+        with redirect_stdout(inbox_out):
+            inbox_code = link_cli.memory_inbox(target, project="alpha", json_output=True)
+        inbox = json.loads(inbox_out.getvalue())
+
+        text_out = StringIO()
+        with redirect_stdout(text_out):
+            text_code = link_cli.memory_inbox(target, project="alpha")
+
+        self.assertEqual(alpha_code, 0)
+        self.assertEqual(beta_code, 0)
+        self.assertEqual(inbox_code, 0)
+        self.assertEqual(text_code, 0)
+        self.assertEqual(inbox["project"], "alpha")
+        self.assertEqual([item["project"] for item in inbox["items"]], ["alpha"])
+        self.assertIn("Project: alpha", text_out.getvalue())
+        self.assertNotIn("Beta design context", inbox_out.getvalue())
+
     def test_explain_memory_reports_trust_state_and_graph(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

@@ -117,6 +117,36 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(inbox["next_actions"][0]["kind"], "review")
         self.assertIn("actions", item)
 
+    def test_memory_inbox_filters_project_scoped_memories(self):
+        base = {
+            "path": "wiki/memories/example.md",
+            "memory_type": "project",
+            "scope": "project",
+            "status": "active",
+            "date_captured": "2026-05-05T00:00:00Z",
+            "source": "unit test",
+            "review_status": "pending",
+            "tags": ["memory"],
+            "tldr": "Project memory.",
+            "snippet": "Project memory.",
+        }
+        records = [
+            {**base, "name": "alpha-note", "title": "Alpha note", "project": "alpha"},
+            {**base, "name": "beta-note", "title": "Beta note", "project": "beta"},
+            {
+                **base,
+                "name": "global-note",
+                "title": "Global note",
+                "scope": "global",
+                "project": "",
+            },
+        ]
+
+        inbox = memory_inbox(records, project="alpha")
+
+        self.assertEqual(inbox["project"], "alpha")
+        self.assertEqual([item["name"] for item in inbox["items"]], ["alpha-note", "global-note"])
+
     def test_memory_inbox_prioritizes_metadata_repairs(self):
         records = [
             {

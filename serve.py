@@ -158,6 +158,7 @@ def _memory_inbox(limit: int = 20, include_archived: bool = False, project: str 
         limit=limit,
         include_archived=include_archived,
         review_command="review-memory",
+        project=project,
     )
 
 

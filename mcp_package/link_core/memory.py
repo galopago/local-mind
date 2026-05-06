@@ -1089,11 +1089,15 @@ def memory_inbox(
     limit: int = 20,
     include_archived: bool = False,
     review_command: str = "review-memory",
+    project: str | None = None,
 ) -> dict[str, object]:
     limit = max(1, min(limit, 50))
+    project_name = normalize_project(project)
     severity_rank = {"high": 0, "medium": 1, "low": 2}
     items: list[dict[str, object]] = []
     for record in records:
+        if not memory_visible_for_project(record, project_name):
+            continue
         if not include_archived and str(record.get("status") or "").lower() == "archived":
             continue
         issues = memory_review_issues(record, review_command=review_command)
@@ -1123,6 +1127,7 @@ def memory_inbox(
         "review_count": len(items),
         "counts_by_severity": counts_by_severity,
         "include_archived": include_archived,
+        "project": project_name,
         "next_actions": [
             item["primary_action"]
             for item in items[:limit]

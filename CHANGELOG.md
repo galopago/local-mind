@@ -35,6 +35,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added MCP `capture_inbox` to review saved raw captures with redacted snippets before accepting, redacting, or deleting them.
 - Added raw capture visibility to `/memory` and `/api/memory-dashboard`, including accept/redact/delete commands and secret-warning counts.
 - Added project filtering to `/memory`, `/profile`, `/api/memory-dashboard`, `/api/memory-profile`, and `/api/memory-inbox`.
+- Added project filtering to CLI and MCP memory inbox workflows.
 - Added read-only web Memory Dashboard at `/memory` and `/api/memory-dashboard` for active memories, review queue, recent updates, archived memories, and next-action commands.
 - Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; memory write operations remain CLI/MCP-only.
 - Added a graph node inspector so moving nodes no longer accidentally opens pages; double-click or Open page still navigates.

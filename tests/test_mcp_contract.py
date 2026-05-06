@@ -360,6 +360,32 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(reviewed["remaining_issue_count"], 0)
         self.assertEqual(clear["review_count"], 0)
 
+    def test_memory_inbox_project_filter_contract(self):
+        self.server.review_memory("prefer-local-personal-memory")
+        alpha = json.loads(self.server.remember_memory(
+            "Alpha project stores deployment context in Link.",
+            title="Alpha deployment context",
+            memory_type="project",
+            scope="project",
+            project="alpha",
+        ))
+        beta = json.loads(self.server.remember_memory(
+            "Beta project stores design context in Link.",
+            title="Beta design context",
+            memory_type="project",
+            scope="project",
+            project="beta",
+        ))
+
+        raw_payload = self.server.memory_inbox(project="alpha")
+        inbox = json.loads(raw_payload)
+
+        self.assertTrue(alpha["created"])
+        self.assertTrue(beta["created"])
+        self.assertEqual(inbox["project"], "alpha")
+        self.assertEqual([item["project"] for item in inbox["items"]], ["alpha"])
+        self.assertNotIn("Beta design context", raw_payload)
+
     def test_explain_memory_contract(self):
         payload = json.loads(self.server.explain_memory("prefer-local-personal-memory"))
 

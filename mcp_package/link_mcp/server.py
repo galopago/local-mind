@@ -183,12 +183,13 @@ def _memory_review_issues(record: dict[str, object]) -> list[dict[str, str]]:
     return _core_memory_review_issues(record, review_command="review_memory")
 
 
-def _memory_inbox(limit: int = 20, include_archived: bool = False) -> dict[str, object]:
+def _memory_inbox(limit: int = 20, include_archived: bool = False, project: str = "") -> dict[str, object]:
     return _core_memory_inbox(
         _memory_records(),
         limit=limit,
         include_archived=include_archived,
         review_command="review_memory",
+        project=project,
     )
 
 
@@ -889,15 +890,16 @@ def memory_profile(limit: int = 10, project: str = "") -> str:
 
 
 @mcp.tool()
-def memory_inbox(limit: int = 20, include_archived: bool = False) -> str:
+def memory_inbox(limit: int = 20, include_archived: bool = False, project: str = "") -> str:
     """List memories that need user review.
 
     Use this to surface pending, stale, invalid, or underspecified memories for
     human confirmation. Archived memories are excluded unless include_archived
-    is true.
+    is true. Pass project to include broad user/global memory plus that
+    project's scoped memories while excluding other explicit projects.
     """
     limit = _parse_limit(limit, default=20)
-    return json.dumps(_memory_inbox(limit=limit, include_archived=include_archived), ensure_ascii=False)
+    return json.dumps(_memory_inbox(limit=limit, include_archived=include_archived, project=project), ensure_ascii=False)
 
 
 @mcp.tool()

@@ -449,7 +449,7 @@ Common endpoints:
 | `python3 link.py brief "task" <dir> [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, and safe memory rules. |
 | `python3 link.py recall "query" <dir> [--project slug]` | Search local agent memories. |
 | `python3 link.py profile <dir> [--project slug]` | Show what Link remembers by type, scope, status, and recency. |
-| `python3 link.py memory-inbox <dir>` | Show memories that need review or stronger metadata with next-step commands. |
+| `python3 link.py memory-inbox <dir> [--project slug]` | Show memories that need review or stronger metadata with next-step commands. |
 | `python3 link.py review-memory <name> <dir>` | Mark a confirmed memory as reviewed. |
 | `python3 link.py explain-memory <name> <dir>` | Explain provenance, lifecycle, graph links, review issues, and recall readiness. |
 | `python3 link.py update-memory <name> "text" <dir> [--project slug]` | Merge new text into an existing memory, blocking likely conflicts with other active memories by default. |
