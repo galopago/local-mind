@@ -158,6 +158,13 @@ def _clean_text_input(value, max_len: int = MAX_TEXT_INPUT) -> str:
     return text[:max_len]
 
 
+def _required_text_input(value, message: str, max_len: int = MAX_TEXT_INPUT) -> str:
+    text = _clean_text_input(value, max_len=max_len)
+    if not text:
+        raise ValueError(message)
+    return text
+
+
 def _parse_limit(value, default: int = 20, max_limit: int = 50) -> int:
     try:
         limit = int(value)
@@ -690,6 +697,28 @@ def _resolve_memory_page(identifier: str) -> tuple[Path | None, dict[str, object
     )
 
 
+def _rebuild_memory_backlinks() -> bool:
+    rebuilt = json.loads(rebuild_backlinks())
+    return bool(rebuilt.get("rebuilt"))
+
+
+def _memory_mutation_options(project: str = "") -> dict[str, object]:
+    return {
+        "timestamp": _utc_timestamp(),
+        "records": _memory_records(),
+        "project": _resolve_project(project),
+        "log_writer": _append_log,
+        "rebuild_backlinks": _rebuild_memory_backlinks,
+    }
+
+
+def _memory_type_scope(memory_type: str, scope: str) -> tuple[str, str]:
+    return (
+        _clean_text_input(memory_type).lower() or "note",
+        _clean_text_input(scope).lower() or "user",
+    )
+
+
 def _set_memory_status(identifier: str, status: str, reason: str = "") -> dict[str, object]:
     result = _core_set_memory_status(
         WIKI_DIR,
@@ -706,10 +735,6 @@ def _set_memory_status(identifier: str, status: str, reason: str = "") -> dict[s
 
 
 def _forget_memory(identifier: str, confirm: bool = False) -> dict[str, object]:
-    def rebuild_memory_backlinks() -> bool:
-        rebuilt = json.loads(rebuild_backlinks())
-        return bool(rebuilt.get("rebuilt"))
-
     result = _core_forget_memory_page(
         WIKI_DIR,
         _clean_text_input(identifier, max_len=300),
@@ -717,7 +742,7 @@ def _forget_memory(identifier: str, confirm: bool = False) -> dict[str, object]:
         records=_memory_records(),
         timestamp=_utc_timestamp(),
         log_writer=_append_log,
-        rebuild_backlinks=rebuild_memory_backlinks,
+        rebuild_backlinks=_rebuild_memory_backlinks,
     )
     if result.get("forgotten"):
         _cache.clear()
@@ -746,68 +771,35 @@ def _update_memory_page(
     allow_conflict: bool = False,
     project: str = "",
 ) -> dict[str, object]:
-    clean_text = _clean_text_input(text, max_len=4000)
-    if not clean_text:
-        raise ValueError("memory update text required")
+    clean_text = _required_text_input(text, "memory update text required", max_len=4000)
     clean_source = _clean_text_input(source, max_len=500) or "mcp"
-
-    def rebuild_memory_backlinks() -> bool:
-        rebuilt = json.loads(rebuild_backlinks())
-        return bool(rebuilt.get("rebuilt"))
+    options = _memory_mutation_options(project)
 
     result = _core_update_memory_page(
-        WIKI_DIR,
-        _clean_text_input(identifier, max_len=300),
-        clean_text,
-        source=clean_source,
-        timestamp=_utc_timestamp(),
-        records=_memory_records(),
-        review_command="review_memory",
+        WIKI_DIR, _clean_text_input(identifier, max_len=300), clean_text,
+        source=clean_source, review_command="review_memory",
         allow_conflict=allow_conflict,
-        project=_resolve_project(project),
-        log_writer=_append_log,
-        rebuild_backlinks=rebuild_memory_backlinks,
+        **options,
     )
     _cache.clear()
     return result
 
 
 def _write_memory_page(
-    text: str,
-    title: str = "",
-    memory_type: str = "note",
-    scope: str = "user",
-    tags: str = "",
-    source: str = "mcp",
-    allow_duplicate: bool = False,
-    allow_conflict: bool = False,
-    project: str = "",
+    text: str, title: str = "", memory_type: str = "note",
+    scope: str = "user", tags: str = "", source: str = "mcp",
+    allow_duplicate: bool = False, allow_conflict: bool = False, project: str = "",
 ) -> dict[str, object]:
-    clean_text = _clean_text_input(text, max_len=4000)
-    if not clean_text:
-        raise ValueError("memory text required")
-    memory_type = _clean_text_input(memory_type).lower() or "note"
-    scope = _clean_text_input(scope).lower() or "user"
-
-    def rebuild_memory_backlinks() -> bool:
-        rebuilt = json.loads(rebuild_backlinks())
-        return bool(rebuilt.get("rebuilt"))
+    clean_text = _required_text_input(text, "memory text required", max_len=4000)
+    memory_type, scope = _memory_type_scope(memory_type, scope)
+    options = _memory_mutation_options(project)
 
     result = _core_write_memory_page(
-        WIKI_DIR,
-        clean_text,
-        title=_clean_text_input(title),
-        memory_type=memory_type,
-        scope=scope,
-        tags=_clean_text_input(tags, max_len=500),
-        source=_clean_text_input(source, max_len=500),
-        timestamp=_utc_timestamp(),
-        project=_resolve_project(project),
-        records=_memory_records(),
-        allow_duplicate=allow_duplicate,
-        allow_conflict=allow_conflict,
-        log_writer=_append_log,
-        rebuild_backlinks=rebuild_memory_backlinks,
+        WIKI_DIR, clean_text, title=_clean_text_input(title),
+        memory_type=memory_type, scope=scope,
+        tags=_clean_text_input(tags, max_len=500), source=_clean_text_input(source, max_len=500),
+        allow_duplicate=allow_duplicate, allow_conflict=allow_conflict,
+        **options,
     )
     if result.get("created"):
         _cache.clear()

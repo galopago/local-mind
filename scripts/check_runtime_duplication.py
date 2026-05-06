@@ -20,12 +20,8 @@ LARGE_DUPLICATE_LINE_THRESHOLD = 20
 # These are still runtime-specific adapters around shared core calls. New large
 # duplicate helpers should be extracted instead of added here.
 ALLOWED_LARGE_DUPLICATE_NAMES = {
-    "_mark_memory_reviewed",
     "_memory_audit",
     "_memory_brief",
-    "_set_memory_status",
-    "_update_memory_page",
-    "_write_memory_page",
 }
 
 

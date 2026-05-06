@@ -44,6 +44,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added MCP `validate_wiki` and `/api/validate` so agents can run the same ingest gate without shell access.
 - Added a runtime duplication guard in CI to block new large copied helper bodies across CLI, web, and MCP runtimes.
 - Added a tool contract guard in CI to keep public CLI commands, MCP tools, and README references from drifting.
+- Tightened memory mutation adapters so CLI and MCP memory writes share more core behavior with fewer runtime-side exceptions.
 - Added raw capture status to CLI and MCP memory briefs so session priming surfaces saved captures and secret-warning captures.
 - Added `/brief` and `/api/memory-brief` so the local web UI and HTTP clients can get startup memory context, review warnings, and raw capture status.
 - Added `memory-audit` and MCP `memory_audit` for a read-only health report covering memory backlog, raw captures, risk factors, and next actions.

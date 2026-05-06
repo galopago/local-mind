@@ -882,6 +882,52 @@ def _resolve_memory_page(wiki_dir: Path, identifier: str) -> tuple[Path | None, 
     return _core_resolve_memory_page(wiki_dir, identifier, records=_memory_records(wiki_dir))
 
 
+def _memory_runtime(target: Path) -> tuple[Path, list[dict[str, object]]]:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
+    return wiki_dir, _memory_records(wiki_dir)
+
+
+def _log_writer_for(wiki_dir: Path) -> Callable[[str, str, str, list[str]], None]:
+    return lambda ts, operation, description, lines: _append_log(
+        wiki_dir,
+        ts,
+        operation,
+        description,
+        lines,
+    )
+
+
+def _rebuild_memory_backlinks(wiki_dir: Path) -> bool:
+    backlinks = _build_backlinks(wiki_dir)
+    (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
+def _memory_mutation_options(
+    wiki_dir: Path,
+    records: list[dict[str, object]],
+    timestamp: str | None,
+    project: str | None = None,
+) -> dict[str, object]:
+    return {
+        "timestamp": timestamp or _utc_timestamp(),
+        "records": records,
+        "project": project,
+        "log_writer": _log_writer_for(wiki_dir),
+        "rebuild_backlinks": lambda: _rebuild_memory_backlinks(wiki_dir),
+    }
+
+
+def _required_memory_text(text: str, message: str) -> str:
+    clean_text = text.strip()
+    if not clean_text:
+        raise ValueError(message)
+    return clean_text
+
+
 def _set_memory_status(
     target: Path,
     identifier: str,
@@ -889,24 +935,15 @@ def _set_memory_status(
     reason: str | None = None,
     timestamp: str | None = None,
 ) -> dict[str, object]:
-    target = target.expanduser().resolve()
-    wiki_dir = _resolve_wiki_dir(target)
-    if not wiki_dir.exists():
-        raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
+    wiki_dir, records = _memory_runtime(target)
     return _core_set_memory_status(
         wiki_dir,
         identifier,
         status,
         reason=reason,
         timestamp=timestamp or _utc_timestamp(),
-        records=_memory_records(wiki_dir),
-        log_writer=lambda ts, operation, description, lines: _append_log(
-            wiki_dir,
-            ts,
-            operation,
-            description,
-            lines,
-        ),
+        records=records,
+        log_writer=_log_writer_for(wiki_dir),
     )
 
 
@@ -916,24 +953,15 @@ def _mark_memory_reviewed(
     note: str | None = None,
     timestamp: str | None = None,
 ) -> dict[str, object]:
-    target = target.expanduser().resolve()
-    wiki_dir = _resolve_wiki_dir(target)
-    if not wiki_dir.exists():
-        raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
+    wiki_dir, records = _memory_runtime(target)
     return _core_mark_memory_reviewed(
         wiki_dir,
         identifier,
         note=note,
         timestamp=timestamp or _utc_timestamp(),
-        records=_memory_records(wiki_dir),
+        records=records,
         review_command="review-memory",
-        log_writer=lambda ts, operation, description, lines: _append_log(
-            wiki_dir,
-            ts,
-            operation,
-            description,
-            lines,
-        ),
+        log_writer=_log_writer_for(wiki_dir),
     )
 
 
@@ -946,87 +974,33 @@ def _update_memory_page(
     allow_conflict: bool = False,
     project: str | None = None,
 ) -> dict[str, object]:
-    target = target.expanduser().resolve()
-    wiki_dir = _resolve_wiki_dir(target)
-    if not wiki_dir.exists():
-        raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
-    clean_text = text.strip()
-    if not clean_text:
-        raise ValueError("memory update text required")
-
-    def rebuild_memory_backlinks() -> bool:
-        backlinks = _build_backlinks(wiki_dir)
-        (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
-        return True
+    wiki_dir, records = _memory_runtime(target)
+    clean_text = _required_memory_text(text, "memory update text required")
+    options = _memory_mutation_options(wiki_dir, records, timestamp, project)
 
     return _core_update_memory_page(
-        wiki_dir,
-        identifier,
-        clean_text,
-        source=source,
-        timestamp=timestamp or _utc_timestamp(),
-        records=_memory_records(wiki_dir),
-        review_command="review-memory",
-        allow_conflict=allow_conflict,
-        project=project,
-        log_writer=lambda ts, operation, description, lines: _append_log(
-            wiki_dir,
-            ts,
-            operation,
-            description,
-            lines,
-        ),
-        rebuild_backlinks=rebuild_memory_backlinks,
+        wiki_dir, identifier, clean_text, source=source,
+        review_command="review-memory", allow_conflict=allow_conflict,
+        **options,
     )
 
 
 def _write_memory_page(
-    target: Path,
-    text: str,
-    title: str | None = None,
-    memory_type: str = "note",
-    scope: str = "user",
-    tags: str | None = None,
-    source: str = "manual",
-    timestamp: str | None = None,
-    allow_duplicate: bool = False,
-    allow_conflict: bool = False,
-    project: str | None = None,
+    target: Path, text: str, title: str | None = None,
+    memory_type: str = "note", scope: str = "user",
+    tags: str | None = None, source: str = "manual",
+    timestamp: str | None = None, allow_duplicate: bool = False,
+    allow_conflict: bool = False, project: str | None = None,
 ) -> dict[str, object]:
-    target = target.expanduser().resolve()
-    wiki_dir = _resolve_wiki_dir(target)
-    if not wiki_dir.exists():
-        raise FileNotFoundError(f"missing wiki directory: {wiki_dir}")
-    clean_text = text.strip()
-    if not clean_text:
-        raise ValueError("memory text required")
-
-    def rebuild_memory_backlinks() -> bool:
-        backlinks = _build_backlinks(wiki_dir)
-        (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
-        return True
+    wiki_dir, records = _memory_runtime(target)
+    clean_text = _required_memory_text(text, "memory text required")
+    options = _memory_mutation_options(wiki_dir, records, timestamp, project)
 
     return _core_write_memory_page(
-        wiki_dir,
-        clean_text,
-        title=title,
-        memory_type=memory_type,
-        scope=scope,
-        tags=tags,
-        source=source,
-        timestamp=timestamp or _utc_timestamp(),
-        project=project,
-        records=_memory_records(wiki_dir),
-        allow_duplicate=allow_duplicate,
-        allow_conflict=allow_conflict,
-        log_writer=lambda ts, operation, description, lines: _append_log(
-            wiki_dir,
-            ts,
-            operation,
-            description,
-            lines,
-        ),
-        rebuild_backlinks=rebuild_memory_backlinks,
+        wiki_dir, clean_text, title=title, memory_type=memory_type,
+        scope=scope, tags=tags, source=source,
+        allow_duplicate=allow_duplicate, allow_conflict=allow_conflict,
+        **options,
     )
 
 
