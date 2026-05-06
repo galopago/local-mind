@@ -172,7 +172,7 @@ class DemoSnapshotTests(unittest.TestCase):
         self.assertEqual(dashboard["review_count"], 1)
         self.assertEqual(dashboard["next_actions"][0]["label"], "Review pending memories")
         self.assertEqual(dashboard["review"][0]["name"], "prefer-local-personal-memory")
-        self.assertEqual(dashboard["review"][0]["actions"][1]["label"], "Review")
+        self.assertEqual(dashboard["review"][0]["actions"][0]["label"], "Review")
         self.assertIn("Memory Dashboard", html)
         self.assertIn("Next actions", html)
         self.assertIn("Review needed", html)

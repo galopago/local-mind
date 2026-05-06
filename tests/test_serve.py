@@ -236,7 +236,7 @@ class ServeTests(unittest.TestCase):
             archived_count=0,
         )
 
-        self.assertIn("1 memory need confirmation", actions[0]["detail"])
+        self.assertIn("1 memory needs confirmation", actions[0]["detail"])
         self.assertNotIn("memoryy", actions[0]["detail"])
 
     def test_cache_invalidation_sees_existing_page_edits(self):

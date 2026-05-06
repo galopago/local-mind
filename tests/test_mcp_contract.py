@@ -215,6 +215,8 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(inbox["review_count"], 1)
         self.assertEqual(inbox["items"][0]["name"], "prefer-local-personal-memory")
         self.assertEqual(inbox["items"][0]["issues"][0]["code"], "pending_review")
+        self.assertEqual(inbox["items"][0]["primary_action"]["kind"], "review")
+        self.assertEqual(inbox["items"][0]["primary_action"]["tool"], "review_memory")
         self.assertTrue(reviewed["updated"])
         self.assertEqual(reviewed["review_status"], "reviewed")
         self.assertEqual(reviewed["remaining_issue_count"], 0)

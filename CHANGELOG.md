@@ -19,6 +19,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added proposal-only memory extraction with `propose-memories` and MCP `propose_memories` for chat/session notes.
 - Added agent memory briefs with `link.py brief` and MCP `memory_brief` so agents can prime themselves with relevant local memory before a task.
 - Added conflict detection for memory writes, updates, and proposals; contradictory active memories are surfaced before saving unless explicitly allowed.
+- Added shared memory review action plans so inbox and explanation payloads tell agents whether to review, update, archive, restore, or edit metadata next.
 - Added read-only web Memory Dashboard at `/memory` and `/api/memory-dashboard` for active memories, review queue, recent updates, archived memories, and next-action commands.
 - Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; memory write operations remain CLI/MCP-only.
 - Added a graph node inspector so moving nodes no longer accidentally opens pages; double-click or Open page still navigates.

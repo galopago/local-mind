@@ -86,6 +86,56 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(recalled[0]["name"], "prefer-release-branches")
         self.assertNotIn("body", recalled[0])
 
+    def test_memory_inbox_returns_action_plan(self):
+        records = [
+            {
+                "name": "needs-review",
+                "path": "wiki/memories/needs-review.md",
+                "title": "Needs review",
+                "memory_type": "preference",
+                "scope": "user",
+                "status": "active",
+                "date_captured": "2026-05-05T00:00:00Z",
+                "source": "unit test",
+                "review_status": "pending",
+                "tags": ["memory"],
+                "tldr": "User prefers reviewed memory.",
+                "snippet": "User prefers reviewed memory.",
+            }
+        ]
+
+        inbox = memory_inbox(records)
+        item = inbox["items"][0]
+
+        self.assertEqual(item["primary_action"]["kind"], "review")
+        self.assertEqual(item["primary_action"]["tool"], "review_memory")
+        self.assertIn("review-memory", item["primary_action"]["command"])
+        self.assertEqual(inbox["next_actions"][0]["kind"], "review")
+        self.assertIn("actions", item)
+
+    def test_memory_inbox_prioritizes_metadata_repairs(self):
+        records = [
+            {
+                "name": "missing-source",
+                "path": "wiki/memories/missing-source.md",
+                "title": "Missing source",
+                "memory_type": "preference",
+                "scope": "user",
+                "status": "active",
+                "date_captured": "2026-05-05T00:00:00Z",
+                "source": "",
+                "review_status": "reviewed",
+                "tags": ["memory"],
+                "tldr": "User prefers metadata.",
+                "snippet": "User prefers metadata.",
+            }
+        ]
+
+        inbox = memory_inbox(records)
+
+        self.assertEqual(inbox["items"][0]["primary_action"]["kind"], "edit_metadata")
+        self.assertIn("wiki/memories/missing-source.md", inbox["items"][0]["primary_action"]["command"])
+
     def test_proposals_are_duplicate_aware_and_write_free(self):
         records = [
             {
@@ -342,6 +392,7 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(explanation["graph"]["inbound"], ["agent-memory"])
         self.assertEqual(explanation["graph"]["forward"], ["release-workflow"])
         self.assertEqual(explanation["graph"]["wikilinks"], ["release-workflow"])
+        self.assertEqual(explanation["review"]["primary_action"]["kind"], "explain")
         self.assertIn("User prefers focused commits", explanation["body"])
         self.assertEqual(len(explanation["log_entries"]), 1)
         self.assertEqual(extract_wikilinks("[[one]] [[one]] [[two|Two]]"), ["one", "two"])

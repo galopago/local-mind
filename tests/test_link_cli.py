@@ -440,6 +440,14 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(inbox["review_count"], 1)
         self.assertEqual(inbox["items"][0]["name"], "prefer-local-personal-memory")
         self.assertEqual(inbox["items"][0]["issues"][0]["code"], "pending_review")
+        self.assertEqual(inbox["items"][0]["primary_action"]["kind"], "review")
+
+        text_out = StringIO()
+        with redirect_stdout(text_out):
+            text_code = link_cli.memory_inbox(target)
+        self.assertEqual(text_code, 0)
+        self.assertIn("Next: Review", text_out.getvalue())
+        self.assertIn("Other actions:", text_out.getvalue())
 
         review_out = StringIO()
         with redirect_stdout(review_out):

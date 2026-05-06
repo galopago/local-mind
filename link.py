@@ -1769,7 +1769,18 @@ def memory_inbox(
         print(f"  {item['path']}")
         for issue in item["issues"]:
             print(f"  [{issue['severity']}] {issue['code']}: {issue['message']}")
-        print(f"  Review: python3 link.py review-memory \"{item['name']}\" .")
+        primary = item.get("primary_action") or {}
+        if primary:
+            print(f"  Next: {primary['label']} - {primary['description']}")
+            print(f"  Command: {primary['command']}")
+        actions = [
+            action
+            for action in item.get("actions", [])
+            if action.get("kind") != primary.get("kind")
+        ][:3]
+        if actions:
+            labels = ", ".join(str(action.get("label") or "") for action in actions)
+            print(f"  Other actions: {labels}")
     return 0
 
 

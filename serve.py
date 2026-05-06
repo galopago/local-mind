@@ -12,6 +12,7 @@ if (_BUNDLED_CORE / "link_core").exists():
 from link_core.memory import (
     count_values as _core_count_values,
     is_active_memory as _core_is_active_memory,
+    memory_action_hints as _core_memory_action_hints,
     memory_explanation as _core_memory_explanation,
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
@@ -209,39 +210,18 @@ def _memory_activity_key(record: dict[str, object]) -> tuple[str, str, str]:
 
 
 def _memory_action_hints(record: dict[str, object]) -> list[dict[str, str]]:
-    name = str(record.get("name") or "")
-    status = str(record.get("status") or "active").lower()
-    hints = [
-        {
-            "label": "Explain",
-            "href": f"/explain-memory?memory={urllib.parse.quote(name, safe='')}",
-            "command": f'python3 link.py explain-memory "{name}" .',
-        },
-    ]
-    if status == "archived":
-        hints.append({
-            "label": "Restore",
+    hints: list[dict[str, str]] = []
+    for action in _core_memory_action_hints(record, review_command="review-memory"):
+        item = {
+            "label": str(action.get("label") or ""),
             "href": "",
-            "command": f'python3 link.py restore-memory "{name}" .',
-        })
-        return hints
-    hints.extend([
-        {
-            "label": "Review",
-            "href": "",
-            "command": f'python3 link.py review-memory "{name}" .',
-        },
-        {
-            "label": "Update",
-            "href": "",
-            "command": f'python3 link.py update-memory "{name}" "new detail" .',
-        },
-        {
-            "label": "Archive",
-            "href": "",
-            "command": f'python3 link.py archive-memory "{name}" . --reason "why"',
-        },
-    ])
+            "command": str(action.get("command") or ""),
+            "description": str(action.get("description") or ""),
+        }
+        if action.get("kind") == "explain":
+            name = str(record.get("name") or "")
+            item["href"] = f"/explain-memory?memory={urllib.parse.quote(name, safe='')}"
+        hints.append(item)
     return hints
 
 
@@ -260,9 +240,10 @@ def _memory_dashboard_next_actions(
     actions: list[dict[str, str]] = []
     if review_count:
         memory_label = "memory" if review_count == 1 else "memories"
+        verb = "needs" if review_count == 1 else "need"
         actions.append({
             "label": "Review pending memories",
-            "detail": f"{review_count} {memory_label} need confirmation or metadata cleanup.",
+            "detail": f"{review_count} {memory_label} {verb} confirmation or metadata cleanup.",
             "href": "/inbox",
             "command": "python3 link.py memory-inbox .",
             "priority": "high",
@@ -969,15 +950,15 @@ def _render_memory_card(record: dict[str, object], include_issues: bool = False)
             for issue in record["issues"]
         ) + "</ul>"
     actions = ""
-    for action in _memory_action_hints(record):
-        label = html.escape(action["label"])
-        if action["href"]:
-            label_html = f'<a href="{html.escape(action["href"])}">{label}</a>'
+    for action in record.get("actions") or _memory_action_hints(record):
+        label = html.escape(str(action.get("label") or ""))
+        if action.get("href"):
+            label_html = f'<a href="{html.escape(str(action["href"]))}">{label}</a>'
         else:
             label_html = label
         actions += (
             f'<div><strong>{label_html}</strong>'
-            f'<code>{html.escape(action["command"])}</code></div>'
+            f'<code>{html.escape(str(action.get("command") or ""))}</code></div>'
         )
     summary_html = f'<p class="summary">{html.escape(summary)}</p>' if summary else ""
     return (

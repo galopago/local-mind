@@ -311,6 +311,164 @@ def memory_review_issues(
     return issues
 
 
+def _tool_name(command: str) -> str:
+    return command.replace("-", "_")
+
+
+def _cli_command(command: str) -> str:
+    return command.replace("_", "-")
+
+
+def _memory_action(
+    *,
+    kind: str,
+    label: str,
+    description: str,
+    command: str,
+    tool: str,
+    arguments: Mapping[str, object],
+    priority: str,
+) -> dict[str, object]:
+    return {
+        "kind": kind,
+        "label": label,
+        "description": description,
+        "command": command,
+        "tool": tool,
+        "arguments": dict(arguments),
+        "priority": priority,
+    }
+
+
+def memory_action_hints(
+    record: Mapping[str, object],
+    issues: Iterable[Mapping[str, str]] | None = None,
+    review_command: str = "review-memory",
+) -> list[dict[str, object]]:
+    """Return ordered actions for resolving or auditing one memory."""
+    name = str(record.get("name") or "")
+    path = str(record.get("path") or f"wiki/memories/{name}.md")
+    status = str(record.get("status") or "active").lower()
+    issue_list = [dict(issue) for issue in issues] if issues is not None else memory_review_issues(record, review_command)
+    issue_codes = {str(issue.get("code") or "") for issue in issue_list}
+    review_cli = _cli_command(review_command)
+    review_tool = _tool_name(review_command)
+    actions: list[dict[str, object]] = []
+    seen: set[str] = set()
+
+    def add(action: dict[str, object]) -> None:
+        kind = str(action["kind"])
+        if kind in seen:
+            return
+        actions.append(action)
+        seen.add(kind)
+
+    if status == "archived":
+        add(_memory_action(
+            kind="restore",
+            label="Restore",
+            description="Restore this archived memory to active recall if it is valid again.",
+            command=f'python3 link.py restore-memory "{name}" .',
+            tool="restore_memory",
+            arguments={"identifier": name},
+            priority="high",
+        ))
+        add(_memory_action(
+            kind="explain",
+            label="Explain",
+            description="Inspect why this memory exists before restoring it.",
+            command=f'python3 link.py explain-memory "{name}" .',
+            tool="explain_memory",
+            arguments={"identifier": name},
+            priority="medium",
+        ))
+        return actions
+
+    if issue_codes & {"invalid_review_status", "invalid_memory_type", "invalid_scope", "missing_source", "missing_date_captured"}:
+        add(_memory_action(
+            kind="edit_metadata",
+            label="Edit metadata",
+            description="Fix the Markdown frontmatter, then run review again.",
+            command=f'$EDITOR "{path}"',
+            tool="edit_memory_file",
+            arguments={"path": path},
+            priority="high",
+        ))
+    if issue_codes & {"needs_update", "missing_summary"}:
+        add(_memory_action(
+            kind="update",
+            label="Update",
+            description="Merge corrected memory text and reset review to pending.",
+            command=f'python3 link.py update-memory "{name}" "new detail" .',
+            tool="update_memory",
+            arguments={"identifier": name, "memory": "new detail"},
+            priority="high",
+        ))
+    if "stale_status" in issue_codes:
+        add(_memory_action(
+            kind="archive",
+            label="Archive",
+            description="Archive this stale memory so default recall ignores it.",
+            command=f'python3 link.py archive-memory "{name}" . --reason "stale"',
+            tool="archive_memory",
+            arguments={"identifier": name, "reason": "stale"},
+            priority="high",
+        ))
+    if "pending_review" in issue_codes and not any(
+        issue.get("severity") == "high" for issue in issue_list
+    ):
+        add(_memory_action(
+            kind="review",
+            label="Review",
+            description="Mark this memory reviewed after the user confirms it is accurate.",
+            command=f'python3 link.py {review_cli} "{name}" .',
+            tool=review_tool,
+            arguments={"identifier": name},
+            priority="high",
+        ))
+
+    add(_memory_action(
+        kind="explain",
+        label="Explain",
+        description="Audit provenance, graph links, lifecycle, and review state.",
+        command=f'python3 link.py explain-memory "{name}" .',
+        tool="explain_memory",
+        arguments={"identifier": name},
+        priority="medium",
+    ))
+    if "update" not in seen:
+        add(_memory_action(
+            kind="update",
+            label="Update",
+            description="Merge a corrected detail into this memory.",
+            command=f'python3 link.py update-memory "{name}" "new detail" .',
+            tool="update_memory",
+            arguments={"identifier": name, "memory": "new detail"},
+            priority="medium",
+        ))
+    if "archive" not in seen:
+        add(_memory_action(
+            kind="archive",
+            label="Archive",
+            description="Hide this memory from default recall without deleting the Markdown file.",
+            command=f'python3 link.py archive-memory "{name}" . --reason "why"',
+            tool="archive_memory",
+            arguments={"identifier": name, "reason": "why"},
+            priority="medium",
+        ))
+    return actions
+
+
+def primary_memory_action(actions: Iterable[Mapping[str, object]]) -> dict[str, object] | None:
+    action_list = [dict(action) for action in actions]
+    if not action_list:
+        return None
+    for action in action_list:
+        if str(action.get("priority") or "") == "high":
+            return action
+    return action_list[0]
+
+
 def memory_log_entries(
     wiki_dir: Path,
     record: Mapping[str, object],
@@ -395,6 +553,7 @@ def memory_explanation(
     text = page_path.read_text(encoding="utf-8", errors="replace")
     _, body = parse_frontmatter(text)
     issues = memory_review_issues(record, review_command=review_command)
+    actions = memory_action_hints(record, issues=issues, review_command=review_command)
     backlinks, backlinks_error = load_backlinks_index(wiki_dir / "_backlinks.json")
     if backlinks_error:
         backlinks = build_backlinks(wiki_dir, body_only=backlinks_body_only)
@@ -414,6 +573,8 @@ def memory_explanation(
             "review_note": record.get("review_note", ""),
             "issues": issues,
             "issue_count": len(issues),
+            "actions": actions,
+            "primary_action": primary_memory_action(actions),
         },
         "provenance": {
             "source": record.get("source", ""),
@@ -914,6 +1075,8 @@ def memory_inbox(
         item = slim_memory(record)
         item["issues"] = issues
         item["issue_count"] = len(issues)
+        item["actions"] = memory_action_hints(record, issues=issues, review_command=review_command)
+        item["primary_action"] = primary_memory_action(item["actions"])
         item["highest_severity"] = min(
             (issue["severity"] for issue in issues),
             key=lambda severity: severity_rank.get(severity, 9),
@@ -933,6 +1096,11 @@ def memory_inbox(
         "review_count": len(items),
         "counts_by_severity": counts_by_severity,
         "include_archived": include_archived,
+        "next_actions": [
+            item["primary_action"]
+            for item in items[:limit]
+            if item.get("primary_action")
+        ],
         "items": items[:limit],
     }
 

@@ -348,6 +348,7 @@ Most agents should start with:
 |------|-------------|
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory. |
 | `memory_profile` | You need to know what Link remembers about the user/project. |
+| `memory_inbox` | You need review items with the safest next action for each memory. |
 | `recall_memory` | You need preferences, decisions, facts, or project context. |
 | `get_context` | You need a topic plus its graph neighborhood. |
 | `search_wiki` | You need ranked search across the wiki. |
@@ -399,7 +400,7 @@ Common endpoints:
 | `python3 link.py brief "task" <dir>` | Prime an agent with profile counts, relevant memories, review warnings, and safe memory rules. |
 | `python3 link.py recall "query" <dir>` | Search local agent memories. |
 | `python3 link.py profile <dir>` | Show what Link remembers by type, scope, status, and recency. |
-| `python3 link.py memory-inbox <dir>` | Show memories that need review or stronger metadata. |
+| `python3 link.py memory-inbox <dir>` | Show memories that need review or stronger metadata with next-step commands. |
 | `python3 link.py review-memory <name> <dir>` | Mark a confirmed memory as reviewed. |
 | `python3 link.py explain-memory <name> <dir>` | Explain provenance, lifecycle, graph links, review issues, and recall readiness. |
 | `python3 link.py update-memory <name> "text" <dir>` | Merge new text into an existing memory, blocking likely conflicts with other active memories by default. |
