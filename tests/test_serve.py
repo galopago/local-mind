@@ -97,6 +97,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("window.location.href = '/search?q=' + encodeURIComponent(q);", html)
         self.assertIn("data-theme-toggle", html)
         self.assertIn("localStorage.getItem('link-theme')", html)
+        self.assertIn('<a href="/ingest">ingest</a>', html)
         self.assertIn('<a href="/brief">brief</a>', html)
         self.assertIn('<a href="/propose">propose</a>', html)
         self.assertIn('<a href="/audit">audit</a>', html)
@@ -914,6 +915,22 @@ class ServeTests(unittest.TestCase):
         self.assertNotIn("text", secret_payload)
         self.assertEqual(traversal_status, 404)
         self.assertFalse(traversal_payload["found"])
+
+    def test_ingest_page_and_api_show_pending_raw(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        (raw / "new-source.md").write_text("# New source\n", encoding="utf-8")
+        reset_wiki(wiki)
+
+        api_status, payload = run_handler("GET", "/api/ingest-status")
+        html = serve._render_ingest()
+
+        self.assertEqual(api_status, 200)
+        self.assertEqual(payload["pending_count"], 1)
+        self.assertEqual(payload["guidance"]["state"], "pending_raw")
+        self.assertIn("ingest raw/new-source.md into Link", html)
+        self.assertIn("Pending Raw Files", html)
 
     def test_rebuild_backlinks_requires_json_post(self):
         wiki = self.make_wiki()

@@ -505,6 +505,7 @@ Common endpoints:
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions. |
+| `GET /api/ingest-status` | Raw ingest state with pending files, graph health, exact agent prompt, and follow-up commands. |
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |
 | `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context for an agent, including relevant memories, review warnings, and capture status. |

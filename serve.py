@@ -29,6 +29,9 @@ from link_core.memory import (
 from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
 )
+from link_core.ingest import (
+    collect_ingest_status as _core_collect_ingest_status,
+)
 from link_core.log import (
     append_log as _core_append_log,
     utc_timestamp as _core_utc_timestamp,
@@ -219,6 +222,10 @@ def _project_visible_records(project: str | None = None) -> list[dict[str, objec
         for record in _memory_records()
         if _core_memory_visible_for_project(record, project_name)
     ]
+
+
+def _ingest_status() -> dict[str, object]:
+    return _core_collect_ingest_status(WIKI_DIR.parent)
 
 
 def _memory_inbox(limit: int = 20, include_archived: bool = False, project: str | None = None) -> dict[str, object]:
@@ -1470,6 +1477,7 @@ def _header_html():
   </div>
   <nav>
     <a href="/">home</a>
+    <a href="/ingest">ingest</a>
     <a href="/brief">brief</a>
     <a href="/propose">propose</a>
     <a href="/memory">memory</a>
@@ -2015,6 +2023,73 @@ def _render_propose(project: str | None = None):
         f'<section class="proposal-results" data-proposal-results aria-live="polite"></section>'
     )
     return _layout("Propose Memories", body)
+
+
+def _render_ingest():
+    status = _ingest_status()
+    guidance = status.get("guidance") if isinstance(status.get("guidance"), dict) else {}
+    agent_prompt = str(guidance.get("agent_prompt") or "")
+    commands = guidance.get("commands") if isinstance(guidance.get("commands"), list) else []
+    notes = guidance.get("notes") if isinstance(guidance.get("notes"), list) else []
+    pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
+    represented = status.get("represented_raw") if isinstance(status.get("represented_raw"), list) else []
+
+    stats = (
+        f'<div class="home-stats">'
+        f'<div class="stat"><span class="num">{int(status.get("raw_count") or 0)}</span><span class="label">raw</span></div>'
+        f'<div class="stat"><span class="num">{int(status.get("represented_count") or 0)}</span><span class="label">represented</span></div>'
+        f'<div class="stat"><span class="num">{int(status.get("pending_count") or 0)}</span><span class="label">pending</span></div>'
+        f'<div class="stat"><span class="num">{html.escape(str(status.get("backlinks_status") or "unknown"))}</span><span class="label">graph</span></div>'
+        f'</div>'
+    )
+    action_rows = ""
+    if agent_prompt:
+        action_rows += (
+            f'<div class="memory-action-row"><span class="memory-action-head"><strong>Ask your agent</strong></span>'
+            f'<code>{html.escape(agent_prompt)}</code></div>'
+        )
+    for command in commands:
+        action_rows += (
+            f'<div class="memory-action-row"><span class="memory-action-head"><strong>Run</strong></span>'
+            f'<code>{html.escape(str(command))}</code></div>'
+        )
+    actions = f'<div class="memory-actions">{action_rows}</div>' if action_rows else ""
+
+    pending_html = ""
+    if pending:
+        rows = ""
+        for item in pending[:50]:
+            rows += (
+                f'<li><code>{html.escape(str(item.get("raw") or ""))}</code>'
+                f'<span class="type">{int(item.get("size_bytes") or 0)} bytes</span></li>'
+            )
+        if len(pending) > 50:
+            rows += f'<li>... {len(pending) - 50} more</li>'
+        pending_html = f'<div class="section-heading"><h2>Pending Raw Files</h2><a href="/propose">propose memories</a></div><ul class="page-list">{rows}</ul>'
+    elif represented:
+        rows = "".join(
+            f'<li><code>{html.escape(str(item.get("raw") or ""))}</code>'
+            f'<span class="type">{", ".join(html.escape(str(page)) for page in item.get("source_pages", []) or [])}</span></li>'
+            for item in represented[:20]
+        )
+        pending_html = f'<div class="section-heading"><h2>Represented Raw Files</h2><a href="/all">all pages</a></div><ul class="page-list">{rows}</ul>'
+    else:
+        pending_html = '<p>No raw source files found yet.</p>'
+
+    notes_html = ""
+    if notes:
+        notes_html = "<ul>" + "".join(f"<li>{html.escape(str(note))}</li>" for note in notes) + "</ul>"
+
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / ingest</div>'
+        f'<h1>Ingest</h1>'
+        f'<p class="summary">{html.escape(str(guidance.get("summary") or "Check raw source ingest state."))}</p>'
+        f'{stats}'
+        f'{actions}'
+        f'{pending_html}'
+        f'{notes_html}'
+    )
+    return _layout("Ingest", body)
 
 
 def _render_inbox(project: str | None = None):
@@ -3012,6 +3087,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._err("file")
         elif path in ("/", ""):
             self._ok(_render_home())
+        elif path == "/ingest":
+            self._ok(_render_ingest())
         elif path == "/brief":
             brief_query = query.get("q", [""])[0] or query.get("query", [""])[0]
             self._ok(_render_brief(query=brief_query, project=query.get("project", [""])[0]))
@@ -3045,6 +3122,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/status":
             include_validation = query.get("validate", ["false"])[0].lower() in {"1", "true", "yes"}
             self._json(_link_status_payload(include_validation=include_validation))
+        elif path == "/api/ingest-status":
+            self._json(_ingest_status())
         elif path == "/api/backlinks":
             data, error = _load_backlinks_index()
             if error:
