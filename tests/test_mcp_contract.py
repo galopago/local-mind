@@ -231,6 +231,28 @@ class McpContractTests(unittest.TestCase):
         self.assertNotIn("body", payload["relevant_memories"][0])
         self.assertIn("agent_guidance", payload)
 
+    def test_capture_session_contract(self):
+        before_memories = list((self.target / "wiki/memories").glob("*.md"))
+
+        payload = json.loads(self.server.capture_session(
+            "Remember that the user prefers release branches for Link work.",
+            title="Release workflow session",
+            project="link",
+        ))
+
+        capture_path = self.target / payload["path"]
+        after_memories = list((self.target / "wiki/memories").glob("*.md"))
+        capture_text = capture_path.read_text(encoding="utf-8")
+        log_text = (self.target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertTrue(payload["captured"])
+        self.assertEqual(payload["project"], "link")
+        self.assertTrue(payload["path"].startswith("raw/memory-captures/"))
+        self.assertIn('project: "link"', capture_text)
+        self.assertGreaterEqual(payload["proposals"]["count"], 1)
+        self.assertEqual(len(after_memories), len(before_memories))
+        self.assertIn("capture-session", log_text)
+
     def test_memory_inbox_and_review_memory_contract(self):
         inbox = json.loads(self.server.memory_inbox())
         reviewed = json.loads(self.server.review_memory(

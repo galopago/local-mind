@@ -369,10 +369,11 @@ Most agents should start with:
 | `explain_memory` | You need provenance and review state for a memory. |
 | `remember_memory` | The user explicitly approves saving a durable memory. |
 | `propose_memories` | You want memory candidates from chat/session notes without writing. |
+| `capture_session` | You want to save long session notes locally before approving memory writes. |
 
 Full tool set: `memory_brief`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
-`propose_memories`, `update_memory`, `archive_memory`, `restore_memory`,
+`propose_memories`, `capture_session`, `update_memory`, `archive_memory`, `restore_memory`,
 `get_context`, `get_pages`, `get_backlinks`, `get_graph`, `rebuild_backlinks`.
 
 Memory write tools return `duplicate_candidates` or `conflict_candidates` when

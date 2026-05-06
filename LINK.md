@@ -289,7 +289,7 @@ Rules:
 - Use `scope: user` for broad personal preferences, `project` for the current project, and `global` for agent-wide principles.
 - For `scope: project`, include a project key when you know it. `link.py` infers this from repo-local installs; otherwise pass `--project <slug>` or MCP `project`.
 - At the start of a session or substantial task, run `python3 link.py brief "<task or question>" .` or MCP `memory_brief` when available. Treat this as the default way to prime yourself with local memory.
-- For long chat/session notes, prefer `python3 link.py capture-session "<file-or-text>" .`; it stores the raw note locally and returns proposal-only memory candidates. If you do not need to keep the raw note, run `python3 link.py propose-memories "<file-or-text>" .` instead. Do not write proposals until the human confirms.
+- For long chat/session notes, prefer `python3 link.py capture-session "<file-or-text>" .` or MCP `capture_session`; it stores the raw note locally and returns proposal-only memory candidates. If you do not need to keep the raw note, run `python3 link.py propose-memories "<file-or-text>" .` or MCP `propose_memories` instead. Do not write proposals until the human confirms.
 - Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
 - Run `python3 link.py profile .` when the human asks what Link knows or when you need a quick overview of remembered preferences, decisions, and project context.
 - Run `python3 link.py memory-inbox .` to find pending, stale, invalid, or underspecified memories and follow each item's primary action.

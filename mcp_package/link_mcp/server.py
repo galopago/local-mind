@@ -57,8 +57,9 @@ mcp = FastMCP(
         "task as the query when available. Use recall_memory for focused user "
         "preferences, decisions, and project context, memory_profile to inspect "
         "what Link remembers, memory_inbox to find memories needing review, and "
-        "explain_memory to audit why a memory exists. Use propose_memories for "
-        "chat or session notes before writing memory. Use search_wiki to find "
+        "explain_memory to audit why a memory exists. Use capture_session for "
+        "long chat or session notes that should be stored locally before memory "
+        "approval; use propose_memories when no raw capture is needed. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
         "neighborhood. Only call remember_memory when the user explicitly asks "
         "you to remember something; if it returns duplicate candidates, use "
@@ -73,6 +74,7 @@ mcp = FastMCP(
 _cache: dict = {}
 _cache_mtime: float = 0.0
 MAX_TEXT_INPUT = 200
+MAX_CAPTURE_INPUT = 12000
 
 from link_core.memory import (
     count_values as _core_count_values,
@@ -95,6 +97,7 @@ from link_core.memory import (
     write_memory_page as _core_write_memory_page,
 )
 from link_core.frontmatter import (
+    frontmatter_string as _frontmatter_string,
     parse_frontmatter as _parse_frontmatter,
 )
 from link_core.wiki import (
@@ -257,6 +260,96 @@ def _propose_memories_from_text(
         writes_memory=False,
         project=_resolve_project(project),
     )
+
+
+def _capture_title(text: str, source: str, title: str = "") -> str:
+    if title.strip():
+        return " ".join(title.split())
+    if source.strip() and source.strip() != "mcp":
+        return f"Memory capture: {' '.join(source.strip().split())[:120]}"
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "Session notes")
+    short = " ".join(first_line.split()[:10]).strip(" .")
+    return f"Memory capture: {short or 'Session notes'}"
+
+
+def _capture_filename(timestamp: str, title: str, raw_dir: Path) -> Path:
+    safe_stamp = timestamp.replace("-", "").replace(":", "")
+    slug = _core_slugify(title.replace("Memory capture:", ""), fallback="session-notes")
+    base = f"{safe_stamp}-{slug}"
+    candidate = raw_dir / f"{base}.md"
+    counter = 2
+    while candidate.exists():
+        candidate = raw_dir / f"{base}-{counter}.md"
+        counter += 1
+    return candidate
+
+
+def _capture_session(
+    text: str,
+    title: str = "",
+    source: str = "mcp",
+    limit: int = 10,
+    project: str = "",
+) -> dict[str, object]:
+    clean_text = _clean_text_input(text, max_len=MAX_CAPTURE_INPUT)
+    if not clean_text:
+        raise ValueError("session text required")
+    clean_source = _clean_text_input(source, max_len=500) or "mcp"
+    project_name = _resolve_project(project)
+    timestamp = _utc_timestamp()
+    capture_title = _capture_title(clean_text, clean_source, _clean_text_input(title, max_len=200))
+    root = WIKI_DIR.parent
+    capture_dir = root / "raw" / "memory-captures"
+    capture_dir.mkdir(parents=True, exist_ok=True)
+    capture_path = _capture_filename(timestamp, capture_title, capture_dir)
+    project_line = f'project: "{_frontmatter_string(project_name)}"\n' if project_name else ""
+    capture_path.write_text(
+        f"""---
+title: "{_frontmatter_string(capture_title)}"
+source_type: conversation
+date_captured: "{timestamp}"
+{project_line}---
+
+# {capture_title}
+
+Captured locally for Link memory review. This raw note is proposal-only until the user approves durable memories.
+
+## Source Input
+
+{clean_source}
+
+## Notes
+
+{clean_text}
+""",
+        encoding="utf-8",
+    )
+    rel_path = capture_path.relative_to(root).as_posix()
+    proposals = _propose_memories_from_text(
+        clean_text,
+        source=rel_path,
+        limit=limit,
+        project=project_name,
+    )
+    _append_log(
+        timestamp,
+        "capture-session",
+        f"Captured proposal-only session notes at {rel_path}",
+        [
+            f"Source input: {clean_source}",
+            f"Project: {project_name or 'none'}",
+            f"Proposals: {proposals['count']}",
+        ],
+    )
+    _cache.clear()
+    return {
+        "captured": True,
+        "path": rel_path,
+        "source": clean_source,
+        "title": capture_title,
+        "project": project_name,
+        "proposals": proposals,
+    }
 
 
 def _append_log(timestamp: str, operation: str, description: str, lines: list[str]) -> None:
@@ -464,6 +557,26 @@ def propose_memories(text: str, source: str = "mcp", limit: int = 10, project: s
     source = _clean_text_input(source, max_len=500) or "mcp"
     limit = _parse_limit(limit, default=10, max_limit=20)
     return json.dumps(_propose_memories_from_text(clean_text, source=source, limit=limit, project=project), ensure_ascii=False)
+
+
+@mcp.tool()
+def capture_session(text: str, title: str = "", source: str = "mcp", limit: int = 10, project: str = "") -> str:
+    """Save long chat/session notes locally and return memory proposals only.
+
+    Writes a raw note under raw/memory-captures/ and logs the capture, but does
+    not create durable memory pages. Use this when the user wants the session
+    preserved for review before approving remember_memory or update_memory.
+    """
+    limit = _parse_limit(limit, default=10, max_limit=20)
+    try:
+        result = _capture_session(text, title=title, source=source, limit=limit, project=project)
+    except ValueError as exc:
+        return json.dumps({
+            "captured": False,
+            "error": str(exc),
+            "proposals": {"proposed": False, "count": 0, "proposals": []},
+        })
+    return json.dumps(result, ensure_ascii=False)
 
 
 @mcp.tool()
