@@ -424,9 +424,12 @@ Use `git push`, `git archive`, or clean build artifacts for public sharing. Do
 not zip a whole working directory; ignored local files, `.git/`, caches, raw
 sources, and build outputs can be included by accident.
 
-## Develop And Release
+## Contributing
 
-Run the local gate:
+Contributions should come through pull requests. Please target `develop` unless
+the maintainer asks for a different branch. `main` is the release branch.
+
+Before opening a PR, run the local gate:
 
 ```bash
 python3 -m unittest discover -s tests
@@ -438,25 +441,39 @@ PYTHONPATH=mcp_package python3 scripts/smoke_mcp_stdio.py /tmp/link-mcp-smoke/wi
 git diff --check
 ```
 
-Prepare release files:
+In the PR description, include:
+
+- What changed.
+- How you tested it.
+- Whether it touches memory writes, installers, MCP behavior, HTTP endpoints, or release tooling.
+- Screenshots or GIFs for UI changes.
+
+Do not include personal wiki data, raw sources, registry tokens, `.env` files, or
+local MCP credentials in a PR.
+
+## Maintainer Release
+
+Release publishing is maintainer-only. Contributors do not need PyPI or MCP
+Registry credentials.
+
+To prepare release files, run:
 
 ```bash
 python3 scripts/prepare_release.py 1.0.8
 ```
 
-After the release PR merges and CI passes:
+This updates the package version files and moves `CHANGELOG.md` `Unreleased`
+notes into a dated release section.
+
+After the release PR merges to `main` and CI passes, the maintainer tags and
+publishes from a clean `main` checkout. The script prints the exact publish
+commands for the selected version:
 
 ```bash
 git switch main
 git pull --ff-only
 git tag -a v1.0.8 -m "v1.0.8"
 git push origin v1.0.8
-cd mcp_package
-python3 -c "from pathlib import Path; import shutil; shutil.rmtree('dist', ignore_errors=True); [shutil.rmtree(p, ignore_errors=True) for p in Path('.').glob('*.egg-info')]"
-python3 -m build
-python3 -m twine check dist/*
-python3 -m twine upload dist/*
-mcp-publisher publish
 ```
 
 Never reuse a published PyPI version or move a public release tag. If a release
