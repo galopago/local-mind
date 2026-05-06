@@ -106,7 +106,10 @@ from link_core.memory import (
     write_memory_page as _core_write_memory_page,
 )
 from link_core.capture import (
+    capture_inbox as _core_capture_inbox,
     capture_notes_from_markdown as _core_capture_notes_from_markdown,
+    capture_records as _core_capture_records,
+    mcp_capture_commands as _core_mcp_capture_commands,
     resolve_capture_file as _core_resolve_capture_file,
 )
 from link_core.frontmatter import (
@@ -491,60 +494,23 @@ def _resolve_capture_file(capture: str) -> Path | None:
     return _core_resolve_capture_file(WIKI_DIR.parent, capture, max_len=500)
 
 
-def _capture_notes_from_markdown(text: str) -> tuple[dict[str, object], str]:
-    return _core_capture_notes_from_markdown(text)
-
-
 def _capture_records(limit: int = 20, project: str = "") -> list[dict[str, object]]:
     root = WIKI_DIR.parent
-    capture_dir = root / "raw" / "memory-captures"
-    if not capture_dir.exists():
-        return []
-    project_name = _core_normalize_project(project)
-    records: list[dict[str, object]] = []
-    for path in sorted(capture_dir.rglob("*.md")):
-        if path.name.startswith("."):
-            continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-            stat = path.stat()
-        except OSError:
-            continue
-        meta, notes = _capture_notes_from_markdown(text)
-        capture_project = _core_normalize_project(str(meta.get("project") or ""))
-        if project_name and capture_project and capture_project != project_name:
-            continue
-        rel = path.relative_to(root).as_posix()
-        warnings = _secret_value_warnings(text)
-        safe_notes, _, _ = _redact_secret_values(notes)
-        records.append({
-            "path": rel,
-            "title": str(meta.get("title") or path.stem),
-            "project": capture_project,
-            "date_captured": str(meta.get("date_captured") or ""),
-            "size_bytes": stat.st_size,
-            "secret_warnings": warnings,
-            "warning_count": len(warnings),
-            "snippet": re.sub(r"\s+", " ", safe_notes).strip()[:180],
-            "commands": {
-                "accept": f'accept_capture(capture="{rel}", index=1)',
-                "redact": f'redact_capture(capture="{rel}")',
-                "delete": f'delete_capture(capture="{rel}", confirm=true)',
-            },
-        })
-    records.sort(key=lambda item: (str(item["date_captured"]), str(item["path"])), reverse=True)
-    return records[:max(1, min(limit, 50))]
+    return _core_capture_records(
+        root,
+        limit=limit,
+        project=project,
+        commands_for=_core_mcp_capture_commands,
+    )
 
 
 def _capture_inbox(limit: int = 20, project: str = "") -> dict[str, object]:
-    project_name = _core_normalize_project(project)
-    captures = _capture_records(limit=limit, project=project_name)
-    return {
-        "count": len(captures),
-        "warning_count": sum(1 for capture in captures if capture["warning_count"]),
-        "project": project_name,
-        "captures": captures,
-    }
+    return _core_capture_inbox(
+        WIKI_DIR.parent,
+        limit=limit,
+        project=project,
+        commands_for=_core_mcp_capture_commands,
+    )
 
 
 def _capture_review_summary(project: str = "", limit: int = 3) -> dict[str, object]:
@@ -585,7 +551,7 @@ def _accept_capture(
     if capture_path is None:
         raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
     raw_text = capture_path.read_text(encoding="utf-8", errors="replace")
-    meta, notes = _capture_notes_from_markdown(raw_text)
+    meta, notes = _core_capture_notes_from_markdown(raw_text)
     if not notes:
         raise ValueError("capture has no notes")
 

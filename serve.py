@@ -33,10 +33,6 @@ from link_core.log import (
     append_log as _core_append_log,
     utc_timestamp as _core_utc_timestamp,
 )
-from link_core.security import (
-    redact_secret_values as _redact_secret_values,
-    secret_value_warnings as _secret_value_warnings,
-)
 from link_core.query import (
     query_link as _core_query_link,
 )
@@ -45,6 +41,11 @@ from link_core.validation import (
 )
 from link_core.status import (
     link_status as _core_link_status,
+)
+from link_core.capture import (
+    capture_inbox as _core_capture_inbox,
+    capture_records as _core_capture_records,
+    cli_capture_commands as _core_cli_capture_commands,
 )
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
@@ -408,59 +409,22 @@ def _memory_dashboard_next_actions(
 
 
 def _capture_records(limit: int = 12, project: str | None = None) -> list[dict[str, object]]:
-    project_name = _core_normalize_project(project)
     root = WIKI_DIR.parent
-    capture_dir = RAW_DIR / "memory-captures"
-    if not capture_dir.exists():
-        return []
-    records: list[dict[str, object]] = []
-    for path in sorted(capture_dir.rglob("*.md")):
-        if path.name.startswith("."):
-            continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-            stat = path.stat()
-        except OSError:
-            continue
-        meta, body = _parse_frontmatter(text)
-        notes_match = re.search(r"^## Notes\s*(.*?)(?=^## |\Z)", body, flags=re.MULTILINE | re.DOTALL)
-        notes = notes_match.group(1).strip() if notes_match else body.strip()
-        title = str(meta.get("title") or path.stem)
-        capture_project = _core_normalize_project(str(meta.get("project") or ""))
-        if project_name and capture_project and capture_project != project_name:
-            continue
-        warnings = _secret_value_warnings(text)
-        safe_notes, _, _ = _redact_secret_values(notes)
-        rel = path.relative_to(root).as_posix()
-        records.append({
-            "path": rel,
-            "title": title,
-            "project": capture_project,
-            "date_captured": str(meta.get("date_captured") or ""),
-            "size_bytes": stat.st_size,
-            "secret_warnings": warnings,
-            "warning_count": len(warnings),
-            "snippet": re.sub(r"\s+", " ", safe_notes).strip()[:180],
-            "commands": {
-                "accept": f'python3 link.py accept-capture "{rel}" . --index 1',
-                "redact": f'python3 link.py redact-capture "{rel}" .',
-                "delete": f'python3 link.py delete-capture "{rel}" . --confirm',
-            },
-        })
-    records.sort(key=lambda item: (str(item["date_captured"]), str(item["path"])), reverse=True)
-    return records[:limit]
+    return _core_capture_records(
+        root,
+        limit=limit,
+        project=project,
+        commands_for=_core_cli_capture_commands,
+    )
 
 
 def _capture_inbox(limit: int = 20, project: str | None = None) -> dict[str, object]:
-    limit = max(1, min(limit, 50))
-    project_name = _core_normalize_project(project)
-    captures = _capture_records(limit=limit, project=project_name)
-    return {
-        "count": len(captures),
-        "warning_count": sum(1 for capture in captures if capture["warning_count"]),
-        "project": project_name,
-        "captures": captures,
-    }
+    return _core_capture_inbox(
+        WIKI_DIR.parent,
+        limit=limit,
+        project=project,
+        commands_for=_core_cli_capture_commands,
+    )
 
 
 def _capture_review_summary(project: str | None = None, limit: int = 3) -> dict[str, object]:

@@ -121,6 +121,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ### Changed
 
+- Moved raw capture inbox parsing, project filtering, snippet redaction, and command generation into shared `link_core.capture` helpers.
 - Polished the graph view with reset, label, and motion controls, keyboard focus, empty-state handling, cursor-centered zoom, and sticky dragged node placement.
 - Restructured README.md into a product-doc flow: promise, quick start, first 10 minutes, install paths, then reference and release details.
 - Switched release guidance to `release/*` branches and made changelog updates part of the release checklist.
