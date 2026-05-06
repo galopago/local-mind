@@ -93,6 +93,7 @@ from link_core.memory import (
     memory_explanation as _core_memory_explanation,
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
+    memory_audit_report as _core_memory_audit_report,
     memory_records as _core_memory_records,
     normalize_project as _core_normalize_project,
     memory_review_issues as _core_memory_review_issues,
@@ -336,60 +337,47 @@ def _ingest_status() -> dict[str, object]:
     return _core_collect_ingest_status(WIKI_DIR.parent)
 
 
+def _mcp_memory_audit_actions(
+    inbox: dict[str, object],
+    captures: dict[str, object],
+    project_name: str,
+) -> list[dict[str, object]]:
+    project_arg = f', project="{project_name}"' if project_name else ""
+    return [
+        {
+            "label": "Review memory inbox",
+            "tool": "memory_inbox",
+            "command": f"memory_inbox(include_archived=true{project_arg})",
+            "recommended": bool(inbox["review_count"]),
+        },
+        {
+            "label": "Review raw captures",
+            "tool": "capture_inbox",
+            "command": f"capture_inbox({project_arg.lstrip(', ')})" if project_arg else "capture_inbox()",
+            "recommended": bool(captures["count"]),
+        },
+        {
+            "label": "Explain a memory",
+            "tool": "explain_memory",
+            "command": 'explain_memory(identifier="<memory-name>")',
+            "recommended": False,
+        },
+    ]
+
+
 def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
     parsed_limit = _parse_limit(limit, default=10, max_limit=50)
     project_name = _resolve_project(project)
     profile = _memory_profile(limit=parsed_limit, project=project_name)
     inbox = _memory_inbox(limit=parsed_limit, include_archived=True, project=project_name)
     captures = _capture_review_summary(project=project_name, limit=min(parsed_limit, 10))
-    risk_factors: list[dict[str, object]] = []
-    if inbox["review_count"]:
-        risk_factors.append({
-            "code": "memory_review_backlog",
-            "count": inbox["review_count"],
-            "message": f'{inbox["review_count"]} memory item(s) need review or cleanup.',
-        })
-    if captures["count"]:
-        risk_factors.append({
-            "code": "raw_capture_backlog",
-            "count": captures["count"],
-            "message": f'{captures["count"]} raw capture(s) are waiting for review.',
-        })
-    if captures["warning_count"]:
-        risk_factors.append({
-            "code": "capture_secret_warnings",
-            "count": captures["warning_count"],
-            "message": f'{captures["warning_count"]} raw capture(s) contain secret-looking values.',
-        })
-    project_arg = f', project="{project_name}"' if project_name else ""
-    return {
-        "status": "needs_attention" if risk_factors else "healthy",
-        "project": _core_normalize_project(project_name),
-        "profile": profile,
-        "inbox": inbox,
-        "captures": captures,
-        "risk_factors": risk_factors,
-        "next_actions": [
-            {
-                "label": "Review memory inbox",
-                "tool": "memory_inbox",
-                "command": f"memory_inbox(include_archived=true{project_arg})",
-                "recommended": bool(inbox["review_count"]),
-            },
-            {
-                "label": "Review raw captures",
-                "tool": "capture_inbox",
-                "command": f"capture_inbox({project_arg.lstrip(', ')})" if project_arg else "capture_inbox()",
-                "recommended": bool(captures["count"]),
-            },
-            {
-                "label": "Explain a memory",
-                "tool": "explain_memory",
-                "command": 'explain_memory(identifier="<memory-name>")',
-                "recommended": False,
-            },
-        ],
-    }
+    return _core_memory_audit_report(
+        profile,
+        inbox,
+        captures,
+        _mcp_memory_audit_actions(inbox, captures, project_name),
+        project=project_name,
+    )
 
 
 def _recall_memories(

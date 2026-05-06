@@ -11,6 +11,7 @@ from link_core.memory import (  # noqa: E402
     extract_wikilinks,
     forget_memory_page,
     mark_memory_reviewed,
+    memory_audit_report,
     memory_brief,
     memory_conflict_candidates,
     memory_explanation,
@@ -123,6 +124,22 @@ class MemoryCoreTests(unittest.TestCase):
         forget_action = next(action for action in item["actions"] if action["kind"] == "forget")
         self.assertEqual(forget_action["tool"], "forget_memory")
         self.assertTrue(forget_action["arguments"]["confirm"])
+
+    def test_memory_audit_report_builds_shared_risk_factors(self):
+        profile = {"memory_count": 2}
+        inbox = {"review_count": 1}
+        captures = {"count": 2, "warning_count": 1, "items": []}
+        actions = [{"label": "Review memory inbox", "recommended": True}]
+
+        audit = memory_audit_report(profile, inbox, captures, actions, project="Link Product")
+
+        self.assertEqual(audit["status"], "needs_attention")
+        self.assertEqual(audit["project"], "link-product")
+        self.assertEqual(
+            [factor["code"] for factor in audit["risk_factors"]],
+            ["memory_review_backlog", "raw_capture_backlog", "capture_secret_warnings"],
+        )
+        self.assertEqual(audit["next_actions"], actions)
 
     def test_memory_inbox_filters_project_scoped_memories(self):
         base = {

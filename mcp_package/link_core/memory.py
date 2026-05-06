@@ -1307,6 +1307,48 @@ def memory_profile(
     }
 
 
+def memory_audit_report(
+    profile: Mapping[str, object],
+    inbox: Mapping[str, object],
+    captures: Mapping[str, object],
+    next_actions: Iterable[Mapping[str, object]],
+    project: str | None = None,
+) -> dict[str, object]:
+    """Build the shared memory/capture risk report for CLI, HTTP, and MCP."""
+    project_name = normalize_project(project)
+    review_count = int(inbox.get("review_count") or 0)
+    capture_count = int(captures.get("count") or 0)
+    capture_warning_count = int(captures.get("warning_count") or 0)
+    risk_factors: list[dict[str, object]] = []
+    if review_count:
+        risk_factors.append({
+            "code": "memory_review_backlog",
+            "count": review_count,
+            "message": f"{review_count} memory item(s) need review or cleanup.",
+        })
+    if capture_count:
+        risk_factors.append({
+            "code": "raw_capture_backlog",
+            "count": capture_count,
+            "message": f"{capture_count} raw capture(s) are waiting for review.",
+        })
+    if capture_warning_count:
+        risk_factors.append({
+            "code": "capture_secret_warnings",
+            "count": capture_warning_count,
+            "message": f"{capture_warning_count} raw capture(s) contain secret-looking values.",
+        })
+    return {
+        "status": "needs_attention" if risk_factors else "healthy",
+        "project": project_name,
+        "profile": dict(profile),
+        "inbox": dict(inbox),
+        "captures": dict(captures),
+        "risk_factors": risk_factors,
+        "next_actions": [dict(action) for action in next_actions],
+    }
+
+
 def memory_brief(
     records: Iterable[Mapping[str, object]],
     query: str = "",
