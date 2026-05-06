@@ -1375,6 +1375,9 @@ PROPOSAL_UI_JS = """
   }
 
   function approvalPrompt(proposal) {
+    if (proposal.primary_action && proposal.primary_action.prompt) {
+      return proposal.primary_action.prompt;
+    }
     var memory = proposal.memory || '';
     if (proposal.suggested_action === 'update-memory' && proposal.duplicate_candidates && proposal.duplicate_candidates.length) {
       var target = proposal.duplicate_candidates[0].name || proposal.duplicate_candidates[0].title || '<memory>';
@@ -1410,8 +1413,14 @@ PROPOSAL_UI_JS = """
       if (duplicates) addText(card, 'p', 'proposal-warning', 'Possible duplicate: ' + duplicates);
       var conflicts = candidateNames(proposal.conflict_candidates);
       if (conflicts) addText(card, 'p', 'proposal-warning', 'Possible conflict: ' + conflicts);
+      var action = proposal.primary_action || {};
+      if (action.label) addText(card, 'p', 'summary', action.label + ': ' + (action.description || ''));
       var prompt = addText(card, 'code', 'proposal-command', approvalPrompt(proposal));
       prompt.setAttribute('title', 'Copy this into your agent chat if you approve the memory.');
+      if (action.command) {
+        var command = addText(card, 'code', 'proposal-command', action.command);
+        command.setAttribute('title', 'Equivalent local command.');
+      }
       resultsEl.appendChild(card);
     });
   }

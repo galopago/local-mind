@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
@@ -1695,6 +1696,95 @@ def proposal_title(memory: str, memory_type: str) -> str:
     return title[:67].rstrip() + "..."
 
 
+def _shell_words(*parts: object) -> str:
+    return " ".join(shlex.quote(str(part)) for part in parts if str(part) != "")
+
+
+def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
+    """Return the safest next action for a memory proposal."""
+    memory = str(proposal.get("memory") or "")
+    title = str(proposal.get("title") or proposal_title(memory, str(proposal.get("memory_type") or "note")))
+    memory_type = str(proposal.get("memory_type") or "note")
+    scope = str(proposal.get("scope") or "user")
+    source = str(proposal.get("source") or "proposal")
+    project = str(proposal.get("project") or "")
+    duplicate_candidates = proposal.get("duplicate_candidates")
+    conflict_candidates = proposal.get("conflict_candidates")
+    duplicate_list = duplicate_candidates if isinstance(duplicate_candidates, list) else []
+    conflict_list = conflict_candidates if isinstance(conflict_candidates, list) else []
+
+    if duplicate_list:
+        first = duplicate_list[0] if isinstance(duplicate_list[0], Mapping) else {}
+        identifier = str(first.get("name") or first.get("title") or "")
+        command = _shell_words("python3", "link.py", "update-memory", identifier, memory, ".", "--source", source)
+        args: dict[str, object] = {"identifier": identifier, "memory": memory, "source": source}
+        if project:
+            args["project"] = project
+        action = _memory_action(
+            kind="update",
+            label="Update existing memory",
+            description="A strong duplicate exists; update it instead of creating another memory.",
+            command=command,
+            tool="update_memory",
+            arguments=args,
+            priority="high",
+        )
+        action["prompt"] = f'Approve by asking: update memory {identifier} with "{memory}"'
+        return action
+
+    if conflict_list:
+        first = conflict_list[0] if isinstance(conflict_list[0], Mapping) else {}
+        identifier = str(first.get("name") or first.get("title") or "")
+        action = _memory_action(
+            kind="review_conflict",
+            label="Review conflict",
+            description="A likely conflicting memory exists; inspect it before saving or archiving anything.",
+            command=_shell_words("python3", "link.py", "explain-memory", identifier, "."),
+            tool="explain_memory",
+            arguments={"identifier": identifier},
+            priority="high",
+        )
+        action["prompt"] = f"Review possible conflict with {identifier} before saving this proposal."
+        return action
+
+    command_parts: list[object] = [
+        "python3",
+        "link.py",
+        "remember",
+        memory,
+        ".",
+        "--title",
+        title,
+        "--type",
+        memory_type,
+        "--scope",
+        scope,
+        "--source",
+        source,
+    ]
+    args: dict[str, object] = {
+        "memory": memory,
+        "title": title,
+        "memory_type": memory_type,
+        "scope": scope,
+        "source": source,
+    }
+    if project:
+        command_parts.extend(["--project", project])
+        args["project"] = project
+    action = _memory_action(
+        kind="remember",
+        label="Remember",
+        description="Create a new durable memory after the user approves this proposal.",
+        command=_shell_words(*command_parts),
+        tool="remember_memory",
+        arguments=args,
+        priority="high",
+    )
+    action["prompt"] = f"Approve by asking: remember that {memory}"
+    return action
+
+
 def classify_memory_segment(segment: str) -> dict[str, object] | None:
     text = segment.strip()
     lower = text.lower()
@@ -1818,7 +1908,7 @@ def propose_memories_from_text(
             suggested_action = "review-conflict"
         else:
             suggested_action = "remember"
-        proposals.append({
+        proposal = {
             "title": title,
             "memory": memory,
             "memory_type": memory_type,
@@ -1831,7 +1921,9 @@ def propose_memories_from_text(
             "duplicate_candidates": duplicate_candidates,
             "conflict_candidates": conflict_candidates,
             "suggested_action": suggested_action,
-        })
+        }
+        proposal["primary_action"] = memory_proposal_action(proposal)
+        proposals.append(proposal)
         if len(proposals) >= limit:
             break
     return {

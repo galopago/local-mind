@@ -1713,6 +1713,9 @@ def propose_memories(
             print(f"   Project: {proposal['project']}")
         print(f"   Action: {proposal['suggested_action']}")
         print(f"   Memory: {proposal['memory']}")
+        primary_action = proposal.get("primary_action") if isinstance(proposal.get("primary_action"), dict) else {}
+        if primary_action.get("command"):
+            print(f"   Command: {primary_action['command']}")
         if proposal["duplicate_candidates"]:
             first = proposal["duplicate_candidates"][0]
             print(f"   Duplicate candidate: {first['title']} ({first['path']})")

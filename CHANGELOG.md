@@ -31,6 +31,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added MCP `ingest_status` so MCP-only agents can inspect pending raw files and validation guidance.
 - Added clearer product framing in the README and local home page for the distinction between source-backed wiki knowledge and explicit agent memory.
 - Added a local raw-source picker to `/propose` with secret-aware loading for proposal-only memory workflows.
+- Added shared proposal action hints so memory proposals include the safest approval prompt, local command, MCP tool, and arguments.
 - Added a wider graph page layout with fullscreen mode so larger wikis can be explored without being squeezed into the reading column.
 - Added large-graph controls for node search, type filtering, and selected-node neighborhood depth.
 - Added duplicate protection for `remember`/`remember_memory`; strong duplicate memories are refused unless explicitly allowed.

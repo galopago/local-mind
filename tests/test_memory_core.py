@@ -317,10 +317,15 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(payload["count"], 2)
         self.assertGreaterEqual(payload["skipped_count"], 1)
         self.assertEqual(payload["proposals"][0]["suggested_action"], "update-memory")
+        self.assertEqual(payload["proposals"][0]["primary_action"]["kind"], "update")
+        self.assertEqual(payload["proposals"][0]["primary_action"]["tool"], "update_memory")
+        self.assertIn("update-memory", payload["proposals"][0]["primary_action"]["command"])
         duplicate = payload["proposals"][0]["duplicate_candidates"][0]
         self.assertEqual(duplicate["name"], "prefer-release-branches")
         self.assertNotIn("body", duplicate)
         self.assertEqual(payload["proposals"][1]["memory_type"], "decision")
+        self.assertEqual(payload["proposals"][1]["primary_action"]["kind"], "remember")
+        self.assertEqual(payload["proposals"][1]["primary_action"]["tool"], "remember_memory")
 
     def test_memory_conflict_candidates_catch_branch_policy_changes(self):
         records = [

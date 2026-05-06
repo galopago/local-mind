@@ -548,9 +548,11 @@ class LinkCliTests(unittest.TestCase):
         self.assertGreaterEqual(payload["skipped_count"], 1)
         self.assertEqual(payload["proposals"][0]["memory_type"], "preference")
         self.assertEqual(payload["proposals"][0]["suggested_action"], "update-memory")
+        self.assertEqual(payload["proposals"][0]["primary_action"]["kind"], "update")
         self.assertEqual(payload["proposals"][0]["duplicate_candidates"][0]["name"], "prefer-release-branches")
         self.assertEqual(payload["proposals"][1]["memory_type"], "decision")
         self.assertEqual(payload["proposals"][1]["scope"], "project")
+        self.assertEqual(payload["proposals"][1]["primary_action"]["kind"], "remember")
         self.assertFalse((target / "wiki/memories/decision-keep-memory-mode-local.md").exists())
 
     def test_recall_finds_memory_pages(self):
