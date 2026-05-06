@@ -255,6 +255,25 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(len(after_memories), len(before_memories))
         self.assertIn("capture-session", log_text)
 
+    def test_accept_capture_contract(self):
+        capture = json.loads(self.server.capture_session(
+            "We decided to keep MCP capture approval local and explicit.",
+            title="MCP capture approval session",
+            project="link",
+        ))
+
+        accepted = json.loads(self.server.accept_capture(capture["path"], index=1))
+        memory_path = self.target / accepted["result"]["path"]
+        memory_text = memory_path.read_text(encoding="utf-8")
+        log_text = (self.target / "wiki/log.md").read_text(encoding="utf-8")
+
+        self.assertTrue(accepted["accepted"])
+        self.assertEqual(accepted["capture"], capture["path"])
+        self.assertTrue(accepted["result"]["created"])
+        self.assertIn(f'source: "{capture["path"]}"', memory_text)
+        self.assertIn("MCP capture approval", memory_text)
+        self.assertIn("accept-capture", log_text)
+
     def test_memory_inbox_and_review_memory_contract(self):
         inbox = json.loads(self.server.memory_inbox())
         reviewed = json.loads(self.server.review_memory(

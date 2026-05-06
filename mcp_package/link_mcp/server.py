@@ -358,6 +358,114 @@ Captured locally for Link memory review. This raw note is proposal-only until th
     }
 
 
+def _resolve_capture_file(capture: str) -> Path | None:
+    root = WIKI_DIR.parent
+    raw = _clean_text_input(capture, max_len=500)
+    if not raw:
+        return None
+    candidates = [Path(raw).expanduser()]
+    if not Path(raw).is_absolute():
+        candidates.extend([
+            root / raw,
+            root / "raw" / "memory-captures" / raw,
+            root / "raw" / "memory-captures" / f"{raw}.md",
+        ])
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        if not resolved.is_file():
+            continue
+        try:
+            resolved.relative_to(root)
+        except ValueError:
+            continue
+        return resolved
+    return None
+
+
+def _capture_notes_from_markdown(text: str) -> tuple[dict[str, object], str]:
+    meta, body = _parse_frontmatter(text)
+    match = re.search(r"^## Notes\s*(.*?)(?=^## |\Z)", body, flags=re.MULTILINE | re.DOTALL)
+    notes = match.group(1).strip() if match else body.strip()
+    return meta, notes
+
+
+def _accept_capture(
+    capture: str,
+    index: int = 1,
+    title: str = "",
+    memory_type: str = "",
+    scope: str = "",
+    tags: str = "",
+    project: str = "",
+    allow_duplicate: bool = False,
+    allow_conflict: bool = False,
+) -> dict[str, object]:
+    try:
+        proposal_index = int(index)
+    except (TypeError, ValueError):
+        raise ValueError("proposal index must be an integer")
+    if proposal_index < 1:
+        raise ValueError("proposal index must be 1 or greater")
+
+    root = WIKI_DIR.parent
+    capture_path = _resolve_capture_file(capture)
+    if capture_path is None:
+        raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
+    raw_text = capture_path.read_text(encoding="utf-8", errors="replace")
+    meta, notes = _capture_notes_from_markdown(raw_text)
+    if not notes:
+        raise ValueError("capture has no notes")
+
+    rel_path = capture_path.relative_to(root).as_posix()
+    project_name = _core_slugify(
+        _clean_text_input(project) or str(meta.get("project") or "") or _default_project(),
+        fallback="",
+    )
+    proposals = _propose_memories_from_text(
+        notes,
+        source=rel_path,
+        limit=max(1, min(max(proposal_index, 10), 50)),
+        project=project_name,
+    )
+    if proposal_index > len(proposals["proposals"]):
+        raise ValueError(f"capture has {len(proposals['proposals'])} proposal(s); index {proposal_index} is unavailable")
+    proposal = proposals["proposals"][proposal_index - 1]
+    chosen_scope = _clean_text_input(scope).lower() or str(proposal["scope"])
+    chosen_project = project_name if chosen_scope == "project" else ""
+    result = _write_memory_page(
+        str(proposal["memory"]),
+        title=_clean_text_input(title) or str(proposal["title"]),
+        memory_type=_clean_text_input(memory_type).lower() or str(proposal["memory_type"]),
+        scope=chosen_scope,
+        tags=tags,
+        source=rel_path,
+        allow_duplicate=allow_duplicate,
+        allow_conflict=allow_conflict,
+        project=chosen_project,
+    )
+    payload = {
+        "accepted": bool(result.get("created")),
+        "capture": rel_path,
+        "proposal_index": proposal_index,
+        "proposal": proposal,
+        "result": result,
+    }
+    if result.get("created"):
+        _append_log(
+            _utc_timestamp(),
+            "accept-capture",
+            f"Accepted proposal {proposal_index} from {rel_path}",
+            [
+                f"Memory: {result['path']}",
+                f"Project: {result.get('project') or 'none'}",
+            ],
+        )
+    return payload
+
+
 def _append_log(timestamp: str, operation: str, description: str, lines: list[str]) -> None:
     log_path = WIKI_DIR / "log.md"
     if not log_path.exists():
@@ -582,6 +690,40 @@ def capture_session(text: str, title: str = "", source: str = "mcp", limit: int 
             "error": str(exc),
             "proposals": {"proposed": False, "count": 0, "proposals": []},
         })
+    return json.dumps(result, ensure_ascii=False)
+
+
+@mcp.tool()
+def accept_capture(
+    capture: str,
+    index: int = 1,
+    title: str = "",
+    memory_type: str = "",
+    scope: str = "",
+    tags: str = "",
+    project: str = "",
+    allow_duplicate: bool = False,
+    allow_conflict: bool = False,
+) -> str:
+    """Accept one proposal from a saved raw session capture.
+
+    Recomputes proposals from raw/memory-captures, selects the 1-based index,
+    and writes the chosen memory through duplicate/conflict-safe creation.
+    """
+    try:
+        result = _accept_capture(
+            capture,
+            index=index,
+            title=title,
+            memory_type=memory_type,
+            scope=scope,
+            tags=tags,
+            project=project,
+            allow_duplicate=allow_duplicate,
+            allow_conflict=allow_conflict,
+        )
+    except ValueError as exc:
+        return json.dumps({"accepted": False, "error": str(exc)})
     return json.dumps(result, ensure_ascii=False)
 
 
