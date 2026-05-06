@@ -172,6 +172,8 @@ fi
 
 if [ -f "$TARGET_DIR/link.py" ]; then
     echo ""
+    echo "  Check Link readiness:"
+    echo "    python3 \"$TARGET_DIR/link.py\" status \"$TARGET_DIR\" --validate"
     echo "  Check wiki health:"
     echo "    python3 \"$TARGET_DIR/link.py\" doctor \"$TARGET_DIR\""
     echo "  Validate ingest output:"
