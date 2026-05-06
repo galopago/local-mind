@@ -454,8 +454,44 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(payload["selection"], "query")
         self.assertEqual(payload["profile"]["memory_count"], 1)
+        self.assertEqual(payload["captures"]["count"], 0)
         self.assertEqual(payload["relevant_memories"][0]["name"], "prefer-local-personal-memory")
         self.assertNotIn("body", payload["relevant_memories"][0])
+
+    def test_brief_surfaces_saved_captures_without_secret_values(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        fake_key = "sk-" + ("F" * 24)
+        with redirect_stdout(StringIO()):
+            link_cli.capture_session(
+                target,
+                f"Remember that brief should surface capture review. Test key {fake_key}",
+                title="Brief capture",
+                project="alpha",
+                json_output=True,
+            )
+
+        json_out = StringIO()
+        with redirect_stdout(json_out):
+            json_code = link_cli.brief(target, "capture review", project="alpha", json_output=True)
+        payload = json.loads(json_out.getvalue())
+
+        text_out = StringIO()
+        with redirect_stdout(text_out):
+            text_code = link_cli.brief(target, "capture review", project="alpha")
+
+        self.assertEqual(json_code, 0)
+        self.assertEqual(text_code, 0)
+        self.assertEqual(payload["captures"]["project"], "alpha")
+        self.assertEqual(payload["captures"]["count"], 1)
+        self.assertEqual(payload["captures"]["warning_count"], 1)
+        self.assertIn("[redacted-secret]", payload["captures"]["items"][0]["snippet"])
+        self.assertIn("capture-inbox", payload["captures"]["next_action"])
+        self.assertIn("Redact raw captures", "\n".join(payload["agent_guidance"]))
+        self.assertNotIn(fake_key, json_out.getvalue())
+        self.assertIn("Raw captures", text_out.getvalue())
+        self.assertNotIn(fake_key, text_out.getvalue())
 
     def test_capture_session_writes_raw_note_and_proposes_only(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))

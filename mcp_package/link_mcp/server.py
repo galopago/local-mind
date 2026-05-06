@@ -228,13 +228,23 @@ def _memory_profile(limit: int = 10, project: str = "") -> dict[str, object]:
 
 
 def _memory_brief(query: str = "", limit: int = 6, project: str = "") -> dict[str, object]:
-    return _core_memory_brief(
+    project_name = _resolve_project(project)
+    payload = _core_memory_brief(
         _memory_records(),
         query=_clean_text_input(query, max_len=500),
         limit=limit,
         review_command="review_memory",
-        project=_resolve_project(project),
+        project=project_name,
     )
+    payload["captures"] = _capture_review_summary(project=project_name)
+    if payload["captures"]["count"]:
+        capture_count = payload["captures"]["count"]
+        payload["agent_guidance"].append(
+            f"Review {capture_count} saved raw capture{'s' if capture_count != 1 else ''} before accepting or deleting capture state."
+        )
+    if payload["captures"]["warning_count"]:
+        payload["agent_guidance"].append("Redact raw captures with secret warnings before sharing snippets or using their contents.")
+    return payload
 
 
 def _recall_memories(
@@ -445,6 +455,21 @@ def _capture_inbox(limit: int = 20, project: str = "") -> dict[str, object]:
         "warning_count": sum(1 for capture in captures if capture["warning_count"]),
         "project": project_name,
         "captures": captures,
+    }
+
+
+def _capture_review_summary(project: str = "", limit: int = 3) -> dict[str, object]:
+    project_name = _core_normalize_project(project)
+    captures = _capture_records(limit=50, project=project_name)
+    next_action = "capture_inbox()"
+    if project_name:
+        next_action = f'capture_inbox(project="{project_name}")'
+    return {
+        "count": len(captures),
+        "warning_count": sum(1 for capture in captures if capture["warning_count"]),
+        "project": project_name,
+        "items": captures[:max(1, min(limit, 10))],
+        "next_action": next_action,
     }
 
 

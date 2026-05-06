@@ -18,6 +18,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added memory merge/update workflow with `update-memory` and MCP `update_memory`, including update counts, audit logs, backlink rebuilds, and review reset.
 - Added proposal-only memory extraction with `propose-memories` and MCP `propose_memories` for chat/session notes.
 - Added agent memory briefs with `link.py brief` and MCP `memory_brief` so agents can prime themselves with relevant local memory before a task.
+- Added raw capture status to CLI and MCP memory briefs so session priming surfaces saved captures and secret-warning captures.
 - Added conflict detection for memory writes, updates, and proposals; contradictory active memories are surfaced before saving unless explicitly allowed.
 - Added shared memory review action plans so inbox and explanation payloads tell agents whether to review, update, archive, restore, or edit metadata next.
 - Added project-aware memory boundaries so project-scoped memories can carry a project key and recall/profile/brief keep other explicit projects out of context.

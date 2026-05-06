@@ -1880,6 +1880,22 @@ def capture_inbox(
     return 0
 
 
+def _capture_review_summary(target: Path, project: str | None = None, limit: int = 3) -> dict[str, object]:
+    root = _resolve_link_root(target)
+    captures = _capture_records(target, limit=50, project=project)
+    warning_count = sum(1 for capture in captures if capture["warning_count"])
+    summary = {
+        "count": len(captures),
+        "warning_count": warning_count,
+        "project": _core_normalize_project(project),
+        "items": captures[:max(1, min(limit, 10))],
+        "next_action": f'python3 link.py capture-inbox "{root}"',
+    }
+    if summary["project"]:
+        summary["next_action"] = f'python3 link.py capture-inbox "{root}" --project "{summary["project"]}"'
+    return summary
+
+
 def accept_capture(
     target: Path,
     capture: str,
@@ -2417,6 +2433,14 @@ def brief(
         return 1
     project_name = project or _default_project(target)
     payload = _memory_brief(wiki_dir, query=query, limit=limit, project=project_name)
+    payload["captures"] = _capture_review_summary(target, project=project_name)
+    if payload["captures"]["count"]:
+        capture_count = payload["captures"]["count"]
+        payload["agent_guidance"].append(
+            f"Review {capture_count} saved raw capture{'s' if capture_count != 1 else ''} before accepting or deleting capture state."
+        )
+    if payload["captures"]["warning_count"]:
+        payload["agent_guidance"].append("Redact raw captures with secret warnings before sharing snippets or using their contents.")
 
     if json_output:
         print(json.dumps(payload, indent=2))
@@ -2447,6 +2471,15 @@ def brief(
             print(f"- {item['title']} ({item['memory_type']} · {item['scope']})")
             first_issue = item["issues"][0]
             print(f"  [{first_issue['severity']}] {first_issue['code']}: {first_issue['message']}")
+    if payload["captures"]["items"]:
+        print("")
+        print("Raw captures")
+        print(f"{payload['captures']['count']} saved · {payload['captures']['warning_count']} with secret-looking warnings")
+        for capture in payload["captures"]["items"]:
+            print(f"- {capture['title']} ({capture['path']})")
+            if capture["secret_warnings"]:
+                print("  Warnings: " + ", ".join(capture["secret_warnings"]))
+        print(f"  Next: {payload['captures']['next_action']}")
     print("")
     print("Agent guidance")
     for item in payload["agent_guidance"]:

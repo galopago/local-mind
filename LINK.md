@@ -288,7 +288,7 @@ Rules:
 - Use `memory_type: preference` for user preferences, `decision` for choices made, `project` for project context, `fact` for stable facts, and `note` for everything else.
 - Use `scope: user` for broad personal preferences, `project` for the current project, and `global` for agent-wide principles.
 - For `scope: project`, include a project key when you know it. `link.py` infers this from repo-local installs; otherwise pass `--project <slug>` or MCP `project`.
-- At the start of a session or substantial task, run `python3 link.py brief "<task or question>" .` or MCP `memory_brief` when available. Treat this as the default way to prime yourself with local memory.
+- At the start of a session or substantial task, run `python3 link.py brief "<task or question>" .` or MCP `memory_brief` when available. Treat this as the default way to prime yourself with local memory, review warnings, and saved raw capture status.
 - For long chat/session notes, prefer `python3 link.py capture-session "<file-or-text>" .` or MCP `capture_session`; it stores the raw note locally and returns proposal-only memory candidates. If you do not need to keep the raw note, run `python3 link.py propose-memories "<file-or-text>" .` or MCP `propose_memories` instead. Do not write proposals until the human confirms.
 - Use `python3 link.py capture-inbox .` or MCP `capture_inbox` to review saved raw captures, secret warnings, and the exact accept/redact/delete commands before changing capture state.
 - When the human approves a captured proposal, run `python3 link.py accept-capture "<raw-capture-path>" . --index <n>` or MCP `accept_capture`. If it reports a duplicate or conflict, stop and ask whether to update/archive the existing memory instead.

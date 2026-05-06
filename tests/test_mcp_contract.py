@@ -227,9 +227,30 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["query"], "local personal memory")
         self.assertEqual(payload["profile"]["memory_count"], 1)
         self.assertEqual(payload["review"]["count"], 1)
+        self.assertEqual(payload["captures"]["count"], 0)
         self.assertEqual(payload["relevant_memories"][0]["name"], "prefer-local-personal-memory")
         self.assertNotIn("body", payload["relevant_memories"][0])
         self.assertIn("agent_guidance", payload)
+
+    def test_memory_brief_surfaces_capture_review_contract(self):
+        fake_key = "sk-" + ("F" * 24)
+        capture = json.loads(self.server.capture_session(
+            f"Remember that MCP brief should surface capture review. Test key {fake_key}",
+            title="MCP brief capture",
+            project="alpha",
+        ))
+
+        raw_payload = self.server.memory_brief("capture review", project="alpha")
+        payload = json.loads(raw_payload)
+
+        self.assertTrue(capture["captured"])
+        self.assertEqual(payload["captures"]["project"], "alpha")
+        self.assertEqual(payload["captures"]["count"], 1)
+        self.assertEqual(payload["captures"]["warning_count"], 1)
+        self.assertIn("[redacted-secret]", payload["captures"]["items"][0]["snippet"])
+        self.assertIn("capture_inbox", payload["captures"]["next_action"])
+        self.assertIn("Redact raw captures", "\n".join(payload["agent_guidance"]))
+        self.assertNotIn(fake_key, raw_payload)
 
     def test_capture_session_contract(self):
         before_memories = list((self.target / "wiki/memories").glob("*.md"))
