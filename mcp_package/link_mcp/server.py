@@ -55,6 +55,7 @@ mcp = FastMCP(
         "Link is local personal memory for agents. Use link_status when "
         "connecting to Link or troubleshooting setup/readiness. Start with "
         "migrate_wiki if link_status reports a missing or old schema marker. "
+        "Use ingest_status to check pending raw files and the next ingest prompt. "
         "query_link when the user asks a substantive question that may need "
         "both memory and wiki context. Use memory_brief at "
         "session start or before personalized/project work; pass the user's "
@@ -115,6 +116,9 @@ from link_core.capture import (
 )
 from link_core.frontmatter import (
     frontmatter_string as _frontmatter_string,
+)
+from link_core.ingest import (
+    collect_ingest_status as _core_collect_ingest_status,
 )
 from link_core.log import (
     append_log as _core_append_log,
@@ -319,6 +323,10 @@ def _migrate_wiki() -> dict[str, object]:
     _cache = {}
     _cache_mtime = 0.0
     return payload
+
+
+def _ingest_status() -> dict[str, object]:
+    return _core_collect_ingest_status(WIKI_DIR.parent)
 
 
 def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
@@ -866,6 +874,16 @@ def migrate_wiki() -> str:
     plus the local schema marker; it does not rewrite user pages.
     """
     return json.dumps(_migrate_wiki(), ensure_ascii=False)
+
+
+@mcp.tool()
+def ingest_status() -> str:
+    """Return raw source ingest state and the next safe action.
+
+    Use this when the user asks to ingest, after they drop files into raw/, or
+    when you need the exact next agent prompt and validation commands.
+    """
+    return json.dumps(_ingest_status(), ensure_ascii=False)
 
 
 @mcp.tool()

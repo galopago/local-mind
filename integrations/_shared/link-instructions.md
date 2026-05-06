@@ -6,6 +6,8 @@ If you are unsure whether Link is ready, use MCP `link_status` when available, o
 
 If status reports a missing or old schema marker, use MCP `migrate_wiki` when available, or run `link migrate`, before other writes.
 
+When the user asks to ingest or drops files into `raw/`, use MCP `ingest_status` when available, or run `link ingest-status`, before deciding what to process.
+
 When answering a substantive question that may need local memory or wiki context, start with MCP `query_link` when available, or run `link query "<task or question>"`.
 
 When starting personalized or project-specific work, prime yourself with Link first: use MCP `memory_brief` when available, or run `link brief "<task or question>"`.

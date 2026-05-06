@@ -458,6 +458,7 @@ Most agents should start with:
 |------|-------------|
 | `link_status` | You are connecting to Link or troubleshooting setup and need version, readiness, counts, validation summary, and safe next actions. |
 | `migrate_wiki` | `link_status` reports a missing or old schema marker and you need a safe, idempotent local migration. |
+| `ingest_status` | The user dropped files into `raw/` or asks to ingest, and you need pending raw files plus the next prompt/checks. |
 | `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, graph context, budget limits, and follow-up actions without reading the whole wiki. |
 | `validate_wiki` | You just ingested sources or substantially edited pages and need to verify page shape, links, and backlink freshness before reporting done. |
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory, review warnings, and saved capture status. |
@@ -477,7 +478,7 @@ Most agents should start with:
 | `delete_capture` | The user explicitly confirms deleting a saved raw capture. |
 | `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
 
-Full tool set: `link_status`, `migrate_wiki`, `query_link`, `validate_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
+Full tool set: `link_status`, `migrate_wiki`, `ingest_status`, `query_link`, `validate_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,

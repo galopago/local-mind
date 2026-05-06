@@ -146,6 +146,13 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["previous"]["status"], "missing")
         self.assertEqual(payload["schema"]["status"], "current")
 
+    def test_ingest_status_contract(self):
+        payload = json.loads(self.server.ingest_status())
+
+        self.assertEqual(payload["guidance"]["state"], "ready")
+        self.assertEqual(payload["pending_count"], 0)
+        self.assertEqual(payload["backlinks_status"], "current")
+
     def test_validate_wiki_contract(self):
         payload = json.loads(self.server.validate_wiki())
 

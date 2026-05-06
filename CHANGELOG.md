@@ -28,6 +28,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added first-run agent prompts to installer output so new users can immediately try brief, remember, and query workflows.
 - Added guided `link ingest-status` output with structured JSON guidance, exact agent prompts, and follow-up validation commands.
 - Added `/ingest` and `/api/ingest-status` so the local UI shows pending raw files, graph health, and the next agent prompt.
+- Added MCP `ingest_status` so MCP-only agents can inspect pending raw files and validation guidance.
 - Added clearer product framing in the README and local home page for the distinction between source-backed wiki knowledge and explicit agent memory.
 - Added a local raw-source picker to `/propose` with secret-aware loading for proposal-only memory workflows.
 - Added a wider graph page layout with fullscreen mode so larger wikis can be explored without being squeezed into the reading column.
