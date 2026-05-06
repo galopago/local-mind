@@ -58,6 +58,10 @@ PYEOF
     echo "Done."
     echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
     echo "  View wiki: link serve"
+    echo "  Try in your agent:"
+    echo "    brief me from Link before we continue"
+    echo "    remember that I prefer local-first agent memory"
+    echo "    query Link for what you know about me"
 
 elif [ "$MODE" = "--project" ]; then
     INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
@@ -72,6 +76,10 @@ elif [ "$MODE" = "--project" ]; then
     echo "Done."
     echo "  Drop sources into raw/ and say 'ingest' to process them."
     echo "  View wiki: python3 link.py serve"
+    echo "  Try in your agent:"
+    echo "    brief me from Link before we continue"
+    echo "    remember that this project uses Link for local agent memory"
+    echo "    query Link for what this project remembers"
 else
     echo "Usage: bash install.sh [--project]"
     exit 1
