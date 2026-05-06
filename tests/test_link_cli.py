@@ -490,6 +490,24 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["relevant_memories"][0]["name"], "prefer-local-personal-memory")
         self.assertNotIn("body", payload["relevant_memories"][0])
 
+    def test_query_builds_context_packet(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-query-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.query(target, "agent memory", budget="small", json_output=True)
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertTrue(payload["found"])
+        self.assertEqual(payload["budget"], "small")
+        self.assertIn("memory", payload["strategy"]["mode"])
+        self.assertEqual(payload["wiki"]["primary"], "agent-memory")
+        self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-personal-memory")
+        self.assertIn("context_packet", payload)
+
     def test_brief_surfaces_saved_captures_without_secret_values(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

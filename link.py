@@ -9,6 +9,7 @@ Usage:
   python link.py propose-memories <file-or-text> [target]
   python link.py capture-inbox [target]
   python link.py update-memory <name-or-title> "new memory text" [target]
+  python link.py query "task or question" [target]
   python link.py brief ["task or question"] [target]
   python link.py recall "query" [target]
   python link.py profile [target]
@@ -121,8 +122,12 @@ from link_core.security import (
     redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
+from link_core.query import (
+    query_link as _core_query_link,
+)
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
+    build_wiki_cache as _core_build_wiki_cache,
 )
 del _BUNDLED_CORE
 
@@ -790,6 +795,18 @@ def _memory_brief(wiki_dir: Path, query: str = "", limit: int = 6, project: str 
         limit=limit,
         review_command="review-memory",
         project=project,
+    )
+
+
+def _query_link(wiki_dir: Path, query: str, budget: str = "medium", project: str | None = None) -> dict[str, object]:
+    return _core_query_link(
+        wiki_dir,
+        query,
+        _core_build_wiki_cache(wiki_dir),
+        _memory_records(wiki_dir),
+        budget=budget,
+        project=project,
+        review_command="review-memory",
     )
 
 
@@ -2490,6 +2507,67 @@ def _print_memory_list(title: str, records: list[dict[str, object]], empty: str 
             print(f"  {summary}")
 
 
+def query(
+    target: Path,
+    query_text: str,
+    budget: str = "medium",
+    project: str | None = None,
+    json_output: bool = False,
+) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    project_name = project or _default_project(target)
+    payload = _query_link(wiki_dir, query_text, budget=budget, project=project_name)
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+    if not payload.get("found"):
+        print(f"No Link context found for: {query_text}")
+        if payload.get("error"):
+            print(f"Error: {payload['error']}")
+            return 1
+        return 0
+
+    print(f"Link context packet: {payload['query']}")
+    if payload.get("project"):
+        print(f"Project: {payload['project']}")
+    strategy = payload["strategy"]
+    print(f"Budget: {payload['budget']} · Mode: {strategy['mode']}")
+    print("")
+
+    memory = payload["memory"]
+    print(f"Memory ({memory['count']})")
+    for item in memory["items"]:
+        print(f"- {item['title']} ({item.get('memory_type', 'memory')} · {item.get('scope', '')})")
+        print(f"  {item.get('summary', '')}")
+        recall_info = item.get("recall", {})
+        if isinstance(recall_info, dict) and recall_info.get("state"):
+            print(f"  Recall: {recall_info['state']} · {item['why_selected']}")
+    if not memory["items"]:
+        print("- none")
+
+    wiki = payload["wiki"]
+    print("")
+    print(f"Wiki ({len(wiki['pages'])} pages · primary: {wiki['primary'] or 'none'})")
+    for item in wiki["pages"]:
+        print(f"- [{item['relationship']}] {item['title']} ({item.get('type', '')})")
+        content = " ".join(str(item.get("content", "")).split())
+        if content:
+            print(f"  {content[:240]}{'...' if len(content) > 240 else ''}")
+        print(f"  Why: {item['why_selected']}")
+    if not wiki["pages"]:
+        print("- none")
+
+    print("")
+    print("Agent guidance")
+    for item in payload["agent_guidance"]:
+        print(f"- {item}")
+    return 0
+
+
 def brief(
     target: Path,
     query: str = "",
@@ -2987,6 +3065,13 @@ def main(argv: list[str] | None = None) -> int:
     recall_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
     recall_cmd.add_argument("--json", action="store_true", help="print machine-readable results")
 
+    query_cmd = sub.add_parser("query", aliases=["query-link"], help="build a compact answer-ready Link context packet")
+    query_cmd.add_argument("query", help="task or question to retrieve memory and wiki context for")
+    query_cmd.add_argument("target", nargs="?", default=".")
+    query_cmd.add_argument("--budget", choices=("small", "medium", "large"), default="medium")
+    query_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
+    query_cmd.add_argument("--json", action="store_true", help="print machine-readable context packet")
+
     brief_cmd = sub.add_parser("brief", help="prime an agent with relevant local memory")
     brief_cmd.add_argument("query", nargs="?", default="", help="optional task or question to retrieve memory for")
     brief_cmd.add_argument("target", nargs="?", default=".")
@@ -3141,6 +3226,14 @@ def main(argv: list[str] | None = None) -> int:
             json_output=args.json,
             include_archived=args.include_archived,
             project=args.project,
+        )
+    if args.command in {"query", "query-link"}:
+        return query(
+            Path(args.target),
+            args.query,
+            budget=args.budget,
+            project=args.project,
+            json_output=args.json,
         )
     if args.command == "brief":
         return brief(Path(args.target), query=args.query, limit=args.limit, project=args.project, json_output=args.json)

@@ -34,6 +34,9 @@ from link_core.security import (
     redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
+from link_core.query import (
+    query_link as _core_query_link,
+)
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
@@ -2325,6 +2328,29 @@ def _search_pages(q: str, limit: int = 20) -> list:
     return _core_search_pages(q, cache, limit=limit)
 
 
+def _query_link(query: str, budget: str = "medium", project: str | None = None) -> dict[str, object]:
+    _get_all_pages()
+    cache = {
+        "pages": _pages_cache or [],
+        "page_index": _page_index,
+        "fulltext": _fulltext_index,
+        "normalized_fulltext": _normalized_fulltext_index,
+        "snippet_index": _snippet_index,
+        "token_index": _token_index,
+        "meta_token_index": _meta_token_index,
+        "page_map": _page_map,
+    }
+    return _core_query_link(
+        WIKI_DIR,
+        query,
+        cache,
+        _memory_records(),
+        budget=budget,
+        project=project,
+        review_command="review-memory",
+    )
+
+
 def _get_context(topic: str) -> dict:
     """Return everything an agent needs to answer a question about a topic.
     Finds the best matching page, then returns:
@@ -2539,6 +2565,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(_memory_brief(
                     query=brief_query,
                     limit=limit,
+                    project=query.get("project", [""])[0],
+                ))
+        elif path == "/api/query-link":
+            query_text = query.get("q", [""])[0] or query.get("query", [""])[0]
+            if not query_text.strip():
+                self._json({"found": False, "error": "query parameter required", "context_packet": []}, status=400)
+            else:
+                self._json(_query_link(
+                    query=query_text,
+                    budget=query.get("budget", ["medium"])[0],
                     project=query.get("project", [""])[0],
                 ))
         elif path == "/api/memory-audit":

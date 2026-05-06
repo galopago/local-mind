@@ -391,6 +391,52 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Alpha brief capture", html)
         self.assertNotIn(fake_key, html)
 
+    def test_query_link_api_returns_context_packet(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent memory\ntags: [memory]\n---\n\n"
+            "# Agent memory\n\n"
+            "> **TLDR:** Agents use durable local memory.\n\n"
+            "## Overview\n\nAgent memory connects to [[retrieval]].\n",
+        )
+        write_page(
+            wiki,
+            "concepts/retrieval.md",
+            "---\ntype: concept\ntitle: Retrieval\n---\n\n"
+            "# Retrieval\n\n> **TLDR:** Retrieval selects context.\n",
+        )
+        write_page(
+            wiki,
+            "memories/prefer-local-memory.md",
+            "---\n"
+            "type: memory\n"
+            "title: Prefer local memory\n"
+            "memory_type: preference\n"
+            "scope: user\n"
+            "status: active\n"
+            "date_captured: \"2026-05-05T00:00:00Z\"\n"
+            "source: unit-test\n"
+            "review_status: reviewed\n"
+            "tags: [memory]\n"
+            "---\n\n"
+            "# Prefer local memory\n\n"
+            "> **TLDR:** User prefers local agent memory.\n\n"
+            "## Memory\n\nUser prefers local agent memory.\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(serve._build_backlinks()), encoding="utf-8")
+        reset_wiki(wiki)
+
+        status, payload = run_handler("GET", "/api/query-link?q=agent%20memory&budget=small")
+
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["found"])
+        self.assertEqual(payload["budget"], "small")
+        self.assertEqual(payload["wiki"]["primary"], "agent-memory")
+        self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-memory")
+        self.assertIn("context_packet", payload)
+
     def test_memory_inbox_and_explain_render_action_commands(self):
         wiki = self.make_wiki()
         write_page(

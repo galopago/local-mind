@@ -402,6 +402,7 @@ Most agents should start with:
 
 | Tool | Use it when |
 |------|-------------|
+| `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, and graph context without reading the whole wiki. |
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory, review warnings, and saved capture status. |
 | `memory_audit` | You need one read-only health report for memory review backlog, raw captures, and next actions. |
 | `memory_profile` | You need to know what Link remembers about the user/project. |
@@ -419,7 +420,7 @@ Most agents should start with:
 | `delete_capture` | The user explicitly confirms deleting a saved raw capture. |
 | `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
 
-Full tool set: `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
+Full tool set: `query_link`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
@@ -454,6 +455,7 @@ Common endpoints:
 | `GET /api/memory-inbox?project=<slug>` | Memories that need review or metadata cleanup. |
 | `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, secret-warning labels, and review commands. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |
+| `GET /api/query-link?q=<query>&budget=small\|medium\|large` | Compact context packet with relevant memory, ranked wiki results, graph context, and selection reasons. |
 | `POST /api/propose-memories` | Returns memory proposals without writing pages. |
 | `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; marks a memory reviewed. |
 | `POST /api/archive-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "reason": "optional" }`; hides a memory from default recall. |
@@ -476,6 +478,7 @@ Common endpoints:
 | `python3 link.py accept-capture <capture> <dir> [--index N]` | Accept one proposal from a saved raw capture using duplicate/conflict-safe memory writes. |
 | `python3 link.py redact-capture <capture> <dir>` | Replace secret-looking values in a saved raw capture and log labels/counts only. |
 | `python3 link.py delete-capture <capture> <dir> --confirm` | Delete a saved raw capture after explicit confirmation. |
+| `python3 link.py query "task" <dir> [--budget small\|medium\|large] [--project slug]` | Build a compact answer-ready packet from memory, wiki search, and graph context. |
 | `python3 link.py brief "task" <dir> [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
 | `python3 link.py memory-audit <dir> [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |
 | `python3 link.py recall "query" <dir> [--project slug]` | Search local agent memories with recall readiness. |

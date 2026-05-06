@@ -114,6 +114,16 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["count"], 0)
         self.assertEqual(payload["results"], [])
 
+    def test_query_link_contract(self):
+        payload = json.loads(self.server.query_link("agent memory", budget="small"))
+
+        self.assertTrue(payload["found"])
+        self.assertEqual(payload["budget"], "small")
+        self.assertIn("memory", payload["strategy"]["mode"])
+        self.assertEqual(payload["wiki"]["primary"], "agent-memory")
+        self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-personal-memory")
+        self.assertIn("why_selected", payload["context_packet"][0])
+
     def test_get_context_contract(self):
         payload = json.loads(self.server.get_context("agent memory"))
         page_names = [page["name"] for page in payload["pages"]]

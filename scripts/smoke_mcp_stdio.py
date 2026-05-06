@@ -12,6 +12,7 @@ from typing import Any
 
 
 EXPECTED_TOOLS = {
+    "query_link",
     "search_wiki",
     "get_context",
     "get_graph",

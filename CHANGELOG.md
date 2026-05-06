@@ -21,6 +21,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added memory merge/update workflow with `update-memory` and MCP `update_memory`, including update counts, audit logs, backlink rebuilds, and review reset.
 - Added proposal-only memory extraction with `propose-memories` and MCP `propose_memories` for chat/session notes.
 - Added agent memory briefs with `link.py brief` and MCP `memory_brief` so agents can prime themselves with relevant local memory before a task.
+- Added smart Link query packets with `link.py query`, MCP `query_link`, and `/api/query-link` so agents can retrieve budgeted memory, ranked wiki results, and graph context without reading the whole wiki.
 - Added raw capture status to CLI and MCP memory briefs so session priming surfaces saved captures and secret-warning captures.
 - Added `/brief` and `/api/memory-brief` so the local web UI and HTTP clients can get startup memory context, review warnings, and raw capture status.
 - Added `memory-audit` and MCP `memory_audit` for a read-only health report covering memory backlog, raw captures, risk factors, and next actions.

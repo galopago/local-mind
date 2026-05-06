@@ -52,7 +52,9 @@ except ImportError:
 mcp = FastMCP(
     "link",
     instructions=(
-        "Link is local personal memory for agents. Start with memory_brief at "
+        "Link is local personal memory for agents. Start with query_link when "
+        "the user asks a substantive question that may need both memory and "
+        "wiki context. Use memory_brief at "
         "session start or before personalized/project work; pass the user's "
         "task as the query when available. Use recall_memory for focused user "
         "preferences, decisions, and project context, memory_profile to inspect "
@@ -107,6 +109,9 @@ from link_core.frontmatter import (
 from link_core.security import (
     redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
+)
+from link_core.query import (
+    query_link as _core_query_link,
 )
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
@@ -247,6 +252,19 @@ def _memory_brief(query: str = "", limit: int = 6, project: str = "") -> dict[st
     if payload["captures"]["warning_count"]:
         payload["agent_guidance"].append("Redact raw captures with secret warnings before sharing snippets or using their contents.")
     return payload
+
+
+def _query_link(query: str, budget: str = "medium", project: str = "") -> dict[str, object]:
+    project_name = _resolve_project(project)
+    return _core_query_link(
+        WIKI_DIR,
+        _clean_text_input(query, max_len=500),
+        _build_cache(),
+        _memory_records(),
+        budget=budget,
+        project=project_name,
+        review_command="review_memory",
+    )
 
 
 def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
@@ -805,6 +823,19 @@ def _write_memory_page(
 
 
 # ── MCP Tools ─────────────────────────────────────────────────────────
+
+@mcp.tool()
+def query_link(query: str, budget: str = "medium", project: str = "") -> str:
+    """Build a compact answer-ready Link context packet.
+
+    Use this before answering substantive questions that may need local memory,
+    wiki knowledge, or both. It returns budgeted memories, ranked wiki results,
+    graph-neighborhood context, and why each item was selected so the agent does
+    not waste context by reading the whole wiki.
+    budget: small, medium, or large.
+    """
+    return json.dumps(_query_link(query=query, budget=budget, project=project), ensure_ascii=False)
+
 
 @mcp.tool()
 def memory_brief(query: str = "", limit: int = 6, project: str = "") -> str:
