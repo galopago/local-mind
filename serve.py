@@ -24,6 +24,9 @@ from link_core.memory import (
 from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
 )
+from link_core.security import (
+    secret_value_warnings as _secret_value_warnings,
+)
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
@@ -236,8 +239,18 @@ def _memory_dashboard_next_actions(
     review_count: int,
     updated_count: int,
     archived_count: int,
+    capture_count: int = 0,
+    capture_warning_count: int = 0,
 ) -> list[dict[str, str]]:
     actions: list[dict[str, str]] = []
+    if capture_warning_count:
+        actions.append({
+            "label": "Redact capture warnings",
+            "detail": f"{capture_warning_count} raw capture{'s' if capture_warning_count != 1 else ''} contain secret-looking values.",
+            "href": "/memory",
+            "command": "python3 link.py redact-capture raw/memory-captures/<capture>.md .",
+            "priority": "high",
+        })
     if review_count:
         memory_label = "memory" if review_count == 1 else "memories"
         verb = "needs" if review_count == 1 else "need"
@@ -264,6 +277,14 @@ def _memory_dashboard_next_actions(
             "command": "python3 link.py profile .",
             "priority": "low",
         })
+    if capture_count and not capture_warning_count:
+        actions.append({
+            "label": "Review raw captures",
+            "detail": f"{capture_count} saved raw capture{'s' if capture_count != 1 else ''} can be accepted, redacted, or deleted.",
+            "href": "/memory",
+            "command": "python3 link.py accept-capture raw/memory-captures/<capture>.md . --index 1",
+            "priority": "medium",
+        })
     if not memory_count:
         actions.append({
             "label": "Create the first memory",
@@ -281,6 +302,43 @@ def _memory_dashboard_next_actions(
             "priority": "info",
         })
     return actions[:3]
+
+
+def _capture_records(limit: int = 12) -> list[dict[str, object]]:
+    root = WIKI_DIR.parent
+    capture_dir = RAW_DIR / "memory-captures"
+    if not capture_dir.exists():
+        return []
+    records: list[dict[str, object]] = []
+    for path in sorted(capture_dir.rglob("*.md")):
+        if path.name.startswith("."):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            stat = path.stat()
+        except OSError:
+            continue
+        meta, body = _parse_frontmatter(text)
+        title = str(meta.get("title") or path.stem)
+        warnings = _secret_value_warnings(text)
+        rel = path.relative_to(root).as_posix()
+        records.append({
+            "path": rel,
+            "title": title,
+            "project": str(meta.get("project") or ""),
+            "date_captured": str(meta.get("date_captured") or ""),
+            "size_bytes": stat.st_size,
+            "secret_warnings": warnings,
+            "warning_count": len(warnings),
+            "snippet": re.sub(r"\s+", " ", body).strip()[:180],
+            "commands": {
+                "accept": f'python3 link.py accept-capture "{rel}" . --index 1',
+                "redact": f'python3 link.py redact-capture "{rel}" .',
+                "delete": f'python3 link.py delete-capture "{rel}" . --confirm',
+            },
+        })
+    records.sort(key=lambda item: (str(item["date_captured"]), str(item["path"])), reverse=True)
+    return records[:limit]
 
 
 def _memory_dashboard(limit: int = 12) -> dict[str, object]:
@@ -305,12 +363,16 @@ def _memory_dashboard(limit: int = 12) -> dict[str, object]:
     review_count = inbox["review_count"]
     updated_count = len(recent_updates)
     archived_count = len(archived_records)
+    captures = _capture_records(limit=limit)
+    capture_warning_count = sum(1 for capture in captures if capture["warning_count"])
     return {
         "memory_count": len(records),
         "active_count": len(active_records),
         "review_count": review_count,
         "archived_count": archived_count,
         "updated_count": updated_count,
+        "capture_count": len(captures),
+        "capture_warning_count": capture_warning_count,
         "by_type": _count_values(records, "memory_type"),
         "by_scope": _count_values(records, "scope"),
         "counts_by_severity": inbox["counts_by_severity"],
@@ -319,11 +381,14 @@ def _memory_dashboard(limit: int = 12) -> dict[str, object]:
             review_count=review_count,
             updated_count=updated_count,
             archived_count=archived_count,
+            capture_count=len(captures),
+            capture_warning_count=capture_warning_count,
         ),
         "active": [_memory_with_actions(record) for record in recent_active[:limit]],
         "review": [_memory_with_actions(record) for record in inbox["items"][:limit]],
         "recent_updates": [_memory_with_actions(record) for record in recent_updates[:limit]],
         "archived": [_memory_with_actions(record) for record in archived[:limit]],
+        "captures": captures,
     }
 
 
@@ -981,6 +1046,54 @@ def _render_memory_section(title: str, records: list[dict[str, object]], empty: 
     return heading + f'<div class="memory-grid">{cards}</div>'
 
 
+def _render_capture_card(capture: dict[str, object]) -> str:
+    title = html.escape(str(capture.get("title") or capture.get("path") or "Raw capture"))
+    path = html.escape(str(capture.get("path") or ""))
+    meta_parts = ["raw capture"]
+    if capture.get("project"):
+        meta_parts.append(f'project {capture["project"]}')
+    if capture.get("date_captured"):
+        meta_parts.append(f'captured {capture["date_captured"]}')
+    warnings = [str(label) for label in capture.get("secret_warnings") or []]
+    if warnings:
+        meta_parts.append("secret warnings")
+    meta = " · ".join(meta_parts)
+    warning_html = ""
+    if warnings:
+        warning_html = (
+            '<p class="summary"><strong>Secret-looking values:</strong> '
+            + html.escape(", ".join(warnings))
+            + "</p>"
+        )
+    commands = capture.get("commands") or {}
+    actions = "".join(
+        f'<div><strong>{html.escape(label)}</strong><code>{html.escape(str(command))}</code></div>'
+        for label, command in (
+            ("Accept proposal", commands.get("accept", "")),
+            ("Redact", commands.get("redact", "")),
+            ("Delete", commands.get("delete", "")),
+        )
+        if command
+    )
+    return (
+        '<article class="memory-card">'
+        f'<h3>{title}</h3>'
+        f'<div class="memory-meta">{html.escape(meta)}</div>'
+        f'<p class="summary"><code>{path}</code></p>'
+        f'{warning_html}'
+        f'<div class="memory-actions">{actions}</div>'
+        '</article>'
+    )
+
+
+def _render_capture_section(captures: list[dict[str, object]]) -> str:
+    heading = '<div class="section-heading"><h2>Raw captures</h2></div>'
+    if not captures:
+        return heading + "<p>No saved raw captures.</p>"
+    cards = "".join(_render_capture_card(capture) for capture in captures)
+    return heading + f'<div class="memory-grid">{cards}</div>'
+
+
 def _render_memory_next_actions(actions: list[dict[str, str]]) -> str:
     items = ""
     for action in actions:
@@ -1004,6 +1117,7 @@ def _render_memory_dashboard():
         f'<div class="stat"><span class="num">{dashboard["active_count"]}</span><span class="label">active</span></div>'
         f'<div class="stat"><span class="num">{dashboard["review_count"]}</span><span class="label">review</span></div>'
         f'<div class="stat"><span class="num">{dashboard["updated_count"]}</span><span class="label">updated</span></div>'
+        f'<div class="stat"><span class="num">{dashboard["capture_count"]}</span><span class="label">captures</span></div>'
         f'<div class="stat"><span class="num">{dashboard["archived_count"]}</span><span class="label">archived</span></div>'
         f'</div>'
     )
@@ -1025,6 +1139,7 @@ def _render_memory_dashboard():
         f'{_render_memory_next_actions(dashboard["next_actions"])}'
         f'{counts}'
         f'{_render_memory_section("Review needed", dashboard["review"], "No memories need review.", href="/inbox", include_issues=True)}'
+        f'{_render_capture_section(dashboard["captures"])}'
         f'{_render_memory_section("Recent updates", dashboard["recent_updates"], "No memory updates yet.")}'
         f'{_render_memory_section("Active memories", dashboard["active"], "No active memories yet.", href="/profile")}'
         f'{_render_memory_section("Archived memories", dashboard["archived"], "No archived memories.")}'

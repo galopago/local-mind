@@ -31,6 +31,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added MCP `redact_capture` so agents can redact saved raw captures after user approval.
 - Added `link.py delete-capture` with explicit confirmation for removing saved raw captures without logging capture contents.
 - Added MCP `delete_capture` with explicit confirmation for removing saved raw captures.
+- Added raw capture visibility to `/memory` and `/api/memory-dashboard`, including accept/redact/delete commands and secret-warning counts.
 - Added read-only web Memory Dashboard at `/memory` and `/api/memory-dashboard` for active memories, review queue, recent updates, archived memories, and next-action commands.
 - Added secure proposal-only HTTP endpoint `POST /api/propose-memories`; memory write operations remain CLI/MCP-only.
 - Added a graph node inspector so moving nodes no longer accidentally opens pages; double-click or Open page still navigates.

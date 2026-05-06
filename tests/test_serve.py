@@ -239,6 +239,35 @@ class ServeTests(unittest.TestCase):
         self.assertIn("1 memory needs confirmation", actions[0]["detail"])
         self.assertNotIn("memoryy", actions[0]["detail"])
 
+    def test_memory_dashboard_surfaces_raw_captures_and_secret_warnings(self):
+        wiki = self.make_wiki()
+        capture_dir = wiki.parent / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        fake_key = "sk-" + ("D" * 24)
+        (capture_dir / "session.md").write_text(
+            "---\n"
+            "title: \"Session capture\"\n"
+            "source_type: conversation\n"
+            "date_captured: \"2026-05-05T00:00:00Z\"\n"
+            "project: \"link\"\n"
+            "---\n\n"
+            "# Session capture\n\n"
+            "## Notes\n\n"
+            f"Remember that dashboard capture review is visible. Test key {fake_key}\n",
+            encoding="utf-8",
+        )
+
+        dashboard = serve._memory_dashboard(limit=8)
+        html = serve._render_memory_dashboard()
+
+        self.assertEqual(dashboard["capture_count"], 1)
+        self.assertEqual(dashboard["capture_warning_count"], 1)
+        self.assertEqual(dashboard["captures"][0]["secret_warnings"], ["OpenAI API key"])
+        self.assertIn("Redact capture warnings", dashboard["next_actions"][0]["label"])
+        self.assertIn("accept-capture", dashboard["captures"][0]["commands"]["accept"])
+        self.assertIn("Raw captures", html)
+        self.assertIn("redact-capture", html)
+
     def test_cache_invalidation_sees_existing_page_edits(self):
         wiki = self.make_wiki()
         page = write_page(

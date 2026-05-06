@@ -416,7 +416,7 @@ Common endpoints:
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
-| `GET /api/memory-dashboard` | Read-only memory dashboard data. |
+| `GET /api/memory-dashboard` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |
 | `GET /api/memory-profile` | Counts and recent memories for the local memory profile. |
 | `GET /api/memory-inbox` | Memories that need review or metadata cleanup. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |
