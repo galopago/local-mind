@@ -457,7 +457,7 @@ Common endpoints:
 | `python3 link.py archive-memory <name> <dir>` | Reversibly hide a stale or wrong memory from default recall. |
 | `python3 link.py restore-memory <name> <dir>` | Restore an archived memory to active recall. |
 | `python3 link.py forget-memory <name> <dir> --confirm` | Permanently delete a memory after explicit confirmation; archive first if you may need it later. |
-| `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, and secret-looking content. |
+| `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, memory review state, raw capture backlog, and secret-looking content. |
 | `python3 link.py doctor <dir> --fix` | Create missing structure and repair backlinks safely. |
 | `python3 link.py rebuild-backlinks <dir>` | Regenerate `wiki/_backlinks.json`. |
 | `python3 link.py verify-mcp <dir>` | Verify `link-mcp` import and print MCP config. |

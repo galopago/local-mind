@@ -367,7 +367,7 @@ python3 link.py doctor .
 
 Use `python3 link.py doctor . --fix` only for safe mechanical repairs: creating missing Link directories/files and rebuilding `_backlinks.json`. Do not use it as a substitute for content review.
 
-Treat doctor errors as blockers. Doctor warnings are quality issues to triage with the human. It checks required structure, dead links, stale backlinks, index drift, TLDR/query summaries, Sources sections, `source_count` consistency, isolated graph pages, raw-source coverage, and secret-looking filenames or file contents.
+Treat doctor errors as blockers. Doctor warnings are quality issues to triage with the human. It checks required structure, dead links, stale backlinks, index drift, TLDR/query summaries, Sources sections, `source_count` consistency, isolated graph pages, raw-source coverage, memory review state, raw capture backlog, and secret-looking filenames or file contents.
 
 Run these checks and report findings:
 

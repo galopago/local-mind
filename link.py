@@ -1033,7 +1033,10 @@ def _raw_source_files(raw_dir: Path) -> list[Path]:
     for path in sorted(raw_dir.rglob("*")):
         if not path.is_file() or path.name.startswith("."):
             continue
-        if any(part in SKIP_SCAN_DIRS for part in path.relative_to(raw_dir).parts):
+        rel_parts = path.relative_to(raw_dir).parts
+        if rel_parts and rel_parts[0] == "memory-captures":
+            continue
+        if any(part in SKIP_SCAN_DIRS for part in rel_parts):
             continue
         files.append(path)
     return files
@@ -1367,6 +1370,22 @@ def doctor(target: Path, fix: bool = False) -> int:
             warnings.append("isolated wiki pages: " + ", ".join(isolated[:8]))
         else:
             print("OK graph has no isolated wiki pages")
+
+        memory_review = _memory_inbox(wiki_dir, limit=8, include_archived=True)
+        if memory_review["review_count"]:
+            names = ", ".join(item["name"] for item in memory_review["items"][:8])
+            warnings.append(f"memories need review: {names}")
+        else:
+            print("OK memories are reviewed")
+
+        captures = _capture_records(target, limit=50)
+        capture_warning_count = sum(1 for capture in captures if capture["warning_count"])
+        if captures:
+            warnings.append(f"raw memory captures pending review: {len(captures)}")
+        else:
+            print("OK no raw memory captures pending review")
+        if capture_warning_count:
+            warnings.append(f"raw memory captures with secret warnings: {capture_warning_count}")
 
     uningested = _find_uningested_raw(target)
     if uningested:

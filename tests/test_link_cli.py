@@ -79,6 +79,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("OK wiki pages have summaries", out.getvalue())
         self.assertIn("OK source-backed pages cite sources", out.getvalue())
         self.assertIn("OK no sensitive-looking file contents", out.getvalue())
+        self.assertIn("memories need review", out.getvalue())
 
     def test_ingest_status_accepts_demo_wiki(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
@@ -93,6 +94,34 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Raw files: 3", out.getvalue())
         self.assertIn("Pending ingest: 0", out.getvalue())
         self.assertIn("Backlinks: current", out.getvalue())
+
+    def test_capture_session_is_not_pending_source_ingest(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.capture_session(
+                target,
+                "Remember that capture notes are proposal-only memory backlog.",
+                title="Capture backlog",
+                json_output=True,
+            )
+
+        ingest_out = StringIO()
+        with redirect_stdout(ingest_out):
+            ingest_code = link_cli.ingest_status(target, json_output=True)
+        ingest = json.loads(ingest_out.getvalue())
+
+        doctor_out = StringIO()
+        with redirect_stdout(doctor_out):
+            doctor_code = link_cli.doctor(target)
+
+        self.assertEqual(ingest_code, 0)
+        self.assertEqual(ingest["raw_count"], 3)
+        self.assertEqual(ingest["pending_count"], 0)
+        self.assertEqual(doctor_code, 0)
+        self.assertIn("raw memory captures pending review: 1", doctor_out.getvalue())
+        self.assertNotIn("raw files not referenced by wiki pages", doctor_out.getvalue())
 
     def test_ingest_status_reports_pending_raw_file(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
