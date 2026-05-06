@@ -406,7 +406,7 @@ Most agents should start with:
 | `memory_audit` | You need one read-only health report for memory review backlog, raw captures, and next actions. |
 | `memory_profile` | You need to know what Link remembers about the user/project. |
 | `memory_inbox` | You need review items with the safest next action for each memory. |
-| `recall_memory` | You need preferences, decisions, facts, or project context. |
+| `recall_memory` | You need preferences, decisions, facts, or project context with recall readiness. |
 | `get_context` | You need a topic plus its graph neighborhood. |
 | `search_wiki` | You need ranked search across the wiki. |
 | `explain_memory` | You need provenance and review state for a memory. |
@@ -477,7 +477,7 @@ Common endpoints:
 | `python3 link.py delete-capture <capture> <dir> --confirm` | Delete a saved raw capture after explicit confirmation. |
 | `python3 link.py brief "task" <dir> [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
 | `python3 link.py memory-audit <dir> [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |
-| `python3 link.py recall "query" <dir> [--project slug]` | Search local agent memories. |
+| `python3 link.py recall "query" <dir> [--project slug]` | Search local agent memories with recall readiness. |
 | `python3 link.py profile <dir> [--project slug]` | Show what Link remembers by type, scope, status, and recency. |
 | `python3 link.py memory-inbox <dir> [--project slug]` | Show memories that need review or stronger metadata with next-step commands. |
 | `python3 link.py review-memory <name> <dir>` | Mark a confirmed memory as reviewed. |

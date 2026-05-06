@@ -2234,6 +2234,9 @@ def recall(
     for record in results:
         print(f"- {record['title']} ({record['memory_type']} · {record['scope']})")
         print(f"  {record['path']}")
+        recall = record.get("recall") if isinstance(record.get("recall"), dict) else {}
+        if recall.get("state"):
+            print(f"  Recall: {recall['state']}")
         summary = record.get("tldr") or record.get("snippet")
         if summary:
             print(f"  {summary}")

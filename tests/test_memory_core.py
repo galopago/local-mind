@@ -89,6 +89,9 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertIn("agent_guidance", brief)
         self.assertEqual(inbox["review_count"], 0)
         self.assertEqual(recalled[0]["name"], "prefer-release-branches")
+        self.assertEqual(recalled[0]["recall"]["state"], "ready")
+        self.assertEqual(recalled[0]["review_issue_count"], 0)
+        self.assertEqual(recalled[0]["highest_review_severity"], "none")
         self.assertNotIn("body", recalled[0])
 
     def test_memory_inbox_returns_action_plan(self):

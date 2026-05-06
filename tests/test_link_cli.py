@@ -367,6 +367,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Prefer release branches", out.getvalue())
         self.assertIn("wiki/memories/prefer-release-branches.md", out.getvalue())
+        self.assertIn("Recall: needs_review", out.getvalue())
 
     def test_recall_json(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
@@ -383,6 +384,8 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(payload["count"], 2)
         self.assertEqual(payload["memories"][0]["name"], "local-memory-preference")
+        self.assertEqual(payload["memories"][0]["recall"]["state"], "needs_review")
+        self.assertEqual(payload["memories"][0]["review_issue_count"], 1)
 
     def test_recall_json_filters_project(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))

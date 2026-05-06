@@ -1441,6 +1441,7 @@ def recall_memories(
         return []
     project_name = normalize_project(project)
     scored: list[tuple[int, int, str, dict[str, object]]] = []
+    severity_rank = {"high": 0, "medium": 1, "low": 2}
     for record in records:
         if not memory_visible_for_project(record, project_name):
             continue
@@ -1449,9 +1450,19 @@ def recall_memories(
         score = score_memory(record, q)
         if score > 0:
             rank_score = memory_rank_score(record, score, project=project_name)
+            issues = memory_review_issues(record)
             slim = slim_memory(record)
             slim["score"] = score
             slim["rank_score"] = rank_score
+            slim["recall"] = recall_state(record, issues)
+            slim["review_issue_count"] = len(issues)
+            slim["highest_review_severity"] = (
+                "none" if not issues else
+                min(
+                    (str(issue.get("severity") or "low") for issue in issues),
+                    key=lambda severity: severity_rank.get(severity, 9),
+                )
+            )
             recency = str(record.get("updated_at") or record.get("date_captured") or "")
             scored.append((rank_score, score, recency, slim))
     scored.sort(key=lambda item: str(item[3]["title"]).lower())

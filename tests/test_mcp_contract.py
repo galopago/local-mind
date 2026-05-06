@@ -181,6 +181,8 @@ class McpContractTests(unittest.TestCase):
         self.assertGreaterEqual(payload["count"], 1)
         self.assertEqual(payload["memories"][0]["name"], "prefer-local-personal-memory")
         self.assertEqual(payload["memories"][0]["memory_type"], "preference")
+        self.assertEqual(payload["memories"][0]["recall"]["state"], "needs_review")
+        self.assertEqual(payload["memories"][0]["review_issue_count"], 1)
 
     def test_recall_memory_project_filter_contract(self):
         alpha = json.loads(self.server.remember_memory(
