@@ -63,7 +63,9 @@ mcp = FastMCP(
         "approval, and capture_inbox to review saved captures before accepting, "
         "redacting, or deleting them; use propose_memories when no raw capture is needed. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
-        "neighborhood. Only call remember_memory when the user explicitly asks "
+        "neighborhood. After ingesting sources or substantially editing wiki "
+        "pages, call rebuild_backlinks, then validate_wiki before saying the "
+        "wiki is updated. Only call remember_memory when the user explicitly asks "
         "you to remember something; if it returns duplicate candidates, use "
         "update_memory on the existing memory instead of forcing a duplicate. "
         "If it returns conflict candidates, ask the user whether to update or "
@@ -115,6 +117,9 @@ from link_core.security import (
 )
 from link_core.query import (
     query_link as _core_query_link,
+)
+from link_core.validation import (
+    validate_wiki as _core_validate_wiki,
 )
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
@@ -268,6 +273,10 @@ def _query_link(query: str, budget: str = "medium", project: str = "") -> dict[s
         project=project_name,
         review_command="review_memory",
     )
+
+
+def _validate_wiki(strict: bool = False) -> dict[str, object]:
+    return _core_validate_wiki(WIKI_DIR, strict=bool(strict))
 
 
 def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
@@ -844,6 +853,18 @@ def memory_brief(query: str = "", limit: int = 6, project: str = "") -> str:
     """
     limit = _parse_limit(limit, default=6, max_limit=20)
     return json.dumps(_memory_brief(query=query, limit=limit, project=project), ensure_ascii=False)
+
+
+@mcp.tool()
+def validate_wiki(strict: bool = False) -> str:
+    """Validate agent-generated wiki pages after ingest or large edits.
+
+    Call rebuild_backlinks first, then validate_wiki before reporting ingest
+    complete. The response checks required frontmatter, directory/type
+    alignment, required sections, dead wikilinks, and backlink freshness.
+    strict=true also fails on warnings such as missing TLDR/Query summaries.
+    """
+    return json.dumps(_validate_wiki(strict=strict), ensure_ascii=False)
 
 
 @mcp.tool()

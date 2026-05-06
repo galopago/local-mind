@@ -331,7 +331,7 @@ When the human adds a new source to `raw/` and asks you to process it:
 - Watch for page bloat: if a sub-topic is growing past 2-3 paragraphs within an article, it likely deserves its own page. Split proactively.
 - Conversely, a new page must have enough substance to stand alone. If you cannot write at least a meaningful TLDR + Overview, fold the information into an existing page instead.
 - After ingest completes, rebuild `wiki/_backlinks.json` by scanning all `[[wikilinks]]` across the wiki.
-- After rebuilding backlinks, run `python3 link.py validate .` when `link.py` is available. Treat validation errors as blockers before reporting ingest complete.
+- After rebuilding backlinks, run MCP `validate_wiki`, `python3 link.py validate .`, or `GET /api/validate` when available. Treat validation errors as blockers before reporting ingest complete.
 
 **Image ingest rules:**
 - Images in `raw/` (png, jpg, webp, gif, svg) are valid sources. Use vision to understand what the image IS.
@@ -580,6 +580,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 | `GET /api/graph` | All nodes + edges for graph visualization |
 | `GET /api/backlinks` | Reverse link index |
 | `POST /api/rebuild-backlinks` | JSON `{}`; rebuild `_backlinks.json` by scanning all wikilinks |
+| `GET /api/validate?strict=true` | Validate generated wiki pages; failed gates return HTTP 422 with structured findings |
 
 During query operations, prefer `/api/context?topic=X` over reading files manually — it returns the primary page plus all related pages via graph traversal in one call.
 

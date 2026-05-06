@@ -124,6 +124,27 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-personal-memory")
         self.assertIn("why_selected", payload["context_packet"][0])
 
+    def test_validate_wiki_contract(self):
+        payload = json.loads(self.server.validate_wiki())
+
+        self.assertTrue(payload["passed"])
+        self.assertEqual(payload["error_count"], 0)
+        self.assertEqual(payload["warning_count"], 0)
+
+    def test_validate_wiki_reports_failed_gate(self):
+        page = self.target / "wiki/concepts/agent-memory.md"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace("type: concept", "type: source", 1),
+            encoding="utf-8",
+        )
+        json.loads(self.server.rebuild_backlinks())
+
+        payload = json.loads(self.server.validate_wiki(strict=True))
+        codes = {finding["code"] for finding in payload["findings"]}
+
+        self.assertFalse(payload["passed"])
+        self.assertIn("type_directory_mismatch", codes)
+
     def test_get_context_contract(self):
         payload = json.loads(self.server.get_context("agent memory"))
         page_names = [page["name"] for page in payload["pages"]]

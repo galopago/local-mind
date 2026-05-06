@@ -405,6 +405,7 @@ Most agents should start with:
 | Tool | Use it when |
 |------|-------------|
 | `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, and graph context without reading the whole wiki. |
+| `validate_wiki` | You just ingested sources or substantially edited pages and need to verify page shape, links, and backlink freshness before reporting done. |
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory, review warnings, and saved capture status. |
 | `memory_audit` | You need one read-only health report for memory review backlog, raw captures, and next actions. |
 | `memory_profile` | You need to know what Link remembers about the user/project. |
@@ -422,7 +423,7 @@ Most agents should start with:
 | `delete_capture` | The user explicitly confirms deleting a saved raw capture. |
 | `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
 
-Full tool set: `query_link`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
+Full tool set: `query_link`, `validate_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
@@ -458,6 +459,7 @@ Common endpoints:
 | `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, secret-warning labels, and review commands. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |
 | `GET /api/query-link?q=<query>&budget=small\|medium\|large` | Compact context packet with relevant memory, ranked wiki results, graph context, and selection reasons. |
+| `GET /api/validate?strict=true` | Validate generated wiki pages; failed gates return HTTP 422 with structured findings. |
 | `POST /api/propose-memories` | Returns memory proposals without writing pages. |
 | `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; marks a memory reviewed. |
 | `POST /api/archive-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "reason": "optional" }`; hides a memory from default recall. |

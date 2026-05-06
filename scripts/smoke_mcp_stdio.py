@@ -13,6 +13,7 @@ from typing import Any
 
 EXPECTED_TOOLS = {
     "query_link",
+    "validate_wiki",
     "search_wiki",
     "get_context",
     "get_graph",
@@ -82,6 +83,17 @@ async def _run_smoke(wiki_dir: Path, python: str) -> None:
                 raise RuntimeError("query_link did not return the expected demo packet")
             if not packet.get("context_packet"):
                 raise RuntimeError("query_link returned an empty context packet")
+
+            validation = _json_text(
+                await session.call_tool(
+                    "validate_wiki",
+                    {},
+                    read_timeout_seconds=timedelta(seconds=10),
+                ),
+                "validate_wiki",
+            )
+            if not validation.get("passed") or validation.get("error_count") != 0:
+                raise RuntimeError("validate_wiki did not accept the demo wiki")
 
             context = _json_text(
                 await session.call_tool(

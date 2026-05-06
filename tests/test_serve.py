@@ -839,6 +839,57 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(rebuilt["backlinks"], {"b": ["a"]})
         self.assertEqual(rebuilt["forward"], {"a": ["b"]})
 
+    def test_validate_api_reports_wiki_gate_status(self):
+        wiki = self.make_wiki()
+        for dirname in ("sources", "concepts", "entities", "memories", "comparisons", "explorations"):
+            (wiki / dirname).mkdir(exist_ok=True)
+        write_page(
+            wiki,
+            "sources/example-source.md",
+            "---\ntype: source\ntitle: Example Source\n---\n\n"
+            "# Example Source\n\n"
+            "> **TLDR:** A valid source page.\n\n"
+            "## Summary\n\nUseful source.\n\n"
+            "## Raw Source\n\n`raw/example.md`\n",
+        )
+        write_page(
+            wiki,
+            "concepts/example-concept.md",
+            "---\ntype: concept\ntitle: Example Concept\n---\n\n"
+            "# Example Concept\n\n"
+            "> **TLDR:** A valid concept page.\n\n"
+            "## Overview\n\nConcept cites [[example-source]].\n\n"
+            "## Sources\n\n- [[example-source]]\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(serve._build_backlinks()), encoding="utf-8")
+
+        status, payload = run_handler("GET", "/api/validate")
+
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["passed"])
+        self.assertEqual(payload["error_count"], 0)
+
+    def test_validate_api_uses_422_for_failed_gate(self):
+        wiki = self.make_wiki()
+        for dirname in ("sources", "concepts", "entities", "memories", "comparisons", "explorations"):
+            (wiki / dirname).mkdir(exist_ok=True)
+        write_page(
+            wiki,
+            "concepts/bad-page.md",
+            "---\ntype: source\n---\n\n"
+            "# Bad Page\n\n"
+            "Mentions [[missing-page]].\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(serve._build_backlinks()), encoding="utf-8")
+
+        status, payload = run_handler("GET", "/api/validate?strict=true")
+        codes = {finding["code"] for finding in payload["findings"]}
+
+        self.assertEqual(status, 422)
+        self.assertFalse(payload["passed"])
+        self.assertIn("type_directory_mismatch", codes)
+        self.assertIn("dead_wikilink", codes)
+
     def test_graph_controls_exist_before_graph_script(self):
         wiki = self.make_wiki()
         write_page(

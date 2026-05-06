@@ -40,6 +40,9 @@ from link_core.security import (
 from link_core.query import (
     query_link as _core_query_link,
 )
+from link_core.validation import (
+    validate_wiki as _core_validate_wiki,
+)
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
@@ -2377,6 +2380,10 @@ def _rebuild_backlinks_payload() -> dict[str, object]:
     return {"rebuilt": True, "pages": len(result.get("backlinks", {}))}
 
 
+def _validate_wiki_payload(strict: bool = False) -> dict[str, object]:
+    return _core_validate_wiki(WIKI_DIR, strict=strict)
+
+
 # ---------------------------------------------------------------------------
 # HTTP handler
 # ---------------------------------------------------------------------------
@@ -2508,6 +2515,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(data)
         elif path == "/api/rebuild-backlinks":
             self._json({"error": "use POST with JSON body: {}"}, status=405)
+        elif path == "/api/validate":
+            strict = query.get("strict", ["false"])[0].lower() in {"1", "true", "yes"}
+            payload = _validate_wiki_payload(strict=strict)
+            self._json(payload, status=200 if payload.get("passed") else 422)
         elif path == "/api/graph":
             self._json(_get_graph_data())
         elif path == "/api/memory-profile":
