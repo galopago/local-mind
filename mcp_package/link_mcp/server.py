@@ -249,6 +249,62 @@ def _memory_brief(query: str = "", limit: int = 6, project: str = "") -> dict[st
     return payload
 
 
+def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
+    parsed_limit = _parse_limit(limit, default=10, max_limit=50)
+    project_name = _resolve_project(project)
+    profile = _memory_profile(limit=parsed_limit, project=project_name)
+    inbox = _memory_inbox(limit=parsed_limit, include_archived=True, project=project_name)
+    captures = _capture_review_summary(project=project_name, limit=min(parsed_limit, 10))
+    risk_factors: list[dict[str, object]] = []
+    if inbox["review_count"]:
+        risk_factors.append({
+            "code": "memory_review_backlog",
+            "count": inbox["review_count"],
+            "message": f'{inbox["review_count"]} memory item(s) need review or cleanup.',
+        })
+    if captures["count"]:
+        risk_factors.append({
+            "code": "raw_capture_backlog",
+            "count": captures["count"],
+            "message": f'{captures["count"]} raw capture(s) are waiting for review.',
+        })
+    if captures["warning_count"]:
+        risk_factors.append({
+            "code": "capture_secret_warnings",
+            "count": captures["warning_count"],
+            "message": f'{captures["warning_count"]} raw capture(s) contain secret-looking values.',
+        })
+    project_arg = f', project="{project_name}"' if project_name else ""
+    return {
+        "status": "needs_attention" if risk_factors else "healthy",
+        "project": _core_normalize_project(project_name),
+        "profile": profile,
+        "inbox": inbox,
+        "captures": captures,
+        "risk_factors": risk_factors,
+        "next_actions": [
+            {
+                "label": "Review memory inbox",
+                "tool": "memory_inbox",
+                "command": f"memory_inbox(include_archived=true{project_arg})",
+                "recommended": bool(inbox["review_count"]),
+            },
+            {
+                "label": "Review raw captures",
+                "tool": "capture_inbox",
+                "command": f"capture_inbox({project_arg.lstrip(', ')})" if project_arg else "capture_inbox()",
+                "recommended": bool(captures["count"]),
+            },
+            {
+                "label": "Explain a memory",
+                "tool": "explain_memory",
+                "command": 'explain_memory(identifier="<memory-name>")',
+                "recommended": False,
+            },
+        ],
+    }
+
+
 def _recall_memories(
     query: str,
     limit: int = 10,
@@ -933,6 +989,16 @@ def memory_profile(limit: int = 10, project: str = "") -> str:
     """
     limit = _parse_limit(limit, default=10)
     return json.dumps(_memory_profile(limit=limit, project=project), ensure_ascii=False)
+
+
+@mcp.tool()
+def memory_audit(limit: int = 10, project: str = "") -> str:
+    """Audit local memory health, review backlog, and raw capture state.
+
+    Use this when the user asks what Link knows, what needs attention, or
+    whether local agent memory is ready for use.
+    """
+    return json.dumps(_memory_audit(limit=limit, project=project), ensure_ascii=False)
 
 
 @mcp.tool()

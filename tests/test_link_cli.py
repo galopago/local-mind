@@ -522,6 +522,42 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Raw captures", text_out.getvalue())
         self.assertNotIn(fake_key, text_out.getvalue())
 
+    def test_memory_audit_reports_backlog_without_secret_values(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        fake_key = "sk-" + ("G" * 24)
+        with redirect_stdout(StringIO()):
+            link_cli.capture_session(
+                target,
+                f"Remember that memory audit should show capture risk. Test key {fake_key}",
+                title="Audit capture",
+                project="alpha",
+                json_output=True,
+            )
+
+        json_out = StringIO()
+        with redirect_stdout(json_out):
+            json_code = link_cli.memory_audit(target, project="alpha", json_output=True)
+        payload = json.loads(json_out.getvalue())
+
+        text_out = StringIO()
+        with redirect_stdout(text_out):
+            text_code = link_cli.memory_audit(target, project="alpha")
+
+        self.assertEqual(json_code, 0)
+        self.assertEqual(text_code, 0)
+        self.assertEqual(payload["status"], "needs_attention")
+        self.assertEqual(payload["project"], "alpha")
+        self.assertEqual(payload["captures"]["warning_count"], 1)
+        self.assertIn("capture_secret_warnings", [factor["code"] for factor in payload["risk_factors"]])
+        self.assertIn("memory-inbox", payload["next_actions"][0]["command"])
+        self.assertIn("capture-inbox", payload["next_actions"][1]["command"])
+        self.assertNotIn(fake_key, json_out.getvalue())
+        self.assertIn("Link memory audit", text_out.getvalue())
+        self.assertIn("needs_attention", text_out.getvalue())
+        self.assertNotIn(fake_key, text_out.getvalue())
+
     def test_capture_session_writes_raw_note_and_proposes_only(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

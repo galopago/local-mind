@@ -12,6 +12,7 @@ Usage:
   python link.py brief ["task or question"] [target]
   python link.py recall "query" [target]
   python link.py profile [target]
+  python link.py memory-audit [target]
   python link.py archive-memory <name-or-title> [target]
   python link.py restore-memory <name-or-title> [target]
   python link.py forget-memory <name-or-title> [target] --confirm
@@ -2608,6 +2609,102 @@ def profile(target: Path, limit: int = 10, project: str | None = None, json_outp
     return 0
 
 
+def _memory_audit_payload(target: Path, wiki_dir: Path, limit: int = 10, project: str | None = None) -> dict[str, object]:
+    project_name = project or _default_project(target)
+    profile_data = _memory_profile(wiki_dir, limit=limit, project=project_name)
+    inbox = _memory_inbox(wiki_dir, limit=limit, include_archived=True, project=project_name)
+    captures = _capture_review_summary(target, project=project_name, limit=min(limit, 10))
+    risk_factors: list[dict[str, object]] = []
+    if inbox["review_count"]:
+        risk_factors.append({
+            "code": "memory_review_backlog",
+            "count": inbox["review_count"],
+            "message": f'{inbox["review_count"]} memory item(s) need review or cleanup.',
+        })
+    if captures["count"]:
+        risk_factors.append({
+            "code": "raw_capture_backlog",
+            "count": captures["count"],
+            "message": f'{captures["count"]} raw capture(s) are waiting for review.',
+        })
+    if captures["warning_count"]:
+        risk_factors.append({
+            "code": "capture_secret_warnings",
+            "count": captures["warning_count"],
+            "message": f'{captures["warning_count"]} raw capture(s) contain secret-looking values.',
+        })
+
+    root = _resolve_link_root(target)
+    project_arg = f' --project "{project_name}"' if project_name else ""
+    next_actions = [
+        {
+            "label": "Review memory inbox",
+            "command": f'python3 link.py memory-inbox "{root}"{project_arg}',
+            "recommended": bool(inbox["review_count"]),
+        },
+        {
+            "label": "Review raw captures",
+            "command": f'python3 link.py capture-inbox "{root}"{project_arg}',
+            "recommended": bool(captures["count"]),
+        },
+        {
+            "label": "Run doctor",
+            "command": f'python3 link.py doctor "{root}"',
+            "recommended": not risk_factors,
+        },
+    ]
+    return {
+        "status": "needs_attention" if risk_factors else "healthy",
+        "project": _core_normalize_project(project_name),
+        "profile": profile_data,
+        "inbox": inbox,
+        "captures": captures,
+        "risk_factors": risk_factors,
+        "next_actions": next_actions,
+    }
+
+
+def memory_audit(target: Path, limit: int = 10, project: str | None = None, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    payload = _memory_audit_payload(target, wiki_dir, limit=limit, project=project)
+
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print(f"Link memory audit: {target}")
+    if payload["project"]:
+        print(f"Project: {payload['project']}")
+    print(f"Status: {payload['status']}")
+    print("")
+    profile_data = payload["profile"]
+    print(
+        f"Memories: {profile_data['memory_count']} total · "
+        f"{profile_data['active_count']} active · "
+        f"{profile_data['review_count']} need review"
+    )
+    print(
+        f"Raw captures: {payload['captures']['count']} saved · "
+        f"{payload['captures']['warning_count']} with secret-looking warnings"
+    )
+    if payload["risk_factors"]:
+        print("")
+        print("Needs attention")
+        for factor in payload["risk_factors"]:
+            print(f"- {factor['code']}: {factor['message']}")
+    print("")
+    print("Next actions")
+    for action in payload["next_actions"]:
+        marker = "recommended" if action["recommended"] else "optional"
+        print(f"- {action['label']} ({marker})")
+        print(f"  {action['command']}")
+    return 0
+
+
 def _check_link_mcp_import(python_cmd: str) -> dict[str, object]:
     code = (
         "import json, link_mcp; "
@@ -2900,6 +2997,12 @@ def main(argv: list[str] | None = None) -> int:
     profile_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
     profile_cmd.add_argument("--json", action="store_true", help="print machine-readable profile")
 
+    audit_cmd = sub.add_parser("memory-audit", help="audit memory health, review backlog, and raw captures")
+    audit_cmd.add_argument("target", nargs="?", default=".")
+    audit_cmd.add_argument("--limit", type=int, default=10)
+    audit_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
+    audit_cmd.add_argument("--json", action="store_true", help="print machine-readable audit")
+
     archive_cmd = sub.add_parser("archive-memory", help="archive a stale or unwanted memory")
     archive_cmd.add_argument("identifier", help="memory page name, title, or path")
     archive_cmd.add_argument("target", nargs="?", default=".")
@@ -3040,6 +3143,8 @@ def main(argv: list[str] | None = None) -> int:
         return brief(Path(args.target), query=args.query, limit=args.limit, project=args.project, json_output=args.json)
     if args.command == "profile":
         return profile(Path(args.target), limit=args.limit, project=args.project, json_output=args.json)
+    if args.command == "memory-audit":
+        return memory_audit(Path(args.target), limit=args.limit, project=args.project, json_output=args.json)
     if args.command == "archive-memory":
         return archive_memory(Path(args.target), args.identifier, reason=args.reason, json_output=args.json)
     if args.command == "restore-memory":

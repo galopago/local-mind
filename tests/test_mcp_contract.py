@@ -252,6 +252,26 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("Redact raw captures", "\n".join(payload["agent_guidance"]))
         self.assertNotIn(fake_key, raw_payload)
 
+    def test_memory_audit_contract(self):
+        fake_key = "sk-" + ("G" * 24)
+        capture = json.loads(self.server.capture_session(
+            f"Remember that MCP audit should show capture risk. Test key {fake_key}",
+            title="MCP audit capture",
+            project="alpha",
+        ))
+
+        raw_payload = self.server.memory_audit(project="alpha")
+        payload = json.loads(raw_payload)
+
+        self.assertTrue(capture["captured"])
+        self.assertEqual(payload["status"], "needs_attention")
+        self.assertEqual(payload["project"], "alpha")
+        self.assertEqual(payload["captures"]["warning_count"], 1)
+        self.assertIn("capture_secret_warnings", [factor["code"] for factor in payload["risk_factors"]])
+        self.assertEqual(payload["next_actions"][0]["tool"], "memory_inbox")
+        self.assertEqual(payload["next_actions"][1]["tool"], "capture_inbox")
+        self.assertNotIn(fake_key, raw_payload)
+
     def test_capture_session_contract(self):
         before_memories = list((self.target / "wiki/memories").glob("*.md"))
         fake_key = "sk-" + ("A" * 24)

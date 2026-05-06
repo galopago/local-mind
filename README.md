@@ -381,6 +381,7 @@ Most agents should start with:
 | Tool | Use it when |
 |------|-------------|
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory, review warnings, and saved capture status. |
+| `memory_audit` | You need one read-only health report for memory review backlog, raw captures, and next actions. |
 | `memory_profile` | You need to know what Link remembers about the user/project. |
 | `memory_inbox` | You need review items with the safest next action for each memory. |
 | `recall_memory` | You need preferences, decisions, facts, or project context. |
@@ -396,7 +397,7 @@ Most agents should start with:
 | `delete_capture` | The user explicitly confirms deleting a saved raw capture. |
 | `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
 
-Full tool set: `memory_brief`, `memory_profile`, `memory_inbox`, `review_memory`,
+Full tool set: `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
@@ -448,6 +449,7 @@ Common endpoints:
 | `python3 link.py redact-capture <capture> <dir>` | Replace secret-looking values in a saved raw capture and log labels/counts only. |
 | `python3 link.py delete-capture <capture> <dir> --confirm` | Delete a saved raw capture after explicit confirmation. |
 | `python3 link.py brief "task" <dir> [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
+| `python3 link.py memory-audit <dir> [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |
 | `python3 link.py recall "query" <dir> [--project slug]` | Search local agent memories. |
 | `python3 link.py profile <dir> [--project slug]` | Show what Link remembers by type, scope, status, and recency. |
 | `python3 link.py memory-inbox <dir> [--project slug]` | Show memories that need review or stronger metadata with next-step commands. |
