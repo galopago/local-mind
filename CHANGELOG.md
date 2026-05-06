@@ -57,6 +57,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added an explicit `system`/`dark`/`light` theme toggle for the local web UI; dark mode now uses a black page background.
 - Added a real MCP stdio smoke test for the built `link-mcp` wheel in CI.
 - Added release hygiene checks that protect the public agent instruction contract for `query_link`, `validate_wiki`, and `memory_brief`.
+- Changed CI to run on pull requests and manual dispatch only, preserving GitHub minutes for the develop-branch workflow.
 - Added Memory Dashboard next actions so the web UI and API surface the most important memory maintenance step.
 - Extracted shared memory proposal logic into `link_core` so CLI, HTTP, and MCP proposal behavior stays aligned.
 - Extracted shared raw capture path resolution and notes parsing into `link_core` so CLI and MCP capture operations use the same root-escape guard.
