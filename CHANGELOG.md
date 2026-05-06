@@ -84,6 +84,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Tightened README onboarding and release examples around Link's local memory product value.
 - Simplified onboarding docs and installed instructions around natural agent prompts and the short `link` command instead of path-heavy maintenance commands.
 - Moved the local UI theme control into a compact header utility above search so it no longer wraps awkwardly in the navigation row.
+- Reworked the local UI header into a clean brand/tools row with navigation tabs below it.
 - Fixed installer MCP setup reporting so failed upgrades no longer masquerade as success by reusing an unrelated older global `link-mcp`.
 - Fixed project-mode installer output so MCP wiki paths are absolute and next-step hints point at the project wiki instead of `~/link`.
 - Fixed search/context matching for natural queries against hyphenated page slugs, e.g. `local first software` now finds `local-first-software`.

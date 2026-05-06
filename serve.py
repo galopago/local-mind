@@ -877,15 +877,14 @@ a { color: var(--link); }
 a, p, li, code { overflow-wrap: anywhere; }
 a:hover { text-decoration: underline; }
 
-header { border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 24px;
-         display: flex; align-items: center; justify-content: space-between; gap: 14px;
-         flex-wrap: wrap; }
-header .logo { font-size: 24px; font-weight: bold; letter-spacing: 0; }
+header { border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 24px; }
+header .header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+header .logo { font-size: 24px; font-weight: bold; letter-spacing: 0; white-space: nowrap; flex: 0 0 auto; }
 header .logo a { color: var(--text-strong); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
 header .logo img { width: 28px; height: 28px; border-radius: 7px; flex: none; }
 header .logo small { font-weight: normal; font-size: 13px; color: var(--subtle); margin-left: 8px; }
-header nav { display: flex; gap: 16px; font-size: 14px; font-family: sans-serif; flex-wrap: wrap; min-width: 0; flex: 1 1 360px; align-items: center; }
-header .header-tools { display: grid; justify-items: end; gap: 6px; flex: 0 1 180px; min-width: 150px; }
+header nav { display: flex; gap: 10px 16px; font-size: 14px; font-family: sans-serif; flex-wrap: wrap; min-width: 0; align-items: center; }
+header .header-tools { display: grid; justify-items: end; gap: 7px; flex: 0 0 220px; min-width: 170px; max-width: 42vw; }
 header form { display: block; width: 100%; }
 header input { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; width: 100%; background: var(--surface); color: var(--text); }
 header .theme-toggle { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
@@ -1012,9 +1011,9 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--border
          font-size: 12px; color: var(--faint); font-family: sans-serif; }
 @media (max-width: 760px) {
   body { padding: 20px; }
-  header { align-items: flex-start; }
+  header .header-top { align-items: flex-start; }
   header nav { gap: 10px 14px; }
-  header .header-tools { justify-items: stretch; flex-basis: 100%; }
+  header .header-tools { justify-items: end; }
   header .theme-toggle { justify-self: end; }
   .home-stats { flex-wrap: wrap; gap: 14px 22px; }
   .product-lanes { grid-template-columns: minmax(0, 1fr); }
@@ -1024,6 +1023,11 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--border
   .graph-shell { grid-template-columns: 1fr; }
   #graph-canvas { min-height: 460px; }
   .graph-frame.is-fullscreen { padding: 12px; }
+}
+@media (max-width: 560px) {
+  header .header-top { flex-wrap: wrap; }
+  header .header-tools { flex-basis: 100%; max-width: none; justify-items: stretch; }
+  header .theme-toggle { justify-self: end; }
 }
 """
 
@@ -1166,7 +1170,17 @@ MEMORY_ACTION_JS = """
 
 def _header_html():
     return f"""<header>
-  <div class="logo"><a href="/"><img src="/logo.svg" alt="">Link</a><small>agent memory</small></div>
+  <div class="header-top">
+    <div class="logo"><a href="/"><img src="/logo.svg" alt="">Link</a><small>agent memory</small></div>
+    <div class="header-tools">
+      <button type="button" class="theme-toggle" data-theme-toggle>
+        <span class="theme-icon" aria-hidden="true"></span><span class="theme-text" data-theme-text>system</span>
+      </button>
+      <form action="/search" method="get">
+        <input type="text" name="q" placeholder="search... (/)" autocomplete="off" id="search-input">
+      </form>
+    </div>
+  </div>
   <nav>
     <a href="/">home</a>
     <a href="/brief">brief</a>
@@ -1179,14 +1193,6 @@ def _header_html():
     <a href="/all">all pages</a>
     <a href="/graph">graph</a>
   </nav>
-  <div class="header-tools">
-    <button type="button" class="theme-toggle" data-theme-toggle>
-      <span class="theme-icon" aria-hidden="true"></span><span class="theme-text" data-theme-text>system</span>
-    </button>
-    <form action="/search" method="get">
-      <input type="text" name="q" placeholder="search... (/)" autocomplete="off" id="search-input">
-    </form>
-  </div>
 </header>"""
 
 
