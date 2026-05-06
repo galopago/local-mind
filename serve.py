@@ -414,6 +414,71 @@ def _memory_dashboard(limit: int = 12, project: str | None = None) -> dict[str, 
     }
 
 
+def _memory_audit(limit: int = 10, project: str | None = None) -> dict[str, object]:
+    limit = max(1, min(limit, 50))
+    project_name = _core_normalize_project(project)
+    profile = _memory_profile(limit=limit, project=project_name)
+    inbox = _memory_inbox(limit=limit, include_archived=True, project=project_name)
+    captures = _capture_records(limit=min(limit, 10), project=project_name)
+    capture_warning_count = sum(1 for capture in captures if capture["warning_count"])
+    risk_factors: list[dict[str, object]] = []
+    if inbox["review_count"]:
+        risk_factors.append({
+            "code": "memory_review_backlog",
+            "count": inbox["review_count"],
+            "message": f'{inbox["review_count"]} memory item(s) need review or cleanup.',
+        })
+    if captures:
+        risk_factors.append({
+            "code": "raw_capture_backlog",
+            "count": len(captures),
+            "message": f"{len(captures)} raw capture(s) are waiting for review.",
+        })
+    if capture_warning_count:
+        risk_factors.append({
+            "code": "capture_secret_warnings",
+            "count": capture_warning_count,
+            "message": f"{capture_warning_count} raw capture(s) contain secret-looking values.",
+        })
+    project_query = f"?project={urllib.parse.quote(project_name, safe='')}" if project_name else ""
+    project_arg = f' --project "{project_name}"' if project_name else ""
+    return {
+        "status": "needs_attention" if risk_factors else "healthy",
+        "project": project_name,
+        "profile": profile,
+        "inbox": inbox,
+        "captures": {
+            "count": len(captures),
+            "warning_count": capture_warning_count,
+            "items": captures,
+        },
+        "risk_factors": risk_factors,
+        "next_actions": [
+            {
+                "label": "Review memory inbox",
+                "detail": "Review pending, stale, invalid, or underspecified memories.",
+                "href": f"/inbox{project_query}",
+                "command": f"python3 link.py memory-inbox .{project_arg}",
+                "recommended": bool(inbox["review_count"]),
+            },
+            {
+                "label": "Review raw captures",
+                "detail": "Accept, redact, or delete saved proposal-only raw captures.",
+                "href": f"/memory{project_query}",
+                "command": f"python3 link.py capture-inbox .{project_arg}",
+                "recommended": bool(captures),
+            },
+            {
+                "label": "Run doctor",
+                "detail": "Check graph, source, memory, raw capture, and secret hygiene.",
+                "href": "",
+                "command": "python3 link.py doctor .",
+                "recommended": not risk_factors,
+            },
+        ],
+    }
+
+
 def _json_for_script(data) -> str:
     """Serialize JSON for direct embedding inside a <script> tag."""
     return (
@@ -861,6 +926,7 @@ def _header_html():
   <nav>
     <a href="/">home</a>
     <a href="/memory">memory</a>
+    <a href="/audit">audit</a>
     <a href="/inbox">inbox</a>
     <a href="/profile">profile</a>
     <a href="/page/log">log</a>
@@ -1234,8 +1300,47 @@ def _render_profile(project: str | None = None):
     return _layout("Memory Profile", body)
 
 
-def _render_inbox():
-    inbox = _memory_inbox(limit=50)
+def _render_memory_audit(project: str | None = None):
+    audit = _memory_audit(limit=10, project=project)
+    profile = audit["profile"]
+    captures = audit["captures"]
+    stats = (
+        f'<div class="home-stats">'
+        f'<div class="stat"><span class="num">{profile["memory_count"]}</span><span class="label">memories</span></div>'
+        f'<div class="stat"><span class="num">{profile["active_count"]}</span><span class="label">active</span></div>'
+        f'<div class="stat"><span class="num">{profile["review_count"]}</span><span class="label">review</span></div>'
+        f'<div class="stat"><span class="num">{captures["count"]}</span><span class="label">captures</span></div>'
+        f'<div class="stat"><span class="num">{captures["warning_count"]}</span><span class="label">warnings</span></div>'
+        f'</div>'
+    )
+    risk_html = ""
+    if audit["risk_factors"]:
+        risk_html = "<h2>Needs attention</h2><ul class='memory-issues'>" + "".join(
+            f'<li><span class="severity">review</span> {html.escape(str(item["code"]))}: '
+            f'{html.escape(str(item["message"]))}</li>'
+            for item in audit["risk_factors"]
+        ) + "</ul>"
+    else:
+        risk_html = "<h2>Needs attention</h2><p>No memory audit risks detected.</p>"
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / audit</div>'
+        f'<h1>Memory Audit</h1>'
+        f'<div class="memory-profile">'
+        f'<p class="summary">Read-only health report for local agent memory, review backlog, raw captures, and safe next actions.</p>'
+        f'{"<p><strong>Project:</strong> " + html.escape(str(audit["project"])) + "</p>" if audit["project"] else ""}'
+        f'<p><strong>Status:</strong> {html.escape(str(audit["status"]))}</p>'
+        f'{stats}'
+        f'{risk_html}'
+        f'{_render_memory_next_actions(audit["next_actions"])}'
+        f'{_render_memory_section("Memory inbox sample", audit["inbox"]["items"], "No memory review items.", href="/inbox", include_issues=True)}'
+        f'{_render_capture_section(captures["items"])}'
+        f'</div>'
+    )
+    return _layout("Memory Audit", body)
+
+
+def _render_inbox(project: str | None = None):
+    inbox = _memory_inbox(limit=50, project=project)
     review_count = inbox["review_count"]
     stats = (
         f'<div class="home-stats">'
@@ -1287,6 +1392,7 @@ def _render_inbox():
         f'<h1>Memory Review Inbox</h1>'
         f'<div class="memory-profile">'
         f'<p class="summary">Memories that need confirmation, stronger metadata, or cleanup.</p>'
+        f'{"<p><strong>Project:</strong> " + html.escape(str(inbox["project"])) + "</p>" if inbox["project"] else ""}'
         f'{stats}'
         f'{severity_html}'
         f'{content}'
@@ -2064,8 +2170,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._ok(_render_home())
         elif path == "/memory":
             self._ok(_render_memory_dashboard(project=query.get("project", [""])[0]))
+        elif path == "/audit":
+            self._ok(_render_memory_audit(project=query.get("project", [""])[0]))
         elif path == "/inbox":
-            self._ok(_render_inbox())
+            self._ok(_render_inbox(project=query.get("project", [""])[0]))
         elif path == "/explain-memory":
             identifier = query.get("memory", [""])[0].strip() or query.get("name", [""])[0].strip()
             self._ok(_render_explain_memory(identifier))
@@ -2105,6 +2213,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": error}, status=400)
             else:
                 self._json(_memory_dashboard(limit=limit, project=query.get("project", [""])[0]))
+        elif path == "/api/memory-audit":
+            limit, error = _parse_search_limit(query.get("limit", ["10"])[0])
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                self._json(_memory_audit(limit=limit, project=query.get("project", [""])[0]))
         elif path == "/api/memory-inbox":
             limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
             if error:

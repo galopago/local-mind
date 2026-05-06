@@ -426,6 +426,7 @@ Common endpoints:
 |----------|-------------|
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |
+| `GET /api/memory-audit?project=<slug>` | Read-only memory health report with backlog, capture risks, and next actions. |
 | `GET /api/memory-profile?project=<slug>` | Counts and recent memories for the local memory profile. |
 | `GET /api/memory-inbox?project=<slug>` | Memories that need review or metadata cleanup. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |

@@ -79,6 +79,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("window.location.href = '/search?q=' + encodeURIComponent(q);", html)
         self.assertIn("data-theme-toggle", html)
         self.assertIn("localStorage.getItem('link-theme')", html)
+        self.assertIn('<a href="/audit">audit</a>', html)
 
     def test_css_has_mobile_overflow_guards(self):
         self.assertIn("* { box-sizing: border-box; margin: 0; padding: 0; }", serve.CSS)
@@ -303,6 +304,57 @@ class ServeTests(unittest.TestCase):
         self.assertIn("<h2>Actions</h2>", explain_html)
         self.assertIn("Next:</strong> Review", explain_html)
         self.assertIn("forget-memory", explain_html)
+
+    def test_memory_audit_page_and_api_report_backlog(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "memories/alpha-review.md",
+            (
+                "---\n"
+                "type: memory\n"
+                "title: \"Alpha review\"\n"
+                "memory_type: project\n"
+                "scope: project\n"
+                "project: \"alpha\"\n"
+                "status: active\n"
+                "date_captured: \"2026-05-05T00:00:00Z\"\n"
+                "source: \"unit test\"\n"
+                "review_status: pending\n"
+                "---\n\n"
+                "# Alpha review\n\n"
+                "> **TLDR:** Alpha memory needs review.\n"
+            ),
+        )
+        capture_dir = wiki.parent / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        fake_key = "sk-" + ("H" * 24)
+        (capture_dir / "alpha.md").write_text(
+            "---\n"
+            "title: \"Alpha capture\"\n"
+            "source_type: conversation\n"
+            "date_captured: \"2026-05-05T00:00:00Z\"\n"
+            "project: \"alpha\"\n"
+            "---\n\n"
+            "# Alpha capture\n\n"
+            "## Notes\n\n"
+            f"Remember that web audit reports capture risks. Test key {fake_key}\n",
+            encoding="utf-8",
+        )
+
+        audit = serve._memory_audit(project="alpha")
+        status, payload = run_handler("GET", "/api/memory-audit?project=alpha")
+        html = serve._render_memory_audit(project="alpha")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(audit["status"], "needs_attention")
+        self.assertEqual(payload["project"], "alpha")
+        self.assertEqual(payload["captures"]["warning_count"], 1)
+        self.assertIn("capture_secret_warnings", [item["code"] for item in payload["risk_factors"]])
+        self.assertIn("Memory Audit", html)
+        self.assertIn("memory-inbox", html)
+        self.assertIn("capture-inbox", html)
+        self.assertNotIn(fake_key, html)
 
     def test_memory_dashboard_filters_project_memory_and_captures(self):
         wiki = self.make_wiki()
