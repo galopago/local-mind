@@ -89,6 +89,7 @@ from link_core.memory import (
     resolve_memory_page as _core_resolve_memory_page,
     set_memory_status as _core_set_memory_status,
     slim_memory as _core_slim_memory,
+    slugify as _core_slugify,
     top_tags as _core_top_tags,
     update_memory_page as _core_update_memory_page,
     write_memory_page as _core_write_memory_page,
@@ -120,6 +121,13 @@ def _parse_limit(value, default: int = 20, max_limit: int = 50) -> int:
     except (TypeError, ValueError):
         return default
     return min(max(limit, 1), max_limit)
+
+
+def _default_project() -> str:
+    root = WIKI_DIR.parent
+    if (root / ".git").exists():
+        return _core_slugify(root.name, fallback="")
+    return ""
 
 
 def _wiki_mtime() -> float:
@@ -196,36 +204,58 @@ def _recent_memories(records: list[dict[str, object]]) -> list[dict[str, object]
     return _core_recent_memories(records)
 
 
-def _memory_profile(limit: int = 10) -> dict[str, object]:
-    return _core_memory_profile(_memory_records(), limit=limit, review_command="review_memory")
+def _resolve_project(project: str = "") -> str:
+    return _clean_text_input(project) or _default_project()
 
 
-def _memory_brief(query: str = "", limit: int = 6) -> dict[str, object]:
+def _memory_profile(limit: int = 10, project: str = "") -> dict[str, object]:
+    return _core_memory_profile(
+        _memory_records(),
+        limit=limit,
+        review_command="review_memory",
+        project=_resolve_project(project),
+    )
+
+
+def _memory_brief(query: str = "", limit: int = 6, project: str = "") -> dict[str, object]:
     return _core_memory_brief(
         _memory_records(),
         query=_clean_text_input(query, max_len=500),
         limit=limit,
         review_command="review_memory",
+        project=_resolve_project(project),
     )
 
 
-def _recall_memories(query: str, limit: int = 10, include_archived: bool = False) -> list[dict[str, object]]:
+def _recall_memories(
+    query: str,
+    limit: int = 10,
+    include_archived: bool = False,
+    project: str = "",
+) -> list[dict[str, object]]:
     query = _clean_text_input(query)
     return _core_recall_memories(
         _memory_records(),
         query,
         limit=limit,
         include_archived=include_archived,
+        project=_resolve_project(project),
     )
 
 
-def _propose_memories_from_text(text: str, source: str = "mcp", limit: int = 10) -> dict[str, object]:
+def _propose_memories_from_text(
+    text: str,
+    source: str = "mcp",
+    limit: int = 10,
+    project: str = "",
+) -> dict[str, object]:
     return _core_propose_memories_from_text(
         text,
         _memory_records(),
         source=source,
         limit=limit,
         writes_memory=False,
+        project=_resolve_project(project),
     )
 
 
@@ -284,6 +314,7 @@ def _update_memory_page(
     text: str,
     source: str = "mcp",
     allow_conflict: bool = False,
+    project: str = "",
 ) -> dict[str, object]:
     clean_text = _clean_text_input(text, max_len=4000)
     if not clean_text:
@@ -303,6 +334,7 @@ def _update_memory_page(
         records=_memory_records(),
         review_command="review_memory",
         allow_conflict=allow_conflict,
+        project=_resolve_project(project),
         log_writer=_append_log,
         rebuild_backlinks=rebuild_memory_backlinks,
     )
@@ -319,6 +351,7 @@ def _write_memory_page(
     source: str = "mcp",
     allow_duplicate: bool = False,
     allow_conflict: bool = False,
+    project: str = "",
 ) -> dict[str, object]:
     clean_text = _clean_text_input(text, max_len=4000)
     if not clean_text:
@@ -339,6 +372,7 @@ def _write_memory_page(
         tags=_clean_text_input(tags, max_len=500),
         source=_clean_text_input(source, max_len=500),
         timestamp=_utc_timestamp(),
+        project=_resolve_project(project),
         records=_memory_records(),
         allow_duplicate=allow_duplicate,
         allow_conflict=allow_conflict,
@@ -353,7 +387,7 @@ def _write_memory_page(
 # ── MCP Tools ─────────────────────────────────────────────────────────
 
 @mcp.tool()
-def memory_brief(query: str = "", limit: int = 6) -> str:
+def memory_brief(query: str = "", limit: int = 6, project: str = "") -> str:
     """Prime the agent with local memory before answering or coding.
 
     Call this at the start of a session or before a user task that may depend
@@ -362,7 +396,7 @@ def memory_brief(query: str = "", limit: int = 6) -> str:
     safe memory use.
     """
     limit = _parse_limit(limit, default=6, max_limit=20)
-    return json.dumps(_memory_brief(query=query, limit=limit), ensure_ascii=False)
+    return json.dumps(_memory_brief(query=query, limit=limit, project=project), ensure_ascii=False)
 
 
 @mcp.tool()
@@ -393,7 +427,7 @@ def search_wiki(query: str, limit: int = 20) -> str:
 
 
 @mcp.tool()
-def recall_memory(query: str, limit: int = 10, include_archived: bool = False) -> str:
+def recall_memory(query: str, limit: int = 10, include_archived: bool = False, project: str = "") -> str:
     """Search local agent memory pages first.
 
     Use this when the user asks about preferences, decisions, project context,
@@ -405,17 +439,19 @@ def recall_memory(query: str, limit: int = 10, include_archived: bool = False) -
     limit = _parse_limit(limit, default=10)
     if not query:
         return json.dumps({"error": "query required", "query": "", "count": 0, "memories": []})
-    memories = _recall_memories(query, limit=limit, include_archived=include_archived)
+    project_name = _resolve_project(project)
+    memories = _recall_memories(query, limit=limit, include_archived=include_archived, project=project_name)
     return json.dumps({
         "query": query,
         "count": len(memories),
         "include_archived": include_archived,
+        "project": project_name,
         "memories": memories,
     }, ensure_ascii=False)
 
 
 @mcp.tool()
-def propose_memories(text: str, source: str = "mcp", limit: int = 10) -> str:
+def propose_memories(text: str, source: str = "mcp", limit: int = 10, project: str = "") -> str:
     """Propose durable memories from chat or session notes without writing them.
 
     Returns conservative memory proposals with type, scope, confidence, reason,
@@ -427,11 +463,11 @@ def propose_memories(text: str, source: str = "mcp", limit: int = 10) -> str:
         return json.dumps({"proposed": False, "error": "text required", "count": 0, "proposals": []})
     source = _clean_text_input(source, max_len=500) or "mcp"
     limit = _parse_limit(limit, default=10, max_limit=20)
-    return json.dumps(_propose_memories_from_text(clean_text, source=source, limit=limit), ensure_ascii=False)
+    return json.dumps(_propose_memories_from_text(clean_text, source=source, limit=limit, project=project), ensure_ascii=False)
 
 
 @mcp.tool()
-def memory_profile(limit: int = 10) -> str:
+def memory_profile(limit: int = 10, project: str = "") -> str:
     """Summarize what Link currently remembers.
 
     Use this to inspect the local memory profile before doing personalized work.
@@ -439,7 +475,7 @@ def memory_profile(limit: int = 10) -> str:
     lists for preferences, decisions, and project context.
     """
     limit = _parse_limit(limit, default=10)
-    return json.dumps(_memory_profile(limit=limit), ensure_ascii=False)
+    return json.dumps(_memory_profile(limit=limit, project=project), ensure_ascii=False)
 
 
 @mcp.tool()
@@ -484,6 +520,7 @@ def update_memory(
     memory: str,
     source: str = "mcp",
     allow_conflict: bool = False,
+    project: str = "",
 ) -> str:
     """Merge new information into an existing active memory.
 
@@ -492,7 +529,13 @@ def update_memory(
     the memory body, logged, and marked pending review.
     """
     try:
-        result = _update_memory_page(identifier, memory, source=source, allow_conflict=allow_conflict)
+        result = _update_memory_page(
+            identifier,
+            memory,
+            source=source,
+            allow_conflict=allow_conflict,
+            project=project,
+        )
     except ValueError as exc:
         return json.dumps({"updated": False, "error": str(exc)})
     return json.dumps(result, ensure_ascii=False)
@@ -533,6 +576,7 @@ def remember_memory(
     source: str = "mcp",
     allow_duplicate: bool = False,
     allow_conflict: bool = False,
+    project: str = "",
 ) -> str:
     """Save a local agent memory as a Markdown page.
 
@@ -542,6 +586,7 @@ def remember_memory(
     Potential conflicts are refused unless allow_conflict is true.
     memory_type: preference, decision, project, fact, or note.
     scope: user, project, or global.
+    project: optional project key for project-scoped memories.
     tags: optional comma-separated tags.
     """
     try:
@@ -554,6 +599,7 @@ def remember_memory(
             source=source,
             allow_duplicate=allow_duplicate,
             allow_conflict=allow_conflict,
+            project=project,
         )
     except ValueError as exc:
         return json.dumps({"created": False, "error": str(exc)})

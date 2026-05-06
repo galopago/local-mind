@@ -114,6 +114,7 @@ from link_core.memory import (
     recent_memories as _core_recent_memories,
     resolve_memory_page as _core_resolve_memory_page,
     set_memory_status as _core_set_memory_status,
+    slugify as _core_slugify,
     top_tags as _core_top_tags,
     update_memory_page as _core_update_memory_page,
     write_memory_page as _core_write_memory_page,
@@ -711,6 +712,15 @@ def _resolve_wiki_dir(target: Path) -> Path:
     return target / "wiki"
 
 
+def _default_project(target: Path) -> str:
+    root = target.expanduser().resolve()
+    if root.name == "wiki":
+        root = root.parent
+    if (root / ".git").exists():
+        return _core_slugify(root.name, fallback="")
+    return ""
+
+
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -754,16 +764,22 @@ def _recent_memories(records: list[dict[str, object]]) -> list[dict[str, object]
     return _core_recent_memories(records)
 
 
-def _memory_profile(wiki_dir: Path, limit: int = 10) -> dict[str, object]:
-    return _core_memory_profile(_memory_records(wiki_dir), limit=limit, review_command="review-memory")
+def _memory_profile(wiki_dir: Path, limit: int = 10, project: str | None = None) -> dict[str, object]:
+    return _core_memory_profile(
+        _memory_records(wiki_dir),
+        limit=limit,
+        review_command="review-memory",
+        project=project,
+    )
 
 
-def _memory_brief(wiki_dir: Path, query: str = "", limit: int = 6) -> dict[str, object]:
+def _memory_brief(wiki_dir: Path, query: str = "", limit: int = 6, project: str | None = None) -> dict[str, object]:
     return _core_memory_brief(
         _memory_records(wiki_dir),
         query=query,
         limit=limit,
         review_command="review-memory",
+        project=project,
     )
 
 
@@ -772,12 +788,14 @@ def _recall_memories(
     query: str,
     limit: int = 10,
     include_archived: bool = False,
+    project: str | None = None,
 ) -> list[dict[str, object]]:
     return _core_recall_memories(
         _memory_records(wiki_dir),
         query,
         limit=limit,
         include_archived=include_archived,
+        project=project,
     )
 
 
@@ -786,6 +804,7 @@ def _propose_memories_from_text(
     text: str,
     source: str = "inline",
     limit: int = 10,
+    project: str | None = None,
 ) -> dict[str, object]:
     return _core_propose_memories_from_text(
         text,
@@ -793,6 +812,7 @@ def _propose_memories_from_text(
         source=source,
         limit=limit,
         writes_memory=False,
+        project=project,
     )
 
 
@@ -873,6 +893,7 @@ def _update_memory_page(
     source: str = "manual",
     timestamp: str | None = None,
     allow_conflict: bool = False,
+    project: str | None = None,
 ) -> dict[str, object]:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
@@ -896,6 +917,7 @@ def _update_memory_page(
         records=_memory_records(wiki_dir),
         review_command="review-memory",
         allow_conflict=allow_conflict,
+        project=project,
         log_writer=lambda ts, operation, description, lines: _append_log(
             wiki_dir,
             ts,
@@ -918,6 +940,7 @@ def _write_memory_page(
     timestamp: str | None = None,
     allow_duplicate: bool = False,
     allow_conflict: bool = False,
+    project: str | None = None,
 ) -> dict[str, object]:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
@@ -941,6 +964,7 @@ def _write_memory_page(
         tags=tags,
         source=source,
         timestamp=timestamp or _utc_timestamp(),
+        project=project,
         records=_memory_records(wiki_dir),
         allow_duplicate=allow_duplicate,
         allow_conflict=allow_conflict,
@@ -1451,6 +1475,7 @@ def remember(
     source: str = "manual",
     allow_duplicate: bool = False,
     allow_conflict: bool = False,
+    project: str | None = None,
     json_output: bool = False,
 ) -> int:
     if not text or not text.strip():
@@ -1467,6 +1492,7 @@ def remember(
             source=source,
             allow_duplicate=allow_duplicate,
             allow_conflict=allow_conflict,
+            project=project or _default_project(target),
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"Could not remember: {exc}", file=sys.stderr)
@@ -1517,6 +1543,8 @@ def remember(
     print(f"Path: {result['path']}")
     print(f"Type: {result['memory_type']}")
     print(f"Scope: {result['scope']}")
+    if result.get("project"):
+        print(f"Project: {result['project']}")
     print("")
     print("Next:")
     print(f"  python3 link.py recall \"{result['title']}\" .")
@@ -1543,6 +1571,7 @@ def propose_memories(
     target: Path,
     source_input: str,
     limit: int = 10,
+    project: str | None = None,
     json_output: bool = False,
 ) -> int:
     target = target.expanduser().resolve()
@@ -1559,6 +1588,7 @@ def propose_memories(
         text,
         source=source,
         limit=max(1, min(limit, 20)),
+        project=project or _default_project(target),
     )
 
     if json_output:
@@ -1567,6 +1597,8 @@ def propose_memories(
 
     print("Memory proposals")
     print(f"Source: {result['source']}")
+    if result.get("project"):
+        print(f"Project: {result['project']}")
     print(f"Count: {result['count']}")
     if not result["proposals"]:
         print("No durable memory candidates found.")
@@ -1575,6 +1607,8 @@ def propose_memories(
         print("")
         print(f"{index}. {proposal['title']} [{proposal['confidence']}]")
         print(f"   Type: {proposal['memory_type']} | Scope: {proposal['scope']}")
+        if proposal.get("project"):
+            print(f"   Project: {proposal['project']}")
         print(f"   Action: {proposal['suggested_action']}")
         print(f"   Memory: {proposal['memory']}")
         if proposal["duplicate_candidates"]:
@@ -1592,6 +1626,7 @@ def update_memory(
     text: str,
     source: str = "manual",
     allow_conflict: bool = False,
+    project: str | None = None,
     json_output: bool = False,
 ) -> int:
     if not text or not text.strip():
@@ -1604,6 +1639,7 @@ def update_memory(
             text,
             source=source,
             allow_conflict=allow_conflict,
+            project=project or _default_project(target),
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"Could not update memory: {exc}", file=sys.stderr)
@@ -1649,24 +1685,35 @@ def recall(
     limit: int = 10,
     json_output: bool = False,
     include_archived: bool = False,
+    project: str | None = None,
 ) -> int:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
-    results = _recall_memories(wiki_dir, query, limit=limit, include_archived=include_archived)
+    project_name = project or _default_project(target)
+    results = _recall_memories(
+        wiki_dir,
+        query,
+        limit=limit,
+        include_archived=include_archived,
+        project=project_name,
+    )
 
     if json_output:
         print(json.dumps({
             "query": query,
             "count": len(results),
             "include_archived": include_archived,
+            "project": project_name,
             "memories": results,
         }, indent=2))
         return 0
 
     print(f"Link memory recall: {query}")
+    if project_name:
+        print(f"Project: {project_name}")
     if include_archived:
         print("Including archived/stale memories")
     print("")
@@ -1885,13 +1932,20 @@ def _print_memory_list(title: str, records: list[dict[str, object]], empty: str 
             print(f"  {summary}")
 
 
-def brief(target: Path, query: str = "", limit: int = 6, json_output: bool = False) -> int:
+def brief(
+    target: Path,
+    query: str = "",
+    limit: int = 6,
+    project: str | None = None,
+    json_output: bool = False,
+) -> int:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
-    payload = _memory_brief(wiki_dir, query=query, limit=limit)
+    project_name = project or _default_project(target)
+    payload = _memory_brief(wiki_dir, query=query, limit=limit, project=project_name)
 
     if json_output:
         print(json.dumps(payload, indent=2))
@@ -1901,6 +1955,8 @@ def brief(target: Path, query: str = "", limit: int = 6, json_output: bool = Fal
     if query:
         title += f": {query}"
     print(title)
+    if project_name:
+        print(f"Project: {project_name}")
     print("")
     profile_data = payload["profile"]
     print(
@@ -1927,19 +1983,22 @@ def brief(target: Path, query: str = "", limit: int = 6, json_output: bool = Fal
     return 0
 
 
-def profile(target: Path, limit: int = 10, json_output: bool = False) -> int:
+def profile(target: Path, limit: int = 10, project: str | None = None, json_output: bool = False) -> int:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
-    profile_data = _memory_profile(wiki_dir, limit=limit)
+    project_name = project or _default_project(target)
+    profile_data = _memory_profile(wiki_dir, limit=limit, project=project_name)
 
     if json_output:
         print(json.dumps(profile_data, indent=2))
         return 0
 
     print(f"Link memory profile: {target}")
+    if project_name:
+        print(f"Project: {project_name}")
     print("")
     memory_count = profile_data["memory_count"]
     active_count = profile_data["active_count"]
@@ -1947,6 +2006,8 @@ def profile(target: Path, limit: int = 10, json_output: bool = False) -> int:
     print(f"{memory_count} memor{'y' if memory_count == 1 else 'ies'} · {active_count} active · {review_count} need review")
     print(f"Types: {_format_counts(profile_data['by_type'])}")
     print(f"Scopes: {_format_counts(profile_data['by_scope'])}")
+    if profile_data["by_project"]:
+        print(f"Projects: {_format_counts(profile_data['by_project'])}")
     print(f"Status: {_format_counts(profile_data['by_status'])}")
     tags = ", ".join(
         f"{item['tag']} ({item['count']})"
@@ -2187,6 +2248,7 @@ def main(argv: list[str] | None = None) -> int:
     remember_cmd.add_argument("--scope", choices=MEMORY_SCOPES, default="user")
     remember_cmd.add_argument("--tags", default=None, help="comma-separated tags")
     remember_cmd.add_argument("--source", default="manual", help="where this memory came from")
+    remember_cmd.add_argument("--project", default=None, help="project key for project-scoped memories")
     remember_cmd.add_argument("--allow-duplicate", action="store_true", help="create a new memory even if a strong duplicate exists")
     remember_cmd.add_argument("--allow-conflict", action="store_true", help="create a memory even if it may conflict with an active memory")
     remember_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
@@ -2195,6 +2257,7 @@ def main(argv: list[str] | None = None) -> int:
     propose_cmd.add_argument("source_input", help="text or path to a note/session file")
     propose_cmd.add_argument("target", nargs="?", default=".")
     propose_cmd.add_argument("--limit", type=int, default=10)
+    propose_cmd.add_argument("--project", default=None, help="project key for duplicate/conflict checks")
     propose_cmd.add_argument("--json", action="store_true", help="print machine-readable proposals")
 
     update_memory_cmd = sub.add_parser("update-memory", help="merge new text into an existing memory")
@@ -2202,6 +2265,7 @@ def main(argv: list[str] | None = None) -> int:
     update_memory_cmd.add_argument("text", help="new memory text to merge")
     update_memory_cmd.add_argument("target", nargs="?", default=".")
     update_memory_cmd.add_argument("--source", default="manual", help="where this update came from")
+    update_memory_cmd.add_argument("--project", default=None, help="project key for conflict checks")
     update_memory_cmd.add_argument("--allow-conflict", action="store_true", help="update even if the text may conflict with another active memory")
     update_memory_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
@@ -2210,17 +2274,20 @@ def main(argv: list[str] | None = None) -> int:
     recall_cmd.add_argument("target", nargs="?", default=".")
     recall_cmd.add_argument("--limit", type=int, default=10)
     recall_cmd.add_argument("--include-archived", action="store_true", help="include archived and stale memories")
+    recall_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
     recall_cmd.add_argument("--json", action="store_true", help="print machine-readable results")
 
     brief_cmd = sub.add_parser("brief", help="prime an agent with relevant local memory")
     brief_cmd.add_argument("query", nargs="?", default="", help="optional task or question to retrieve memory for")
     brief_cmd.add_argument("target", nargs="?", default=".")
     brief_cmd.add_argument("--limit", type=int, default=6)
+    brief_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
     brief_cmd.add_argument("--json", action="store_true", help="print machine-readable memory brief")
 
     profile_cmd = sub.add_parser("profile", help="show what Link remembers")
     profile_cmd.add_argument("target", nargs="?", default=".")
     profile_cmd.add_argument("--limit", type=int, default=10)
+    profile_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
     profile_cmd.add_argument("--json", action="store_true", help="print machine-readable profile")
 
     archive_cmd = sub.add_parser("archive-memory", help="archive a stale or unwanted memory")
@@ -2276,6 +2343,7 @@ def main(argv: list[str] | None = None) -> int:
             scope=args.scope,
             tags=args.tags,
             source=args.source,
+            project=args.project,
             allow_duplicate=args.allow_duplicate,
             allow_conflict=args.allow_conflict,
             json_output=args.json,
@@ -2285,6 +2353,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.target),
             args.source_input,
             limit=args.limit,
+            project=args.project,
             json_output=args.json,
         )
     if args.command == "update-memory":
@@ -2294,6 +2363,7 @@ def main(argv: list[str] | None = None) -> int:
             args.text,
             source=args.source,
             allow_conflict=args.allow_conflict,
+            project=args.project,
             json_output=args.json,
         )
     if args.command == "recall":
@@ -2303,11 +2373,12 @@ def main(argv: list[str] | None = None) -> int:
             limit=args.limit,
             json_output=args.json,
             include_archived=args.include_archived,
+            project=args.project,
         )
     if args.command == "brief":
-        return brief(Path(args.target), query=args.query, limit=args.limit, json_output=args.json)
+        return brief(Path(args.target), query=args.query, limit=args.limit, project=args.project, json_output=args.json)
     if args.command == "profile":
-        return profile(Path(args.target), limit=args.limit, json_output=args.json)
+        return profile(Path(args.target), limit=args.limit, project=args.project, json_output=args.json)
     if args.command == "archive-memory":
         return archive_memory(Path(args.target), args.identifier, reason=args.reason, json_output=args.json)
     if args.command == "restore-memory":

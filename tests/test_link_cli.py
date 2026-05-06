@@ -355,6 +355,37 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["count"], 2)
         self.assertEqual(payload["memories"][0]["name"], "local-memory-preference")
 
+    def test_recall_json_filters_project(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.remember(
+                target,
+                "Project uses alpha API for imports.",
+                title="Alpha API imports",
+                memory_type="project",
+                scope="project",
+                project="alpha",
+            )
+            link_cli.remember(
+                target,
+                "Project uses beta API for imports.",
+                title="Beta API imports",
+                memory_type="project",
+                scope="project",
+                project="beta",
+            )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.recall(target, "API imports", project="alpha", json_output=True)
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["project"], "alpha")
+        self.assertEqual([item["name"] for item in payload["memories"]], ["alpha-api-imports"])
+
     def test_profile_summarizes_memories(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

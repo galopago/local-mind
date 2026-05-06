@@ -81,15 +81,15 @@ Custom wiki path:
 
 | Tool | Description |
 |------|-------------|
-| `memory_brief(query?, limit?)` | Prime the agent before answering or coding with profile counts, relevant memories, review warnings, and safe memory rules. |
-| `memory_profile(limit?)` | Summarize what Link remembers by type, scope, status, recency, preferences, decisions, and project context. |
+| `memory_brief(query?, limit?, project?)` | Prime the agent before answering or coding with profile counts, relevant memories, review warnings, and safe memory rules. |
+| `memory_profile(limit?, project?)` | Summarize what Link remembers by type, scope, status, recency, preferences, decisions, and project context. |
 | `memory_inbox(limit?, include_archived?)` | List memories that need user review, cleanup, or stronger metadata with primary actions and tool-call hints. |
 | `review_memory(identifier, note?)` | Mark a confirmed memory as reviewed. |
 | `explain_memory(identifier)` | Explain provenance, lifecycle, graph links, review issues, and recall readiness for one memory. |
-| `recall_memory(query, limit?, include_archived?)` | Search durable local memories for preferences, decisions, and project context. |
-| `remember_memory(memory, title?, memory_type?, scope?, tags?, source?, allow_duplicate?, allow_conflict?)` | Save an explicit user-approved local memory under `wiki/memories/`; strong duplicates and likely conflicts require explicit override. |
-| `propose_memories(text, source?, limit?)` | Propose durable memories from chat/session notes without writing them. |
-| `update_memory(identifier, memory, source?, allow_conflict?)` | Merge new information into an existing memory, blocking likely conflicts with other active memories by default. |
+| `recall_memory(query, limit?, include_archived?, project?)` | Search durable local memories for preferences, decisions, and project context. |
+| `remember_memory(memory, title?, memory_type?, scope?, tags?, source?, allow_duplicate?, allow_conflict?, project?)` | Save an explicit user-approved local memory under `wiki/memories/`; strong duplicates and likely conflicts require explicit override. |
+| `propose_memories(text, source?, limit?, project?)` | Propose durable memories from chat/session notes without writing them. |
+| `update_memory(identifier, memory, source?, allow_conflict?, project?)` | Merge new information into an existing memory, blocking likely conflicts with other active memories by default. |
 | `archive_memory(identifier, reason?)` | Archive stale or wrong memory without deleting the Markdown page. |
 | `restore_memory(identifier)` | Restore archived memory to active status. |
 | `search_wiki(query, limit?)` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets. |
@@ -99,7 +99,7 @@ Custom wiki path:
 | `get_graph()` | All nodes + edges for graph reasoning. |
 | `rebuild_backlinks()` | Rebuild `_backlinks.json` after ingest or lint. |
 
-Start with `memory_brief`, passing the user's task as `query` when available. Use `memory_profile` to inspect the user/project memory shape, `memory_inbox` to find memories needing human review and the primary action for each item, `explain_memory` to audit why a memory exists, then `recall_memory` for focused preferences, decisions, and project context. Use `propose_memories` for long chat/session notes; it only returns candidates. If `remember_memory` returns duplicate candidates, use `update_memory` on the existing memory unless the user confirms a separate memory. If it returns conflict candidates, ask the user whether to update or archive the older memory before forcing a conflict. Use `archive_memory`, not deletion, when a memory is stale or wrong. Use `get_context` for source-backed topic answers — one call returns the primary page plus all related pages via graph traversal.
+Start with `memory_brief`, passing the user's task as `query` when available. Pass `project` for repo-specific work so Link returns broad user/global memory plus that project's memory, while keeping other explicit projects out of recall and duplicate/conflict checks. Use `memory_profile` to inspect the user/project memory shape, `memory_inbox` to find memories needing human review and the primary action for each item, `explain_memory` to audit why a memory exists, then `recall_memory` for focused preferences, decisions, and project context. Use `propose_memories` for long chat/session notes; it only returns candidates. If `remember_memory` returns duplicate candidates, use `update_memory` on the existing memory unless the user confirms a separate memory. If it returns conflict candidates, ask the user whether to update or archive the older memory before forcing a conflict. Use `archive_memory`, not deletion, when a memory is stale or wrong. Use `get_context` for source-backed topic answers — one call returns the primary page plus all related pages via graph traversal.
 
 ## Wiki location
 

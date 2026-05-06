@@ -102,6 +102,10 @@ def slugify(value: str, fallback: str = "memory") -> str:
     return slug or fallback
 
 
+def normalize_project(value: str | None) -> str:
+    return slugify(value or "", fallback="")
+
+
 def memory_title(text: str, explicit_title: str | None = None) -> str:
     if explicit_title and explicit_title.strip():
         return explicit_title.strip()
@@ -177,6 +181,16 @@ def is_active_memory(record: Mapping[str, object]) -> bool:
     return str(record.get("status") or "active").lower() not in {"archived", "stale"}
 
 
+def memory_visible_for_project(record: Mapping[str, object], project: str | None = None) -> bool:
+    project_name = normalize_project(project)
+    if not project_name:
+        return True
+    if str(record.get("scope") or "").lower() != "project":
+        return True
+    record_project = normalize_project(str(record.get("project") or ""))
+    return not record_project or record_project == project_name
+
+
 def extract_tldr(body: str) -> str:
     match = re.search(r">\s*\*\*TLDR:\*\*\s*(.+)", body)
     return match.group(1).strip() if match else ""
@@ -212,6 +226,7 @@ def memory_records(wiki_dir: Path, include_body: bool = True) -> list[dict[str, 
             "title": title,
             "memory_type": meta.get("memory_type") or "note",
             "scope": meta.get("scope") or "user",
+            "project": normalize_project(str(meta.get("project", ""))),
             "status": meta.get("status") or "active",
             "date_captured": meta.get("date_captured", ""),
             "updated_at": meta.get("updated_at", ""),
@@ -842,6 +857,7 @@ def update_memory_page(
     records: Iterable[Mapping[str, object]] | None = None,
     review_command: str = "review-memory",
     allow_conflict: bool = False,
+    project: str | None = None,
     log_writer: MemoryLogWriter | None = None,
     rebuild_backlinks: BacklinkRebuilder | None = None,
 ) -> dict[str, object]:
@@ -862,6 +878,7 @@ def update_memory_page(
         str(record.get("title") or ""),
         str(record.get("memory_type") or "note"),
         str(record.get("scope") or "user"),
+        project=project or str(record.get("project") or ""),
         exclude_names=[str(record.get("name") or "")],
     )
     if conflict_candidates and not allow_conflict:
@@ -872,6 +889,7 @@ def update_memory_page(
             "name": record["name"],
             "path": record["path"],
             "title": record["title"],
+            "project": record.get("project", ""),
             "conflict_candidates": conflict_candidates,
         }
 
@@ -912,6 +930,7 @@ def update_memory_page(
         "name": updated_record["name"],
         "path": updated_record["path"],
         "title": updated_record["title"],
+        "project": updated_record.get("project", ""),
         "previous_review_status": previous_review_status,
         "review_status": updated_record.get("review_status", "pending"),
         "updated_at": timestamp,
@@ -934,6 +953,7 @@ def write_memory_page(
     tags: str | None,
     source: str,
     timestamp: str,
+    project: str | None = None,
     records: Iterable[Mapping[str, object]] | None = None,
     allow_duplicate: bool = False,
     allow_conflict: bool = False,
@@ -949,6 +969,7 @@ def write_memory_page(
     if not clean_text:
         raise ValueError("memory text required")
     clean_source = source.strip() if source is not None else ""
+    clean_project = normalize_project(project) if scope == "project" else ""
     memory_title_value = memory_title(clean_text, title)
     summary = clean_text.splitlines()[0].strip()
     if len(summary) > 180:
@@ -960,6 +981,7 @@ def write_memory_page(
         title,
         memory_type,
         scope,
+        project=clean_project,
     )
     if duplicate_candidates and not allow_duplicate:
         return {
@@ -969,6 +991,7 @@ def write_memory_page(
             "title": memory_title_value,
             "memory_type": memory_type,
             "scope": scope,
+            "project": clean_project,
             "candidates": duplicate_candidates,
         }
     conflict_candidates = memory_conflict_candidates(
@@ -977,6 +1000,7 @@ def write_memory_page(
         title,
         memory_type,
         scope,
+        project=clean_project,
     )
     if conflict_candidates and not allow_conflict:
         return {
@@ -986,6 +1010,7 @@ def write_memory_page(
             "title": memory_title_value,
             "memory_type": memory_type,
             "scope": scope,
+            "project": clean_project,
             "conflict_candidates": conflict_candidates,
         }
 
@@ -998,13 +1023,14 @@ def write_memory_page(
         slug_tag = slugify(tag, fallback="")
         if slug_tag and slug_tag not in tag_values:
             tag_values.append(slug_tag)
+    project_line = f'project: "{frontmatter_string(clean_project)}"\n' if clean_project else ""
 
     page = f"""---
 type: memory
 title: "{frontmatter_string(memory_title_value)}"
 memory_type: {memory_type}
 scope: {scope}
-status: active
+{project_line}status: active
 date_captured: "{timestamp}"
 source: "{frontmatter_string(clean_source)}"
 review_status: pending
@@ -1049,6 +1075,7 @@ tags: {yaml_list(tag_values)}
         "title": memory_title_value,
         "memory_type": memory_type,
         "scope": scope,
+        "project": clean_project,
         "backlinks_rebuilt": bool(backlinks_rebuilt),
         "duplicate_override": bool(duplicate_candidates and allow_duplicate),
         "duplicate_candidates": duplicate_candidates,
@@ -1143,9 +1170,15 @@ def memory_profile(
     records: Iterable[Mapping[str, object]],
     limit: int = 10,
     review_command: str = "review-memory",
+    project: str | None = None,
 ) -> dict[str, object]:
     limit = max(1, min(limit, 50))
-    record_list = [dict(record) for record in records]
+    project_name = normalize_project(project)
+    record_list = [
+        dict(record)
+        for record in records
+        if memory_visible_for_project(record, project_name)
+    ]
     active_records = [record for record in record_list if is_active_memory(record)]
     archived_records = [
         record for record in record_list
@@ -1164,8 +1197,18 @@ def memory_profile(
         "memory_count": len(record_list),
         "active_count": len(active_records),
         "review_count": memory_inbox(record_list, limit=limit, review_command=review_command)["review_count"],
+        "project": project_name,
         "by_type": count_values(record_list, "memory_type"),
         "by_scope": count_values(record_list, "scope"),
+        "by_project": count_values(
+            [
+                record
+                for record in record_list
+                if str(record.get("scope") or "") == "project"
+                and normalize_project(str(record.get("project") or ""))
+            ],
+            "project",
+        ),
         "by_status": count_values(record_list, "status"),
         "top_tags": top_tags(record_list),
         "recent": recent[:limit],
@@ -1181,12 +1224,18 @@ def memory_brief(
     query: str = "",
     limit: int = 6,
     review_command: str = "review-memory",
+    project: str | None = None,
 ) -> dict[str, object]:
     """Return the compact memory payload an agent should read before work."""
     limit = max(1, min(limit, 20))
     q = query.strip()
-    record_list = [dict(record) for record in records]
-    profile = memory_profile(record_list, limit=limit, review_command=review_command)
+    project_name = normalize_project(project)
+    record_list = [
+        dict(record)
+        for record in records
+        if memory_visible_for_project(record, project_name)
+    ]
+    profile = memory_profile(record_list, limit=limit, review_command=review_command, project=project_name)
     inbox = memory_inbox(record_list, limit=limit, review_command=review_command)
 
     if q:
@@ -1235,6 +1284,7 @@ def memory_brief(
 
     return {
         "query": q,
+        "project": project_name,
         "selection": selection,
         "profile": profile,
         "relevant_count": len(relevant),
@@ -1281,12 +1331,16 @@ def recall_memories(
     query: str,
     limit: int = 10,
     include_archived: bool = False,
+    project: str | None = None,
 ) -> list[dict[str, object]]:
     q = query.strip()
     if not q:
         return []
+    project_name = normalize_project(project)
     scored: list[tuple[int, dict[str, object]]] = []
     for record in records:
+        if not memory_visible_for_project(record, project_name):
+            continue
         if not include_archived and not is_active_memory(record):
             continue
         score = score_memory(record, q)
@@ -1304,6 +1358,7 @@ def memory_duplicate_candidates(
     title: str | None,
     memory_type: str,
     scope: str,
+    project: str | None = None,
     limit: int = 3,
 ) -> list[dict[str, object]]:
     title_value = memory_title(text, title)
@@ -1311,10 +1366,13 @@ def memory_duplicate_candidates(
     new_title = compact_memory_text(title_value)
     new_body = compact_memory_text(text)
     new_tokens = memory_tokens(f"{title_value} {text}")
+    project_name = normalize_project(project)
     candidates: list[tuple[int, dict[str, object]]] = []
 
     for record in records:
         if not is_active_memory(record):
+            continue
+        if scope == "project" and not memory_visible_for_project(record, project_name):
             continue
         reasons: list[str] = []
         score = 0
@@ -1366,6 +1424,7 @@ def memory_conflict_candidates(
     title: str | None,
     memory_type: str,
     scope: str,
+    project: str | None = None,
     limit: int = 3,
     exclude_names: Iterable[str] | None = None,
 ) -> list[dict[str, object]]:
@@ -1380,12 +1439,15 @@ def memory_conflict_candidates(
     new_negated = has_negation(new_text)
     new_groups = _extract_option_groups(new_text)
     new_pairs = _extract_preference_pairs(new_text)
+    project_name = normalize_project(project)
     excluded = {name for name in (exclude_names or []) if name}
     candidates: list[tuple[int, dict[str, object]]] = []
 
     for record in records:
         name = str(record.get("name") or "")
         if name in excluded or not is_active_memory(record):
+            continue
+        if scope == "project" and not memory_visible_for_project(record, project_name):
             continue
         record_type = str(record.get("memory_type") or "")
         record_scope = str(record.get("scope") or "")
@@ -1590,8 +1652,10 @@ def propose_memories_from_text(
     source: str = "inline",
     limit: int = 10,
     writes_memory: bool = False,
+    project: str | None = None,
 ) -> dict[str, object]:
     record_list = [dict(record) for record in records]
+    project_name = normalize_project(project)
     proposals: list[dict[str, object]] = []
     seen: set[str] = set()
     skipped = 0
@@ -1619,6 +1683,7 @@ def propose_memories_from_text(
             title,
             memory_type,
             scope,
+            project=project_name,
         )
         conflict_candidates = memory_conflict_candidates(
             record_list,
@@ -1626,6 +1691,7 @@ def propose_memories_from_text(
             title,
             memory_type,
             scope,
+            project=project_name,
         )
         if duplicate_candidates:
             suggested_action = "update-memory"
@@ -1638,6 +1704,7 @@ def propose_memories_from_text(
             "memory": memory,
             "memory_type": memory_type,
             "scope": scope,
+            "project": project_name if scope == "project" else "",
             "confidence": confidence_label(score),
             "confidence_score": score,
             "reason": classified["reason"],
@@ -1651,6 +1718,7 @@ def propose_memories_from_text(
     return {
         "proposed": True,
         "source": source,
+        "project": project_name,
         "count": len(proposals),
         "skipped_count": skipped,
         "proposals": proposals,

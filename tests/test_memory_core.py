@@ -39,6 +39,7 @@ class MemoryCoreTests(unittest.TestCase):
             "title: \"Prefer release branches\"\n"
             "memory_type: preference\n"
             "scope: project\n"
+            "project: \"Link Product\"\n"
             "status: active\n"
             "date_captured: \"2026-05-05T00:00:00Z\"\n"
             "source: \"unit test\"\n"
@@ -77,6 +78,9 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertIn("body", records[0])
         self.assertEqual(profile["memory_count"], 2)
         self.assertEqual(profile["active_count"], 1)
+        release_memory = next(record for record in records if record["name"] == "prefer-release-branches")
+        self.assertEqual(release_memory["project"], "link-product")
+        self.assertEqual(profile["by_project"], {"link-product": 1})
         self.assertEqual(profile["archived"][0]["name"], "old-branch-rule")
         self.assertEqual(brief["selection"], "query")
         self.assertEqual(brief["relevant_memories"][0]["name"], "prefer-release-branches")
@@ -135,6 +139,56 @@ class MemoryCoreTests(unittest.TestCase):
 
         self.assertEqual(inbox["items"][0]["primary_action"]["kind"], "edit_metadata")
         self.assertIn("wiki/memories/missing-source.md", inbox["items"][0]["primary_action"]["command"])
+
+    def test_recall_and_profile_filter_project_memories(self):
+        records = [
+            {
+                "name": "global-style",
+                "path": "wiki/memories/global-style.md",
+                "title": "Global style",
+                "memory_type": "preference",
+                "scope": "user",
+                "project": "",
+                "status": "active",
+                "tldr": "User prefers concise status updates.",
+                "snippet": "User prefers concise status updates.",
+                "body": "User prefers concise status updates.",
+            },
+            {
+                "name": "link-branching",
+                "path": "wiki/memories/link-branching.md",
+                "title": "Link branching",
+                "memory_type": "preference",
+                "scope": "project",
+                "project": "link",
+                "status": "active",
+                "tldr": "User prefers release branches for Link.",
+                "snippet": "User prefers release branches for Link.",
+                "body": "User prefers release branches for Link.",
+            },
+            {
+                "name": "other-branching",
+                "path": "wiki/memories/other-branching.md",
+                "title": "Other branching",
+                "memory_type": "preference",
+                "scope": "project",
+                "project": "other",
+                "status": "active",
+                "tldr": "User prefers develop branches for Other.",
+                "snippet": "User prefers develop branches for Other.",
+                "body": "User prefers develop branches for Other.",
+            },
+        ]
+
+        recalled = recall_memories(records, "branches", project="link")
+        profile = memory_profile(records, project="link")
+
+        self.assertEqual([record["name"] for record in recalled], ["link-branching"])
+        self.assertEqual(profile["project"], "link")
+        self.assertEqual(profile["memory_count"], 2)
+        self.assertEqual(profile["by_scope"]["user"], 1)
+        self.assertEqual(profile["by_scope"]["project"], 1)
+        self.assertEqual(profile["by_project"]["link"], 1)
 
     def test_proposals_are_duplicate_aware_and_write_free(self):
         records = [

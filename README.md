@@ -131,8 +131,9 @@ bash integrations/antigravity/install.sh   # Google Antigravity
 This creates `~/link/`, installs or upgrades `link-mcp`, writes lightweight agent
 instructions, and leaves existing wiki data untouched on reinstall.
 
-Use `--project` if you want memory scoped to the current repo instead of global
-memory under `~/link`.
+Use `--project` for a repo-local Link install. Project-scoped memories then get a
+project key, and recall/profile/brief include global user memory plus that
+project's memory.
 
 ### 2. Add One Source
 
@@ -309,16 +310,20 @@ ingest raw/notes.md into Link
 Remember preferences and decisions directly:
 
 ```bash
-python3 ~/link/link.py remember "User prefers feature branches for Link work." ~/link --title "Prefer feature branches" --type preference --scope project
-python3 ~/link/link.py recall "branch preference" ~/link
+python3 ~/link/link.py remember "User prefers feature branches for Link work." ~/link --title "Prefer feature branches" --type preference --scope project --project link
+python3 ~/link/link.py recall "branch preference" ~/link --project link
 python3 ~/link/link.py explain-memory prefer-feature-branches ~/link
-python3 ~/link/link.py update-memory prefer-feature-branches "Use focused branches for public PR work." ~/link
+python3 ~/link/link.py update-memory prefer-feature-branches "Use focused branches for public PR work." ~/link --project link
 python3 ~/link/link.py review-memory prefer-feature-branches ~/link --note "confirmed"
 ```
 
 If a new memory may contradict an active memory, Link reports conflict candidates
 instead of saving silently. Update or archive the old memory, or use
 `--allow-conflict` only when both memories should coexist.
+
+For project installs, Link infers the project key from the repo directory. For a
+global `~/link` wiki, pass `--project <slug>` when saving or recalling repo
+specific memories.
 
 Maintain the wiki:
 
@@ -365,6 +370,10 @@ Memory write tools return `duplicate_candidates` or `conflict_candidates` when
 the safer next step is review, update, or archive instead of creating another
 memory page.
 
+Project-aware tools accept an optional `project` argument. When set, Link returns
+broad user/global memory plus memories for that project, while keeping memories
+from other explicit projects out of recall and duplicate/conflict checks.
+
 ## HTTP API
 
 `serve.py` exposes Link locally while the web viewer is running.
@@ -395,15 +404,15 @@ Common endpoints:
 |---------|-------------|
 | `python3 link.py demo` | Create `./link-demo` with a pre-ingested sample wiki. |
 | `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
-| `python3 link.py remember "text" <dir>` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
-| `python3 link.py propose-memories <file-or-text> <dir>` | Propose durable memories from notes without writing them. |
-| `python3 link.py brief "task" <dir>` | Prime an agent with profile counts, relevant memories, review warnings, and safe memory rules. |
-| `python3 link.py recall "query" <dir>` | Search local agent memories. |
-| `python3 link.py profile <dir>` | Show what Link remembers by type, scope, status, and recency. |
+| `python3 link.py remember "text" <dir> [--project slug]` | Save a local agent memory; strong duplicates and likely conflicts are refused unless explicitly allowed. |
+| `python3 link.py propose-memories <file-or-text> <dir> [--project slug]` | Propose durable memories from notes without writing them. |
+| `python3 link.py brief "task" <dir> [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, and safe memory rules. |
+| `python3 link.py recall "query" <dir> [--project slug]` | Search local agent memories. |
+| `python3 link.py profile <dir> [--project slug]` | Show what Link remembers by type, scope, status, and recency. |
 | `python3 link.py memory-inbox <dir>` | Show memories that need review or stronger metadata with next-step commands. |
 | `python3 link.py review-memory <name> <dir>` | Mark a confirmed memory as reviewed. |
 | `python3 link.py explain-memory <name> <dir>` | Explain provenance, lifecycle, graph links, review issues, and recall readiness. |
-| `python3 link.py update-memory <name> "text" <dir>` | Merge new text into an existing memory, blocking likely conflicts with other active memories by default. |
+| `python3 link.py update-memory <name> "text" <dir> [--project slug]` | Merge new text into an existing memory, blocking likely conflicts with other active memories by default. |
 | `python3 link.py archive-memory <name> <dir>` | Reversibly hide a stale or wrong memory from default recall. |
 | `python3 link.py restore-memory <name> <dir>` | Restore an archived memory to active recall. |
 | `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, and secret-looking content. |

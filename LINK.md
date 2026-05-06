@@ -170,6 +170,7 @@ type: memory
 title: "Short Memory Title"
 memory_type: preference | decision | project | fact | note
 scope: user | project | global
+project: "optional-project-slug"
 status: active | stale | archived
 date_captured: "2026-04-09T14:30:00Z"
 updated_at: ""
@@ -286,6 +287,7 @@ Rules:
 - Keep memories specific and actionable. "User likes quality" is too vague; "User prefers release/* branches over codex/* branches" is useful.
 - Use `memory_type: preference` for user preferences, `decision` for choices made, `project` for project context, `fact` for stable facts, and `note` for everything else.
 - Use `scope: user` for broad personal preferences, `project` for the current project, and `global` for agent-wide principles.
+- For `scope: project`, include a project key when you know it. `link.py` infers this from repo-local installs; otherwise pass `--project <slug>` or MCP `project`.
 - At the start of a session or substantial task, run `python3 link.py brief "<task or question>" .` or MCP `memory_brief` when available. Treat this as the default way to prime yourself with local memory.
 - For long chat/session notes, run `python3 link.py propose-memories "<file-or-text>" .` first. Treat proposals as candidates only; do not write them until the human confirms.
 - Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.

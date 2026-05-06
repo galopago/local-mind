@@ -182,6 +182,33 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["memories"][0]["name"], "prefer-local-personal-memory")
         self.assertEqual(payload["memories"][0]["memory_type"], "preference")
 
+    def test_recall_memory_project_filter_contract(self):
+        alpha = json.loads(self.server.remember_memory(
+            "Project uses alpha API for imports.",
+            title="Alpha API imports",
+            memory_type="project",
+            scope="project",
+            project="alpha",
+        ))
+        beta = json.loads(self.server.remember_memory(
+            "Project uses beta API for imports.",
+            title="Beta API imports",
+            memory_type="project",
+            scope="project",
+            project="beta",
+        ))
+        recalled = json.loads(self.server.recall_memory("API imports", project="alpha"))
+        profile = json.loads(self.server.memory_profile(project="alpha"))
+
+        self.assertTrue(alpha["created"])
+        self.assertTrue(beta["created"])
+        self.assertEqual(alpha["project"], "alpha")
+        self.assertEqual(recalled["project"], "alpha")
+        self.assertEqual([memory["name"] for memory in recalled["memories"]], ["alpha-api-imports"])
+        self.assertEqual(profile["project"], "alpha")
+        self.assertIn("alpha", profile["by_project"])
+        self.assertNotIn("beta-api-imports", {memory["name"] for memory in profile["recent"]})
+
     def test_memory_profile_contract(self):
         payload = json.loads(self.server.memory_profile())
 
