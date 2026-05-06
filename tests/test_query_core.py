@@ -87,6 +87,64 @@ class QueryCoreTests(unittest.TestCase):
         self.assertLessEqual(len(payload["context_packet"]), 4)
         self.assertIn("why_selected", payload["context_packet"][0])
         self.assertIn("do not read the whole wiki", payload["agent_guidance"][0])
+        self.assertIn("budget_report", payload)
+        self.assertEqual(payload["follow_up"][0]["tool"], "get_context")
+
+    def test_query_link_reports_budget_overflow_and_followups(self):
+        root = Path(tempfile.mkdtemp(prefix="link-query-core-"))
+        wiki = root / "wiki"
+        wiki.mkdir()
+        write_page(wiki, "index.md", "# Index\n")
+        write_page(wiki, "log.md", "# Log\n")
+        for index in range(6):
+            write_page(
+                wiki,
+                f"concepts/agent-memory-{index}.md",
+                "---\n"
+                "type: concept\n"
+                f"title: Agent memory {index}\n"
+                "tags: [agents, memory]\n"
+                "---\n\n"
+                f"# Agent memory {index}\n\n"
+                "> **TLDR:** Agents use durable memory.\n\n"
+                "## Overview\n\n"
+                "Agent memory supports source-backed local recall.\n",
+            )
+        for index in range(4):
+            write_page(
+                wiki,
+                f"memories/prefer-local-memory-{index}.md",
+                "---\n"
+                "type: memory\n"
+                f"title: Prefer local memory {index}\n"
+                "memory_type: preference\n"
+                "scope: user\n"
+                "status: active\n"
+                "date_captured: \"2026-05-05T00:00:00Z\"\n"
+                "source: unit-test\n"
+                "review_status: reviewed\n"
+                "tags: [memory]\n"
+                "---\n\n"
+                f"# Prefer local memory {index}\n\n"
+                "> **TLDR:** User prefers local agent memory.\n\n"
+                "## Memory\n\nUser prefers local agent memory.\n",
+            )
+        (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki)), encoding="utf-8")
+
+        payload = query_link(
+            wiki,
+            "agent memory",
+            build_wiki_cache(wiki),
+            memory_records(wiki),
+            budget="small",
+        )
+
+        self.assertTrue(payload["budget_report"]["memories"]["has_more"])
+        self.assertTrue(payload["budget_report"]["wiki_search"]["has_more"])
+        self.assertLessEqual(payload["budget_report"]["memories"]["selected"], 3)
+        self.assertEqual(payload["follow_up"][0]["tool"], "query_link")
+        self.assertEqual(payload["follow_up"][0]["arguments"]["budget"], "medium")
+        self.assertIn("budget-limited", payload["agent_guidance"][1])
 
 
 if __name__ == "__main__":

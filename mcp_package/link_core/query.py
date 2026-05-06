@@ -155,6 +155,54 @@ def _compact_review(review: object, limit: int) -> dict[str, object]:
     }
 
 
+def _next_budget(current: str) -> str:
+    order = ["small", "medium", "large"]
+    try:
+        index = order.index(current)
+    except ValueError:
+        return "medium"
+    return order[min(index + 1, len(order) - 1)]
+
+
+def _budget_item(selected: int, limit: int, has_more: bool) -> dict[str, object]:
+    return {
+        "selected": selected,
+        "limit": limit,
+        "has_more": has_more,
+    }
+
+
+def _follow_up_actions(
+    query: str,
+    budget_name: str,
+    project: str,
+    primary: object,
+    budget_report: Mapping[str, Mapping[str, object]],
+) -> list[dict[str, object]]:
+    actions: list[dict[str, object]] = []
+    if any(bool(section.get("has_more")) for section in budget_report.values()):
+        args: dict[str, object] = {"query": query, "budget": _next_budget(budget_name)}
+        if project:
+            args["project"] = project
+        actions.append({
+            "when": "packet is relevant but too thin",
+            "tool": "query_link",
+            "arguments": args,
+        })
+    if primary:
+        actions.append({
+            "when": "need the full source-backed topic neighborhood",
+            "tool": "get_context",
+            "arguments": {"topic": primary},
+        })
+    actions.append({
+        "when": "need a different angle or exact page candidates",
+        "tool": "search_wiki",
+        "arguments": {"query": query, "limit": 10},
+    })
+    return actions
+
+
 def query_link(
     wiki_dir: Path,
     query: str,
@@ -186,15 +234,14 @@ def query_link(
             "context_packet": [],
         }
 
-    memories = [
-        _compact_memory(memory)
-        for memory in recall_memories(
-            record_list,
-            q,
-            limit=limits["memories"],
-            project=project_name,
-        )
-    ]
+    raw_memories = recall_memories(
+        record_list,
+        q,
+        limit=limits["memories"] + 1,
+        project=project_name,
+    )
+    memory_has_more = len(raw_memories) > limits["memories"]
+    memories = [_compact_memory(memory) for memory in raw_memories[: limits["memories"]]]
     brief = memory_brief(
         record_list,
         query=q,
@@ -202,17 +249,20 @@ def query_link(
         review_command=review_command,
         project=project_name,
     )
-    search_results = search_pages(q, cache, limit=limits["search_results"])
+    raw_search_results = search_pages(q, cache, limit=limits["search_results"] + 1)
+    search_has_more = len(raw_search_results) > limits["search_results"]
+    search_results = raw_search_results[: limits["search_results"]]
     context = context_for_topic(
         wiki_dir,
         q,
         cache,
-        limit=limits["context_pages"],
+        limit=limits["context_pages"] + 1,
     )
+    raw_context_pages = [page for page in context.get("pages", []) if isinstance(page, Mapping)]
+    context_has_more = len(raw_context_pages) > limits["context_pages"]
     pages = [
         _compact_page(page, limits["primary_chars"], limits["neighbor_chars"])
-        for page in context.get("pages", [])
-        if isinstance(page, Mapping)
+        for page in raw_context_pages[: limits["context_pages"]]
     ]
     packet = [*memories, *pages]
     mode_parts = []
@@ -231,6 +281,14 @@ def query_link(
     review = _compact_review(brief.get("review", {}), limit=limits["memories"])
     if review.get("count"):
         guidance.insert(2, "Some memories need review; treat provisional memories carefully.")
+    budget_report = {
+        "memories": _budget_item(len(memories), limits["memories"], memory_has_more),
+        "wiki_search": _budget_item(len(search_results), limits["search_results"], search_has_more),
+        "graph_context": _budget_item(len(pages), limits["context_pages"], context_has_more),
+        "context_packet": _budget_item(len(packet), limits["memories"] + limits["context_pages"], False),
+    }
+    if any(bool(section.get("has_more")) for section in budget_report.values()):
+        guidance.insert(1, "This packet is budget-limited; use follow_up instead of scanning files manually.")
 
     return {
         "query": q,
@@ -242,6 +300,14 @@ def query_link(
             "selection": "budgeted memory + ranked wiki + graph neighborhood",
             "limits": limits,
         },
+        "budget_report": budget_report,
+        "follow_up": _follow_up_actions(
+            q,
+            budget_name,
+            project_name,
+            context.get("primary", ""),
+            budget_report,
+        ),
         "memory": {
             "count": len(memories),
             "review": review,

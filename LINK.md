@@ -348,7 +348,7 @@ When the human adds a new source to `raw/` and asks you to process it:
 
 When the human asks a question:
 
-1. Start with the smart query path when available: MCP `query_link`, `python3 link.py query "<question>" .`, or `GET /api/query-link?q=<question>`. This returns a compact context packet with relevant memory, ranked wiki results, graph context, and selection reasons. Do not read the whole wiki unless the packet is insufficient.
+1. Start with the smart query path when available: MCP `query_link`, `python3 link.py query "<question>" .`, or `GET /api/query-link?q=<question>`. This returns a compact context packet with relevant memory, ranked wiki results, graph context, selection reasons, budget reports, and follow-up tool actions. Do not read the whole wiki unless the packet is insufficient; if it is budget-limited, use the returned `follow_up` action first.
 2. If the question only needs session priming or personal/project preferences, use `python3 link.py brief "<question>" .` or MCP `memory_brief`. Use `profile`/`memory_profile` and `recall`/`recall_memory` afterward only when you need deeper detail.
 3. **If you need full source-backed context for one topic:** call `GET /api/context?topic=<question>` or MCP `get_context` — returns the best matching page plus related pages via graph traversal.
 4. **If server/MCP is not available:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.

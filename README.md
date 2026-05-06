@@ -404,7 +404,7 @@ Most agents should start with:
 
 | Tool | Use it when |
 |------|-------------|
-| `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, and graph context without reading the whole wiki. |
+| `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, graph context, budget limits, and follow-up actions without reading the whole wiki. |
 | `validate_wiki` | You just ingested sources or substantially edited pages and need to verify page shape, links, and backlink freshness before reporting done. |
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory, review warnings, and saved capture status. |
 | `memory_audit` | You need one read-only health report for memory review backlog, raw captures, and next actions. |
@@ -458,7 +458,7 @@ Common endpoints:
 | `GET /api/memory-inbox?project=<slug>` | Memories that need review or metadata cleanup. |
 | `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, secret-warning labels, and review commands. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |
-| `GET /api/query-link?q=<query>&budget=small\|medium\|large` | Compact context packet with relevant memory, ranked wiki results, graph context, and selection reasons. |
+| `GET /api/query-link?q=<query>&budget=small\|medium\|large` | Compact context packet with relevant memory, ranked wiki results, graph context, budget reports, follow-up actions, and selection reasons. |
 | `GET /api/validate?strict=true` | Validate generated wiki pages; failed gates return HTTP 422 with structured findings. |
 | `POST /api/propose-memories` | Returns memory proposals without writing pages. |
 | `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; marks a memory reviewed. |

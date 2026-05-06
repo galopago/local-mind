@@ -123,6 +123,8 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["wiki"]["primary"], "agent-memory")
         self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-personal-memory")
         self.assertIn("why_selected", payload["context_packet"][0])
+        self.assertIn("budget_report", payload)
+        self.assertIn("follow_up", payload)
 
     def test_validate_wiki_contract(self):
         payload = json.loads(self.server.validate_wiki())

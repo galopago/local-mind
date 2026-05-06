@@ -436,6 +436,8 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["wiki"]["primary"], "agent-memory")
         self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-memory")
         self.assertIn("context_packet", payload)
+        self.assertIn("budget_report", payload)
+        self.assertIn("follow_up", payload)
 
     def test_memory_inbox_and_explain_render_action_commands(self):
         wiki = self.make_wiki()
