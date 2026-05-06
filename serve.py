@@ -245,13 +245,19 @@ def _memory_duplicate_candidates(
     )
 
 
-def _propose_memories_from_text(text: str, source: str = "http", limit: int = 10) -> dict[str, object]:
+def _propose_memories_from_text(
+    text: str,
+    source: str = "http",
+    limit: int = 10,
+    project: str | None = None,
+) -> dict[str, object]:
     return _core_propose_memories_from_text(
         text,
         _memory_records(),
         source=source,
         limit=limit,
         writes_memory=False,
+        project=project,
     )
 
 
@@ -940,6 +946,23 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .brief-form button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
                      border-radius: 4px; padding: 6px 10px; cursor: pointer; }
 .brief-form button:hover { background: var(--button-hover); }
+.proposal-form { display: grid; gap: 10px; margin: 16px 0; font-family: sans-serif; }
+.proposal-form textarea,
+.proposal-form input { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid var(--border);
+                       border-radius: 4px; background: var(--surface); color: var(--text); font: inherit; }
+.proposal-form textarea { min-height: 190px; resize: vertical; line-height: 1.45; }
+.proposal-controls { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 92px auto; gap: 8px; align-items: end; }
+.proposal-form label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+.proposal-form button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
+                        border-radius: 4px; padding: 8px 10px; cursor: pointer; font: inherit; }
+.proposal-form button:hover { background: var(--button-hover); }
+.proposal-status { min-height: 1.4em; color: var(--muted); font-family: sans-serif; }
+.proposal-results { display: grid; gap: 12px; margin-top: 14px; }
+.proposal-card { border: 1px solid var(--border-soft); border-radius: 6px; padding: 12px; background: var(--surface); min-width: 0; }
+.proposal-card h3 { margin-top: 0; font-size: 16px; }
+.proposal-warning { color: #8a6d3b; font-family: sans-serif; font-size: 13px; line-height: 1.45; }
+.proposal-command { display: block; margin-top: 10px; padding: 8px; background: var(--surface-code);
+                    border-radius: 4px; white-space: normal; overflow-wrap: anywhere; }
 .memory-issues { margin-top: 6px; }
 .memory-issues li { border: none; padding: 0; color: var(--muted); font-size: 13px; }
 .memory-issues .severity { font-family: sans-serif; font-size: 11px; text-transform: uppercase; color: #8a6d3b; }
@@ -1018,6 +1041,7 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--border
   .home-stats { flex-wrap: wrap; gap: 14px 22px; }
   .product-lanes { grid-template-columns: minmax(0, 1fr); }
   .memory-grid { grid-template-columns: minmax(0, 1fr); }
+  .proposal-controls { grid-template-columns: minmax(0, 1fr); }
   .memory-dashboard .section-heading { flex-wrap: wrap; }
   .memory-actions code, .memory-next code { word-break: break-word; }
   .graph-shell { grid-template-columns: 1fr; }
@@ -1168,6 +1192,105 @@ MEMORY_ACTION_JS = """
 """
 
 
+PROPOSAL_UI_JS = """
+(function() {
+  var form = document.querySelector('[data-proposal-form]');
+  if (!form) return;
+  var statusEl = document.querySelector('[data-proposal-status]');
+  var resultsEl = document.querySelector('[data-proposal-results]');
+
+  function setStatus(text) {
+    if (statusEl) statusEl.textContent = text || '';
+  }
+
+  function addText(parent, tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    node.textContent = text || '';
+    parent.appendChild(node);
+    return node;
+  }
+
+  function candidateNames(items) {
+    return (items || []).map(function(item) {
+      return item.name || item.title || '';
+    }).filter(Boolean).join(', ');
+  }
+
+  function approvalPrompt(proposal) {
+    var memory = proposal.memory || '';
+    if (proposal.suggested_action === 'update-memory' && proposal.duplicate_candidates && proposal.duplicate_candidates.length) {
+      var target = proposal.duplicate_candidates[0].name || proposal.duplicate_candidates[0].title || '<memory>';
+      return 'Approve by asking: update memory ' + target + ' with "' + memory + '"';
+    }
+    return 'Approve by asking: remember that ' + memory;
+  }
+
+  function renderProposals(data) {
+    if (!resultsEl) return;
+    resultsEl.textContent = '';
+    if (!data || data.error) {
+      addText(resultsEl, 'p', 'summary', data && data.error ? data.error : 'No response.');
+      return;
+    }
+    if (!data.proposals || !data.proposals.length) {
+      addText(resultsEl, 'p', 'summary', 'No durable memory candidates found. Keep this as source-backed wiki knowledge unless there is a clear preference, decision, or project fact.');
+      return;
+    }
+    data.proposals.forEach(function(proposal) {
+      var card = document.createElement('article');
+      card.className = 'proposal-card';
+      addText(card, 'h3', '', proposal.title || 'Memory proposal');
+      addText(card, 'div', 'memory-meta', [
+        proposal.memory_type || 'note',
+        proposal.scope || 'user',
+        proposal.confidence || 'unknown confidence',
+        proposal.suggested_action || 'remember'
+      ].filter(Boolean).join(' · '));
+      addText(card, 'p', 'summary', proposal.memory || '');
+      if (proposal.reason) addText(card, 'p', 'summary', proposal.reason);
+      var duplicates = candidateNames(proposal.duplicate_candidates);
+      if (duplicates) addText(card, 'p', 'proposal-warning', 'Possible duplicate: ' + duplicates);
+      var conflicts = candidateNames(proposal.conflict_candidates);
+      if (conflicts) addText(card, 'p', 'proposal-warning', 'Possible conflict: ' + conflicts);
+      var prompt = addText(card, 'code', 'proposal-command', approvalPrompt(proposal));
+      prompt.setAttribute('title', 'Copy this into your agent chat if you approve the memory.');
+      resultsEl.appendChild(card);
+    });
+  }
+
+  form.addEventListener('submit', async function(event) {
+    event.preventDefault();
+    var text = form.elements.text.value || '';
+    if (!text.trim()) {
+      setStatus('Paste source or session notes first.');
+      return;
+    }
+    setStatus('Proposing memories...');
+    if (resultsEl) resultsEl.textContent = '';
+    try {
+      var response = await fetch('/api/propose-memories', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          text: text,
+          source: form.elements.source.value || 'web proposal',
+          project: form.elements.project.value || '',
+          limit: form.elements.limit.value || '10'
+        })
+      });
+      var data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'proposal failed');
+      setStatus(data.count + ' proposal' + (data.count === 1 ? '' : 's') + ' found. Nothing was written.');
+      renderProposals(data);
+    } catch (error) {
+      setStatus(error.message || 'proposal failed');
+    }
+  });
+})();
+"""
+
+
 def _header_html():
     return f"""<header>
   <div class="header-top">
@@ -1184,6 +1307,7 @@ def _header_html():
   <nav>
     <a href="/">home</a>
     <a href="/brief">brief</a>
+    <a href="/propose">propose</a>
     <a href="/memory">memory</a>
     <a href="/audit">audit</a>
     <a href="/inbox">inbox</a>
@@ -1254,6 +1378,7 @@ document.addEventListener('keydown', function(e) {{
 </script>
 <script>{THEME_CONTROL_JS}</script>
 <script>{MEMORY_ACTION_JS}</script>
+<script>{PROPOSAL_UI_JS}</script>
 </body>
 </html>"""
 
@@ -1699,6 +1824,31 @@ def _render_captures(project: str | None = None):
         f'</div>'
     )
     return _layout("Raw Capture Inbox", body)
+
+
+def _render_propose(project: str | None = None):
+    project_value = html.escape(str(project or ""), quote=True)
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / propose</div>'
+        f'<h1>Propose Memories</h1>'
+        f'<p class="summary">Paste source notes, session notes, or a raw excerpt. Link returns memory candidates without writing anything.</p>'
+        f'<div class="memory-next"><strong>Trust rule</strong>'
+        f'<p>Source-backed wiki knowledge and durable agent memory are separate. Save only preferences, decisions, or project facts you approve.</p></div>'
+        f'<form class="proposal-form" data-proposal-form>'
+        f'<label>Source or session notes'
+        f'<textarea name="text" placeholder="Paste notes here. Example: I prefer short release notes. We decided to keep Link local-first."></textarea>'
+        f'</label>'
+        f'<div class="proposal-controls">'
+        f'<label>Source label<input name="source" value="web proposal" autocomplete="off"></label>'
+        f'<label>Project<input name="project" value="{project_value}" placeholder="optional" autocomplete="off"></label>'
+        f'<label>Limit<input name="limit" type="number" min="1" max="20" value="10"></label>'
+        f'<button type="submit">Propose</button>'
+        f'</div>'
+        f'<div class="proposal-status" data-proposal-status aria-live="polite"></div>'
+        f'</form>'
+        f'<section class="proposal-results" data-proposal-results aria-live="polite"></section>'
+    )
+    return _layout("Propose Memories", body)
 
 
 def _render_inbox(project: str | None = None):
@@ -2528,6 +2678,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 text[:MAX_POST_BYTES],
                 source=source,
                 limit=min(limit, 20),
+                project=str(payload.get("project") or ""),
             )
             self._json(result)
             return
@@ -2583,6 +2734,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/brief":
             brief_query = query.get("q", [""])[0] or query.get("query", [""])[0]
             self._ok(_render_brief(query=brief_query, project=query.get("project", [""])[0]))
+        elif path == "/propose":
+            self._ok(_render_propose(project=query.get("project", [""])[0]))
         elif path == "/memory":
             self._ok(_render_memory_dashboard(project=query.get("project", [""])[0]))
         elif path == "/audit":

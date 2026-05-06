@@ -17,6 +17,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added memory action commands to web inbox and explanation pages, including review, update, archive, restore, and low-priority forget actions.
 - Added Memory Review Inbox with `memory-inbox`, `review-memory`, MCP `memory_inbox`/`review_memory`, `/inbox`, and `/api/memory-inbox`.
 - Added Explain Memory views with `explain-memory`, MCP `explain_memory`, `/explain-memory`, and `/api/explain-memory` for provenance, review state, lifecycle, graph links, and recall readiness.
+- Added `/propose`, a read-only local UI for turning pasted source/session notes into memory proposals without writing pages.
 - Added MCP `link_status` and `/api/status` for a compact readiness summary with version, wiki path, page/memory counts, optional validation, and safe next actions.
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.
 - Added `link.py status --validate` to installer next-step output so new users have one readiness command after setup.

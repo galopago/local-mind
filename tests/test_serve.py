@@ -96,6 +96,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("data-theme-toggle", html)
         self.assertIn("localStorage.getItem('link-theme')", html)
         self.assertIn('<a href="/brief">brief</a>', html)
+        self.assertIn('<a href="/propose">propose</a>', html)
         self.assertIn('<a href="/audit">audit</a>', html)
         self.assertIn('<a href="/captures">captures</a>', html)
 
@@ -861,6 +862,18 @@ class ServeTests(unittest.TestCase):
         self.assertIn("use POST", get_payload["error"])
         self.assertEqual(bad_type_status, 415)
         self.assertIn("application/json", bad_type_payload["error"])
+
+    def test_propose_page_renders_read_only_workflow(self):
+        wiki = self.make_wiki()
+
+        html = serve._render_propose(project="link")
+
+        self.assertIn('<a href="/propose">propose</a>', html)
+        self.assertIn('data-proposal-form', html)
+        self.assertIn('data-proposal-results', html)
+        self.assertIn('value="link"', html)
+        self.assertIn("without writing anything", html)
+        self.assertIn("Save only preferences", html)
 
     def test_rebuild_backlinks_requires_json_post(self):
         wiki = self.make_wiki()

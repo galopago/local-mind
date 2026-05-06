@@ -71,6 +71,10 @@ propose memories from raw/file.md
 
 Then approve only the memories you want agents to carry forward.
 
+You can also open `/propose`, paste source or session notes, and review
+proposal-only candidates in the local UI. Nothing is written until you approve a
+memory through your agent or the CLI.
+
 ## Quick Start
 
 Try Link with a finished, pre-ingested wiki:
@@ -86,6 +90,7 @@ Open:
 
 - `http://localhost:3000`
 - `http://localhost:3000/brief`
+- `http://localhost:3000/propose`
 - `http://localhost:3000/memory`
 - `http://localhost:3000/audit`
 - `http://localhost:3000/captures`
@@ -507,7 +512,7 @@ Common endpoints:
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |
 | `GET /api/query-link?q=<query>&budget=small\|medium\|large` | Compact context packet with relevant memory, ranked wiki results, graph context, budget reports, follow-up actions, and selection reasons. |
 | `GET /api/validate?strict=true` | Validate generated wiki pages; failed gates return HTTP 422 with structured findings. |
-| `POST /api/propose-memories` | Returns memory proposals without writing pages. |
+| `POST /api/propose-memories` | Returns memory proposals without writing pages; used by `/propose`. |
 | `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; marks a memory reviewed. |
 | `POST /api/archive-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "reason": "optional" }`; hides a memory from default recall. |
 | `POST /api/restore-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name" }`; restores an archived memory to active recall. |
