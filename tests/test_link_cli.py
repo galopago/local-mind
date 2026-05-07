@@ -766,6 +766,29 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-personal-memory")
         self.assertIn("context_packet", payload)
 
+    def test_benchmark_reports_local_query_timings(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-benchmark-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.benchmark(target, "agent memory", budget="small", json_output=True)
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["query"], "agent memory")
+        self.assertTrue(payload["found"])
+        self.assertGreaterEqual(payload["pages"], 1)
+        self.assertGreaterEqual(payload["memories"], 1)
+        self.assertGreaterEqual(payload["edges"], 1)
+        self.assertEqual(payload["budget"], "small")
+        self.assertIn("cache", payload["timings"])
+        self.assertIn("search", payload["timings"])
+        self.assertIn("query", payload["timings"])
+        self.assertIn("graph", payload["timings"])
+        self.assertGreater(payload["budget_report"]["context_packet"]["estimated_chars"], 0)
+
     def test_brief_surfaces_saved_captures_without_secret_values(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

@@ -557,6 +557,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link redact-capture <capture>` | Replace secret-looking values in a saved raw capture and log labels/counts only. |
 | `link delete-capture <capture> --confirm` | Delete a saved raw capture after explicit confirmation. |
 | `link query "task" [--budget small\|medium\|large] [--project slug]` | Build a compact answer-ready packet from memory, wiki search, graph context, provenance, and estimated packet size. |
+| `link benchmark ["query"] [--budget small\|medium\|large] [--project slug]` | Measure local cache, search, smart query, and graph timings for your current wiki. |
 | `link brief "task" [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
 | `link memory-audit [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |
 | `link recall "query" [--project slug]` | Search local agent memories with recall readiness. |

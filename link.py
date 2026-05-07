@@ -16,6 +16,7 @@ Usage:
   python link.py capture-inbox [target]
   python link.py update-memory <name-or-title> "new memory text" [target]
   python link.py query "task or question" [target]
+  python link.py benchmark ["query"] [target]
   python link.py brief ["task or question"] [target]
   python link.py recall "query" [target]
   python link.py profile [target]
@@ -40,6 +41,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -171,7 +173,9 @@ from link_core.status import (
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
+    graph_data as _core_graph_data,
     rebuild_index as _core_rebuild_index,
+    search_pages as _core_search_pages,
 )
 del _BUNDLED_CORE
 
@@ -2637,6 +2641,93 @@ def query(
     return 0
 
 
+def _timed(label: str, fn: Callable[[], object]) -> tuple[str, object, float]:
+    start = time.perf_counter()
+    value = fn()
+    return label, value, time.perf_counter() - start
+
+
+def benchmark(
+    target: Path,
+    query_text: str = "agent memory",
+    budget: str = "small",
+    project: str | None = None,
+    json_output: bool = False,
+) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    project_name = project or _default_project(target)
+    timings: dict[str, float] = {}
+
+    label, cache, elapsed = _timed("cache", lambda: _core_build_wiki_cache(wiki_dir))
+    timings[label] = elapsed
+    label, results, elapsed = _timed("search", lambda: _core_search_pages(query_text, cache, limit=20))
+    timings[label] = elapsed
+    label, packet, elapsed = _timed(
+        "query",
+        lambda: _core_query_link(
+            wiki_dir,
+            query_text,
+            cache,
+            _memory_records(wiki_dir),
+            budget=budget,
+            project=project_name,
+            review_command="review-memory",
+        ),
+    )
+    timings[label] = elapsed
+    label, graph, elapsed = _timed("graph", lambda: _core_graph_data(cache))
+    timings[label] = elapsed
+
+    budget_report = packet.get("budget_report", {}) if isinstance(packet, dict) else {}
+    payload = {
+        "target": str(target),
+        "wiki": str(wiki_dir),
+        "query": query_text,
+        "budget": budget,
+        "project": project_name,
+        "pages": len(cache.get("pages", [])),
+        "memories": len(_memory_records(wiki_dir)),
+        "edges": len(graph.get("edges", [])) if isinstance(graph, dict) else 0,
+        "search_results": len(results) if isinstance(results, list) else 0,
+        "context_items": len(packet.get("context_packet", [])) if isinstance(packet, dict) else 0,
+        "found": bool(packet.get("found")) if isinstance(packet, dict) else False,
+        "timings": {key: round(value, 4) for key, value in timings.items()},
+        "budget_report": budget_report,
+    }
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print(f"Link benchmark: {target}")
+    print(f"Query: {query_text}")
+    if project_name:
+        print(f"Project: {project_name}")
+    print("")
+    print(f"Scale: {payload['pages']} pages · {payload['memories']} memories · {payload['edges']} edges")
+    print(f"Results: {payload['search_results']} search results · {payload['context_items']} context items")
+    print("")
+    print("Timings")
+    for key in ("cache", "search", "query", "graph"):
+        print(f"- {key}: {payload['timings'][key]:.4f}s")
+    if isinstance(budget_report, dict):
+        packet_report = budget_report.get("context_packet")
+        if isinstance(packet_report, dict):
+            print("")
+            print(
+                "Packet: "
+                f"{packet_report.get('estimated_chars', 0)} chars · "
+                f"{packet_report.get('estimated_tokens', 0)} tokens · "
+                f"has_more={packet_report.get('has_more', False)}"
+            )
+    print("")
+    print(f"Result: {'found' if payload['found'] else 'no matching context'}")
+    return 0
+
+
 def brief(
     target: Path,
     query: str = "",
@@ -3201,6 +3292,13 @@ def main(argv: list[str] | None = None) -> int:
     query_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
     query_cmd.add_argument("--json", action="store_true", help="print machine-readable context packet")
 
+    benchmark_cmd = sub.add_parser("benchmark", help="measure local search, query, and graph performance")
+    benchmark_cmd.add_argument("query", nargs="?", default="agent memory", help="query to benchmark")
+    benchmark_cmd.add_argument("target", nargs="?", default=".")
+    benchmark_cmd.add_argument("--budget", choices=("small", "medium", "large"), default="small")
+    benchmark_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
+    benchmark_cmd.add_argument("--json", action="store_true", help="print machine-readable benchmark data")
+
     brief_cmd = sub.add_parser("brief", help="prime an agent with relevant local memory")
     brief_cmd.add_argument("query", nargs="?", default="", help="optional task or question to retrieve memory for")
     brief_cmd.add_argument("target", nargs="?", default=".")
@@ -3381,6 +3479,14 @@ def main(argv: list[str] | None = None) -> int:
         return query(
             Path(args.target),
             args.query,
+            budget=args.budget,
+            project=args.project,
+            json_output=args.json,
+        )
+    if args.command == "benchmark":
+        return benchmark(
+            Path(args.target),
+            query_text=args.query,
             budget=args.budget,
             project=args.project,
             json_output=args.json,

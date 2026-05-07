@@ -12,6 +12,7 @@ EXPECTED_CLI_COMMANDS = {
     "accept-capture",
     "archive-memory",
     "backup",
+    "benchmark",
     "brief",
     "capture-inbox",
     "capture-session",
