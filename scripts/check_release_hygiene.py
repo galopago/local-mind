@@ -69,11 +69,11 @@ BINARY_SUFFIXES = {
 CHANGELOG_VERSION_RE = re.compile(r"^## \[([^\]]+)\](?: - \d{4}-\d{2}-\d{2})?\s*$", re.MULTILINE)
 
 AGENT_CONTRACT_REQUIREMENTS = {
-    Path("LINK.md"): ("link_status", "query_link", "validate_wiki", "memory_brief"),
-    Path("README.md"): ("link_status", "query_link", "validate_wiki", "memory_brief"),
-    Path("mcp_package/README.md"): ("link_status", "query_link", "validate_wiki", "memory_brief"),
-    Path("integrations/_shared/link-instructions.md"): ("link_status", "query_link", "validate_wiki", "memory_brief"),
-    Path("integrations/_shared/link-instructions-project.md"): ("link_status", "query_link", "validate_wiki", "memory_brief"),
+    Path("LINK.md"): ("link_status", "starter_prompts", "query_link", "validate_wiki", "memory_brief"),
+    Path("README.md"): ("link_status", "starter_prompts", "query_link", "validate_wiki", "memory_brief"),
+    Path("mcp_package/README.md"): ("link_status", "starter_prompts", "query_link", "validate_wiki", "memory_brief"),
+    Path("integrations/_shared/link-instructions.md"): ("link_status", "starter_prompts", "query_link", "validate_wiki", "memory_brief"),
+    Path("integrations/_shared/link-instructions-project.md"): ("link_status", "starter_prompts", "query_link", "validate_wiki", "memory_brief"),
 }
 
 

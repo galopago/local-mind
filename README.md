@@ -496,7 +496,7 @@ Most agents should start with:
 | `forget_memory` | The user explicitly confirms Link should permanently delete a memory. |
 | `rebuild_index` | You ingested or edited pages and need `wiki/index.md` to reflect the current wiki. |
 
-Full tool set: `link_status`, `migrate_wiki`, `ingest_status`, `query_link`, `validate_wiki`, `backup_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
+Full tool set: `link_status`, `starter_prompts`, `migrate_wiki`, `ingest_status`, `query_link`, `validate_wiki`, `backup_wiki`, `memory_brief`, `memory_audit`, `memory_profile`, `memory_inbox`, `review_memory`,
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
