@@ -73,6 +73,25 @@ class ReleaseHygieneTests(unittest.TestCase):
         self.assertIn(f"agent contract missing 'memory_brief' in {bad}", findings)
         self.assertIn(f"agent contract file missing: {tmp / 'missing.md'}", findings)
 
+    def test_tracked_path_hygiene_blocks_build_artifacts_and_secret_names(self):
+        findings: list[str] = []
+
+        skip_wheel = release_hygiene.check_tracked_path_hygiene(
+            findings,
+            Path("mcp_package/dist/link_mcp-1.2.0-py3-none-any.whl"),
+        )
+        skip_secret = release_hygiene.check_tracked_path_hygiene(findings, Path(".pypirc"))
+        skip_normal = release_hygiene.check_tracked_path_hygiene(findings, Path("README.md"))
+
+        self.assertTrue(skip_wheel)
+        self.assertTrue(skip_secret)
+        self.assertFalse(skip_normal)
+        self.assertIn(
+            "build artifact should not be tracked: mcp_package/dist/link_mcp-1.2.0-py3-none-any.whl",
+            findings,
+        )
+        self.assertIn("sensitive-looking tracked filename: .pypirc", findings)
+
 
 if __name__ == "__main__":
     unittest.main()

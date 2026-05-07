@@ -30,6 +30,15 @@ SECRET_NAME_PATTERNS = (
     "service-account*.json",
 )
 
+BUILD_ARTIFACT_PATTERNS = (
+    "dist/*",
+    "*/dist/*",
+    "*.whl",
+    "*.tar.gz",
+    "*.egg-info",
+    "*.egg-info/*",
+)
+
 SECRET_VALUE_PATTERNS = (
     ("Anthropic API key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b")),
     ("OpenAI API key", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
@@ -144,6 +153,21 @@ def check_agent_contract(
                 findings.append(f"agent contract missing {term!r} in {path}")
 
 
+def check_tracked_path_hygiene(findings: list[str], path: Path) -> bool:
+    """Check release-blocking tracked path patterns. Return true when caller should skip content scan."""
+    rel = path.as_posix()
+    if any(fnmatch.fnmatch(rel, pattern) for pattern in BUILD_ARTIFACT_PATTERNS):
+        findings.append(f"build artifact should not be tracked: {path}")
+        return True
+
+    name = path.name
+    if any(fnmatch.fnmatch(name, pattern) for pattern in SECRET_NAME_PATTERNS):
+        findings.append(f"sensitive-looking tracked filename: {path}")
+        return True
+
+    return False
+
+
 def main() -> int:
     findings: list[str] = []
     current_version = check_version_consistency(findings)
@@ -151,9 +175,7 @@ def main() -> int:
     check_agent_contract(findings)
 
     for path in tracked_files():
-        name = path.name
-        if any(fnmatch.fnmatch(name, pattern) for pattern in SECRET_NAME_PATTERNS):
-            findings.append(f"sensitive-looking tracked filename: {path}")
+        if check_tracked_path_hygiene(findings, path):
             continue
 
         if path.suffix.lower() in BINARY_SUFFIXES:
