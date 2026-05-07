@@ -223,6 +223,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Ask your agent: ingest raw/new-source.md into Link", out.getvalue())
         self.assertIn("Run: link validate", out.getvalue())
         self.assertIn("Suggested workflow: Ingest pending raw sources", out.getvalue())
+        self.assertIn("Memory review: propose memories from raw/new-source.md", out.getvalue())
         self.assertIn("raw/new-source.md -> wiki/sources/new-source.md", out.getvalue())
 
     def test_ingest_status_json(self):

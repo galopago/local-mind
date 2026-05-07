@@ -111,6 +111,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "Rebuild index and backlinks, then validate before reporting ingest complete.",
             ],
             "agent_prompt": guidance.get("agent_prompt"),
+            "memory_prompt": f"propose memories from {first['raw']}",
             "post_checks": [
                 "link rebuild-index",
                 "link rebuild-backlinks",

@@ -1078,6 +1078,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .memory-actions button:hover { background: var(--button-hover); }
 .memory-actions button:disabled { color: var(--button-disabled); cursor: default; }
 .memory-action-result { color: var(--muted); min-height: 1em; }
+.ingest-path { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 14px 0 18px; }
+.ingest-step { border: 1px solid var(--border-soft); border-radius: 4px; background: var(--surface); padding: 12px; font-family: sans-serif; min-width: 0; }
+.ingest-step .step-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
+.ingest-step h3 { margin: 8px 0 5px; font-size: 15px; }
+.ingest-step p { margin: 0 0 8px; color: var(--muted); line-height: 1.4; }
+.ingest-step code { white-space: normal; overflow-wrap: anywhere; }
 .trust-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
 .trust-grid div { border: 1px solid var(--border-soft); border-radius: 4px; padding: 10px; font-family: sans-serif; background: var(--surface); }
 .trust-grid strong { display: block; font-size: 12px; color: var(--subtle); margin-bottom: 4px; }
@@ -2032,6 +2038,10 @@ def _render_ingest():
     plan = status.get("plan") if isinstance(status.get("plan"), dict) else {}
     pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
     represented = status.get("represented_raw") if isinstance(status.get("represented_raw"), list) else []
+    first_raw = str(pending[0].get("raw") or "raw/<file>") if pending else "raw/<file>"
+    ingest_prompt = agent_prompt or f"ingest {first_raw} into Link"
+    memory_prompt = str(plan.get("memory_prompt") or f"propose memories from {first_raw}")
+    propose_href = "/propose?source=" + urllib.parse.quote(first_raw) if pending else "/propose"
 
     stats = (
         f'<div class="home-stats">'
@@ -2053,6 +2063,22 @@ def _render_ingest():
             f'<code>{html.escape(str(command))}</code></div>'
         )
     actions = f'<div class="memory-actions">{action_rows}</div>' if action_rows else ""
+    guide_html = (
+        f'<section class="ingest-path" aria-label="Ingest path">'
+        f'<article class="ingest-step"><span class="step-num">1</span>'
+        f'<h3>Add source</h3><p>Put notes, articles, transcripts, or project files in <code>raw/</code>.</p>'
+        f'<code>{html.escape(first_raw)}</code></article>'
+        f'<article class="ingest-step"><span class="step-num">2</span>'
+        f'<h3>Ask agent</h3><p>Have your agent convert the source into source-backed wiki pages.</p>'
+        f'<code>{html.escape(ingest_prompt)}</code></article>'
+        f'<article class="ingest-step"><span class="step-num">3</span>'
+        f'<h3>Validate</h3><p>Check page shape, links, and graph freshness before relying on the result.</p>'
+        f'<code>link validate</code></article>'
+        f'<article class="ingest-step"><span class="step-num">4</span>'
+        f'<h3>Optional memory</h3><p>Only save preferences, decisions, or project facts after approval.</p>'
+        f'<a href="{html.escape(propose_href, quote=True)}"><code>{html.escape(memory_prompt)}</code></a></article>'
+        f'</section>'
+    )
 
     pending_html = ""
     if pending:
@@ -2107,6 +2133,7 @@ def _render_ingest():
         f'<h1>Ingest</h1>'
         f'<p class="summary">{html.escape(str(guidance.get("summary") or "Check raw source ingest state."))}</p>'
         f'{stats}'
+        f'{guide_html}'
         f'{actions}'
         f'{plan_html}'
         f'{pending_html}'

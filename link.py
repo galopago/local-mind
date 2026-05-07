@@ -1578,6 +1578,9 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
         summary = plan.get("summary")
         if summary:
             print(f"  {summary}")
+        memory_prompt = plan.get("memory_prompt")
+        if memory_prompt:
+            print(f"  Memory review: {memory_prompt}")
         for index, step in enumerate(steps[:6], start=1):
             print(f"  {index}. {step}")
         if batch:

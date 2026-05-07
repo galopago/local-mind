@@ -47,6 +47,7 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["guidance"]["agent_prompt"], "ingest raw/new-note.md into Link")
         self.assertEqual(payload["plan"]["title"], "Ingest pending raw sources")
         self.assertEqual(payload["plan"]["batch"][0]["suggested_source_page"], "wiki/sources/new-note.md")
+        self.assertEqual(payload["plan"]["memory_prompt"], "propose memories from raw/new-note.md")
         self.assertIn("link rebuild-index", payload["plan"]["post_checks"])
 
     def test_collect_ingest_status_reports_represented_raw(self):
