@@ -78,6 +78,11 @@ def link_status(
         if str(record.get("review_status") or "pending").lower() != "reviewed"
         and str(record.get("status") or "active").lower() == "active"
     )
+    content_page_count = sum(
+        1
+        for page in pages
+        if str(page.get("path") or "") not in {"wiki/index.md", "wiki/log.md"}
+    )
     ready = not missing and bool(pages) and (
         not include_validation or bool(validation_summary.get("passed"))
     )
@@ -95,9 +100,12 @@ def link_status(
     if include_validation and validation_summary.get("checked") and not validation_summary.get("passed"):
         next_actions.append(_action("rebuild graph index", "rebuild_backlinks"))
         next_actions.append(_action("rerun validation gate", "validate_wiki"))
-    if ready:
+    if ready and content_page_count:
         next_actions.append(_action("answer with compact local context", "query_link", {"query": "<user task>"}))
         next_actions.append(_action("prime agent memory before work", "memory_brief", {"query": "<user task>"}))
+    elif ready:
+        next_actions.append(_action("add raw sources or inspect ingest readiness", "ingest_status"))
+        next_actions.append(_action("show first-run prompts", "starter_prompts"))
     elif not missing:
         next_actions.append(_action("inspect wiki health", "validate_wiki"))
 
@@ -107,6 +115,7 @@ def link_status(
         "wiki": str(wiki_dir),
         "missing": missing,
         "page_count": len(pages),
+        "content_page_count": content_page_count,
         "memory_count": len(record_list),
         "active_memory_count": active_memory_count,
         "needs_review_count": needs_review_count,

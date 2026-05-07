@@ -364,6 +364,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn(f"Version: {link_cli.LINK_VERSION}", out.getvalue())
         self.assertIn("Ready: yes", out.getvalue())
+        self.assertIn("Content pages:", out.getvalue())
         self.assertIn("Schema: current", out.getvalue())
         self.assertIn("Search backend:", out.getvalue())
         self.assertIn("Validation: passed", out.getvalue())
@@ -373,7 +374,9 @@ class LinkCliTests(unittest.TestCase):
         with redirect_stdout(json_out):
             json_code = link_cli.status(target, include_validation=True, json_output=True)
         self.assertEqual(json_code, 0)
-        self.assertEqual(json.loads(json_out.getvalue())["version"], link_cli.LINK_VERSION)
+        status_payload = json.loads(json_out.getvalue())
+        self.assertEqual(status_payload["version"], link_cli.LINK_VERSION)
+        self.assertGreater(status_payload["content_page_count"], 0)
 
     def test_main_prints_version(self):
         out = StringIO()

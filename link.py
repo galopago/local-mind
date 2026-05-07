@@ -1509,6 +1509,7 @@ def status(target: Path, include_validation: bool = False, json_output: bool = F
     print(f"Version: {payload.get('version') or LINK_VERSION}")
     print(f"Ready: {'yes' if payload['ready'] else 'no'}")
     print(f"Pages: {payload['page_count']}")
+    print(f"Content pages: {payload.get('content_page_count', payload['page_count'])}")
     print(
         f"Memories: {payload['memory_count']} total · "
         f"{payload['active_memory_count']} active · "
