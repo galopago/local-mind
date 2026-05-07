@@ -1106,6 +1106,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .proposal-results { display: grid; gap: 12px; margin-top: 14px; }
 .proposal-card { border: 1px solid var(--border-soft); border-radius: 6px; padding: 12px; background: var(--surface); min-width: 0; }
 .proposal-card h3 { margin-top: 0; font-size: 16px; }
+.proposal-checklist { display: grid; gap: 5px; margin: 10px 0; padding: 9px 10px;
+                      border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface-soft);
+                      color: var(--muted); font-family: sans-serif; font-size: 13px; line-height: 1.4; }
+.proposal-checklist strong { color: var(--text); }
 .proposal-warning { color: #8a6d3b; font-family: sans-serif; font-size: 13px; line-height: 1.45; }
 .proposal-command { display: block; margin-top: 10px; padding: 8px; background: var(--surface-code);
                     border-radius: 4px; white-space: normal; overflow-wrap: anywhere; }
@@ -1113,6 +1117,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .proposal-actions button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
                            border-radius: 4px; padding: 5px 8px; cursor: pointer; font: inherit; }
 .proposal-actions button:hover { background: var(--button-hover); }
+.proposal-actions button:disabled { color: var(--button-disabled); cursor: default; }
 .memory-issues { margin-top: 6px; }
 .memory-issues li { border: none; padding: 0; color: var(--muted); font-size: 13px; }
 .memory-issues .severity { font-family: sans-serif; font-size: 11px; text-transform: uppercase; color: #8a6d3b; }
@@ -1497,10 +1502,19 @@ PROPOSAL_UI_JS = """
 
   function addApproveButton(parent, proposal) {
     var endpoint = approvalEndpoint(proposal);
-    if (!endpoint) return;
+    if (!endpoint) {
+      var blocked = document.createElement('button');
+      blocked.type = 'button';
+      blocked.disabled = true;
+      blocked.textContent = 'Manual review required';
+      blocked.title = 'Copy the approval prompt and resolve duplicates or conflicts with your agent.';
+      parent.appendChild(blocked);
+      return;
+    }
     var button = document.createElement('button');
     button.type = 'button';
     button.textContent = endpoint === '/api/update-memory' ? 'Approve update' : 'Approve and save';
+    button.title = 'Writes durable local memory only after this explicit approval.';
     button.addEventListener('click', async function() {
       var message = endpoint === '/api/update-memory'
         ? 'Update the existing memory with this proposal?'
@@ -1557,6 +1571,13 @@ PROPOSAL_UI_JS = """
       var action = proposal.primary_action || {};
       if (action.label) addText(card, 'p', 'summary', action.label + ': ' + (action.description || ''));
       addText(card, 'p', 'proposal-warning', 'Proposal-only: no durable memory has been written yet.');
+      var checklist = document.createElement('div');
+      checklist.className = 'proposal-checklist';
+      addText(checklist, 'strong', '', 'Review gate');
+      addText(checklist, 'span', '', 'Save only if this is a durable preference, decision, fact, or project context.');
+      addText(checklist, 'span', '', 'Check scope, project, source label, duplicates, and conflicts before approval.');
+      addText(checklist, 'span', '', conflicts ? 'Conflict found: use the approval prompt instead of direct save.' : 'Direct save still requires explicit approval.');
+      card.appendChild(checklist);
       var promptText = approvalPrompt(proposal);
       var prompt = addText(card, 'code', 'proposal-command', promptText);
       prompt.setAttribute('title', 'Copy this into your agent chat if you approve the memory.');
@@ -2197,6 +2218,12 @@ def _render_propose(project: str | None = None, source: str | None = None):
         f'<p class="summary">Paste source notes, session notes, or a raw excerpt. Link returns memory candidates without writing anything.</p>'
         f'<div class="memory-next"><strong>Trust rule</strong>'
         f'<p>Source-backed wiki knowledge and durable agent memory are separate. Save only preferences, decisions, or project facts you approve.</p></div>'
+        f'<section><h2>Review Gate</h2><div class="proposal-checklist">'
+        f'<strong>Before saving memory</strong>'
+        f'<span>Keep ordinary facts in wiki pages; save only durable preferences, decisions, project context, or user facts.</span>'
+        f'<span>Check source label, scope, project, duplicate candidates, and conflict warnings.</span>'
+        f'<span>Use direct approval only when the proposal is clean; otherwise copy the approval prompt into your agent chat.</span>'
+        f'</div></section>'
         f'{proposal_path}'
         f'<section><div class="section-heading"><h2>Local Raw Sources</h2><a href="/captures">captures</a></div>'
         f'<div class="proposal-source-list" data-proposal-sources aria-live="polite"></div></section>'
