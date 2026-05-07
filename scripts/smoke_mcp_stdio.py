@@ -22,6 +22,7 @@ EXPECTED_TOOLS = {
     "search_wiki",
     "get_context",
     "get_graph",
+    "get_graph_summary",
     "recall_memory",
     "memory_profile",
     "rebuild_index",
@@ -144,6 +145,19 @@ async def _run_smoke(wiki_dir: Path, python: str) -> None:
             )
             if not context.get("found") or context.get("primary") != "agent-memory":
                 raise RuntimeError("get_context did not return the expected primary page")
+
+            graph_summary = _json_text(
+                await session.call_tool(
+                    "get_graph_summary",
+                    {"topic": "agent memory", "limit": 5, "depth": 1},
+                    read_timeout_seconds=timedelta(seconds=10),
+                ),
+                "get_graph_summary",
+            )
+            if graph_summary.get("returned_nodes", 0) > 5:
+                raise RuntimeError("get_graph_summary ignored the node limit")
+            if not graph_summary.get("nodes"):
+                raise RuntimeError("get_graph_summary did not return any nodes")
 
             profile = _json_text(
                 await session.call_tool(

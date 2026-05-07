@@ -12,6 +12,8 @@ When the user asks to ingest or drops files into `raw/`, use MCP `ingest_status`
 
 When answering a substantive project question, start with MCP `query_link` when available, or run `python3 link.py query "<task or question>"`.
 
+When you only need graph orientation, especially for a large wiki, prefer MCP `get_graph_summary` or `python3 link.py graph-summary "<topic>"` before requesting the full graph.
+
 When starting project-specific work, prime yourself with Link first: use MCP `memory_brief` when available, or run `python3 link.py brief "<task or question>"`. Project installs infer the current repo as the memory project key, so project-scoped memories stay separate from other repos while broad user memories still apply.
 
 Before broad repairs or risky local wiki edits, create a local backup with MCP `backup_wiki` when available, or run `python3 link.py backup`. Do not include `raw/` unless the user explicitly asks.

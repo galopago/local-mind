@@ -12,6 +12,8 @@ When the user asks to ingest or drops files into `raw/`, use MCP `ingest_status`
 
 When answering a substantive question that may need local memory or wiki context, start with MCP `query_link` when available, or run `link query "<task or question>"`.
 
+When you only need graph orientation, especially for a large wiki, prefer MCP `get_graph_summary` or `link graph-summary "<topic>"` before requesting the full graph.
+
 When starting personalized or project-specific work, prime yourself with Link first: use MCP `memory_brief` when available, or run `link brief "<task or question>"`.
 
 Before broad repairs or risky local wiki edits, create a local backup with MCP `backup_wiki` when available, or run `link backup`. Do not include `raw/` unless the user explicitly asks.

@@ -98,6 +98,7 @@ from link_core.wiki import (
     close_wiki_cache as _core_close_wiki_cache,
     context_for_topic as _core_context_for_topic,
     graph_data as _core_graph_data,
+    graph_summary as _core_graph_summary,
     load_backlinks_index as _core_load_backlinks_index,
     rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
@@ -242,6 +243,18 @@ def _parse_search_limit(raw: str) -> tuple[int | None, str | None]:
     if limit < 1:
         return None, "limit must be at least 1"
     return min(limit, 50), None
+
+
+def _parse_bounded_int(raw: str, label: str, default: int, min_value: int, max_value: int) -> tuple[int | None, str | None]:
+    if raw == "":
+        return default, None
+    try:
+        value = int(raw)
+    except ValueError:
+        return None, f"{label} must be an integer"
+    if value < min_value:
+        return None, f"{label} must be at least {min_value}"
+    return min(value, max_value), None
 
 
 def _utc_timestamp() -> str:
@@ -2672,6 +2685,17 @@ def _get_graph_data() -> dict:
     return _core_graph_data(_current_wiki_cache())
 
 
+def _get_graph_summary(topic: str = "", limit: int = 40, depth: int = 1, max_edges: int = 120) -> dict:
+    """Return bounded graph context for agents and large local wikis."""
+    return _core_graph_summary(
+        _current_wiki_cache(),
+        topic=topic,
+        limit=limit,
+        depth=depth,
+        max_edges=max_edges,
+    )
+
+
 def _rebuild_backlinks_payload() -> dict[str, object]:
     result = _build_backlinks()
     bl_path = WIKI_DIR / "_backlinks.json"
@@ -2900,6 +2924,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(payload, status=200 if payload.get("passed") else 422)
         elif path == "/api/graph":
             self._json(_get_graph_data())
+        elif path == "/api/graph-summary":
+            limit, limit_error = _parse_bounded_int(query.get("limit", ["40"])[0], "limit", 40, 1, 250)
+            depth, depth_error = _parse_bounded_int(query.get("depth", ["1"])[0], "depth", 1, 0, 3)
+            max_edges, edge_error = _parse_bounded_int(query.get("max_edges", ["120"])[0], "max_edges", 120, 0, 1000)
+            error = limit_error or depth_error or edge_error
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                assert limit is not None
+                assert depth is not None
+                assert max_edges is not None
+                self._json(_get_graph_summary(
+                    topic=query.get("topic", [""])[0] or query.get("q", [""])[0],
+                    limit=limit,
+                    depth=depth,
+                    max_edges=max_edges,
+                ))
         elif path == "/api/memory-profile":
             limit, error = _parse_search_limit(query.get("limit", ["10"])[0])
             if error:

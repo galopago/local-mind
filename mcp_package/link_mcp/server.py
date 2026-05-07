@@ -68,7 +68,9 @@ mcp = FastMCP(
         "approval, and capture_inbox to review saved captures before accepting, "
         "redacting, or deleting them; use propose_memories when no raw capture is needed. Use search_wiki to find "
         "general pages and get_context to retrieve a topic with its full graph "
-        "neighborhood. After ingesting sources or substantially editing wiki "
+        "neighborhood. Use get_graph_summary for bounded graph orientation on "
+        "large wikis; use get_graph only for explicit full graph exports. After "
+        "ingesting sources or substantially editing wiki "
         "pages, call rebuild_index, rebuild_backlinks, then validate_wiki "
         "before saying the "
         "wiki is updated. Use backup_wiki before broad repairs or risky local "
@@ -163,6 +165,7 @@ from link_core.wiki import (
     close_wiki_cache as _core_close_wiki_cache,
     context_for_topic as _core_context_for_topic,
     graph_data as _core_graph_data,
+    graph_summary as _core_graph_summary,
     load_backlinks_index as _core_load_backlinks_index,
     rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
@@ -1293,8 +1296,39 @@ def get_graph() -> str:
 
     Useful for understanding the overall structure of the wiki,
     finding highly-connected pages, or detecting isolated clusters.
+
+    For large wikis, prefer get_graph_summary first. Use get_graph only when
+    the user explicitly needs the full graph export.
     """
     return json.dumps(_core_graph_data(_build_cache()), ensure_ascii=False)
+
+
+@mcp.tool()
+def get_graph_summary(topic: str = "", limit: int = 40, depth: int = 1, max_edges: int = 120) -> str:
+    """Get a bounded graph summary for large wikis and agent context budgets.
+
+    Args:
+    - topic: optional topic/query. When provided, Link returns a bounded
+      neighborhood around matching pages. When omitted, Link returns a
+      high-degree overview.
+    - limit: maximum nodes to return, clamped to 1..250.
+    - depth: graph neighborhood depth for topic mode, clamped to 0..3.
+    - max_edges: maximum returned edges among selected nodes, clamped to 0..1000.
+
+    Use this before get_graph when the wiki may contain hundreds or thousands
+    of pages. The response includes total graph size, returned node/edge counts,
+    why each node was selected, top hubs, and follow-up tool actions.
+    """
+    return json.dumps(
+        _core_graph_summary(
+            _build_cache(),
+            topic=_clean_text_input(topic, max_len=MAX_TEXT_INPUT),
+            limit=limit,
+            depth=depth,
+            max_edges=max_edges,
+        ),
+        ensure_ascii=False,
+    )
 
 
 @mcp.tool()

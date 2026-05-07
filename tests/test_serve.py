@@ -878,6 +878,23 @@ class ServeTests(unittest.TestCase):
             1,
         )
 
+    def test_graph_summary_is_bounded_for_api_agents(self):
+        wiki = self.make_wiki()
+        for index in range(8):
+            links = " ".join(f"[[node-{target}]]" for target in range(8) if target != index)
+            write_page(
+                wiki,
+                f"concepts/node-{index}.md",
+                f"---\ntype: concept\ntitle: Node {index}\n---\n# Node {index}\n\n{links}\n",
+            )
+
+        summary = serve._get_graph_summary(limit=4, max_edges=3)
+
+        self.assertEqual(summary["returned_nodes"], 4)
+        self.assertEqual(summary["returned_edges"], 3)
+        self.assertTrue(summary["truncated"])
+        self.assertIn("get_graph", {item["tool"] for item in summary["follow_up"]})
+
     def test_graph_tooltip_exists_before_graph_script(self):
         wiki = self.make_wiki()
         write_page(

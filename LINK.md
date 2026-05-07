@@ -356,12 +356,13 @@ When the human asks a question:
 5. Start with the smart query path when available: MCP `query_link`, `python3 link.py query "<question>" .`, or `GET /api/query-link?q=<question>`. This returns a compact context packet with relevant memory, ranked wiki results, graph context, provenance, selection reasons, budget reports, and follow-up tool actions. Use provenance fields to explain why Link knows something. Do not read the whole wiki unless the packet is insufficient; if it is budget-limited, use the returned `follow_up` action first.
 6. If the question only needs session priming or personal/project preferences, use `python3 link.py brief "<question>" .` or MCP `memory_brief`. Use `profile`/`memory_profile` and `recall`/`recall_memory` afterward only when you need deeper detail.
 7. **If you need full source-backed context for one topic:** call `GET /api/context?topic=<question>` or MCP `get_context` — returns the best matching page plus related pages via graph traversal.
-8. **If server/MCP is not available:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
-9. Read only the relevant pages or packet items and synthesize an answer.
-10. Cite your sources with [[wiki-links]].
-11. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
-12. If yes, create a page in the appropriate directory following its template.
-13. Append to `wiki/log.md`.
+8. **If you need graph orientation on a large wiki:** use `python3 link.py graph-summary "<topic>" .`, `GET /api/graph-summary?topic=<topic>`, or MCP `get_graph_summary` before requesting the full graph.
+9. **If server/MCP is not available:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
+10. Read only the relevant pages or packet items and synthesize an answer.
+11. Cite your sources with [[wiki-links]].
+12. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
+13. If yes, create a page in the appropriate directory following its template.
+14. Append to `wiki/log.md`.
 
 ### 4. Lint
 
@@ -585,7 +586,8 @@ Used during query to find related pages, and during lint to detect orphans and b
 | `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, warnings, and commands |
 | `GET /api/search?q=<query>` | Ranked search — title, alias, tag, fulltext. Returns scores + snippets |
 | `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call |
-| `GET /api/graph` | All nodes + edges for graph visualization |
+| `GET /api/graph-summary?topic=<topic>&limit=40&depth=1` | Bounded graph overview or topic neighborhood for agents and large wikis |
+| `GET /api/graph` | All nodes + edges for graph visualization/export |
 | `GET /api/backlinks` | Reverse link index |
 | `POST /api/rebuild-index` | JSON `{}`; regenerate `wiki/index.md` from current pages |
 | `POST /api/rebuild-backlinks` | JSON `{}`; rebuild `_backlinks.json` by scanning all wikilinks |

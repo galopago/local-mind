@@ -518,6 +518,7 @@ Most agents should start with:
 | `memory_inbox` | You need review items with the safest next action for each memory. |
 | `recall_memory` | You need preferences, decisions, facts, or project context with recall readiness. |
 | `get_context` | You need a topic plus its graph neighborhood. |
+| `get_graph_summary` | You need a bounded graph overview or topic neighborhood without loading every node and edge into agent context. |
 | `search_wiki` | You need ranked search across the wiki. |
 | `explain_memory` | You need provenance and review state for a memory. |
 | `remember_memory` | The user explicitly approves saving a durable memory. |
@@ -534,7 +535,7 @@ Full tool set: `link_status`, `starter_prompts`, `migrate_wiki`, `ingest_status`
 `explain_memory`, `search_wiki`, `recall_memory`, `remember_memory`,
 `propose_memories`, `capture_session`, `capture_inbox`, `accept_capture`, `redact_capture`, `delete_capture`,
 `update_memory`, `archive_memory`, `restore_memory`, `forget_memory`,
-`get_context`, `get_pages`, `get_backlinks`, `get_graph`, `rebuild_index`, `rebuild_backlinks`.
+`get_context`, `get_pages`, `get_backlinks`, `get_graph_summary`, `get_graph`, `rebuild_index`, `rebuild_backlinks`.
 
 Memory write tools return `duplicate_candidates` or `conflict_candidates` when
 the safer next step is review, update, or archive instead of creating another
@@ -580,6 +581,7 @@ Common endpoints:
 | `POST /api/restore-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name" }`; restores an archived memory to active recall. |
 | `GET /api/search?q=<query>` | Ranked search by title, alias, tag, TLDR, and full text. |
 | `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
+| `GET /api/graph-summary?topic=<topic>&limit=40&depth=1` | Bounded graph overview or topic neighborhood for agents and large wikis. |
 | `GET /api/graph` | Nodes and edges for graph visualization. |
 | `POST /api/rebuild-backlinks` | Header `X-Link-Local-Action: true`; rebuild `_backlinks.json` by scanning wikilinks. |
 | `POST /api/rebuild-index` | Header `X-Link-Local-Action: true`; regenerate `wiki/index.md` from current pages. |
@@ -605,6 +607,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link redact-capture <capture>` | Replace secret-looking values in a saved raw capture and log labels/counts only. |
 | `link delete-capture <capture> --confirm` | Delete a saved raw capture after explicit confirmation. |
 | `link query "task" [--budget small\|medium\|large] [--project slug]` | Build a compact answer-ready packet from memory, wiki search, graph context, provenance, and estimated packet size. |
+| `link graph-summary ["topic"] [--limit 40] [--depth 1]` | Show a bounded graph overview or topic neighborhood without dumping every node and edge. |
 | `link benchmark ["query"] [--budget small\|medium\|large] [--project slug]` | Measure local cache, search, smart query, graph timings, search backend, packet size, and readiness recommendations for your current wiki. |
 | `link brief "task" [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
 | `link memory-audit [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |

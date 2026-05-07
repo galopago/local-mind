@@ -17,6 +17,7 @@ Usage:
   python link.py capture-inbox [target]
   python link.py update-memory <name-or-title> "new memory text" [target]
   python link.py query "task or question" [target]
+  python link.py graph-summary ["topic"] [target]
   python link.py benchmark ["query"] [target]
   python link.py brief ["task or question"] [target]
   python link.py recall "query" [target]
@@ -182,6 +183,7 @@ from link_core.wiki import (
     build_wiki_cache as _core_build_wiki_cache,
     close_wiki_cache as _core_close_wiki_cache,
     graph_data as _core_graph_data,
+    graph_summary as _core_graph_summary,
     rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
 )
@@ -2696,6 +2698,64 @@ def query(
     return 0
 
 
+def graph_summary(
+    target: Path,
+    topic: str = "",
+    limit: int = 40,
+    depth: int = 1,
+    max_edges: int = 120,
+    json_output: bool = False,
+) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    if not wiki_dir.exists():
+        print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
+        return 1
+    cache = _core_build_wiki_cache(wiki_dir)
+    payload = _core_graph_summary(
+        cache,
+        topic=topic,
+        limit=limit,
+        depth=depth,
+        max_edges=max_edges,
+    )
+    _core_close_wiki_cache(cache)
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    title = "Link graph summary"
+    if topic:
+        title += f": {topic}"
+    print(title)
+    print(f"Mode: {payload['mode']} · Search backend: {payload['search_backend']}")
+    print(
+        "Scale: "
+        f"{payload['node_count']} nodes · {payload['edge_count']} edges · "
+        f"returned {payload['returned_nodes']} nodes/{payload['returned_edges']} edges"
+    )
+    if payload.get("truncated"):
+        print("Scope: bounded for agent context; use follow-up actions only if needed.")
+    print("")
+    print("Nodes")
+    for node in payload["nodes"]:
+        print(f"- {node['title']} ({node['id']} · degree {node['degree']})")
+        if node.get("summary"):
+            print(f"  {node['summary']}")
+        print(f"  Why: {node['why_selected']}")
+    if not payload["nodes"]:
+        print("- none")
+    print("")
+    print("Follow-up")
+    for action in payload["follow_up"]:
+        tool = action.get("tool", "")
+        args = action.get("arguments", {})
+        when = action.get("when", "")
+        suffix = f" — {when}" if when else ""
+        print(f"- {tool} {json.dumps(args, ensure_ascii=False) if args else ''}{suffix}".rstrip())
+    return 0
+
+
 def _timed(label: str, fn: Callable[[], object]) -> tuple[str, object, float]:
     start = time.perf_counter()
     value = fn()
@@ -3393,6 +3453,14 @@ def main(argv: list[str] | None = None) -> int:
     query_cmd.add_argument("--project", default=None, help="include user/global memories plus this project's memories")
     query_cmd.add_argument("--json", action="store_true", help="print machine-readable context packet")
 
+    graph_summary_cmd = sub.add_parser("graph-summary", help="show a bounded graph summary for agent context budgets")
+    graph_summary_cmd.add_argument("topic", nargs="?", default="", help="optional topic/query for a bounded neighborhood")
+    graph_summary_cmd.add_argument("target", nargs="?", default=".")
+    graph_summary_cmd.add_argument("--limit", type=int, default=40, help="maximum returned nodes")
+    graph_summary_cmd.add_argument("--depth", type=int, default=1, help="neighborhood depth for topic mode")
+    graph_summary_cmd.add_argument("--max-edges", type=int, default=120, help="maximum returned edges")
+    graph_summary_cmd.add_argument("--json", action="store_true", help="print machine-readable graph summary")
+
     benchmark_cmd = sub.add_parser("benchmark", help="measure local search, query, and graph performance")
     benchmark_cmd.add_argument("query", nargs="?", default="agent memory", help="query to benchmark")
     benchmark_cmd.add_argument("target", nargs="?", default=".")
@@ -3584,6 +3652,15 @@ def main(argv: list[str] | None = None) -> int:
             args.query,
             budget=args.budget,
             project=args.project,
+            json_output=args.json,
+        )
+    if args.command == "graph-summary":
+        return graph_summary(
+            Path(args.target),
+            topic=args.topic,
+            limit=args.limit,
+            depth=args.depth,
+            max_edges=args.max_edges,
             json_output=args.json,
         )
     if args.command == "benchmark":

@@ -841,6 +841,21 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-personal-memory")
         self.assertIn("context_packet", payload)
 
+    def test_graph_summary_reports_bounded_context(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-graph-summary-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.graph_summary(target, "agent memory", limit=5, depth=1, max_edges=10, json_output=True)
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["mode"], "topic-neighborhood")
+        self.assertLessEqual(payload["returned_nodes"], 5)
+        self.assertIn("agent-memory", {node["id"] for node in payload["nodes"]})
+
     def test_benchmark_reports_local_query_timings(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-benchmark-test-"))
         target = tmp / "demo"

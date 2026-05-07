@@ -342,6 +342,227 @@ def graph_data(cache: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     return {"nodes": nodes, "edges": edges}
 
 
+def _bounded_int(value: object, default: int, lower: int, upper: int) -> int:
+    try:
+        parsed = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    return min(max(parsed, lower), upper)
+
+
+def _count_by(nodes: list[dict[str, Any]], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for node in nodes:
+        value = str(node.get(key) or "unknown")
+        counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _trim_summary(value: object, max_chars: int = 180) -> str:
+    text = str(value or "").strip()
+    if len(text) <= max_chars:
+        return text
+    return text[: max(0, max_chars - 3)].rstrip() + "..."
+
+
+def graph_summary(
+    cache: dict[str, Any],
+    topic: str = "",
+    limit: int = 40,
+    depth: int = 1,
+    max_edges: int = 120,
+) -> dict[str, Any]:
+    """Return a token-safe graph packet for agents and large local wikis.
+
+    ``graph_data`` intentionally returns the full graph for visualization and
+    exports. This summary keeps the same source graph but selects a bounded set
+    of high-signal nodes so MCP clients do not accidentally pull a 1000+ page
+    graph into model context.
+    """
+    limit = _bounded_int(limit, 40, 1, 250)
+    depth = _bounded_int(depth, 1, 0, 3)
+    max_edges = _bounded_int(max_edges, 120, 0, 1000)
+    topic = str(topic or "").strip()
+
+    graph = graph_data(cache)
+    all_nodes = list(graph.get("nodes", []))
+    all_edges = list(graph.get("edges", []))
+    node_by_id = {str(node.get("id") or ""): node for node in all_nodes}
+    generated_node_ids = {"index", "log"}
+    selectable_ids = {
+        node_id
+        for node_id, node in node_by_id.items()
+        if node_id.lower() not in generated_node_ids and str(node.get("category") or "") != "root"
+    }
+    page_map = cache.get("page_map", {})
+    snippet_index = cache.get("snippet_index", {})
+
+    in_degree = {node_id: 0 for node_id in node_by_id}
+    out_degree = {node_id: 0 for node_id in node_by_id}
+    adjacency: dict[str, set[str]] = {node_id: set() for node_id in node_by_id}
+    for edge in all_edges:
+        source = str(edge.get("source") or "")
+        target = str(edge.get("target") or "")
+        if source not in node_by_id or target not in node_by_id:
+            continue
+        out_degree[source] = out_degree.get(source, 0) + 1
+        in_degree[target] = in_degree.get(target, 0) + 1
+        adjacency.setdefault(source, set()).add(target)
+        adjacency.setdefault(target, set()).add(source)
+
+    degree = {node_id: in_degree.get(node_id, 0) + out_degree.get(node_id, 0) for node_id in node_by_id}
+
+    def node_rank(node_id: str) -> tuple[int, str, str]:
+        node = node_by_id[node_id]
+        return (-degree.get(node_id, 0), str(node.get("title") or "").lower(), node_id)
+
+    top_hubs = [
+        {
+            "id": node_id,
+            "title": node_by_id[node_id].get("title", ""),
+            "category": node_by_id[node_id].get("category", ""),
+            "type": node_by_id[node_id].get("type", ""),
+            "degree": degree.get(node_id, 0),
+        }
+        for node_id in sorted(selectable_ids, key=node_rank)[:10]
+    ]
+
+    selected_ids: list[str] = []
+    selection_reasons: dict[str, str] = {}
+    distances: dict[str, int] = {}
+    found = False
+    mode = "overview"
+
+    if topic:
+        search_results = search_pages(topic, cache, limit=min(max(limit, 10), 50))
+        seeds = [
+            str(result.get("name") or "")
+            for result in search_results
+            if str(result.get("name") or "") in selectable_ids
+        ]
+        if seeds:
+            found = True
+            mode = "topic-neighborhood"
+            frontier = list(dict.fromkeys(seeds))
+            for seed in frontier:
+                distances[seed] = 0
+                selection_reasons[seed] = "matched topic"
+            for current_depth in range(1, depth + 1):
+                candidates: list[str] = []
+                for node_id in frontier:
+                    candidates.extend(
+                        neighbor for neighbor in adjacency.get(node_id, set())
+                        if neighbor in selectable_ids
+                    )
+                next_frontier = []
+                for candidate in sorted(set(candidates), key=node_rank):
+                    if candidate in distances:
+                        continue
+                    distances[candidate] = current_depth
+                    selection_reasons[candidate] = f"within {current_depth} hop{'s' if current_depth != 1 else ''} of a topic match"
+                    next_frontier.append(candidate)
+                frontier = next_frontier
+            selected_ids = sorted(distances, key=lambda node_id: (distances[node_id],) + node_rank(node_id))[:limit]
+
+    if not selected_ids:
+        selected_ids = sorted(selectable_ids, key=node_rank)[:limit]
+        selection_reasons = {node_id: "high-degree overview node" for node_id in selected_ids}
+
+    selected = set(selected_ids)
+    selected_edges = [
+        {"source": str(edge.get("source") or ""), "target": str(edge.get("target") or "")}
+        for edge in all_edges
+        if str(edge.get("source") or "") in selected and str(edge.get("target") or "") in selected
+    ]
+    selected_edges.sort(key=lambda edge: (
+        -degree.get(edge["source"], 0) - degree.get(edge["target"], 0),
+        edge["source"],
+        edge["target"],
+    ))
+    edge_truncated = len(selected_edges) > max_edges
+    selected_edges = selected_edges[:max_edges]
+
+    nodes_payload: list[dict[str, Any]] = []
+    for node_id in selected_ids:
+        node = node_by_id[node_id]
+        page = page_map.get(node_id.lower(), {}) if isinstance(page_map, dict) else {}
+        summary = ""
+        if isinstance(page, dict):
+            summary = str(page.get("tldr") or "")
+        if not summary and isinstance(snippet_index, dict):
+            summary = str(snippet_index.get(node_id.lower(), ""))
+        item = {
+            "id": node_id,
+            "title": node.get("title", ""),
+            "category": node.get("category", ""),
+            "type": node.get("type", ""),
+            "degree": degree.get(node_id, 0),
+            "in_degree": in_degree.get(node_id, 0),
+            "out_degree": out_degree.get(node_id, 0),
+            "summary": _trim_summary(summary),
+            "why_selected": selection_reasons.get(node_id, "selected for graph summary"),
+        }
+        if node_id in distances:
+            item["distance"] = distances[node_id]
+        nodes_payload.append(item)
+
+    if mode == "topic-neighborhood":
+        agent_guidance = [
+            "Use this bounded graph summary for orientation before requesting full pages.",
+            "Call get_context on the best matching node when you need source-backed page content.",
+            "Do not call get_graph unless the user explicitly asks for a full graph export.",
+        ]
+    else:
+        agent_guidance = [
+            "This is a high-degree overview, not the full graph.",
+            "Pass a topic to get_graph_summary to inspect a bounded neighborhood.",
+            "Use query_link or get_context for answer-ready source-backed context.",
+        ]
+
+    follow_up: list[dict[str, Any]] = []
+    if topic and found and selected_ids:
+        follow_up.append({"tool": "get_context", "arguments": {"topic": selected_ids[0]}})
+        follow_up.append({"tool": "get_backlinks", "arguments": {"page_name": selected_ids[0]}})
+    elif topic and not found:
+        follow_up.append({"tool": "search_wiki", "arguments": {"query": topic, "limit": 10}})
+    else:
+        follow_up.append({"tool": "get_graph_summary", "arguments": {"topic": "<topic>", "limit": limit, "depth": depth}})
+
+    considered_nodes = len(distances) if distances else len(selectable_ids)
+    if len(nodes_payload) < considered_nodes or edge_truncated:
+        follow_up.append({
+            "tool": "get_graph_summary",
+            "arguments": {"topic": topic, "limit": min(limit * 2, 250), "depth": depth, "max_edges": min(max_edges * 2, 1000)},
+            "when": "Use only if the bounded graph is insufficient.",
+        })
+    follow_up.append({"tool": "get_graph", "when": "Only for an explicit full graph export or offline analysis."})
+
+    return {
+        "topic": topic,
+        "mode": mode,
+        "found": found if topic else True,
+        "node_count": len(all_nodes),
+        "edge_count": len(all_edges),
+        "returned_nodes": len(nodes_payload),
+        "returned_edges": len(selected_edges),
+        "considered_nodes": considered_nodes,
+        "generated_nodes_excluded": len(node_by_id) - len(selectable_ids),
+        "limit": limit,
+        "depth": depth,
+        "max_edges": max_edges,
+        "truncated": len(nodes_payload) < considered_nodes or edge_truncated,
+        "edge_truncated": edge_truncated,
+        "search_backend": str(cache.get("search_backend") or "token-index"),
+        "category_counts": _count_by(all_nodes, "category"),
+        "type_counts": _count_by(all_nodes, "type"),
+        "top_hubs": top_hubs,
+        "nodes": nodes_payload,
+        "edges": selected_edges,
+        "agent_guidance": agent_guidance,
+        "follow_up": follow_up,
+    }
+
+
 def _index_pages(cache: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         page for page in cache["pages"]

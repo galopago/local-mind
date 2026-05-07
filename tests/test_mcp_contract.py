@@ -262,6 +262,18 @@ class McpContractTests(unittest.TestCase):
         self.assertIn(("prefer-local-personal-memory", "agent-memory"), edges)
         self.assertIn(("retrieval-augmented-generation", "transformers"), edges)
 
+    def test_get_graph_summary_contract(self):
+        payload = json.loads(self.server.get_graph_summary("agent memory", limit=5, depth=1, max_edges=10))
+        node_ids = {node["id"] for node in payload["nodes"]}
+
+        self.assertEqual(payload["mode"], "topic-neighborhood")
+        self.assertTrue(payload["found"])
+        self.assertLessEqual(payload["returned_nodes"], 5)
+        self.assertLessEqual(payload["returned_edges"], 10)
+        self.assertIn("agent-memory", node_ids)
+        self.assertEqual(payload["nodes"][0]["why_selected"], "matched topic")
+        self.assertIn("get_context", {item["tool"] for item in payload["follow_up"]})
+
     def test_recall_memory_contract(self):
         payload = json.loads(self.server.recall_memory("local personal memory"))
 

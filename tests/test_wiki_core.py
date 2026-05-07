@@ -17,6 +17,7 @@ from link_core.wiki import (  # noqa: E402
     build_wiki_cache,
     context_for_topic,
     graph_data,
+    graph_summary,
     load_backlinks_index,
     rebuild_index,
     search_pages,
@@ -91,6 +92,51 @@ class WikiCoreTests(unittest.TestCase):
         self.assertEqual([page["name"] for page in context["pages"]], ["agent-memory", "link", "retrieval"])
         self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
         self.assertIn({"source": "agent-memory", "target": "retrieval"}, graph["edges"])
+
+    def test_graph_summary_caps_overview_for_agent_context(self):
+        wiki = self.make_wiki()
+        for index in range(6):
+            links = " ".join(f"[[page-{target}]]" for target in range(6) if target != index)
+            write_page(
+                wiki,
+                f"concepts/page-{index}.md",
+                f"---\ntype: concept\ntitle: Page {index}\n---\n# Page {index}\n\n{links}\n",
+            )
+        cache = build_wiki_cache(wiki)
+
+        summary = graph_summary(cache, limit=3, max_edges=2)
+
+        self.assertEqual(summary["mode"], "overview")
+        self.assertEqual(summary["node_count"], 8)
+        self.assertEqual(summary["returned_nodes"], 3)
+        self.assertEqual(summary["returned_edges"], 2)
+        self.assertTrue(summary["truncated"])
+        self.assertTrue(summary["edge_truncated"])
+        self.assertEqual(summary["follow_up"][-1]["tool"], "get_graph")
+
+    def test_graph_summary_topic_returns_bounded_neighborhood(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n[[link]] [[retrieval]]\n",
+        )
+        write_page(wiki, "entities/link.md", "---\ntype: entity\ntitle: Link\n---\n# Link\n\n[[agent-memory]]\n")
+        write_page(wiki, "concepts/retrieval.md", "---\ntype: concept\ntitle: Retrieval\n---\n# Retrieval\n")
+        write_page(wiki, "concepts/isolated.md", "---\ntype: concept\ntitle: Isolated\n---\n# Isolated\n")
+        cache = build_wiki_cache(wiki)
+
+        summary = graph_summary(cache, topic="agent memory", limit=10, depth=1)
+        node_ids = {node["id"] for node in summary["nodes"]}
+
+        self.assertEqual(summary["mode"], "topic-neighborhood")
+        self.assertTrue(summary["found"])
+        self.assertIn("agent-memory", node_ids)
+        self.assertIn("link", node_ids)
+        self.assertIn("retrieval", node_ids)
+        self.assertNotIn("isolated", node_ids)
+        self.assertEqual(summary["nodes"][0]["why_selected"], "matched topic")
+        self.assertEqual(summary["follow_up"][0]["tool"], "get_context")
 
     def test_multi_token_search_uses_token_relevance_without_exact_phrase(self):
         wiki = self.make_wiki()
