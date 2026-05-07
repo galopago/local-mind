@@ -691,8 +691,9 @@ Before opening a PR, run the local gate:
 python3 -m pip install "ruff>=0.8,<1"
 python3 -m ruff check .
 python3 -m unittest discover -s tests
-python3 -m py_compile link.py serve.py scripts/check_release_hygiene.py scripts/check_runtime_duplication.py scripts/check_tool_contract.py scripts/prepare_release.py scripts/smoke_first_use.py scripts/smoke_large_wiki.py scripts/smoke_mcp_stdio.py mcp_package/link_core/*.py mcp_package/link_mcp/server.py mcp_package/link_mcp/__main__.py mcp_package/link_mcp/__init__.py
+python3 -m py_compile link.py serve.py scripts/check_release_hygiene.py scripts/check_runtime_duplication.py scripts/check_tool_contract.py scripts/prepare_release.py scripts/smoke_first_use.py scripts/smoke_http_viewer.py scripts/smoke_large_wiki.py scripts/smoke_mcp_stdio.py mcp_package/link_core/*.py mcp_package/link_mcp/server.py mcp_package/link_mcp/__main__.py mcp_package/link_mcp/__init__.py
 python3 scripts/smoke_first_use.py
+python3 scripts/smoke_http_viewer.py
 python3 scripts/smoke_large_wiki.py --pages 1000
 python3 scripts/check_release_hygiene.py
 python3 scripts/check_runtime_duplication.py
