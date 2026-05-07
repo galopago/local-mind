@@ -2050,12 +2050,29 @@ def _render_captures(project: str | None = None):
 def _render_propose(project: str | None = None, source: str | None = None):
     project_value = html.escape(str(project or ""), quote=True)
     source_value = html.escape(str(source or ""), quote=True)
+    proposal_path = (
+        f'<section class="ingest-path" aria-label="Memory proposal path">'
+        f'<article class="ingest-step"><span class="step-num">1</span>'
+        f'<h3>Load source</h3><p>Paste notes or load a safe local raw file. The source stays local.</p>'
+        f'<code>raw/file.md</code></article>'
+        f'<article class="ingest-step"><span class="step-num">2</span>'
+        f'<h3>Propose</h3><p>Link returns candidates only. This step never writes durable memory.</p>'
+        f'<code>Propose</code></article>'
+        f'<article class="ingest-step"><span class="step-num">3</span>'
+        f'<h3>Approve explicitly</h3><p>Copy the approval prompt into your agent chat only for memories you want kept.</p>'
+        f'<code>remember that ...</code></article>'
+        f'<article class="ingest-step"><span class="step-num">4</span>'
+        f'<h3>Review later</h3><p>Use the inbox and explain views to review, archive, update, or forget memories.</p>'
+        f'<code>link memory-inbox</code></article>'
+        f'</section>'
+    )
     body = (
         f'<div class="breadcrumb"><a href="/">Link</a> / propose</div>'
         f'<h1>Propose Memories</h1>'
         f'<p class="summary">Paste source notes, session notes, or a raw excerpt. Link returns memory candidates without writing anything.</p>'
         f'<div class="memory-next"><strong>Trust rule</strong>'
         f'<p>Source-backed wiki knowledge and durable agent memory are separate. Save only preferences, decisions, or project facts you approve.</p></div>'
+        f'{proposal_path}'
         f'<section><div class="section-heading"><h2>Local Raw Sources</h2><a href="/captures">captures</a></div>'
         f'<div class="proposal-source-list" data-proposal-sources aria-live="polite"></div></section>'
         f'<form class="proposal-form" data-proposal-form data-initial-source="{source_value}">'
