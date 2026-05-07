@@ -13,6 +13,7 @@ from typing import Any
 
 EXPECTED_TOOLS = {
     "link_status",
+    "starter_prompts",
     "migrate_wiki",
     "ingest_status",
     "query_link",
@@ -75,6 +76,17 @@ async def _run_smoke(wiki_dir: Path, python: str) -> None:
             )
             if not status.get("ready") or status.get("validation", {}).get("passed") is not True:
                 raise RuntimeError("link_status did not report the demo wiki as ready")
+
+            prompts = _json_text(
+                await session.call_tool(
+                    "starter_prompts",
+                    {"project": "mcp-smoke"},
+                    read_timeout_seconds=timedelta(seconds=10),
+                ),
+                "starter_prompts",
+            )
+            if prompts.get("project") != "mcp-smoke" or prompts.get("prompts", [{}])[0].get("prompt") != "is Link ready?":
+                raise RuntimeError("starter_prompts did not return the expected first-run guidance")
 
             search = _json_text(
                 await session.call_tool(
