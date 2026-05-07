@@ -1017,27 +1017,43 @@ class ServeTests(unittest.TestCase):
             f"# Secret Note\n\nToken {fake_secret} should not be loaded.",
             encoding="utf-8",
         )
+        (raw / "big-note.md").write_text(
+            "# Big Note\n\n" + ("large source text\n" * 5000),
+            encoding="utf-8",
+        )
         (raw / "image.png").write_bytes(b"not listed")
         reset_wiki(wiki)
 
         list_status, list_payload = run_handler("GET", "/api/proposal-sources")
         load_status, load_payload = run_handler("GET", "/api/proposal-source?path=raw/first-memory.md")
         secret_status, secret_payload = run_handler("GET", "/api/proposal-source?path=raw/secret-note.md")
+        big_status, big_payload = run_handler("GET", "/api/proposal-source?path=raw/big-note.md")
         traversal_status, traversal_payload = run_handler("GET", "/api/proposal-source?path=../serve.py")
 
         self.assertEqual(list_status, 200)
-        self.assertEqual(list_payload["count"], 2)
+        self.assertEqual(list_payload["count"], 3)
         sources = {item["path"]: item for item in list_payload["sources"]}
         self.assertTrue(sources["raw/first-memory.md"]["loadable"])
+        self.assertEqual(sources["raw/first-memory.md"]["action"], "load")
+        self.assertEqual(sources["raw/first-memory.md"]["action_label"], "Use in form")
         self.assertFalse(sources["raw/secret-note.md"]["loadable"])
+        self.assertEqual(sources["raw/secret-note.md"]["action"], "redact")
+        self.assertEqual(sources["raw/secret-note.md"]["action_label"], "Redact first")
         self.assertEqual(sources["raw/secret-note.md"]["secret_warnings"], ["OpenAI API key"])
         self.assertNotIn(fake_secret, sources["raw/secret-note.md"]["snippet"])
+        self.assertFalse(sources["raw/big-note.md"]["loadable"])
+        self.assertTrue(sources["raw/big-note.md"]["truncated"])
+        self.assertEqual(sources["raw/big-note.md"]["action"], "split")
+        self.assertEqual(sources["raw/big-note.md"]["action_label"], "Split file")
         self.assertEqual(load_status, 200)
         self.assertIn("local-first agent memory", load_payload["text"])
         self.assertEqual(load_payload["source"], "raw/first-memory.md")
         self.assertEqual(secret_status, 409)
         self.assertIn("redact", secret_payload["error"])
         self.assertNotIn("text", secret_payload)
+        self.assertEqual(big_status, 413)
+        self.assertIn("too large", big_payload["error"])
+        self.assertNotIn("text", big_payload)
         self.assertEqual(traversal_status, 404)
         self.assertFalse(traversal_payload["found"])
 

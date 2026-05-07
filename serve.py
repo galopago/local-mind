@@ -43,7 +43,7 @@ from link_core.log import (
 from link_core.security import (
     clean_text_input as _clean_text_input,
     redact_secret_values as _redact_secret_values,
-    secret_value_warnings as _secret_value_warnings,
+    secret_file_warnings as _secret_file_warnings,
 )
 from link_core.query import (
     query_link as _core_query_link,
@@ -718,6 +718,14 @@ def _proposal_source_snippet(text: str) -> str:
     return " ".join(lines[:3])[:260]
 
 
+def _proposal_source_preview(path: Path) -> str:
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            return handle.read(MAX_PROPOSAL_SOURCE_BYTES + 1)
+    except OSError:
+        return ""
+
+
 def _resolve_proposal_source_path(source_path: str) -> Path | None:
     decoded = urllib.parse.unquote(str(source_path or "")).strip().lstrip("/")
     if decoded.startswith("raw/"):
@@ -738,7 +746,6 @@ def _proposal_source_record(path: Path, include_text: bool = False) -> dict[str,
     rel = path.relative_to(raw_root).as_posix()
     try:
         size = path.stat().st_size
-        text = path.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
         return {
             "path": f"raw/{rel}",
@@ -749,10 +756,24 @@ def _proposal_source_record(path: Path, include_text: bool = False) -> dict[str,
             "secret_warnings": [],
             "warning_count": 0,
             "loadable": False,
+            "truncated": False,
+            "action": "unavailable",
+            "action_label": "Unavailable",
             "error": str(exc),
         }
-    labels = _secret_value_warnings(text)
+    text = _proposal_source_preview(path)
+    labels = _secret_file_warnings(path)
     redacted, _, _ = _redact_secret_values(text) if labels else (text, [], 0)
+    truncated = size > MAX_PROPOSAL_SOURCE_BYTES
+    if labels:
+        action = "redact"
+        action_label = "Redact first"
+    elif truncated:
+        action = "split"
+        action_label = "Split file"
+    else:
+        action = "load"
+        action_label = "Use in form"
     record: dict[str, object] = {
         "path": f"raw/{rel}",
         "source": f"raw/{rel}",
@@ -761,8 +782,10 @@ def _proposal_source_record(path: Path, include_text: bool = False) -> dict[str,
         "snippet": _proposal_source_snippet(redacted),
         "secret_warnings": labels,
         "warning_count": len(labels),
-        "loadable": not labels and size <= MAX_PROPOSAL_SOURCE_BYTES,
-        "truncated": size > MAX_PROPOSAL_SOURCE_BYTES,
+        "loadable": action == "load",
+        "truncated": truncated,
+        "action": action,
+        "action_label": action_label,
     }
     if include_text and record["loadable"]:
         record["text"] = text[:MAX_PROPOSAL_SOURCE_BYTES]
@@ -1461,9 +1484,12 @@ PROPOSAL_UI_JS = """
       if (source.secret_warnings && source.secret_warnings.length) {
         addText(card, 'p', 'proposal-warning', 'Secret-looking values: ' + source.secret_warnings.join(', '));
       }
+      if (source.truncated) {
+        addText(card, 'p', 'proposal-warning', 'Large source: split or summarize it before loading into the proposal form.');
+      }
       var button = document.createElement('button');
       button.type = 'button';
-      button.textContent = source.loadable ? 'Use in form' : (source.warning_count ? 'Redact first' : 'Too large');
+      button.textContent = source.action_label || (source.loadable ? 'Use in form' : (source.warning_count ? 'Redact first' : 'Too large'));
       button.disabled = !source.loadable;
       button.setAttribute('data-proposal-source', source.path || '');
       card.appendChild(button);
