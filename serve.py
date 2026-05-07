@@ -40,6 +40,9 @@ from link_core.log import (
     append_log as _core_append_log,
     utc_timestamp as _core_utc_timestamp,
 )
+from link_core.markdown import (
+    markdown_to_html as _core_markdown_to_html,
+)
 from link_core.raw import (
     RawSourceError as _RawSourceError,
     create_raw_source as _core_create_raw_source,
@@ -871,109 +874,8 @@ def _create_raw_source_payload(payload: dict[str, object]) -> tuple[dict[str, ob
 # Parsing
 # ---------------------------------------------------------------------------
 
-def _inline(text):
-    def _stash(rendered: str) -> str:
-        html_spans.append(rendered)
-        return f"\x00HTML{len(html_spans)-1}\x00"
-
-    def _safe_href(href: str) -> str:
-        href = html.unescape(href).strip()
-        parsed = urllib.parse.urlparse(href)
-        if href.startswith("//") or (parsed.scheme and parsed.scheme.lower() not in {"http", "https", "mailto"}):
-            return "#"
-        return html.escape(href, quote=True)
-
-    def _wl(m):
-        inner = html.unescape(m.group(1))
-        t, d = (inner.split("|", 1) if "|" in inner else (inner, inner))
-        href = _page_href(t)
-        return _stash(f'<a href="{href}">{html.escape(d.strip())}</a>')
-
-    def _md_link(m):
-        label = html.unescape(m.group(1))
-        href = _safe_href(m.group(2))
-        return _stash(f'<a href="{href}">{html.escape(label)}</a>')
-
-    html_spans: list[str] = []
-    text = html.escape(text, quote=False)
-
-    def _save_code(m):
-        return _stash(f"<code>{m.group(1)}</code>")
-
-    text = re.sub(r"`([^`]+)`", _save_code, text)
-    text = re.sub(r"\[\[([^\]]+)\]\]", _wl, text)
-    text = re.sub(r"(?<!!)\[([^\]]+)\]\(([^)]+)\)", _md_link, text)
-    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-    # Guard: only match single * that are not part of **
-    text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", text)
-    for i, span in enumerate(html_spans):
-        text = text.replace(f"\x00HTML{i}\x00", span)
-    return text
-
-
 def _md_to_html(md):
-    out, in_code, in_table, in_list, lt, code_lang, in_blockquote, bq_lines = [], False, False, False, None, "", False, []
-
-    def _flush_blockquote():
-        if bq_lines:
-            out.append(f"<blockquote>{'<br>'.join(bq_lines)}</blockquote>")
-            bq_lines.clear()
-
-    for line in md.split("\n"):
-        s = line.strip()
-        if s.startswith("```"):
-            _flush_blockquote(); in_blockquote = False
-            if in_code:
-                out.append("</code></pre>"); in_code = False; code_lang = ""
-            else:
-                code_lang = s[3:].strip()
-                lang_attr = f' class="language-{html.escape(code_lang)}"' if code_lang else ""
-                out.append(f'<pre><code{lang_attr}>'); in_code = True
-            continue
-        if in_code: out.append(html.escape(line)); continue
-        if in_table and not s.startswith("|"):
-            out.append("</tbody></table>"); in_table = False
-        if in_list and not re.match(r"^\s*[-*]\s|^\s*\d+\.\s", line) and s:
-            out.append(f'</{"ul" if lt == "ul" else "ol"}>'); in_list = False
-        # Blockquote: collect consecutive > lines, flush on non-> line
-        if s.startswith(">"):
-            if in_list: out.append(f'</{"ul" if lt == "ul" else "ol"}>'); in_list = False
-            if in_table: out.append("</tbody></table>"); in_table = False
-            bq_lines.append(_inline(s[1:].strip()))
-            in_blockquote = True
-            continue
-        if in_blockquote:
-            _flush_blockquote(); in_blockquote = False
-        if s in ("---", "***", "___") and not in_table: out.append("<hr>"); continue
-        m = re.match(r"^(#{1,6})\s+(.*)", line)
-        if m: out.append(f'<h{len(m.group(1))}>{_inline(m.group(2))}</h{len(m.group(1))}>'); continue
-        if s.startswith("|"):
-            cells = [c.strip() for c in s.strip("|").split("|")]
-            if all(re.match(r"^[-:]+$", c) for c in cells): continue
-            if not in_table:
-                out.append("<table><thead><tr>" + "".join(f"<th>{_inline(c)}</th>" for c in cells) + "</tr></thead><tbody>"); in_table = True
-            else:
-                out.append("<tr>" + "".join(f"<td>{_inline(c)}</td>" for c in cells) + "</tr>")
-            continue
-        m = re.match(r"^\s*[-*]\s+(.*)", line)
-        if m:
-            if not in_list or lt != "ul":
-                if in_list: out.append(f'</{"ul" if lt == "ul" else "ol"}>')
-                out.append("<ul>"); in_list, lt = True, "ul"
-            out.append(f"<li>{_inline(m.group(1))}</li>"); continue
-        m = re.match(r"^\s*\d+\.\s+(.*)", line)
-        if m:
-            if not in_list or lt != "ol":
-                if in_list: out.append(f'</{"ul" if lt == "ul" else "ol"}>')
-                out.append("<ol>"); in_list, lt = True, "ol"
-            out.append(f"<li>{_inline(m.group(1))}</li>"); continue
-        if not s: out.append(""); continue
-        out.append(f"<p>{_inline(s)}</p>")
-    if in_code: out.append("</code></pre>")
-    if in_table: out.append("</tbody></table>")
-    if in_list: out.append(f'</{"ul" if lt == "ul" else "ol"}>')
-    _flush_blockquote()
-    return "\n".join(out)
+    return _core_markdown_to_html(md, page_href=_page_href)
 
 
 # ---------------------------------------------------------------------------
