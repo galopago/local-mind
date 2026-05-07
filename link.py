@@ -888,15 +888,19 @@ def _memory_brief(wiki_dir: Path, query: str = "", limit: int = 6, project: str 
 
 
 def _query_link(wiki_dir: Path, query: str, budget: str = "medium", project: str | None = None) -> dict[str, object]:
-    return _core_query_link(
-        wiki_dir,
-        query,
-        _core_build_wiki_cache(wiki_dir),
-        _memory_records(wiki_dir),
-        budget=budget,
-        project=project,
-        review_command="review-memory",
-    )
+    cache = _core_build_wiki_cache(wiki_dir)
+    try:
+        return _core_query_link(
+            wiki_dir,
+            query,
+            cache,
+            _memory_records(wiki_dir),
+            budget=budget,
+            project=project,
+            review_command="review-memory",
+        )
+    finally:
+        _core_close_wiki_cache(cache)
 
 
 def _recall_memories(

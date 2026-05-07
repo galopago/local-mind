@@ -5,6 +5,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -211,6 +212,66 @@ class WikiCoreTests(unittest.TestCase):
         self.assertEqual(result["page_count"], 3)
         self.assertEqual(result["category_counts"]["concepts"], 1)
         self.assertEqual(result["next_actions"][0]["tool"], "rebuild_backlinks")
+
+    def test_index_build_closes_owned_cache(self):
+        wiki = self.make_wiki()
+
+        class FakeIndex:
+            closed = False
+
+            def close(self):
+                self.closed = True
+
+        fake = FakeIndex()
+        cache = {
+            "pages": [
+                {
+                    "name": "agent-memory",
+                    "title": "Agent Memory",
+                    "category": "concepts",
+                    "type": "concept",
+                    "tldr": "Durable memory.",
+                }
+            ],
+            "snippet_index": {},
+            "fts_index": fake,
+        }
+
+        with patch("link_core.wiki.build_wiki_cache", return_value=cache):
+            markdown = build_index_markdown(wiki)
+
+        self.assertIn("[[agent-memory]]", markdown)
+        self.assertTrue(fake.closed)
+
+    def test_rebuild_index_closes_owned_cache(self):
+        wiki = self.make_wiki()
+
+        class FakeIndex:
+            closed = False
+
+            def close(self):
+                self.closed = True
+
+        fake = FakeIndex()
+        cache = {
+            "pages": [
+                {
+                    "name": "agent-memory",
+                    "title": "Agent Memory",
+                    "category": "concepts",
+                    "type": "concept",
+                    "tldr": "Durable memory.",
+                }
+            ],
+            "snippet_index": {},
+            "fts_index": fake,
+        }
+
+        with patch("link_core.wiki.build_wiki_cache", return_value=cache):
+            result = rebuild_index(wiki)
+
+        self.assertEqual(result["page_count"], 1)
+        self.assertTrue(fake.closed)
 
 
 if __name__ == "__main__":
