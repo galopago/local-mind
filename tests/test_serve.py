@@ -1359,6 +1359,17 @@ class ServeTests(unittest.TestCase):
                 "X-Link-Local-Action": "true",
             },
         )
+        bad_origin_status, bad_origin_payload = run_handler(
+            "POST",
+            "/api/rebuild-backlinks",
+            body=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": "2",
+                "X-Link-Local-Action": "true",
+                "Origin": "https://attacker.example",
+            },
+        )
         rebuilt = json.loads(backlinks_path.read_text(encoding="utf-8"))
 
         self.assertEqual(get_status, 405)
@@ -1371,6 +1382,9 @@ class ServeTests(unittest.TestCase):
         self.assertIn("X-Link-Local-Action", missing_header_payload["error"])
         self.assertEqual(post_status, 200)
         self.assertTrue(post_payload["rebuilt"])
+        self.assertEqual(bad_origin_status, 403)
+        self.assertFalse(bad_origin_payload["rebuilt"])
+        self.assertIn("Origin/Referer", bad_origin_payload["error"])
         self.assertEqual(rebuilt["backlinks"], {"b": ["a"]})
         self.assertEqual(rebuilt["forward"], {"a": ["b"]})
 

@@ -44,6 +44,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `link benchmark` to measure local cache, search, smart query, and graph timings on a user's current wiki.
 - Extended `link benchmark` and large-wiki smoke to prove bounded agent payload timings for graph summaries and page lists.
 - Made the local graph viewer start with a bounded overview for very large wikis, with an explicit full-graph load control.
+- Hardened local write APIs by rejecting browser `Origin`/`Referer` headers that do not point at the local Link viewer.
 - Added an interactive-readiness verdict and threshold warnings to `link benchmark` so larger local wikis are easier to evaluate.
 - Added shared benchmark health checks to the large-wiki smoke so user-facing and CI scale verdicts stay aligned.
 - Tightened ownership of generated search caches in CLI query and index rebuild paths so in-memory SQLite indexes are closed when short-lived operations finish.

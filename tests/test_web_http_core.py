@@ -8,12 +8,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.web_http import (  # noqa: E402
+    BROWSER_SOURCE_LOCAL_ONLY,
     HOST_HEADER_LOCAL_ONLY,
     HOST_HEADER_REQUIRED,
     is_allowed_static_file,
     parse_bounded_int,
     resolve_raw_static_path,
     safe_resolve,
+    validate_local_browser_source_headers,
     validate_local_host_header,
 )
 
@@ -35,6 +37,22 @@ class WebHttpCoreTests(unittest.TestCase):
         self.assertEqual(validate_local_host_header("localhost.evil.test"), (False, HOST_HEADER_LOCAL_ONLY))
         self.assertEqual(validate_local_host_header("localhost:bad"), (False, HOST_HEADER_LOCAL_ONLY))
         self.assertEqual(validate_local_host_header("localhost attacker"), (False, HOST_HEADER_LOCAL_ONLY))
+
+    def test_validate_local_browser_source_headers_accepts_local_or_missing_sources(self):
+        self.assertEqual(validate_local_browser_source_headers("", ""), (True, None))
+        self.assertEqual(validate_local_browser_source_headers("http://localhost:3000", ""), (True, None))
+        self.assertEqual(validate_local_browser_source_headers("", "http://127.0.0.1:3000/graph"), (True, None))
+
+    def test_validate_local_browser_source_headers_rejects_remote_sources(self):
+        self.assertEqual(
+            validate_local_browser_source_headers("https://attacker.example", ""),
+            (False, BROWSER_SOURCE_LOCAL_ONLY),
+        )
+        self.assertEqual(
+            validate_local_browser_source_headers("", "http://localhost.evil.test/page"),
+            (False, BROWSER_SOURCE_LOCAL_ONLY),
+        )
+        self.assertEqual(validate_local_browser_source_headers("null", ""), (False, BROWSER_SOURCE_LOCAL_ONLY))
 
     def test_raw_static_resolver_stays_under_raw_directory(self):
         with tempfile.TemporaryDirectory() as tmp:

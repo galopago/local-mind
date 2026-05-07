@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Iterable, Mapping
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 
 ALLOWED_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost"})
 HOST_HEADER_REQUIRED = "Host header required"
 HOST_HEADER_LOCAL_ONLY = "Host header must be localhost or 127.0.0.1"
+BROWSER_SOURCE_LOCAL_ONLY = "Origin/Referer must match local Link viewer"
 
 
 def parse_bounded_int(
@@ -68,6 +69,32 @@ def validate_local_host_header(
     if host_name in set(allowed_hosts):
         return True, None
     return False, HOST_HEADER_LOCAL_ONLY
+
+
+def _browser_source_host(header_value: object) -> str | None:
+    value = str(header_value or "").strip().lower()
+    if not value:
+        return None
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return _host_without_port(parsed.netloc) or ""
+
+
+def validate_local_browser_source_headers(
+    origin_header: object,
+    referer_header: object,
+    allowed_hosts: Iterable[str] = ALLOWED_LOCAL_HOSTS,
+) -> tuple[bool, str | None]:
+    """Allow browser-supplied Origin/Referer only from the local viewer."""
+    allowed = set(allowed_hosts)
+    for header_value in (origin_header, referer_header):
+        host = _browser_source_host(header_value)
+        if host is None:
+            continue
+        if host not in allowed:
+            return False, BROWSER_SOURCE_LOCAL_ONLY
+    return True, None
 
 
 def safe_resolve(path: Path) -> Path | None:

@@ -7,6 +7,10 @@ Link is designed for local personal knowledge management. `serve.py` binds to
 outside `localhost`/`127.0.0.1`. It has no authentication, so it should not be
 exposed directly to the public internet.
 
+Local write APIs also require the `X-Link-Local-Action` header. When a browser
+supplies `Origin` or `Referer`, Link accepts local mutations only from
+`localhost` or `127.0.0.1`.
+
 The server and MCP package do not call external APIs, send telemetry, or require
 secrets. Raw sources and generated wiki pages are user data and are ignored by
 git by default.

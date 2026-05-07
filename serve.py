@@ -90,6 +90,7 @@ from link_core.web_http import (
     parse_bounded_int as _core_parse_bounded_int,
     resolve_raw_static_path as _core_resolve_raw_static_path,
     safe_resolve as _core_safe_resolve,
+    validate_local_browser_source_headers as _core_validate_local_browser_source_headers,
     validate_local_host_header as _core_validate_local_host_header,
 )
 from link_core.status import (
@@ -3278,7 +3279,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def _require_local_action_header(self, error_payload: dict[str, object] | None = None) -> bool:
         value = self.headers.get(LOCAL_ACTION_HEADER, "").strip().lower()
         if value in LOCAL_ACTION_VALUES:
-            return True
+            allowed, error = _core_validate_local_browser_source_headers(
+                self.headers.get("Origin", ""),
+                self.headers.get("Referer", ""),
+            )
+            if allowed:
+                return True
+            payload = dict(error_payload or {"updated": False})
+            payload["error"] = error
+            self._json(payload, status=403)
+            return False
         payload = dict(error_payload or {"updated": False})
         payload["error"] = f"{LOCAL_ACTION_HEADER} header required for local mutations"
         self._json({
