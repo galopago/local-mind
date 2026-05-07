@@ -49,7 +49,9 @@ def run_handler(method: str, path: str, body: bytes = b"", headers: dict[str, st
     handler.requestline = f"{method} {path} HTTP/1.1"
     handler.client_address = ("127.0.0.1", 0)
     handler.server = None
-    handler.headers = headers or {}
+    request_headers = {"Host": "127.0.0.1"}
+    request_headers.update(headers or {})
+    handler.headers = request_headers
     handler.rfile = BytesIO(body)
     handler.wfile = BytesIO()
     if method == "POST":
@@ -138,6 +140,14 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn(("X-Link-API-Version", serve.API_VERSION), headers)
         self.assertIn(("X-Content-Type-Options", "nosniff"), headers)
+
+    def test_rejects_unexpected_host_header(self):
+        self.make_wiki()
+
+        status, payload = run_handler("GET", "/api/status", headers={"Host": "attacker.example"})
+
+        self.assertEqual(status, 403)
+        self.assertEqual(payload["error"], "Host header must be localhost or 127.0.0.1")
 
     def test_server_args_stay_local_only(self):
         self.assertEqual(serve._parse_serve_port(["--port", "3010"], default=3000), 3010)

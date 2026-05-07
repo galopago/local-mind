@@ -203,6 +203,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 - Hardened installers to avoid silently using `--break-system-packages`; they now fall back to `~/.link-mcp-venv` and register MCP with the resolved Python.
 - Hardened the local viewer against unsafe graph JSON embedding, path-like wikilink targets, malformed static paths, and local path leakage from static file errors.
+- Hardened the local viewer to reject unexpected `Host` headers in addition to binding to `127.0.0.1`.
 - Hardened `link-mcp` tool inputs for empty queries/topics and invalid search limits.
 - Expanded `doctor` and release hygiene checks for common credential filenames, private keys, and token patterns.
 

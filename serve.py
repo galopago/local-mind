@@ -116,6 +116,7 @@ MAX_PROPOSAL_SOURCE_BYTES = 64 * 1024
 MAX_RAW_SOURCE_BYTES = 60 * 1024
 LOCAL_ACTION_HEADER = "X-Link-Local-Action"
 LOCAL_ACTION_VALUES = {"1", "true", "yes"}
+ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 PROPOSAL_SOURCE_SUFFIXES = {
     ".md",
     ".markdown",
@@ -2763,6 +2764,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         self._head_only = False
+        if not self._require_allowed_host():
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         if path == "/api/rebuild-index":
@@ -2874,6 +2877,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         self._head_only = getattr(self, '_head_only', False)
+        if not self._require_allowed_host():
+            return
         parsed = urllib.parse.urlparse(self.path)
         path, query = parsed.path, urllib.parse.parse_qs(parsed.query)
         if path == "/logo.svg":
@@ -3117,6 +3122,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
+
+    def _require_allowed_host(self) -> bool:
+        host = self.headers.get("Host", "").strip().lower()
+        if not host:
+            self._json({"error": "Host header required"}, status=403)
+            return False
+        if any(char.isspace() for char in host):
+            self._json({"error": "Host header must be localhost or 127.0.0.1"}, status=403)
+            return False
+        if host.startswith("["):
+            host_name = host[1:].split("]", 1)[0]
+        elif host.count(":") == 1:
+            host_name = host.rsplit(":", 1)[0]
+        else:
+            host_name = host
+        if host_name in ALLOWED_HOSTS:
+            return True
+        self._json({"error": "Host header must be localhost or 127.0.0.1"}, status=403)
+        return False
 
     def _require_local_action_header(self, error_payload: dict[str, object] | None = None) -> bool:
         value = self.headers.get(LOCAL_ACTION_HEADER, "").strip().lower()
