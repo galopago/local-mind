@@ -1035,6 +1035,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Ingest path", html)
         self.assertIn("Optional memory", html)
         self.assertIn("propose memories from raw/new-source.md", html)
+        self.assertIn("Post-ingest checks", html)
+        self.assertIn("run before reporting done", html)
         self.assertIn("Ingest pending raw sources", html)
         self.assertIn("wiki/sources/new-source.md", html)
         self.assertIn('/propose?source=raw/new-source.md', html)

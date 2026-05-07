@@ -2330,6 +2330,7 @@ def _render_ingest():
     if plan:
         steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
         batch = plan.get("batch") if isinstance(plan.get("batch"), list) else []
+        post_checks = plan.get("post_checks") if isinstance(plan.get("post_checks"), list) else []
         step_html = "".join(f"<li>{html.escape(str(step))}</li>" for step in steps[:6])
         batch_html = ""
         if batch:
@@ -2340,10 +2341,18 @@ def _render_ingest():
                     f'<span class="type">{html.escape(str(item.get("suggested_source_page") or ""))}</span></li>'
                 )
             batch_html = f'<h3>Batch</h3><ul class="page-list">{rows}</ul>'
+        checks_html = ""
+        if post_checks:
+            rows = "".join(
+                f'<li><code>{html.escape(str(check))}</code>'
+                f'<span class="type">run before reporting done</span></li>'
+                for check in post_checks[:6]
+            )
+            checks_html = f'<h3>Post-ingest checks</h3><ul class="page-list">{rows}</ul>'
         plan_html = (
             f'<section><h2>{html.escape(str(plan.get("title") or "Suggested Workflow"))}</h2>'
             f'<p class="summary">{html.escape(str(plan.get("summary") or ""))}</p>'
-            f'<ol>{step_html}</ol>{batch_html}</section>'
+            f'<ol>{step_html}</ol>{batch_html}{checks_html}</section>'
         )
 
     body = (

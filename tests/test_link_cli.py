@@ -229,6 +229,8 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Suggested workflow: Ingest pending raw sources", out.getvalue())
         self.assertIn("Memory review: propose memories from raw/new-source.md", out.getvalue())
         self.assertIn("raw/new-source.md -> wiki/sources/new-source.md", out.getvalue())
+        self.assertIn("Post-ingest checks:", out.getvalue())
+        self.assertIn("link status --validate", out.getvalue())
 
     def test_ingest_status_json(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
