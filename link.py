@@ -1763,7 +1763,11 @@ def rebuild_index(target: Path) -> int:
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
-    result = _core_rebuild_index(wiki_dir)
+    try:
+        result = _core_rebuild_index(wiki_dir)
+    except OSError as exc:
+        print(f"Could not rebuild index: {exc}", file=sys.stderr)
+        return 1
     print(f"Rebuilt {wiki_dir / 'index.md'}")
     print(f"Pages: {result['page_count']}")
     print(f"Sources: {result['source_count']}")

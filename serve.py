@@ -2931,7 +2931,10 @@ def _rebuild_backlinks_payload() -> dict[str, object]:
 
 
 def _rebuild_index_payload() -> dict[str, object]:
-    result = _core_rebuild_index(WIKI_DIR, cache=_current_wiki_cache())
+    try:
+        result = _core_rebuild_index(WIKI_DIR, cache=_current_wiki_cache())
+    except OSError as exc:
+        return {"rebuilt": False, "error": f"Could not rebuild index: {exc}"}
     _invalidate_pages_cache()
     return result
 

@@ -1921,6 +1921,36 @@ class ServeTests(unittest.TestCase):
         self.assertIn("[[a]]", index_text)
         self.assertEqual(post_payload["category_counts"]["concepts"], 1)
 
+    def test_rebuild_index_reports_read_errors(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/locked-page.md",
+            "---\ntype: concept\ntitle: Locked\n---\n# Locked\n",
+        )
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked-page.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            status, payload = run_handler(
+                "POST",
+                "/api/rebuild-index",
+                body=b"{}",
+                headers={
+                    "Content-Type": "application/json",
+                    "Content-Length": "2",
+                    "X-Link-Local-Action": "true",
+                },
+            )
+
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["rebuilt"])
+        self.assertIn("Could not rebuild index", payload["error"])
+
     def test_rebuild_index_rejects_bad_json_after_local_header(self):
         wiki = self.make_wiki()
 

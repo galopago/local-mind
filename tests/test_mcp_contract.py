@@ -868,6 +868,22 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("[[agent-memory]]", index_text)
         self.assertIn("[[prefer-local-personal-memory]]", index_text)
 
+    def test_rebuild_index_contract_reports_read_errors(self):
+        locked = self.target / "wiki/concepts/locked-page.md"
+        locked.write_text("---\ntype: concept\ntitle: Locked\n---\n\n# Locked\n", encoding="utf-8")
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked-page.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            payload = json.loads(self.server.rebuild_index())
+
+        self.assertFalse(payload["rebuilt"])
+        self.assertIn("Could not rebuild index", payload["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

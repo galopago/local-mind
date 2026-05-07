@@ -1359,7 +1359,10 @@ def rebuild_index() -> str:
     Run this after ingesting sources or making large page edits so the
     human-readable wiki catalog reflects all pages grouped by category.
     """
-    result = _core_rebuild_index(WIKI_DIR, cache=_build_cache())
+    try:
+        result = _core_rebuild_index(WIKI_DIR, cache=_build_cache())
+    except OSError as exc:
+        return json.dumps({"rebuilt": False, "error": f"Could not rebuild index: {exc}"}, ensure_ascii=False)
     _clear_cache()
     return json.dumps(result, ensure_ascii=False)
 
