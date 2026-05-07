@@ -368,6 +368,34 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(payload["proposals"][1]["primary_action"]["kind"], "remember")
         self.assertEqual(payload["proposals"][1]["primary_action"]["tool"], "remember_memory")
 
+    def test_project_duplicate_proposal_command_preserves_project(self):
+        records = [
+            {
+                "name": "prefer-release-branches",
+                "path": "wiki/memories/prefer-release-branches.md",
+                "title": "Prefer release branches",
+                "memory_type": "project",
+                "scope": "project",
+                "project": "link",
+                "status": "active",
+                "tldr": "Project uses release branches for Link work.",
+                "snippet": "Project uses release branches for Link work.",
+                "body": "Project uses release branches for Link work.",
+            }
+        ]
+
+        payload = propose_memories_from_text(
+            "This project uses release branches for Link work.",
+            records,
+            source="unit test",
+            project="Link",
+        )
+        action = payload["proposals"][0]["primary_action"]
+
+        self.assertEqual(payload["project"], "link")
+        self.assertEqual(action["arguments"]["project"], "link")
+        self.assertIn("--project link", action["command"])
+
     def test_memory_conflict_candidates_catch_branch_policy_changes(self):
         records = [
             {

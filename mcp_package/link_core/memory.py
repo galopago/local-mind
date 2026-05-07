@@ -1789,7 +1789,10 @@ def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
     if duplicate_list:
         first = duplicate_list[0] if isinstance(duplicate_list[0], Mapping) else {}
         identifier = str(first.get("name") or first.get("title") or "")
-        command = _shell_words("python3", "link.py", "update-memory", identifier, memory, ".", "--source", source)
+        command_parts: list[object] = ["python3", "link.py", "update-memory", identifier, memory, ".", "--source", source]
+        if project:
+            command_parts.extend(["--project", project])
+        command = _shell_words(*command_parts)
         args: dict[str, object] = {"identifier": identifier, "memory": memory, "source": source}
         if project:
             args["project"] = project
