@@ -1322,7 +1322,10 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Select a node before filtering by neighborhood.", html)
         self.assertIn("var LARGE_GRAPH_LIMIT = 350;", html)
         self.assertIn("var LARGE_LABEL_LIMIT = 160;", html)
+        self.assertIn("var FAST_RENDER_NODE_LIMIT = 450;", html)
+        self.assertIn("var FAST_RENDER_EDGE_LIMIT = 1200;", html)
         self.assertIn("function syncLabelsButton()", html)
+        self.assertIn("function graphNeedsFastRender(currentNodes, currentEdges)", html)
         self.assertIn("function graphTooLargeForMotion()", html)
         self.assertIn("searchInput.addEventListener('input'", html)
 
@@ -1371,6 +1374,23 @@ class ServeTests(unittest.TestCase):
         self.assertIn("var animateFlow = !motionPaused && !graphTooLargeForMotion();", html)
         self.assertIn("if (activeEdge && animateFlow)", html)
         self.assertIn("if (shouldRunContinuously()) startLoop();", html)
+
+    def test_graph_uses_fast_canvas_rendering_for_large_visible_sets(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n",
+        )
+
+        html = serve._render_graph()
+
+        self.assertIn("if (graphNeedsFastRender(currentNodes, currentEdges)) parts.push('fast render');", html)
+        self.assertIn("function strokeEdgeBatch(edgeList, strokeStyle, lineWidth)", html)
+        self.assertIn("if (fastRender) {", html)
+        self.assertIn("strokeEdgeBatch(currentEdges, 'rgba(88,166,255,0.07)', 0.45);", html)
+        self.assertIn("Radial glow stays off in large overview mode except for focused nodes.", html)
+        self.assertIn("ctx.fillStyle = fastRender ? color + '28' : color + '40';", html)
 
     def test_graph_labels_are_sparse_for_large_visible_sets(self):
         wiki = self.make_wiki()

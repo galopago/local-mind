@@ -2747,6 +2747,8 @@ def _render_graph():
   var LABEL_FONT = '11px -apple-system, sans-serif';
   var LARGE_GRAPH_LIMIT = 350;
   var LARGE_LABEL_LIMIT = 160;
+  var FAST_RENDER_NODE_LIMIT = 450;
+  var FAST_RENDER_EDGE_LIMIT = 1200;
   var nodeById = {{}};
   nodes.forEach(function(n) {{ nodeById[n.id] = n; }});
 
@@ -2858,6 +2860,9 @@ def _render_graph():
   function graphTooLargeForDefaultLabels() {{
     return visibleNodes().length > LARGE_LABEL_LIMIT;
   }}
+  function graphNeedsFastRender(currentNodes, currentEdges) {{
+    return currentNodes.length > FAST_RENDER_NODE_LIMIT || currentEdges.length > FAST_RENDER_EDGE_LIMIT;
+  }}
   function syncLabelsButton() {{
     if (!labelsButton) return;
     labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
@@ -2894,6 +2899,7 @@ def _render_graph():
     if (depthValue !== 'all') parts.push('depth ' + depthValue);
     if (graphTooLargeForMotion()) parts.push('motion capped');
     if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');
+    if (graphNeedsFastRender(currentNodes, currentEdges)) parts.push('fast render');
     if (showAllLabels) parts.push('labels all');
     if (searchTerm) {{
       var matches = currentNodes.filter(searchMatches).length;
@@ -3029,6 +3035,20 @@ def _render_graph():
 
   var fitted = false;
 
+  function strokeEdgeBatch(edgeList, strokeStyle, lineWidth) {{
+    if (!edgeList.length) return;
+    ctx.beginPath();
+    edgeList.forEach(function(e) {{
+      var a = toScreen(pos[e.source].x, pos[e.source].y);
+      var b = toScreen(pos[e.target].x, pos[e.target].y);
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    }});
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }}
+
   function draw() {{
     ctx.clearRect(0, 0, W, H);
     var time = frame * 0.018;
@@ -3036,73 +3056,93 @@ def _render_graph():
     var currentEdges = visibleEdges();
     var animateFlow = !motionPaused && !graphTooLargeForMotion();
     var largeLabelSet = currentNodes.length > LARGE_LABEL_LIMIT;
+    var fastRender = graphNeedsFastRender(currentNodes, currentEdges);
 
-    // Edges — double draw: blurred glow + sharp line + flow particle
-    currentEdges.forEach(function(e) {{
-      var a = toScreen(pos[e.source].x, pos[e.source].y);
-      var b = toScreen(pos[e.target].x, pos[e.target].y);
-      var activeEdge = !hoverNode || e.source === hoverNode.id || e.target === hoverNode.id;
-      var alpha = hoverNode ? (activeEdge ? 0.42 : 0.035) : 0.14;
-
-      // Glow layer
-      ctx.save();
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.strokeStyle = 'rgba(88,166,255,' + (alpha * 0.55) + ')';
-      ctx.lineWidth = 3;
-      ctx.filter = 'blur(2px)';
-      ctx.stroke();
-      ctx.restore();
-
-      // Sharp line
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.strokeStyle = 'rgba(139,148,158,' + alpha + ')';
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-
-      // Flow particle
-      if (activeEdge && animateFlow) {{
-        var flowT = ((time * 0.5 + (a.x + b.y) * 0.001) % 2) / 2;
-        var px = a.x + (b.x - a.x) * flowT;
-        var py = a.y + (b.y - a.y) * flowT;
-        var pa = Math.sin(flowT * Math.PI) * (hoverNode ? 0.6 : 0.32);
-        ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(45,212,191,' + pa + ')';
-        ctx.fill();
+    if (fastRender) {{
+      if (hoverNode) {{
+        var activeEdges = [];
+        var inactiveEdges = [];
+        currentEdges.forEach(function(e) {{
+          if (e.source === hoverNode.id || e.target === hoverNode.id) activeEdges.push(e);
+          else inactiveEdges.push(e);
+        }});
+        strokeEdgeBatch(inactiveEdges, 'rgba(139,148,158,0.035)', 0.45);
+        strokeEdgeBatch(activeEdges, 'rgba(88,166,255,0.42)', 1.1);
+      }} else {{
+        strokeEdgeBatch(currentEdges, 'rgba(88,166,255,0.07)', 0.45);
       }}
-    }});
+    }} else {{
+      // Detailed edges for smaller or focused graph neighborhoods.
+      currentEdges.forEach(function(e) {{
+        var a = toScreen(pos[e.source].x, pos[e.source].y);
+        var b = toScreen(pos[e.target].x, pos[e.target].y);
+        var activeEdge = !hoverNode || e.source === hoverNode.id || e.target === hoverNode.id;
+        var alpha = hoverNode ? (activeEdge ? 0.42 : 0.035) : 0.14;
+
+        // Glow layer
+        ctx.save();
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        ctx.strokeStyle = 'rgba(88,166,255,' + (alpha * 0.55) + ')';
+        ctx.lineWidth = 3;
+        ctx.filter = 'blur(2px)';
+        ctx.stroke();
+        ctx.restore();
+
+        // Sharp line
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        ctx.strokeStyle = 'rgba(139,148,158,' + alpha + ')';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // Flow particle
+        if (activeEdge && animateFlow) {{
+          var flowT = ((time * 0.5 + (a.x + b.y) * 0.001) % 2) / 2;
+          var px = a.x + (b.x - a.x) * flowT;
+          var py = a.y + (b.y - a.y) * flowT;
+          var pa = Math.sin(flowT * Math.PI) * (hoverNode ? 0.6 : 0.32);
+          ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI*2);
+          ctx.fillStyle = 'rgba(45,212,191,' + pa + ')';
+          ctx.fill();
+        }}
+      }});
+    }}
 
     // Nodes
     currentNodes.forEach(function(n) {{
       var s = toScreen(pos[n.id].x, pos[n.id].y);
       var r = nodeRadius(n) * Math.max(0.65, Math.min(1.2, zoom));
       var color = nodeColor(n);
-      var pulse = Math.sin(time * 1.2 + (pos[n.id].x + pos[n.id].y) * 0.01) * 0.12 + 0.88;
+      var pulse = fastRender ? 1 : Math.sin(time * 1.2 + (pos[n.id].x + pos[n.id].y) * 0.01) * 0.12 + 0.88;
       var activeNode = isActiveNode(n);
       var selected = selectedNode && selectedNode.id === n.id;
       var matched = searchMatches(n);
       ctx.save();
       ctx.globalAlpha = (hoverNode && !activeNode) || (searchTerm && !matched) ? 0.28 : 1;
 
-      // Radial glow
-      var glowR = r * 3.5 * pulse;
-      var grad = ctx.createRadialGradient(s.x, s.y, r * 0.3, s.x, s.y, glowR);
-      grad.addColorStop(0, color + '30');
-      grad.addColorStop(1, color + '00');
-      ctx.beginPath(); ctx.arc(s.x, s.y, glowR, 0, Math.PI*2);
-      ctx.fillStyle = grad; ctx.fill();
+      if (!fastRender || selected || matched || (hoverNode && activeNode)) {{
+        // Radial glow stays off in large overview mode except for focused nodes.
+        var glowR = r * 3.5 * pulse;
+        var grad = ctx.createRadialGradient(s.x, s.y, r * 0.3, s.x, s.y, glowR);
+        grad.addColorStop(0, color + '30');
+        grad.addColorStop(1, color + '00');
+        ctx.beginPath(); ctx.arc(s.x, s.y, glowR, 0, Math.PI*2);
+        ctx.fillStyle = grad; ctx.fill();
+      }}
 
       // Node body
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
-      ctx.fillStyle = color + '40'; ctx.fill();
+      ctx.fillStyle = fastRender ? color + '28' : color + '40'; ctx.fill();
 
       // Node border
       ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
-      ctx.strokeStyle = selected || matched ? '#ffffff' : color; ctx.lineWidth = selected || matched ? 2.4 : 1.5;
+      ctx.strokeStyle = selected || matched ? '#ffffff' : color; ctx.lineWidth = selected || matched ? 2.4 : (fastRender ? 0.75 : 1.5);
       ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1;
 
       // Inner bright core
-      ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.35, 0, Math.PI*2);
-      ctx.fillStyle = color + 'cc'; ctx.fill();
+      if (!fastRender || selected || matched || (hoverNode && activeNode)) {{
+        ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.35, 0, Math.PI*2);
+        ctx.fillStyle = color + 'cc'; ctx.fill();
+      }}
 
       // Labels stay sparse until a node is hovered.
       var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
