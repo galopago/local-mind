@@ -157,6 +157,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added release hygiene checks that protect the public agent instruction contract for `query_link`, `validate_wiki`, and `memory_brief`.
 - Expanded release hygiene checks so public agent instructions must retain `ingest_status`, `get_graph_summary`, and `backup_wiki` guidance.
 - Routed web memory/search limit parsing through the shared bounded-integer helper so local API endpoints handle invalid limits consistently.
+- Hardened release hygiene so `server.json` cannot silently lose the `link-mcp` package version entry.
 - Added release hygiene checks that block accidental outbound HTTP client code in tracked Python and shell runtimes.
 - Updated agent contract checks and installed instructions to include `link_status` for setup/readiness checks.
 - Changed CI to run on pull requests and manual dispatch only, preserving GitHub minutes for the develop-branch workflow.

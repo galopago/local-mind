@@ -51,6 +51,55 @@ class ReleaseHygieneTests(unittest.TestCase):
 
         self.assertEqual(findings, [])
 
+    def test_version_values_require_server_package_version(self):
+        findings: list[str] = []
+
+        release_hygiene.check_version_values(
+            findings,
+            {
+                "mcp_package/pyproject.toml": "1.0.5",
+                "mcp_package/link_mcp/__init__.py": "1.0.5",
+                "mcp_package/link_core/version.py": "1.0.5",
+                "mcp_package/server.json": "1.0.5",
+            },
+            set(),
+        )
+
+        self.assertIn("version mismatch: server.json has no link-mcp package version", findings)
+
+    def test_version_values_accept_matching_release_files(self):
+        findings: list[str] = []
+
+        release_hygiene.check_version_values(
+            findings,
+            {
+                "mcp_package/pyproject.toml": "1.0.5",
+                "mcp_package/link_mcp/__init__.py": "1.0.5",
+                "mcp_package/link_core/version.py": "1.0.5",
+                "mcp_package/server.json": "1.0.5",
+            },
+            {"1.0.5"},
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_version_values_report_mismatched_package_version(self):
+        findings: list[str] = []
+
+        release_hygiene.check_version_values(
+            findings,
+            {
+                "mcp_package/pyproject.toml": "1.0.5",
+                "mcp_package/link_mcp/__init__.py": "1.0.5",
+                "mcp_package/link_core/version.py": "1.0.5",
+                "mcp_package/server.json": "1.0.5",
+            },
+            {"1.0.4"},
+        )
+
+        self.assertIn("version mismatch: mcp_package/pyproject.toml is '1.0.5'", findings)
+        self.assertIn("version mismatch: server.json package versions are ['1.0.4']", findings)
+
     def test_agent_contract_requires_core_public_workflow_terms(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-agent-contract-test-"))
         good = tmp / "good.md"

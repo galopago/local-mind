@@ -159,6 +159,19 @@ def read_core_version(path: Path) -> str | None:
     return match.group(1) if match else None
 
 
+def check_version_values(
+    findings: list[str],
+    versions: dict[str, str | None],
+    package_versions: set[str | None],
+) -> None:
+    if not package_versions:
+        findings.append("version mismatch: server.json has no link-mcp package version")
+    if len(set(versions.values()) | package_versions) != 1:
+        for label, version in versions.items():
+            findings.append(f"version mismatch: {label} is {version!r}")
+        findings.append(f"version mismatch: server.json package versions are {sorted(package_versions)!r}")
+
+
 def check_version_consistency(findings: list[str]) -> str | None:
     pyproject_version = read_pyproject_version(Path("mcp_package/pyproject.toml"))
     init_version = read_init_version(Path("mcp_package/link_mcp/__init__.py"))
@@ -176,10 +189,7 @@ def check_version_consistency(findings: list[str]) -> str | None:
         "mcp_package/link_core/version.py": core_version,
         "mcp_package/server.json": server_version,
     }
-    if len(set(versions.values()) | package_versions) != 1:
-        for label, version in versions.items():
-            findings.append(f"version mismatch: {label} is {version!r}")
-        findings.append(f"version mismatch: server.json package versions are {sorted(package_versions)!r}")
+    check_version_values(findings, versions, package_versions)
     return pyproject_version
 
 
