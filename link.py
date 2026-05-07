@@ -1488,6 +1488,7 @@ def status(target: Path, include_validation: bool = False, json_output: bool = F
         f"{payload['active_memory_count']} active · "
         f"{payload['needs_review_count']} need review"
     )
+    print(f"Search backend: {payload.get('search_backend', 'unknown')}")
     schema = payload.get("schema") or {}
     if isinstance(schema, dict):
         schema_status = schema.get("status", "unknown")

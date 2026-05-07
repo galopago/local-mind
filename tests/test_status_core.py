@@ -59,6 +59,7 @@ class StatusCoreTests(unittest.TestCase):
         self.assertEqual(payload["page_count"], 3)
         self.assertEqual(payload["memory_count"], 1)
         self.assertEqual(payload["active_memory_count"], 1)
+        self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
         self.assertEqual(payload["schema"]["status"], "current")
         self.assertTrue(payload["validation"]["passed"])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
@@ -72,6 +73,7 @@ class StatusCoreTests(unittest.TestCase):
         self.assertIn("wiki", payload["missing"])
         self.assertEqual(payload["schema"]["status"], "missing")
         self.assertEqual(payload["page_count"], 0)
+        self.assertEqual(payload["search_backend"], "unavailable")
         self.assertEqual(payload["next_actions"][0]["tool"], "doctor")
 
 

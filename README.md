@@ -465,7 +465,7 @@ Most agents should start with:
 
 | Tool | Use it when |
 |------|-------------|
-| `link_status` | You are connecting to Link or troubleshooting setup and need version, readiness, counts, validation summary, and safe next actions. |
+| `link_status` | You are connecting to Link or troubleshooting setup and need version, readiness, counts, search backend, validation summary, and safe next actions. |
 | `migrate_wiki` | `link_status` reports a missing or old schema marker and you need a safe, idempotent local migration. |
 | `ingest_status` | The user dropped files into `raw/` or asks to ingest, and you need pending raw files plus the next prompt/checks and guided ingest plan. |
 | `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, graph context, provenance, budget limits, estimated packet size, and follow-up actions without reading the whole wiki. |

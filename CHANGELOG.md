@@ -29,6 +29,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `/propose`, a read-only local UI for turning pasted source/session notes into memory proposals without writing pages.
 - Added guarded web approval actions on `/propose` with local-only `remember-memory` and `update-memory` APIs for explicitly saving selected proposals.
 - Added MCP `link_status` and `/api/status` for a compact readiness summary with version, wiki path, page/memory counts, optional validation, and safe next actions.
+- Added search backend reporting to Link status payloads so agents and users can see whether local search is using SQLite FTS or the token fallback.
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.
 - Added `link.py status --validate` to installer next-step output so new users have one readiness command after setup.
 - Added a managed `~/.local/bin/link` command for global installs so users can run `link status --validate`, `link query`, and `link brief` without remembering wiki paths.

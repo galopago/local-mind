@@ -277,6 +277,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Ready: yes", out.getvalue())
         self.assertIn("Schema: current", out.getvalue())
+        self.assertIn("Search backend:", out.getvalue())
         self.assertIn("Validation: passed", out.getvalue())
         self.assertIn("query_link", out.getvalue())
 
@@ -362,6 +363,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertFalse(payload["ready"])
         self.assertIn("wiki", payload["missing"])
+        self.assertEqual(payload["search_backend"], "unavailable")
 
     def test_validate_accepts_demo_wiki(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-validate-test-"))

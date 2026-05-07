@@ -135,6 +135,7 @@ class McpContractTests(unittest.TestCase):
         self.assertTrue(payload["ready"])
         self.assertEqual(payload["page_count"], 13)
         self.assertEqual(payload["memory_count"], 1)
+        self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
         self.assertEqual(payload["schema"]["status"], "current")
         self.assertTrue(payload["validation"]["passed"])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")

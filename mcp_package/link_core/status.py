@@ -7,7 +7,7 @@ from typing import Any, Iterable, Mapping
 from .memory import memory_records
 from .schema import schema_status
 from .validation import validate_wiki
-from .wiki import build_wiki_cache
+from .wiki import build_wiki_cache, close_wiki_cache
 
 
 def _action(label: str, tool: str, arguments: dict[str, object] | None = None) -> dict[str, object]:
@@ -38,11 +38,23 @@ def link_status(
     missing = [name for name, path in required_paths.items() if not path.exists()]
     pages: list[Mapping[str, object]] = []
     record_list: list[Mapping[str, object]] = []
+    search_backend = "unavailable"
     if wiki_dir.exists():
+        wiki_cache: Mapping[str, Any] | None = None
+        owns_cache = False
         try:
-            pages = list((cache or build_wiki_cache(wiki_dir)).get("pages", []))
+            if cache is None:
+                wiki_cache = build_wiki_cache(wiki_dir)
+                owns_cache = True
+            else:
+                wiki_cache = cache
+            pages = list(wiki_cache.get("pages", []))
+            search_backend = str(wiki_cache.get("search_backend") or "token-index")
         except Exception:
             pages = []
+        finally:
+            if owns_cache and isinstance(wiki_cache, dict):
+                close_wiki_cache(wiki_cache)
         try:
             record_list = list(records if records is not None else memory_records(wiki_dir))
         except Exception:
@@ -98,6 +110,7 @@ def link_status(
         "memory_count": len(record_list),
         "active_memory_count": active_memory_count,
         "needs_review_count": needs_review_count,
+        "search_backend": search_backend,
         "schema": schema,
         "validation": validation_summary,
         "next_actions": next_actions,

@@ -540,6 +540,7 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["api_version"], serve.API_VERSION)
         self.assertTrue(payload["ready"])
         self.assertEqual(payload["memory_count"], 1)
+        self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
         self.assertTrue(payload["validation"]["passed"])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
 
