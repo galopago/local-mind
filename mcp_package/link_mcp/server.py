@@ -136,6 +136,7 @@ from link_core.log import (
     utc_timestamp as _core_utc_timestamp,
 )
 from link_core.security import (
+    clean_text_input as _clean_text_input,
     redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
@@ -161,13 +162,6 @@ from link_core.wiki import (
     search_pages as _core_search_pages,
     wiki_mtime as _core_wiki_mtime,
 )
-
-
-def _clean_text_input(value, max_len: int = MAX_TEXT_INPUT) -> str:
-    if value is None:
-        return ""
-    text = str(value).strip()
-    return text[:max_len]
 
 
 def _required_text_input(value, message: str, max_len: int = MAX_TEXT_INPUT) -> str:

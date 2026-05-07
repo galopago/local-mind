@@ -39,6 +39,7 @@ from link_core.log import (
     utc_timestamp as _core_utc_timestamp,
 )
 from link_core.security import (
+    clean_text_input as _clean_text_input,
     redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
@@ -175,12 +176,6 @@ def _parse_search_limit(raw: str) -> tuple[int | None, str | None]:
     if limit < 1:
         return None, "limit must be at least 1"
     return min(limit, 50), None
-
-
-def _clean_text_input(value, max_len: int = 500) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()[:max_len]
 
 
 def _utc_timestamp() -> str:

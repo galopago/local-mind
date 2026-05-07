@@ -17,6 +17,13 @@ SECRET_VALUE_PATTERNS = (
 )
 
 
+def clean_text_input(value: object, max_len: int = 500) -> str:
+    """Normalize optional user/tool text input to a stripped, bounded string."""
+    if value is None:
+        return ""
+    return str(value).strip()[:max_len]
+
+
 def secret_value_warnings(text: str) -> list[str]:
     """Return labels for secret-looking values found in text."""
     warnings: list[str] = []
