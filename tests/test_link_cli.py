@@ -1492,11 +1492,11 @@ class LinkCliTests(unittest.TestCase):
             code = link_cli.verify_mcp(
                 target,
                 python_cmd="/tmp/python",
-                import_check=lambda _: {"installed": True, "version": "9.9.9", "error": None},
+                import_check=lambda _: {"installed": True, "version": link_cli.LINK_VERSION, "error": None},
             )
 
         self.assertEqual(code, 0)
-        self.assertIn("link-mcp: installed (9.9.9)", out.getvalue())
+        self.assertIn(f"link-mcp: installed ({link_cli.LINK_VERSION})", out.getvalue())
         self.assertIn('"command": "/tmp/python"', out.getvalue())
         self.assertIn("Result: ready", out.getvalue())
 
@@ -1511,7 +1511,7 @@ class LinkCliTests(unittest.TestCase):
         with redirect_stdout(out):
             code = link_cli.verify_mcp(
                 target,
-                import_check=lambda cmd: checked.append(cmd) or {"installed": True, "version": "9.9.9", "error": None},
+                import_check=lambda cmd: checked.append(cmd) or {"installed": True, "version": link_cli.LINK_VERSION, "error": None},
             )
 
         self.assertEqual(code, 0)
@@ -1531,7 +1531,7 @@ class LinkCliTests(unittest.TestCase):
                 target,
                 python_cmd="/tmp/explicit-python",
                 json_output=True,
-                import_check=lambda cmd: checked.append(cmd) or {"installed": True, "version": "9.9.9", "error": None},
+                import_check=lambda cmd: checked.append(cmd) or {"installed": True, "version": link_cli.LINK_VERSION, "error": None},
             )
 
         self.assertEqual(code, 0)
@@ -1548,14 +1548,35 @@ class LinkCliTests(unittest.TestCase):
                 target,
                 json_output=True,
                 python_cmd="/tmp/python",
-                import_check=lambda _: {"installed": True, "version": "9.9.9", "error": None},
+                import_check=lambda _: {"installed": True, "version": link_cli.LINK_VERSION, "error": None},
             )
 
         data = json.loads(out.getvalue())
         self.assertEqual(code, 0)
         self.assertTrue(data["ready"])
-        self.assertEqual(data["link_mcp"]["version"], "9.9.9")
+        self.assertEqual(data["expected_version"], link_cli.LINK_VERSION)
+        self.assertTrue(data["version_matches"])
+        self.assertEqual(data["link_mcp"]["version"], link_cli.LINK_VERSION)
         self.assertEqual(data["config"]["mcpServers"]["link"]["command"], "/tmp/python")
+
+    def test_verify_mcp_reports_version_mismatch(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                python_cmd="/tmp/python",
+                import_check=lambda _: {"installed": True, "version": "0.9.0", "error": None},
+            )
+
+        self.assertEqual(code, 1)
+        text = out.getvalue()
+        self.assertIn("link-mcp: installed (0.9.0)", text)
+        self.assertIn(f"Expected version: {link_cli.LINK_VERSION}", text)
+        self.assertIn(f"/tmp/python -m pip install --upgrade link-mcp=={link_cli.LINK_VERSION}", text)
 
     def test_verify_mcp_reports_missing_package(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
@@ -1584,7 +1605,7 @@ class LinkCliTests(unittest.TestCase):
             code = link_cli.verify_mcp(
                 target,
                 python_cmd="/tmp/python",
-                import_check=lambda _: {"installed": True, "version": "9.9.9", "error": None},
+                import_check=lambda _: {"installed": True, "version": link_cli.LINK_VERSION, "error": None},
             )
 
         self.assertEqual(code, 1)

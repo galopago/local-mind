@@ -3216,10 +3216,14 @@ def verify_mcp(
     import_status = import_check(python_cmd)
     wiki_exists = wiki_dir.exists() and wiki_dir.is_dir()
     config = _mcp_config(python_cmd, wiki_dir)
-    ready = bool(import_status.get("installed")) and wiki_exists
+    installed_version = str(import_status.get("version") or "")
+    version_matches = bool(import_status.get("installed")) and installed_version == LINK_VERSION
+    ready = bool(import_status.get("installed")) and wiki_exists and version_matches
     status = {
         "ready": ready,
         "python": python_cmd,
+        "expected_version": LINK_VERSION,
+        "version_matches": version_matches,
         "link_mcp": import_status,
         "wiki": {
             "path": str(wiki_dir),
@@ -3237,6 +3241,8 @@ def verify_mcp(
     print(f"Python: {python_cmd}")
     if import_status.get("installed"):
         print(f"link-mcp: installed ({import_status.get('version')})")
+        if not version_matches:
+            print(f"Expected version: {LINK_VERSION}")
     else:
         print("link-mcp: missing")
         error = import_status.get("error")
@@ -3261,6 +3267,9 @@ def verify_mcp(
         print("    python3 -m venv ~/.link-mcp-venv")
         print("    ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp")
         print("    Then rerun with: python3 link.py verify-mcp . --python ~/.link-mcp-venv/bin/python")
+    elif not version_matches:
+        print(f"  Upgrade link-mcp to match Link {LINK_VERSION}:")
+        print(f"    {python_cmd} -m pip install --upgrade link-mcp=={LINK_VERSION}")
     if not wiki_exists:
         print("  Create a wiki with an installer, or try: python3 link.py init")
     print("")

@@ -45,6 +45,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Switched MCP status version reporting to the shared Link runtime version so source checkouts and installed packages cannot drift.
 - Added `link init` to create or repair a normal Link wiki without loading demo content.
 - Added `link serve` to start the local web viewer without remembering `serve.py` paths.
+- Made `link verify-mcp` require the installed `link-mcp` version to match the local Link runtime before reporting ready.
 - Improved local server startup errors with bounded port validation in both `link serve` and `serve.py`, plus clear next-port guidance when a port is already in use.
 - Added `link benchmark` to measure local cache, search, smart query, and graph timings on a user's current wiki.
 - Extended `link benchmark` and large-wiki smoke to prove bounded agent payload timings for graph summaries and page lists.
