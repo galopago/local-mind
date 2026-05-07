@@ -101,9 +101,18 @@ class IngestCoreTests(unittest.TestCase):
 
         self.assertEqual(payload["pending_count"], 0)
         self.assertEqual(payload["represented_count"], 1)
+        self.assertEqual(payload["represented_raw"][0]["source_pages"], ["source"])
+        self.assertEqual(payload["represented_raw"][0]["source_page_paths"], ["wiki/sources/source.md"])
+        self.assertEqual(payload["represented_raw"][0]["source_page_titles"], ["Source"])
         self.assertEqual(payload["safety"]["status"], "clear")
         self.assertEqual(payload["guidance"]["state"], "ready")
         self.assertEqual(payload["plan"]["title"], "Ready for new sources")
+        self.assertEqual(payload["completion"]["represented_count"], 1)
+        self.assertEqual(payload["completion"]["pending_count"], 0)
+        self.assertEqual(payload["completion"]["items"][0]["raw"], "raw/source.md")
+        self.assertEqual(payload["completion"]["items"][0]["source_pages"][0]["path"], "wiki/sources/source.md")
+        self.assertEqual(payload["completion"]["items"][0]["memory_prompt"], "propose memories from raw/source.md")
+        self.assertEqual(payload["completion"]["next_prompt"], "brief me from Link before we continue")
 
     def test_collect_ingest_status_warns_on_represented_secret_raw(self):
         root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))

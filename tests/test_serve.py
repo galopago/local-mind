@@ -1167,6 +1167,36 @@ class ServeTests(unittest.TestCase):
         self.assertIn('/propose?source=raw/new-source.md', html)
         self.assertIn("Pending Raw Files", html)
 
+    def test_ingest_page_shows_completion_for_represented_raw(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        (raw / "represented-source.md").write_text("# Represented source\n", encoding="utf-8")
+        (wiki / "sources").mkdir(parents=True, exist_ok=True)
+        (wiki / "sources" / "represented-source.md").write_text(
+            "---\ntype: source\ntitle: Represented Source\n---\n\n"
+            "# Represented Source\n\n"
+            "## Raw Source\n\n`raw/represented-source.md`\n",
+            encoding="utf-8",
+        )
+        reset_wiki(wiki)
+
+        api_status, payload = run_handler("GET", "/api/ingest-status")
+        html = serve._render_ingest()
+
+        self.assertEqual(api_status, 200)
+        self.assertEqual(payload["guidance"]["state"], "ready")
+        self.assertEqual(payload["completion"]["items"][0]["source_pages"][0]["title"], "Represented Source")
+        self.assertIn("Ingest completion", html)
+        self.assertIn("All 1 raw source(s) are represented", html)
+        self.assertIn("raw/represented-source.md", html)
+        self.assertIn('/page/represented-source', html)
+        self.assertIn("Represented Source", html)
+        self.assertIn('/propose?source=raw/represented-source.md', html)
+        self.assertIn('data-copy-text="propose memories from raw/represented-source.md"', html)
+        self.assertIn('data-copy-text="query Link for represented source"', html)
+        self.assertIn("brief me from Link before we continue", html)
+
     def test_ingest_page_blocks_secret_looking_raw(self):
         wiki = self.make_wiki()
         raw = wiki.parent / "raw"

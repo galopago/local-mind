@@ -1233,6 +1233,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .ingest-step h3 { margin: 8px 0 5px; font-size: 15px; }
 .ingest-step p { margin: 0 0 8px; color: var(--muted); line-height: 1.4; }
 .ingest-step code { white-space: normal; overflow-wrap: anywhere; }
+.ingest-completion-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 14px 0; }
+.ingest-completion-card { border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface); padding: 12px; min-width: 0; font-family: sans-serif; }
+.ingest-completion-card h3 { margin: 0 0 8px; font-size: 16px; overflow-wrap: anywhere; }
+.ingest-completion-card p { margin: 6px 0; color: var(--muted); line-height: 1.45; font-size: 13px; }
+.ingest-completion-card code { white-space: normal; overflow-wrap: anywhere; }
+.ingest-completion-pages { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.ingest-completion-pages a { border: 1px solid var(--border-soft); border-radius: 999px; padding: 3px 8px; background: var(--surface-soft); font-size: 12px; }
+.ingest-completion-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.ingest-completion-actions a { font-size: 13px; }
 .trust-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
 .trust-grid div { border: 1px solid var(--border-soft); border-radius: 4px; padding: 10px; font-family: sans-serif; background: var(--surface); }
 .trust-grid strong { display: block; font-size: 12px; color: var(--subtle); margin-bottom: 4px; }
@@ -2528,6 +2537,7 @@ def _render_ingest():
     pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
     represented = status.get("represented_raw") if isinstance(status.get("represented_raw"), list) else []
     safety = status.get("safety") if isinstance(status.get("safety"), dict) else {}
+    completion = status.get("completion") if isinstance(status.get("completion"), dict) else {}
     plan_batch = plan.get("batch") if isinstance(plan.get("batch"), list) else []
     plan_first = plan_batch[0] if plan_batch and isinstance(plan_batch[0], dict) else {}
     first_raw = str(plan_first.get("raw") or "")
@@ -2647,14 +2657,7 @@ def _render_ingest():
         if len(pending) > 50:
             rows += f'<li>... {len(pending) - 50} more</li>'
         pending_html = f'<div class="section-heading"><h2>Pending Raw Files</h2><a href="/propose">propose memories</a></div><ul class="page-list">{rows}</ul>'
-    elif represented:
-        rows = "".join(
-            f'<li><code>{html.escape(str(item.get("raw") or ""))}</code>'
-            f'<span class="type">{", ".join(html.escape(str(page)) for page in item.get("source_pages", []) or [])}</span></li>'
-            for item in represented[:20]
-        )
-        pending_html = f'<div class="section-heading"><h2>Represented Raw Files</h2><a href="/all">all pages</a></div><ul class="page-list">{rows}</ul>'
-    else:
+    elif not represented:
         pending_html = '<p>No raw source files found yet.</p>'
 
     notes_html = ""
@@ -2690,6 +2693,68 @@ def _render_ingest():
             f'<ol>{step_html}</ol>{batch_html}{checks_html}</section>'
         )
 
+    completion_html = ""
+    completion_items = completion.get("items") if isinstance(completion.get("items"), list) else []
+    if completion_items:
+        cards = ""
+        for item in completion_items:
+            raw_path = str(item.get("raw") or "")
+            pages = item.get("source_pages") if isinstance(item.get("source_pages"), list) else []
+            page_links = ""
+            for page in pages:
+                if not isinstance(page, dict):
+                    continue
+                page_name = str(page.get("name") or "")
+                page_title = str(page.get("title") or page_name)
+                if not page_name:
+                    continue
+                page_links += (
+                    f'<a href="{html.escape(_page_href(page_name), quote=True)}" '
+                    f'title="{html.escape(str(page.get("path") or ""), quote=True)}">{html.escape(page_title)}</a>'
+                )
+            if not page_links:
+                page_links = '<span class="type">source page not found</span>'
+            memory_prompt_value = str(item.get("memory_prompt") or "")
+            query_prompt_value = str(item.get("query_prompt") or "")
+            propose_link = "/propose?source=" + urllib.parse.quote(raw_path) if raw_path else "/propose"
+            warnings = item.get("secret_warnings") if isinstance(item.get("secret_warnings"), list) else []
+            warning_html = ""
+            if warnings:
+                warning_html = (
+                    f'<p class="proposal-warning">Raw warnings: '
+                    f'{", ".join(html.escape(str(label)) for label in warnings)}</p>'
+                )
+            cards += (
+                f'<article class="ingest-completion-card">'
+                f'<h3>{html.escape(raw_path)}</h3>'
+                f'<p>{int(item.get("size_bytes") or 0)} bytes represented by:</p>'
+                f'<div class="ingest-completion-pages">{page_links}</div>'
+                f'{warning_html}'
+                f'<div class="ingest-completion-actions">'
+                f'<a href="{html.escape(propose_link, quote=True)}">propose memories</a>'
+                f'{_copy_button(memory_prompt_value, "Copy memory prompt")}'
+                f'{_copy_button(query_prompt_value, "Copy query prompt")}'
+                f'</div>'
+                f'</article>'
+            )
+        more_html = ""
+        if completion.get("has_more"):
+            more_html = f'<p class="summary">Showing {int(completion.get("shown_count") or 0)} of {int(completion.get("represented_count") or 0)} represented sources.</p>'
+        next_prompt = str(completion.get("next_prompt") or "")
+        next_html_for_completion = ""
+        if next_prompt:
+            next_html_for_completion = (
+                f'<div class="memory-next"><strong>After ingest</strong>'
+                f'<p>Use this to confirm the new context is retrievable before moving on.</p>'
+                f'<code>{html.escape(next_prompt)}</code>{_copy_button(next_prompt, "Copy prompt")}</div>'
+            )
+        completion_html = (
+            f'<section><div class="section-heading"><h2>{html.escape(str(completion.get("title") or "Ingest Completion"))}</h2>'
+            f'<a href="/all">all pages</a></div>'
+            f'<p class="summary">{html.escape(str(completion.get("summary") or ""))}</p>'
+            f'<div class="ingest-completion-grid">{cards}</div>{more_html}{next_html_for_completion}</section>'
+        )
+
     raw_form = (
         f'<section><div class="section-heading"><h2>Add Raw Source</h2><a href="/propose">memory proposals</a></div>'
         f'<p class="summary">Paste a note, article excerpt, transcript, or project context. Link saves it under '
@@ -2717,6 +2782,7 @@ def _render_ingest():
         f'{guide_html}'
         f'{actions}'
         f'{plan_html}'
+        f'{completion_html}'
         f'{pending_html}'
         f'{notes_html}'
     )

@@ -51,6 +51,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added visible post-ingest checks to the CLI and local ingest UI so users see the rebuild/validate/status loop before relying on generated pages.
 - Added `/ingest` and `/api/ingest-status` so the local UI shows pending raw files, graph health, and the next agent prompt.
 - Added a local `/ingest` Add Raw Source form and `POST /api/raw-source` so browser-first users can paste a source, save it under `raw/`, block secret-looking values, and copy the next ingest prompt without remembering filesystem paths.
+- Added ingest completion cards that show which raw files are represented, link to their source pages, and provide copyable memory/query prompts for post-ingest validation.
 - Added MCP `ingest_status` so MCP-only agents can inspect pending raw files and validation guidance.
 - Added `link rebuild-index`, MCP `rebuild_index`, and `POST /api/rebuild-index` to regenerate the human-readable wiki catalog from current pages.
 - Improved `doctor --fix` so it repairs index drift and rebuilds backlinks afterward.

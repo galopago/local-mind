@@ -298,6 +298,10 @@ The agent reads `~/link/LINK.md`, creates a source page under `wiki/sources/`,
 creates or updates concept/entity pages, updates `wiki/index.md`, appends
 `wiki/log.md`, rebuilds backlinks, and validates the generated pages.
 
+Return to **ingest** after the agent finishes. Link shows which raw file is now
+represented, links to the source page, and gives copyable prompts for memory
+proposals or a quick retrieval check.
+
 ### 5. Verify The Loop
 
 ```bash
@@ -554,7 +558,7 @@ Common endpoints:
 |----------|-------------|
 | `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions. |
 | `GET /api/prompts?project=slug` | First-run natural agent prompts plus local readiness/check commands; same payload as `link prompts --json`. |
-| `GET /api/ingest-status` | Raw ingest state with pending files, safety summary, graph health, exact agent prompt, guided plan, and follow-up commands. |
+| `GET /api/ingest-status` | Raw ingest state with pending files, represented-source completion cards, safety summary, graph health, exact agent prompt, guided plan, and follow-up commands. |
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |
 | `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context for an agent, including relevant memories, review warnings, and capture status. |

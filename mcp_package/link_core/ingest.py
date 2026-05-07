@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .frontmatter import parse_frontmatter
 from .security import secret_file_warnings
 from .wiki import build_backlinks, load_backlinks_index
 
@@ -40,15 +41,32 @@ def raw_source_files(raw_dir: Path, skip_dirs: set[str] | None = None) -> list[P
 
 
 def source_page_texts(wiki_dir: Path) -> dict[str, str]:
+    return {name: str(record["text"]) for name, record in source_page_index(wiki_dir).items()}
+
+
+def _heading_title(body: str) -> str:
+    match = re.search(r"^#\s+(.+)", body, re.MULTILINE)
+    return match.group(1).strip() if match else ""
+
+
+def source_page_index(wiki_dir: Path) -> dict[str, dict[str, object]]:
     sources_dir = wiki_dir / "sources"
     if not sources_dir.exists():
         return {}
-    texts: dict[str, str] = {}
+    records: dict[str, dict[str, object]] = {}
     for page in sorted(sources_dir.rglob("*.md")):
         if page.name.startswith("."):
             continue
-        texts[page.stem.lower()] = page.read_text(encoding="utf-8", errors="replace")
-    return texts
+        text = page.read_text(encoding="utf-8", errors="replace")
+        meta, body = parse_frontmatter(text)
+        name = page.stem.lower()
+        records[name] = {
+            "name": page.stem,
+            "path": f"wiki/{page.relative_to(wiki_dir).as_posix()}",
+            "title": str(meta.get("title") or _heading_title(body) or page.stem),
+            "text": text,
+        }
+    return records
 
 
 def normalize_link_index(data: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:
@@ -245,6 +263,56 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
     }
 
 
+def build_ingest_completion(status: dict[str, object], limit: int = 8) -> dict[str, object]:
+    """Summarize raw files that are already represented in source pages."""
+    represented_raw = status.get("represented_raw") if isinstance(status.get("represented_raw"), list) else []
+    pending_count = int(status.get("pending_count") or 0)
+    represented_count = int(status.get("represented_count") or 0)
+    guidance = status.get("guidance") if isinstance(status.get("guidance"), dict) else {}
+    items: list[dict[str, object]] = []
+    for item in represented_raw[: max(limit, 1)]:
+        raw_rel = str(item.get("raw") or "")
+        page_names = item.get("source_pages") if isinstance(item.get("source_pages"), list) else []
+        page_paths = item.get("source_page_paths") if isinstance(item.get("source_page_paths"), list) else []
+        page_titles = item.get("source_page_titles") if isinstance(item.get("source_page_titles"), list) else []
+        pages: list[dict[str, str]] = []
+        for index, page_name in enumerate(page_names):
+            pages.append({
+                "name": str(page_name),
+                "path": str(page_paths[index]) if index < len(page_paths) else "",
+                "title": str(page_titles[index]) if index < len(page_titles) else str(page_name),
+            })
+        items.append({
+            "raw": raw_rel,
+            "size_bytes": int(item.get("size_bytes") or 0),
+            "source_pages": pages,
+            "memory_prompt": f"propose memories from {raw_rel}" if raw_rel else "",
+            "query_prompt": f"query Link for {Path(raw_rel).stem.replace('-', ' ')}" if raw_rel else "",
+            "secret_warnings": list(item.get("secret_warnings") or []),
+        })
+
+    if represented_count and pending_count:
+        summary = f"{represented_count} raw source(s) are represented; {pending_count} still need ingest."
+        next_prompt = str(guidance.get("agent_prompt") or "")
+    elif represented_count:
+        summary = f"All {represented_count} raw source(s) are represented in wiki source pages."
+        next_prompt = 'brief me from Link before we continue'
+    else:
+        summary = "No raw source files are represented yet."
+        next_prompt = str(guidance.get("agent_prompt") or "ingest raw/<file> into Link")
+
+    return {
+        "title": "Ingest completion",
+        "summary": summary,
+        "represented_count": represented_count,
+        "pending_count": pending_count,
+        "shown_count": len(items),
+        "has_more": represented_count > len(items),
+        "items": items,
+        "next_prompt": next_prompt,
+    }
+
+
 def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
     has_raw_dir = bool(status.get("has_raw_dir"))
     has_wiki_dir = bool(status.get("has_wiki_dir"))
@@ -332,7 +400,7 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     raw_dir = target / "raw"
     wiki_dir = target / "wiki"
     raw_files = raw_source_files(raw_dir, skip_dirs=skip_dirs)
-    source_texts = source_page_texts(wiki_dir)
+    source_records = source_page_index(wiki_dir)
 
     represented_raw: list[dict[str, object]] = []
     pending_raw: list[dict[str, object]] = []
@@ -341,15 +409,18 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
         rel = raw_path.relative_to(target).as_posix()
         matches = [
             source_name
-            for source_name, source_text in source_texts.items()
-            if rel in source_text
+            for source_name, source_record in source_records.items()
+            if rel in str(source_record.get("text") or "")
         ]
+        match_records = [source_records[source_name] for source_name in matches]
         warnings = secret_file_warnings(raw_path)
         raw_secret_warning_count += len(warnings)
         item = {
             "raw": rel,
             "size_bytes": raw_path.stat().st_size,
             "source_pages": matches,
+            "source_page_paths": [str(record.get("path") or "") for record in match_records],
+            "source_page_titles": [str(record.get("title") or record.get("name") or "") for record in match_records],
             "secret_warnings": warnings,
             "secret_warning_count": len(warnings),
         }
@@ -367,7 +438,7 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     payload: dict[str, object] = {
         "target": str(target),
         "raw_count": len(raw_files),
-        "source_page_count": len(source_texts),
+        "source_page_count": len(source_records),
         "represented_count": len(represented_raw),
         "pending_count": len(pending_raw),
         "represented_raw": represented_raw,
@@ -381,4 +452,5 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     payload["safety"] = build_ingest_safety(pending_raw, represented_raw)
     payload["guidance"] = build_ingest_guidance(payload)
     payload["plan"] = build_ingest_plan(payload)
+    payload["completion"] = build_ingest_completion(payload)
     return payload
