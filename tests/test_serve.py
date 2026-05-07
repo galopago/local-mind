@@ -1299,6 +1299,16 @@ class ServeTests(unittest.TestCase):
         self.assertIn("navigator.clipboard.writeText", html)
         self.assertIn("var initialSource = form.getAttribute('data-initial-source')", html)
 
+    def test_propose_page_bounds_query_seed_values(self):
+        wiki = self.make_wiki()
+
+        html = serve._render_propose(project="p" * 100, source="s" * 600)
+
+        self.assertIn(f'value="{"p" * 80}"', html)
+        self.assertNotIn("p" * 81, html)
+        self.assertIn(f'data-initial-source="{"s" * 500}"', html)
+        self.assertNotIn("s" * 501, html)
+
     def test_memory_approval_api_requires_header_and_writes_memory(self):
         wiki = self.make_wiki()
         payload = {

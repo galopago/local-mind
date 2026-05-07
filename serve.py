@@ -1384,8 +1384,8 @@ def _render_captures(project: str | None = None):
 
 
 def _render_propose(project: str | None = None, source: str | None = None):
-    project_value = html.escape(str(project or ""), quote=True)
-    source_value = html.escape(str(source or ""), quote=True)
+    project_value = html.escape(_clean_text_input(project, max_len=80), quote=True)
+    source_value = html.escape(_clean_text_input(source, max_len=500), quote=True)
     proposal_path = (
         f'<section class="ingest-path" aria-label="Memory proposal path">'
         f'<article class="ingest-step"><span class="step-num">1</span>'
@@ -3068,8 +3068,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             ))
         elif path == "/propose":
             self._ok(_render_propose(
-                project=query.get("project", [""])[0],
-                source=query.get("source", [""])[0],
+                project=_query_text(query, "project", max_len=80),
+                source=_query_text(query, "source", max_len=500),
             ))
         elif path == "/prompts":
             self._ok(_render_prompts(project=_query_text(query, "project", max_len=80)))

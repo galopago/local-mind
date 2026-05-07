@@ -63,6 +63,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Returned hardened JSON `405` responses for unsupported local HTTP methods, including `TRACE` and `CONNECT`, instead of default server HTML.
 - Hardened `HEAD` handling so local health/static checks return headers without bodies and always reset response state.
 - Bounded local HTTP query, search, project, graph-summary, memory lookup, and proposal metadata parameters with the same text normalization used by CLI/MCP inputs.
+- Bounded `/propose` page seed query values before rendering source/project form defaults.
 - Added an interactive-readiness verdict and threshold warnings to `link benchmark` so larger local wikis are easier to evaluate.
 - Added shared benchmark health checks to the large-wiki smoke so user-facing and CI scale verdicts stay aligned.
 - Tightened ownership of generated search caches in CLI query and index rebuild paths so in-memory SQLite indexes are closed when short-lived operations finish.
