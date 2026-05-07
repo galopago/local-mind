@@ -68,13 +68,16 @@ Then check the demo:
 ```bash
 python3 link.py query "why does Link help agents?" link-demo --budget small
 python3 link.py brief "working on agent memory" link-demo
+python3 link.py benchmark "agent memory" link-demo
 python3 link.py memory-audit link-demo
 python3 link.py status --validate link-demo
 ```
 
 The first query should return a compact packet with a relevant memory, the best
-wiki page, nearby graph context, and agent guidance. The demo also writes
-`link-demo/START_HERE.md` with the exact prompts and checks to try.
+wiki page, nearby graph context, and agent guidance. The benchmark should report
+an interactive-readiness verdict, search backend, graph size, packet size, and
+timings. The demo also writes `link-demo/START_HERE.md` with the exact prompts
+and checks to try.
 
 After the demo:
 
@@ -178,6 +181,18 @@ Then approve only the memories you want agents to carry forward. You can also
 open `/propose`, paste notes, or jump there from a pending raw file on `/ingest`.
 Link returns proposal-only candidates. Nothing is written until you approve a
 memory through your agent or the CLI.
+
+## Trust Gates
+
+Link is designed so agents do useful work without silently absorbing bad context:
+
+| Gate | What it protects |
+|------|------------------|
+| `link ingest-status` | Shows pending raw files, graph state, next prompt/checks, and a `clear`/`warning`/`blocked` raw safety summary. |
+| `/propose` | Lists raw text sources with explicit `load`, `redact`, or `split` actions before memory proposals are generated. |
+| Memory writes | Refuse strong duplicates and likely conflicts unless the user explicitly overrides them. |
+| `link validate` | Checks frontmatter, directory/type alignment, required sections, dead wikilinks, and stale backlinks after ingest. |
+| `link benchmark` | Reports cache/search/query/graph timings, search backend, packet size, and readiness recommendations. |
 
 ## First 10 Minutes
 
@@ -450,6 +465,7 @@ Maintain the wiki:
 link backup
 link doctor --fix
 link memory-audit
+link benchmark "agent memory"
 link rebuild-index
 link rebuild-backlinks
 link validate
@@ -526,7 +542,7 @@ Common endpoints:
 |----------|-------------|
 | `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions. |
 | `GET /api/prompts?project=slug` | First-run natural agent prompts plus local readiness/check commands; same payload as `link prompts --json`. |
-| `GET /api/ingest-status` | Raw ingest state with pending files, graph health, exact agent prompt, guided plan, and follow-up commands. |
+| `GET /api/ingest-status` | Raw ingest state with pending files, safety summary, graph health, exact agent prompt, guided plan, and follow-up commands. |
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |
 | `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context for an agent, including relevant memories, review warnings, and capture status. |
@@ -572,7 +588,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link redact-capture <capture>` | Replace secret-looking values in a saved raw capture and log labels/counts only. |
 | `link delete-capture <capture> --confirm` | Delete a saved raw capture after explicit confirmation. |
 | `link query "task" [--budget small\|medium\|large] [--project slug]` | Build a compact answer-ready packet from memory, wiki search, graph context, provenance, and estimated packet size. |
-| `link benchmark ["query"] [--budget small\|medium\|large] [--project slug]` | Measure local cache, search, smart query, graph timings, search backend, and an interactive-readiness verdict for your current wiki. |
+| `link benchmark ["query"] [--budget small\|medium\|large] [--project slug]` | Measure local cache, search, smart query, graph timings, search backend, packet size, and readiness recommendations for your current wiki. |
 | `link brief "task" [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
 | `link memory-audit [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |
 | `link recall "query" [--project slug]` | Search local agent memories with recall readiness. |
