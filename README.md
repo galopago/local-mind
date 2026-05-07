@@ -600,6 +600,10 @@ Common endpoints:
 | `POST /api/rebuild-backlinks` | Header `X-Link-Local-Action: true`; rebuild `_backlinks.json` by scanning wikilinks. |
 | `POST /api/rebuild-index` | Header `X-Link-Local-Action: true`; regenerate `wiki/index.md` from current pages. |
 
+Web memory approval APIs intentionally do not honor duplicate/conflict override
+flags. If Link reports a duplicate or conflict, review the existing memory and
+use the CLI or MCP tool explicitly after deciding what should coexist.
+
 ## Command Reference
 
 After a global installer run, use `link <command>` from any directory. From a

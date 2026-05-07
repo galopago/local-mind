@@ -1353,6 +1353,73 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(updated["review_status"], "pending")
         self.assertIn("User also wants the web proposal flow", page_text)
 
+    def test_memory_approval_api_ignores_duplicate_override_flags(self):
+        wiki = self.make_wiki()
+        payload = {
+            "memory": "User prefers Link web approvals to be reviewable.",
+            "title": "Reviewable web approvals",
+            "memory_type": "preference",
+            "scope": "user",
+            "source": "web proposal",
+        }
+
+        create_status, created = post_json("/api/remember-memory", payload)
+        duplicate_status, duplicate = post_json(
+            "/api/remember-memory",
+            {**payload, "allow_duplicate": True, "allow_conflict": True},
+        )
+
+        memory_pages = sorted((wiki / "memories").glob("reviewable-web-approvals*.md"))
+        self.assertEqual(create_status, 200)
+        self.assertTrue(created["saved"])
+        self.assertEqual(duplicate_status, 409)
+        self.assertFalse(duplicate["saved"])
+        self.assertTrue(duplicate["duplicate"])
+        self.assertEqual(len(memory_pages), 1)
+
+    def test_memory_update_api_ignores_conflict_override_flags(self):
+        wiki = self.make_wiki()
+        first_status, first = post_json(
+            "/api/remember-memory",
+            {
+                "memory": "User prefers release branches for Link work.",
+                "title": "Prefer release branches",
+                "memory_type": "preference",
+                "scope": "project",
+                "project": "link",
+                "source": "web proposal",
+            },
+        )
+        second = serve._core_write_memory_page(
+            wiki,
+            "User prefers dark mode for Link work.",
+            "Prefer dark mode",
+            "preference",
+            "project",
+            None,
+            "test setup",
+            serve._utc_timestamp(),
+            project="link",
+            records=serve._memory_records(),
+            allow_conflict=True,
+        )
+        update_status, update = post_json(
+            "/api/update-memory",
+            {
+                "memory": second["name"],
+                "text": "User prefers develop branches for Link work.",
+                "source": "web proposal",
+                "project": "link",
+                "allow_conflict": True,
+            },
+        )
+
+        self.assertEqual(first_status, 200)
+        self.assertTrue(second["created"])
+        self.assertEqual(update_status, 409)
+        self.assertFalse(update["saved"])
+        self.assertTrue(update["conflict"])
+
     def test_proposal_sources_api_lists_safe_raw_files(self):
         wiki = self.make_wiki()
         raw = wiki.parent / "raw"
