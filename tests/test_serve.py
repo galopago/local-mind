@@ -150,6 +150,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn("brief me from Link before we continue", html)
         self.assertIn("ingest raw/&lt;file&gt; into Link", html)
         self.assertIn("query Link for what you know about me", html)
+        self.assertIn("propose memories from raw/&lt;file&gt;", html)
+        self.assertIn("Open starter prompts", html)
 
     def test_prompts_page_and_api_share_starter_prompts(self):
         self.make_wiki()

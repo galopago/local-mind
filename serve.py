@@ -1789,24 +1789,23 @@ def _render_home():
         '<p>Ask <code>query Link for ...</code> or open a memory brief. Link combines reviewed memory, wiki pages, and graph context.</p></section>'
         '</div>'
     )
+    prompt_codes = ""
+    for item in _starter_prompts_payload().get("prompts", []):
+        if isinstance(item, dict):
+            prompt_codes += f'<code>{html.escape(str(item.get("prompt") or ""))}</code>'
     prompts = (
         '<section class="prompt-strip" aria-label="First Link prompts">'
         '<h2>Try These Prompts</h2>'
-        '<p>Ask from Codex, Claude, Cursor, Kiro, or any agent with Link installed.</p>'
+        '<p>Ask from Codex, Claude, Cursor, Kiro, or any agent with Link installed. <a href="/prompts">Open starter prompts</a>.</p>'
         '<div class="prompt-grid">'
-        '<code>is Link ready?</code>'
-        '<code>brief me from Link before we continue</code>'
-        '<code>ingest raw/&lt;file&gt; into Link</code>'
-        '<code>remember that I prefer local-first agent memory</code>'
-        '<code>query Link for what you know about me</code>'
-        '</div></section>'
+        f'{prompt_codes}</div></section>'
     )
 
     return _layout("Link", f"<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>{lanes}{prompts}{stats}{sections}")
 
 
 def _starter_prompts_payload(project: str | None = None) -> dict[str, object]:
-    return _core_starter_prompt_payload(ROOT, project=project)
+    return _core_starter_prompt_payload(WIKI_DIR, project=project)
 
 
 def _render_prompts(project: str | None = None):
