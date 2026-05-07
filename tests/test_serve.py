@@ -1613,6 +1613,29 @@ class ServeTests(unittest.TestCase):
         self.assertIn("if (searchMatches(n)) keep[n.id] = true;", html)
         self.assertIn("parts.push('overview capped');", html)
 
+    def test_graph_uses_bounded_initial_payload_for_large_wikis(self):
+        wiki = self.make_wiki()
+        for index in range(920):
+            write_page(
+                wiki,
+                f"concepts/topic-{index}.md",
+                "---\ntype: concept\ntitle: Topic\n---\n"
+                f"# Topic {index}\n\n[[topic-{(index + 1) % 920}]]\n",
+            )
+        reset_wiki(wiki)
+
+        html = serve._render_graph()
+
+        self.assertIn('var initialGraphMode = "summary";', html)
+        self.assertIn("var totalNodeCount = 920;", html)
+        self.assertIn("250/920 nodes", html)
+        self.assertIn("fast overview", html)
+        self.assertIn("Load full graph (920 nodes)", html)
+        self.assertIn("var loadFullButton = document.getElementById('graph-load-full');", html)
+        self.assertIn("function loadFullGraph()", html)
+        self.assertIn("fetch('/api/graph')", html)
+        self.assertIn("Full graph loaded", html)
+
     def test_graph_labels_are_sparse_for_large_visible_sets(self):
         wiki = self.make_wiki()
         write_page(

@@ -146,6 +146,9 @@ RAW_STATIC_TYPES = {
     ".svg": "image/svg+xml",
     ".pdf": "application/pdf",
 }
+GRAPH_INITIAL_FULL_NODE_LIMIT = 900
+GRAPH_INITIAL_SUMMARY_NODE_LIMIT = 250
+GRAPH_INITIAL_SUMMARY_EDGE_LIMIT = 1000
 
 # ---------------------------------------------------------------------------
 # In-memory caches — invalidated on each request by mtime check
@@ -1799,11 +1802,36 @@ def _render_explain_memory(identifier: str):
 
 
 def _render_graph():
-    graph = _get_graph_data()
-    visible_nodes = [n for n in graph["nodes"] if n["category"] != "root"]
+    full_graph = _get_graph_data()
+    full_nodes = [n for n in full_graph["nodes"] if n["category"] != "root"]
+    full_ids = {n["id"] for n in full_nodes}
+    full_edges = [
+        e for e in full_graph["edges"]
+        if e["source"] in full_ids and e["target"] in full_ids
+    ]
+    total_node_count = len(full_nodes)
+    total_edge_count = len(full_edges)
+    graph_mode = "full"
+    graph_note = ""
+    candidate_edges = full_edges
+    if total_node_count > GRAPH_INITIAL_FULL_NODE_LIMIT:
+        summary = _get_graph_summary(
+            limit=GRAPH_INITIAL_SUMMARY_NODE_LIMIT,
+            depth=1,
+            max_edges=GRAPH_INITIAL_SUMMARY_EDGE_LIMIT,
+        )
+        visible_nodes = list(summary.get("nodes", []))
+        candidate_edges = list(summary.get("edges", []))
+        graph_mode = "summary"
+        graph_note = (
+            f" Showing a fast overview of {len(visible_nodes)} high-signal nodes first; "
+            f"load the full graph only when you need every page."
+        )
+    else:
+        visible_nodes = full_nodes
     visible_ids = {n["id"] for n in visible_nodes}
     visible_edges = [
-        e for e in graph["edges"]
+        e for e in candidate_edges
         if e["source"] in visible_ids and e["target"] in visible_ids
     ]
     nodes_json = _json_for_script(visible_nodes)
@@ -1846,6 +1874,7 @@ def _render_graph():
   var labelsButton = document.getElementById('graph-labels');
   var motionButton = document.getElementById('graph-motion');
   var fullscreenButton = document.getElementById('graph-fullscreen');
+  var loadFullButton = document.getElementById('graph-load-full');
   var searchInput = document.getElementById('graph-search');
   var categoryFilter = document.getElementById('graph-category');
   var depthFilter = document.getElementById('graph-depth');
@@ -1867,8 +1896,11 @@ def _render_graph():
   var FAST_RENDER_NODE_LIMIT = 450;
   var FAST_RENDER_EDGE_LIMIT = 1200;
   var OVERVIEW_NODE_LIMIT = 650;
+  var initialGraphMode = {_json_for_script(graph_mode)};
+  var totalNodeCount = {total_node_count};
+  var totalEdgeCount = {total_edge_count};
+  var fullGraphLoaded = initialGraphMode === 'full';
   var nodeById = {{}};
-  nodes.forEach(function(n) {{ nodeById[n.id] = n; }});
 
   function stableNoise(id, salt) {{
     var h = salt * 2166136261;
@@ -1881,25 +1913,44 @@ def _render_graph():
 
   // Start in a loose two-lobe silhouette. Physics keeps it organic after load.
   var pos = {{}}, vel = {{}}, pinned = {{}};
-  nodes.forEach(function(n, i) {{
+  function seedNodePosition(n, i, total) {{
     var lobe = i % 2 === 0 ? -1 : 1;
     var a = i * 2.399963 + stableNoise(n.id, 7) * 0.7;
-    var r = 50 + Math.sqrt((i + 1) / Math.max(nodes.length, 1)) * 155;
+    var r = 50 + Math.sqrt((i + 1) / Math.max(total, 1)) * 155;
     var categoryDrop = n.category === 'sources' ? 58 : (n.category === 'memories' ? -34 : (n.category === 'entities' ? 24 : -6));
     pos[n.id] = {{
       x: lobe * 78 + Math.cos(a) * r * 0.78,
       y: Math.sin(a) * r * 0.58 + categoryDrop
     }};
     vel[n.id] = {{ x: 0, y: 0 }};
-  }});
+  }}
+
+  function seedMissingPositions() {{
+    nodes.forEach(function(n, i) {{
+      if (!pos[n.id]) seedNodePosition(n, i, nodes.length);
+      if (!vel[n.id]) vel[n.id] = {{ x: 0, y: 0 }};
+    }});
+  }}
 
   // Adjacency
   var adj = {{}}, degree = {{}};
-  nodes.forEach(function(n) {{ adj[n.id] = []; degree[n.id] = 0; }});
-  edges.forEach(function(e) {{
-    if (adj[e.source]) {{ adj[e.source].push(e.target); degree[e.source]++; }}
-    if (adj[e.target]) {{ adj[e.target].push(e.source); degree[e.target]++; }}
-  }});
+  function rebuildGraphIndexes() {{
+    nodeById = {{}};
+    adj = {{}};
+    degree = {{}};
+    nodes.forEach(function(n) {{
+      nodeById[n.id] = n;
+      adj[n.id] = [];
+      degree[n.id] = 0;
+    }});
+    edges.forEach(function(e) {{
+      if (adj[e.source]) {{ adj[e.source].push(e.target); degree[e.source]++; }}
+      if (adj[e.target]) {{ adj[e.target].push(e.source); degree[e.target]++; }}
+    }});
+  }}
+
+  rebuildGraphIndexes();
+  seedMissingPositions();
 
   var dragging = null, dragOffX = 0, dragOffY = 0, hoverNode = null, selectedNode = null;
   var panX = 0, panY = 0, panStartX = 0, panStartY = 0, panning = false, didPan = false;
@@ -1925,6 +1976,24 @@ def _render_graph():
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
   function pageHref(id) {{ return '/page/' + encodeURIComponent(id); }}
   function invalidateFilters() {{ visibleCache = null; }}
+  function escapeHtml(value) {{
+    return String(value).replace(/[&<>"']/g, function(ch) {{
+      return {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[ch];
+    }});
+  }}
+  function syncCategoryOptions() {{
+    if (!categoryFilter) return;
+    var categories = [];
+    nodes.forEach(function(n) {{
+      if (n.category && n.category !== 'root' && categories.indexOf(n.category) === -1) categories.push(n.category);
+    }});
+    categories.sort();
+    categoryFilter.innerHTML = '<option value="all">all types</option>' + categories.map(function(category) {{
+      return '<option value="' + escapeHtml(category) + '">' + escapeHtml(category) + '</option>';
+    }}).join('');
+    if (categories.indexOf(categoryValue) === -1) categoryValue = 'all';
+    categoryFilter.value = categoryValue;
+  }}
   function nodeSearchText(n) {{
     return (n.title + ' ' + n.id + ' ' + n.category).toLowerCase();
   }}
@@ -2031,10 +2100,11 @@ def _render_graph():
     var currentNodes = visibleNodes();
     var currentEdges = visibleEdges();
     var parts = [
-      currentNodes.length + '/' + nodes.length + ' nodes',
-      currentEdges.length + '/' + edges.length + ' edges',
+      currentNodes.length + '/' + totalNodeCount + ' nodes',
+      currentEdges.length + '/' + totalEdgeCount + ' edges',
       Math.round(zoom * 100) + '%'
     ];
+    if (!fullGraphLoaded) parts.push('fast overview');
     if (categoryValue !== 'all') parts.push(categoryValue);
     if (depthValue !== 'all') parts.push('depth ' + depthValue);
     if (graphTooLargeForMotion()) parts.push('motion capped');
@@ -2398,6 +2468,56 @@ def _render_graph():
     }}, 0);
   }}
 
+  function applyGraphPayload(payload) {{
+    var nextNodes = (payload.nodes || []).filter(function(n) {{ return n.category !== 'root'; }});
+    var ids = {{}};
+    nextNodes.forEach(function(n) {{ ids[n.id] = true; }});
+    var nextEdges = (payload.edges || []).filter(function(e) {{ return ids[e.source] && ids[e.target]; }});
+    nodes = nextNodes;
+    edges = nextEdges;
+    totalNodeCount = nodes.length;
+    totalEdgeCount = edges.length;
+    fullGraphLoaded = true;
+    pinned = {{}};
+    selectedNode = null;
+    hoverNode = null;
+    depthValue = 'all';
+    if (depthFilter) depthFilter.value = 'all';
+    rebuildGraphIndexes();
+    seedMissingPositions();
+    syncCategoryOptions();
+    invalidateFilters();
+    frame = SETTLE;
+    autoFit();
+    updateInspector();
+    setMotionPaused(true);
+    if (loadFullButton) {{
+      loadFullButton.disabled = true;
+      loadFullButton.textContent = 'Full graph loaded';
+    }}
+  }}
+
+  function loadFullGraph() {{
+    if (!loadFullButton || fullGraphLoaded) return;
+    loadFullButton.disabled = true;
+    loadFullButton.textContent = 'Loading full graph...';
+    fetch('/api/graph')
+      .then(function(response) {{
+        if (!response.ok) throw new Error('graph load failed');
+        return response.json();
+      }})
+      .then(function(payload) {{
+        applyGraphPayload(payload);
+        updateStatus();
+        drawSoon();
+      }})
+      .catch(function() {{
+        loadFullButton.disabled = false;
+        loadFullButton.textContent = 'Retry full graph';
+        if (status) status.textContent = 'Full graph load failed; local API did not return graph data.';
+      }});
+  }}
+
   canvas.addEventListener('mousedown', function(e) {{
     var rect = canvas.getBoundingClientRect();
     var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
@@ -2528,6 +2648,7 @@ def _render_graph():
   if (fullscreenButton) fullscreenButton.addEventListener('click', function() {{
     setFullscreen(!frameEl.classList.contains('is-fullscreen'));
   }});
+  if (loadFullButton) loadFullButton.addEventListener('click', loadFullGraph);
   if (inspectorOpen) inspectorOpen.addEventListener('click', function() {{ openNode(selectedNode); }});
   if (inspectorFocus) inspectorFocus.addEventListener('click', function() {{
     if (!selectedNode) return;
@@ -2573,6 +2694,7 @@ def _render_graph():
   resize();
   if (motionPaused) {{ autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
+  syncCategoryOptions();
   syncLabelsButton();
   updateInspector();
   updateStatus();
@@ -2585,18 +2707,26 @@ def _render_graph():
         f'<span style="background:{c}"></span>{cat} '
         for cat, c in cat_colors.items() if cat != "root"
     )
+    load_full_button = ""
+    if graph_mode != "full":
+        load_full_button = (
+            f'<button id="graph-load-full" type="button">'
+            f'Load full graph ({total_node_count} nodes)</button>'
+        )
 
     body = (
         f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
         f'<h1>Knowledge Graph</h1>'
         f'<p class="meta">For large wikis, use fullscreen, zoom, pan, and sparse labels. '
-        f'The graph is for exploring neighborhoods, not reading every label at once.</p>'
+        f'The graph is for exploring neighborhoods, not reading every label at once.'
+        f'{html.escape(graph_note)}</p>'
         f'<section id="graph-frame" class="graph-frame">'
         f'<div class="graph-toolbar" aria-label="Graph controls">'
         f'<button id="graph-reset" type="button">Reset</button>'
         f'<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
         f'<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
         f'<button id="graph-fullscreen" type="button" aria-pressed="false">Fullscreen</button>'
+        f'{load_full_button}'
         f'<label class="graph-control">Find'
         f'<input id="graph-search" type="search" placeholder="node title"></label>'
         f'<label class="graph-control">Type'
@@ -2605,7 +2735,7 @@ def _render_graph():
         f'<select id="graph-depth"><option value="all">all</option><option value="1">1 hop</option>'
         f'<option value="2">2 hops</option><option value="3">3 hops</option></select></label>'
         f'<span id="graph-status" class="graph-status" aria-live="polite">'
-        f'{node_count} nodes · {edge_count} edges</span>'
+        f'{node_count}/{total_node_count} nodes · {edge_count}/{total_edge_count} edges</span>'
         f'</div>'
         f'<div class="graph-shell">'
         f'<canvas id="graph-canvas" tabindex="0" role="img" '
