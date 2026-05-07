@@ -316,14 +316,8 @@ def _page_links_payload(
     ), 200
 
 
-def _parse_search_limit(raw: str) -> tuple[int | None, str | None]:
-    try:
-        limit = int(raw)
-    except ValueError:
-        return None, "limit must be an integer"
-    if limit < 1:
-        return None, "limit must be at least 1"
-    return min(limit, 50), None
+def _parse_search_limit(raw: object) -> tuple[int | None, str | None]:
+    return _core_parse_bounded_int(raw, "limit", 20, 1, 50)
 
 
 def _utc_timestamp() -> str:

@@ -1883,6 +1883,7 @@ class ServeTests(unittest.TestCase):
     def test_search_limit_validation(self):
         self.assertEqual(serve._parse_search_limit("3"), (3, None))
         self.assertEqual(serve._parse_search_limit("500"), (50, None))
+        self.assertEqual(serve._parse_search_limit(""), (20, None))
         self.assertEqual(serve._parse_search_limit("bad"), (None, "limit must be an integer"))
         self.assertEqual(serve._parse_search_limit("0"), (None, "limit must be at least 1"))
 
