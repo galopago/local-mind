@@ -106,7 +106,7 @@ memory. Use `propose_memories` or `capture_session` for proposal-only review.
 
 | Tool | Description |
 |------|-------------|
-| `link_status(include_validation?)` | Readiness summary with package version, wiki path, page/memory counts, optional validation summary, and safe next actions. |
+| `link_status(include_validation?)` | Readiness summary with package version, wiki path, content/page/memory counts, optional validation summary, and safe next actions. |
 | `starter_prompts(project?)` | First-run natural agent prompts plus local readiness/check commands. |
 | `migrate_wiki()` | Apply safe, idempotent wiki schema migrations when `link_status` reports a missing or old schema marker. |
 | `ingest_status()` | Raw source ingest state with pending files, graph health, the next agent prompt, guided plan, and follow-up checks. |

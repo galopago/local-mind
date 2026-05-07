@@ -160,6 +160,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Improved benchmark recommendations so slow search, cache, page-list, and graph paths get targeted repair guidance.
 - Added README trust-gate guidance for ingest safety, proposal review, validation, benchmark readiness, duplicate/conflict checks, and first-run benchmarking.
 - Clarified README guidance for `link verify-mcp`, including version parity, MCP SDK dependency, wiki path, and config checks.
+- Clarified README and PyPI docs that status reports content/page/memory counts, not just structural page totals.
 - Added a first-use smoke test for init, demo, status, query, brief, remember, capture, ingest-status, and validation workflows.
 - Added `link prompts` coverage to the first-use smoke so CI validates the first-run agent prompt path.
 - Added `doctor --fix` coverage for schema marker creation so one-command repairs stay release-gated.
