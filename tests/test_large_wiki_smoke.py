@@ -131,6 +131,10 @@ class LargeWikiSmokeTests(unittest.TestCase):
         self.assertEqual(payload["health"]["status"], "pass")
         self.assertEqual(payload["health"]["label"], "interactive")
         self.assertIn("thresholds_seconds", payload["health"])
+        self.assertIn("graph_summary", payload["timings"])
+        self.assertIn("page_list", payload["timings"])
+        self.assertLessEqual(payload["graph_summary"]["returned_nodes"], 40)
+        self.assertEqual(payload["page_list"]["returned_count"], 100)
 
 
 if __name__ == "__main__":

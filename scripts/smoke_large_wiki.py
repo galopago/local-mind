@@ -16,12 +16,22 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 from link_core.benchmark import benchmark_health  # noqa: E402
 from link_core.memory import memory_records  # noqa: E402
 from link_core.query import query_link  # noqa: E402
-from link_core.wiki import build_backlinks, build_wiki_cache, close_wiki_cache, graph_data, search_pages  # noqa: E402
+from link_core.wiki import (  # noqa: E402
+    build_backlinks,
+    build_wiki_cache,
+    close_wiki_cache,
+    graph_data,
+    graph_summary,
+    list_pages,
+    search_pages,
+)
 
 DEFAULT_MAX_SECONDS = {
     "cache": 5.0,
     "search": 2.0,
     "query": 5.0,
+    "graph_summary": 1.0,
+    "page_list": 0.5,
     "graph": 3.0,
 }
 
@@ -148,6 +158,13 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
         ),
     )
     timings[label] = elapsed
+    label, graph_packet, elapsed = timed(
+        "graph_summary",
+        lambda: graph_summary(cache, topic="agent memory", limit=40, depth=1, max_edges=120),
+    )
+    timings[label] = elapsed
+    label, page_list, elapsed = timed("page_list", lambda: list_pages(cache, limit=100))
+    timings[label] = elapsed
     label, graph, elapsed = timed("graph", lambda: graph_data(cache))
     timings[label] = elapsed
 
@@ -158,6 +175,10 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
     require(len(packet.get("context_packet", [])) <= 6, "small query budget was not enforced")
     require(packet.get("budget_report", {}).get("wiki_search", {}).get("has_more") is True, "query did not report additional matches")
     require(packet.get("follow_up", [{}])[0].get("tool") == "query_link", "query did not return follow-up guidance")
+    require(graph_packet.get("returned_nodes", 0) <= 40, "graph_summary did not enforce node limit")
+    require(graph_packet.get("truncated") is True, "graph_summary did not report truncation for large wiki")
+    require(page_list.get("returned_count") == 100, "page list did not enforce default agent-safe limit")
+    require(page_list.get("truncated") is True, "page list did not report truncation for large wiki")
     require(len(graph["nodes"]) == expected_pages, f"expected {expected_pages} graph nodes, got {len(graph['nodes'])}")
     require(len(graph["edges"]) >= page_count * 2, "graph edge count is unexpectedly low")
     max_seconds = max_seconds or DEFAULT_MAX_SECONDS
@@ -170,6 +191,15 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
         "search_backend": str(cache.get("search_backend") or "token-index"),
         "context_items": len(packet.get("context_packet", [])),
         "search_results": len(results),
+        "graph_summary": {
+            "returned_nodes": graph_packet.get("returned_nodes", 0),
+            "returned_edges": graph_packet.get("returned_edges", 0),
+            "truncated": graph_packet.get("truncated", False),
+        },
+        "page_list": {
+            "returned_count": page_list.get("returned_count", 0),
+            "truncated": page_list.get("truncated", False),
+        },
         "timings": {key: round(value, 4) for key, value in timings.items()},
         "max_seconds": max_seconds,
     }
@@ -186,6 +216,8 @@ def main() -> int:
     parser.add_argument("--max-cache-seconds", type=float, default=DEFAULT_MAX_SECONDS["cache"])
     parser.add_argument("--max-search-seconds", type=float, default=DEFAULT_MAX_SECONDS["search"])
     parser.add_argument("--max-query-seconds", type=float, default=DEFAULT_MAX_SECONDS["query"])
+    parser.add_argument("--max-graph-summary-seconds", type=float, default=DEFAULT_MAX_SECONDS["graph_summary"])
+    parser.add_argument("--max-page-list-seconds", type=float, default=DEFAULT_MAX_SECONDS["page_list"])
     parser.add_argument("--max-graph-seconds", type=float, default=DEFAULT_MAX_SECONDS["graph"])
     args = parser.parse_args()
 
@@ -198,6 +230,8 @@ def main() -> int:
         "cache": args.max_cache_seconds,
         "search": args.max_search_seconds,
         "query": args.max_query_seconds,
+        "graph_summary": args.max_graph_summary_seconds,
+        "page_list": args.max_page_list_seconds,
         "graph": args.max_graph_seconds,
     }
     try:

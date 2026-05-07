@@ -8,6 +8,8 @@ BENCHMARK_THRESHOLDS_SECONDS = {
     "cache": 5.0,
     "search": 1.0,
     "query": 3.0,
+    "graph_summary": 1.0,
+    "page_list": 0.5,
     "graph": 2.0,
 }
 

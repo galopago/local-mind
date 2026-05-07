@@ -14,7 +14,14 @@ class BenchmarkCoreTests(unittest.TestCase):
         payload = {
             "pages": 1200,
             "search_backend": "sqlite-fts",
-            "timings": {"cache": 0.2, "search": 0.01, "query": 0.03, "graph": 0.04},
+            "timings": {
+                "cache": 0.2,
+                "search": 0.01,
+                "query": 0.03,
+                "graph_summary": 0.01,
+                "page_list": 0.01,
+                "graph": 0.04,
+            },
         }
 
         health = benchmark_health(payload)
@@ -29,7 +36,14 @@ class BenchmarkCoreTests(unittest.TestCase):
         payload = {
             "pages": 20,
             "search_backend": "sqlite-fts",
-            "timings": {"cache": 0.2, "search": 1.5, "query": 0.03, "graph": 0.04},
+            "timings": {
+                "cache": 0.2,
+                "search": 1.5,
+                "query": 0.03,
+                "graph_summary": 0.01,
+                "page_list": 0.01,
+                "graph": 0.04,
+            },
         }
 
         health = benchmark_health(payload)
@@ -44,7 +58,14 @@ class BenchmarkCoreTests(unittest.TestCase):
         payload = {
             "pages": 1000,
             "search_backend": "token-index",
-            "timings": {"cache": 0.2, "search": 0.01, "query": 0.03, "graph": 0.04},
+            "timings": {
+                "cache": 0.2,
+                "search": 0.01,
+                "query": 0.03,
+                "graph_summary": 0.01,
+                "page_list": 0.01,
+                "graph": 0.04,
+            },
         }
 
         health = benchmark_health(payload)

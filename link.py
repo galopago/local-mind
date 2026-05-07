@@ -184,6 +184,7 @@ from link_core.wiki import (
     close_wiki_cache as _core_close_wiki_cache,
     graph_data as _core_graph_data,
     graph_summary as _core_graph_summary,
+    list_pages as _core_list_pages,
     rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
 )
@@ -2794,10 +2795,22 @@ def benchmark(
         ),
     )
     timings[label] = elapsed
+    label, graph_summary_payload, elapsed = _timed(
+        "graph_summary",
+        lambda: _core_graph_summary(cache, topic=query_text, limit=40, depth=1, max_edges=120),
+    )
+    timings[label] = elapsed
+    label, page_list_payload, elapsed = _timed(
+        "page_list",
+        lambda: _core_list_pages(cache, limit=100),
+    )
+    timings[label] = elapsed
     label, graph, elapsed = _timed("graph", lambda: _core_graph_data(cache))
     timings[label] = elapsed
 
     budget_report = packet.get("budget_report", {}) if isinstance(packet, dict) else {}
+    graph_summary_info = graph_summary_payload if isinstance(graph_summary_payload, Mapping) else {}
+    page_list_info = page_list_payload if isinstance(page_list_payload, Mapping) else {}
     payload = {
         "target": str(target),
         "wiki": str(wiki_dir),
@@ -2807,6 +2820,15 @@ def benchmark(
         "pages": len(cache.get("pages", [])),
         "memories": len(_memory_records(wiki_dir)),
         "edges": len(graph.get("edges", [])) if isinstance(graph, dict) else 0,
+        "graph_summary": {
+            "returned_nodes": graph_summary_info.get("returned_nodes", 0),
+            "returned_edges": graph_summary_info.get("returned_edges", 0),
+            "truncated": bool(graph_summary_info.get("truncated")),
+        },
+        "page_list": {
+            "returned_count": page_list_info.get("returned_count", 0),
+            "truncated": bool(page_list_info.get("truncated")),
+        },
         "search_backend": str(cache.get("search_backend") or "token-index"),
         "search_results": len(results) if isinstance(results, list) else 0,
         "context_items": len(packet.get("context_packet", [])) if isinstance(packet, dict) else 0,
@@ -2827,7 +2849,16 @@ def benchmark(
     print("")
     print(f"Scale: {payload['pages']} pages · {payload['memories']} memories · {payload['edges']} edges")
     print(f"Search backend: {payload['search_backend']}")
+    graph_summary_info = payload["graph_summary"]
+    page_list_info = payload["page_list"]
     print(f"Results: {payload['search_results']} search results · {payload['context_items']} context items")
+    if isinstance(graph_summary_info, Mapping) and isinstance(page_list_info, Mapping):
+        print(
+            "Agent-safe payloads: "
+            f"graph summary {graph_summary_info.get('returned_nodes', 0)} nodes/"
+            f"{graph_summary_info.get('returned_edges', 0)} edges · "
+            f"page list {page_list_info.get('returned_count', 0)} pages"
+        )
     health = payload["health"]
     if isinstance(health, Mapping):
         print(f"Verdict: {health.get('label', 'unknown')}")
@@ -2835,7 +2866,7 @@ def benchmark(
             print(f"Health: {health.get('summary')}")
     print("")
     print("Timings")
-    for key in ("cache", "search", "query", "graph"):
+    for key in ("cache", "search", "query", "graph_summary", "page_list", "graph"):
         print(f"- {key}: {payload['timings'][key]:.4f}s")
     if isinstance(health, Mapping) and health.get("warnings"):
         print("")

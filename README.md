@@ -611,7 +611,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link delete-capture <capture> --confirm` | Delete a saved raw capture after explicit confirmation. |
 | `link query "task" [--budget small\|medium\|large] [--project slug]` | Build a compact answer-ready packet from memory, wiki search, graph context, provenance, and estimated packet size. |
 | `link graph-summary ["topic"] [--limit 40] [--depth 1]` | Show a bounded graph overview or topic neighborhood without dumping every node and edge. |
-| `link benchmark ["query"] [--budget small\|medium\|large] [--project slug]` | Measure local cache, search, smart query, graph timings, search backend, packet size, and readiness recommendations for your current wiki. |
+| `link benchmark ["query"] [--budget small\|medium\|large] [--project slug]` | Measure local cache, search, smart query, bounded agent payloads, graph timings, search backend, packet size, and readiness recommendations for your current wiki. |
 | `link brief "task" [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
 | `link memory-audit [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |
 | `link recall "query" [--project slug]` | Search local agent memories with recall readiness. |

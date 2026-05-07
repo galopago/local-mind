@@ -877,12 +877,17 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("cache", payload["timings"])
         self.assertIn("search", payload["timings"])
         self.assertIn("query", payload["timings"])
+        self.assertIn("graph_summary", payload["timings"])
+        self.assertIn("page_list", payload["timings"])
         self.assertIn("graph", payload["timings"])
+        self.assertGreaterEqual(payload["graph_summary"]["returned_nodes"], 1)
+        self.assertGreaterEqual(payload["page_list"]["returned_count"], 1)
         self.assertGreater(payload["budget_report"]["context_packet"]["estimated_chars"], 0)
         self.assertEqual(payload["health"]["status"], "pass")
         self.assertEqual(payload["health"]["label"], "interactive")
         self.assertIn("interactive local agent memory", payload["health"]["summary"])
         self.assertIn("search", payload["health"]["thresholds_seconds"])
+        self.assertIn("graph_summary", payload["health"]["thresholds_seconds"])
 
         text_out = StringIO()
         with redirect_stdout(text_out):
@@ -890,6 +895,7 @@ class LinkCliTests(unittest.TestCase):
 
         self.assertEqual(text_code, 0)
         self.assertIn("Verdict: interactive", text_out.getvalue())
+        self.assertIn("Agent-safe payloads:", text_out.getvalue())
         self.assertIn("Health: Ready for interactive local agent memory.", text_out.getvalue())
 
     def test_brief_surfaces_saved_captures_without_secret_values(self):
