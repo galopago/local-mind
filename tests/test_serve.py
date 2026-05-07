@@ -216,6 +216,7 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["api_version"], serve.API_VERSION)
         self.assertEqual(payload["page_count"], 2)
         self.assertEqual(payload["content_page_count"], 0)
+        self.assertEqual(payload["warnings"], [])
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertEqual(headers["Pragma"], "no-cache")
         self.assertEqual(headers["Expires"], "0")
@@ -784,6 +785,7 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["memory_count"], 1)
         self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
         self.assertTrue(payload["validation"]["passed"])
+        self.assertEqual(payload["warnings"], [])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
 
     def test_memory_inbox_and_explain_render_action_commands(self):

@@ -140,6 +140,7 @@ class McpContractTests(unittest.TestCase):
         self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
         self.assertEqual(payload["schema"]["status"], "current")
         self.assertTrue(payload["validation"]["passed"])
+        self.assertEqual(payload["warnings"], [])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
 
     def test_starter_prompts_contract(self):

@@ -3,11 +3,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
+from link_core import status as status_core  # noqa: E402
 from link_core.status import link_status  # noqa: E402
 from link_core.schema import write_schema  # noqa: E402
 from link_core.wiki import build_backlinks, build_wiki_cache  # noqa: E402
@@ -94,6 +96,25 @@ class StatusCoreTests(unittest.TestCase):
         self.assertEqual(payload["content_page_count"], 0)
         self.assertEqual(payload["next_actions"][0]["tool"], "ingest_status")
         self.assertEqual(payload["next_actions"][1]["tool"], "starter_prompts")
+
+    def test_link_status_surfaces_cache_and_memory_warnings(self):
+        wiki = self.make_wiki()
+
+        with (
+            patch.object(status_core, "build_wiki_cache", side_effect=RuntimeError("cache failed")),
+            patch.object(status_core, "memory_records", side_effect=RuntimeError("memory failed")),
+        ):
+            payload = link_status(wiki)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["page_count"], 0)
+        self.assertEqual(payload["memory_count"], 0)
+        self.assertEqual(
+            [warning["code"] for warning in payload["warnings"]],
+            ["cache_unavailable", "memory_records_unavailable"],
+        )
+        self.assertEqual(payload["warnings"][0]["detail"], "cache failed")
+        self.assertEqual(payload["warnings"][1]["detail"], "memory failed")
 
 
 if __name__ == "__main__":

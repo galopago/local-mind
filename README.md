@@ -511,7 +511,7 @@ Most agents should start with:
 
 | Tool | Use it when |
 |------|-------------|
-| `link_status` | You are connecting to Link or troubleshooting setup and need version, readiness, content/page/memory counts, search backend, validation summary, and safe next actions. |
+| `link_status` | You are connecting to Link or troubleshooting setup and need version, readiness, content/page/memory counts, search backend, validation summary, warnings, and safe next actions. |
 | `starter_prompts` | The user asks what to try after install, or the agent needs the standard readiness, brief, remember, query, ingest, and proposal prompts. |
 | `migrate_wiki` | `link_status` reports a missing or old schema marker and you need a safe, idempotent local migration. |
 | `ingest_status` | The user dropped files into `raw/` or asks to ingest, and you need pending raw files plus the next prompt/checks and guided ingest plan. |
@@ -564,7 +564,7 @@ Common endpoints:
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/status?validate=true` | Readiness summary with content/page/memory counts, optional validation summary, and safe next actions. |
+| `GET /api/status?validate=true` | Readiness summary with content/page/memory counts, optional validation summary, warnings, and safe next actions. |
 | `GET /api/prompts?project=slug` | First-run natural agent prompts plus local readiness/check commands; same payload as `link prompts --json`. |
 | `GET /api/ingest-status` | Raw ingest state with pending files, represented-source completion cards, safety summary, graph health, exact agent prompt, guided plan, and follow-up commands. |
 | `GET /api/page-list?limit=100&offset=0` | Bounded page metadata list for agents and large wikis, with follow-up pagination actions. |

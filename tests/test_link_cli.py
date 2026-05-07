@@ -404,6 +404,39 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["next_actions"][0]["tool"], "ingest_status")
         self.assertEqual(payload["next_actions"][1]["tool"], "starter_prompts")
 
+    def test_status_prints_readiness_warnings(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))
+        target = tmp / "my-link"
+        payload = {
+            "ready": False,
+            "version": link_cli.LINK_VERSION,
+            "wiki": str(target / "wiki"),
+            "missing": [],
+            "page_count": 0,
+            "content_page_count": 0,
+            "memory_count": 0,
+            "active_memory_count": 0,
+            "needs_review_count": 0,
+            "search_backend": "unavailable",
+            "schema": {"status": "current", "version": 1},
+            "validation": {"checked": False},
+            "warnings": [{
+                "code": "cache_unavailable",
+                "message": "Could not build the wiki page cache.",
+                "detail": "cache failed",
+            }],
+            "next_actions": [{"tool": "validate_wiki", "label": "inspect wiki health", "arguments": {}}],
+        }
+
+        out = StringIO()
+        with patch.object(link_cli, "_core_link_status", return_value=payload), redirect_stdout(out):
+            code = link_cli.status(target)
+
+        self.assertEqual(code, 1)
+        self.assertIn("Warnings:", out.getvalue())
+        self.assertIn("cache_unavailable", out.getvalue())
+        self.assertIn("cache failed", out.getvalue())
+
     def test_main_prints_version(self):
         out = StringIO()
 

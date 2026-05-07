@@ -18,6 +18,17 @@ def _action(label: str, tool: str, arguments: dict[str, object] | None = None) -
     }
 
 
+def _warning(code: str, message: str, exc: Exception) -> dict[str, str]:
+    detail = str(exc).strip()
+    payload = {
+        "code": code,
+        "message": message,
+    }
+    if detail:
+        payload["detail"] = detail[:200]
+    return payload
+
+
 def link_status(
     wiki_dir: Path,
     *,
@@ -38,6 +49,7 @@ def link_status(
     missing = [name for name, path in required_paths.items() if not path.exists()]
     pages: list[Mapping[str, object]] = []
     record_list: list[Mapping[str, object]] = []
+    warnings: list[dict[str, str]] = []
     search_backend = "unavailable"
     if wiki_dir.exists():
         wiki_cache: Mapping[str, Any] | None = None
@@ -50,15 +62,25 @@ def link_status(
                 wiki_cache = cache
             pages = list(wiki_cache.get("pages", []))
             search_backend = str(wiki_cache.get("search_backend") or "token-index")
-        except Exception:
+        except Exception as exc:
             pages = []
+            warnings.append(_warning(
+                "cache_unavailable",
+                "Could not build the wiki page cache; page counts and search backend may be incomplete.",
+                exc,
+            ))
         finally:
             if owns_cache and isinstance(wiki_cache, dict):
                 close_wiki_cache(wiki_cache)
         try:
             record_list = list(records if records is not None else memory_records(wiki_dir))
-        except Exception:
+        except Exception as exc:
             record_list = []
+            warnings.append(_warning(
+                "memory_records_unavailable",
+                "Could not read memory records; memory counts may be incomplete.",
+                exc,
+            ))
 
     validation_summary: dict[str, object] = {"checked": False}
     if include_validation and wiki_dir.exists():
@@ -122,5 +144,6 @@ def link_status(
         "search_backend": search_backend,
         "schema": schema,
         "validation": validation_summary,
+        "warnings": warnings,
         "next_actions": next_actions,
     }

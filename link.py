@@ -1535,6 +1535,12 @@ def status(target: Path, include_validation: bool = False, json_output: bool = F
         )
     else:
         print("Validation: not checked (use --validate)")
+    warnings = payload.get("warnings") or []
+    if warnings:
+        print("Warnings:")
+        for warning in warnings:
+            detail = f" ({warning.get('detail')})" if warning.get("detail") else ""
+            print(f"- {warning.get('code')}: {warning.get('message')}{detail}")
     print("")
     print("Next:")
     for action in payload["next_actions"]:
