@@ -119,6 +119,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Fixed installer MCP setup reporting so failed upgrades no longer masquerade as success by reusing an unrelated older global `link-mcp`.
 - Fixed project-mode installer output so MCP wiki paths are absolute and next-step hints point at the project wiki instead of `~/link`.
 - Fixed search/context matching for natural queries against hyphenated page slugs, e.g. `local first software` now finds `local-first-software`.
+- Fixed missing HTTP context topics to return a controlled 400 JSON error.
 - Hardened backlink rebuild over HTTP so local web rebuilds require JSON POST instead of a mutating GET.
 - Hardened HTTP rebuild actions so local web index/backlink mutations require the explicit local-action header.
 - Hardened `/raw/` static serving so the local web viewer only serves supported media/PDF source assets.
@@ -183,7 +184,6 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Fixed wiki cache invalidation so edits to existing pages refresh search and context.
 - Fixed MCP package reinstall behavior so rerunning installers upgrades `link-mcp`.
 - Fixed invalid HTTP search limits to return controlled JSON errors.
-- Fixed missing HTTP context topics to return a controlled 400 JSON error.
 
 ## Earlier
 
