@@ -3473,7 +3473,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/context":
             topic = query.get("topic", [""])[0].strip() or query.get("q", [""])[0].strip()
             if not topic:
-                self._json({"error": "topic parameter required"})
+                self._json({"error": "topic parameter required"}, status=400)
             else:
                 self._json(_get_context(topic))
         else:

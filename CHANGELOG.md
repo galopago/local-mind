@@ -183,6 +183,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Fixed wiki cache invalidation so edits to existing pages refresh search and context.
 - Fixed MCP package reinstall behavior so rerunning installers upgrades `link-mcp`.
 - Fixed invalid HTTP search limits to return controlled JSON errors.
+- Fixed missing HTTP context topics to return a controlled 400 JSON error.
 
 ## Earlier
 

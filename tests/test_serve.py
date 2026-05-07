@@ -216,6 +216,14 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(ctx["forward_count"], 2)
         self.assertEqual([page["name"] for page in ctx["pages"]], ["a", "b", "c"])
 
+    def test_context_api_requires_topic_with_bad_request(self):
+        self.make_wiki()
+
+        status, payload = run_handler("GET", "/api/context")
+
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"], "topic parameter required")
+
     def test_inline_markdown_sanitizes_html_and_links(self):
         rendered = serve._md_to_html(
             "Hello <script>alert(1)</script> "
