@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import sys
 import tempfile
 import unittest
@@ -11,6 +12,14 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 from link_core.memory import memory_records  # noqa: E402
 from link_core.query import query_link  # noqa: E402
 from link_core.wiki import build_backlinks, build_wiki_cache, graph_data  # noqa: E402
+
+SPEC = importlib.util.spec_from_file_location(
+    "smoke_large_wiki", ROOT / "scripts/smoke_large_wiki.py"
+)
+smoke_large_wiki = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+sys.modules[SPEC.name] = smoke_large_wiki
+SPEC.loader.exec_module(smoke_large_wiki)
 
 
 def write_page(wiki: Path, rel: str, text: str) -> None:
@@ -105,6 +114,12 @@ class LargeWikiSmokeTests(unittest.TestCase):
         self.assertEqual(packet["follow_up"][0]["tool"], "query_link")
         self.assertEqual(len(graph["nodes"]), page_count + 30)
         self.assertGreaterEqual(len(graph["edges"]), page_count)
+
+    def test_large_wiki_smoke_enforces_timing_thresholds(self):
+        smoke_large_wiki.check_timing_thresholds({"query": 0.01}, {"query": 0.02})
+
+        with self.assertRaisesRegex(smoke_large_wiki.SmokeFailure, "above 0.0200s threshold"):
+            smoke_large_wiki.check_timing_thresholds({"query": 0.03}, {"query": 0.02})
 
 
 if __name__ == "__main__":

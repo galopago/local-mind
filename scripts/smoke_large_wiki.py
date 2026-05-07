@@ -17,6 +17,13 @@ from link_core.memory import memory_records  # noqa: E402
 from link_core.query import query_link  # noqa: E402
 from link_core.wiki import build_backlinks, build_wiki_cache, graph_data, search_pages  # noqa: E402
 
+DEFAULT_MAX_SECONDS = {
+    "cache": 5.0,
+    "search": 2.0,
+    "query": 5.0,
+    "graph": 3.0,
+}
+
 
 class SmokeFailure(RuntimeError):
     pass
@@ -109,7 +116,18 @@ def timed(label: str, fn):
     return label, value, elapsed
 
 
-def run_smoke(work_dir: Path, page_count: int) -> dict[str, object]:
+def check_timing_thresholds(timings: dict[str, float], max_seconds: dict[str, float]) -> None:
+    for label, elapsed in sorted(timings.items()):
+        ceiling = max_seconds.get(label)
+        if ceiling is None:
+            continue
+        require(
+            elapsed <= ceiling,
+            f"{label} path took {elapsed:.4f}s, above {ceiling:.4f}s threshold",
+        )
+
+
+def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | None = None) -> dict[str, object]:
     wiki = build_large_wiki(work_dir, page_count)
     timings: dict[str, float] = {}
 
@@ -141,6 +159,8 @@ def run_smoke(work_dir: Path, page_count: int) -> dict[str, object]:
     require(packet.get("follow_up", [{}])[0].get("tool") == "query_link", "query did not return follow-up guidance")
     require(len(graph["nodes"]) == expected_pages, f"expected {expected_pages} graph nodes, got {len(graph['nodes'])}")
     require(len(graph["edges"]) >= page_count * 2, "graph edge count is unexpectedly low")
+    max_seconds = max_seconds or DEFAULT_MAX_SECONDS
+    check_timing_thresholds(timings, max_seconds)
 
     return {
         "wiki": str(wiki),
@@ -149,6 +169,7 @@ def run_smoke(work_dir: Path, page_count: int) -> dict[str, object]:
         "context_items": len(packet.get("context_packet", [])),
         "search_results": len(results),
         "timings": {key: round(value, 4) for key, value in timings.items()},
+        "max_seconds": max_seconds,
     }
 
 
@@ -156,6 +177,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Smoke test Link against a synthetic large wiki.")
     parser.add_argument("--pages", type=int, default=1000, help="number of synthetic concept pages")
     parser.add_argument("--work-dir", default="", help="directory for generated wiki artifacts")
+    parser.add_argument("--max-cache-seconds", type=float, default=DEFAULT_MAX_SECONDS["cache"])
+    parser.add_argument("--max-search-seconds", type=float, default=DEFAULT_MAX_SECONDS["search"])
+    parser.add_argument("--max-query-seconds", type=float, default=DEFAULT_MAX_SECONDS["query"])
+    parser.add_argument("--max-graph-seconds", type=float, default=DEFAULT_MAX_SECONDS["graph"])
     args = parser.parse_args()
 
     if args.pages < 1:
@@ -163,8 +188,14 @@ def main() -> int:
         return 2
 
     work_dir = Path(args.work_dir).expanduser().resolve() if args.work_dir else Path(tempfile.mkdtemp(prefix="link-large-wiki-"))
+    max_seconds = {
+        "cache": args.max_cache_seconds,
+        "search": args.max_search_seconds,
+        "query": args.max_query_seconds,
+        "graph": args.max_graph_seconds,
+    }
     try:
-        payload = run_smoke(work_dir, args.pages)
+        payload = run_smoke(work_dir, args.pages, max_seconds=max_seconds)
     except SmokeFailure as exc:
         print(f"Large-wiki smoke failed: {exc}", file=sys.stderr)
         return 1
