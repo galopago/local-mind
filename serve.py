@@ -94,12 +94,16 @@ from link_core.web_graph import (
     graph_needs_bounded_overview as _core_graph_needs_bounded_overview,
 )
 from link_core.web_http import (
+    CONTENT_SECURITY_POLICY as _core_content_security_policy,
     is_allowed_static_file as _core_is_allowed_static_file,
     is_relative_to as _core_is_relative_to,
     LocalRateLimiter as _CoreLocalRateLimiter,
+    local_security_headers as _core_local_security_headers,
     parse_bounded_int as _core_parse_bounded_int,
+    PERMISSIONS_POLICY as _core_permissions_policy,
     resolve_raw_static_path as _core_resolve_raw_static_path,
     safe_resolve as _core_safe_resolve,
+    SVG_CONTENT_SECURITY_POLICY as _core_svg_content_security_policy,
     validate_local_browser_source_headers as _core_validate_local_browser_source_headers,
     validate_local_host_header as _core_validate_local_host_header,
 )
@@ -138,28 +142,9 @@ LOCAL_ACTION_HEADER = "X-Link-Local-Action"
 LOCAL_ACTION_VALUES = {"1", "true", "yes"}
 MUTATION_RATE_LIMIT = 180
 MUTATION_RATE_WINDOW_SECONDS = 60
-CONTENT_SECURITY_POLICY = (
-    "default-src 'self'; "
-    "img-src 'self' data:; "
-    "style-src 'self' 'unsafe-inline'; "
-    "script-src 'self' 'unsafe-inline'; "
-    "connect-src 'self'; "
-    "object-src 'none'; "
-    "base-uri 'none'; "
-    "frame-ancestors 'none'"
-)
-PERMISSIONS_POLICY = (
-    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
-    "serial=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=()"
-)
-SVG_CONTENT_SECURITY_POLICY = (
-    "default-src 'none'; "
-    "img-src 'self' data:; "
-    "style-src 'unsafe-inline'; "
-    "script-src 'none'; "
-    "object-src 'none'; "
-    "sandbox"
-)
+CONTENT_SECURITY_POLICY = _core_content_security_policy
+PERMISSIONS_POLICY = _core_permissions_policy
+SVG_CONTENT_SECURITY_POLICY = _core_svg_content_security_policy
 PROPOSAL_SOURCE_SUFFIXES = {
     ".md",
     ".markdown",
@@ -3389,13 +3374,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return payload, None, 200
 
     def _security_headers(self, content_security_policy: str = CONTENT_SECURITY_POLICY):
-        self.send_header("X-Link-API-Version", API_VERSION)
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
-        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
-        self.send_header("Permissions-Policy", PERMISSIONS_POLICY)
-        self.send_header("Content-Security-Policy", content_security_policy)
+        for key, value in _core_local_security_headers(API_VERSION, content_security_policy):
+            self.send_header(key, value)
 
     def _file(self, fpath, content_type):
         fpath = _safe_resolve(fpath)

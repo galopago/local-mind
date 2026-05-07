@@ -11,6 +11,28 @@ ALLOWED_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost"})
 HOST_HEADER_REQUIRED = "Host header required"
 HOST_HEADER_LOCAL_ONLY = "Host header must be localhost or 127.0.0.1"
 BROWSER_SOURCE_LOCAL_ONLY = "Origin/Referer must match local Link viewer"
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "img-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'none'; "
+    "frame-ancestors 'none'"
+)
+PERMISSIONS_POLICY = (
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
+    "serial=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=()"
+)
+SVG_CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; "
+    "img-src 'self' data:; "
+    "style-src 'unsafe-inline'; "
+    "script-src 'none'; "
+    "object-src 'none'; "
+    "sandbox"
+)
 
 
 def parse_bounded_int(
@@ -63,6 +85,22 @@ class LocalRateLimiter:
         events.append(now)
         self._events[key_text] = events
         return True, 0
+
+
+def local_security_headers(
+    api_version: str,
+    content_security_policy: str = CONTENT_SECURITY_POLICY,
+) -> tuple[tuple[str, str], ...]:
+    """Return baseline local-viewer security headers."""
+    return (
+        ("X-Link-API-Version", str(api_version)),
+        ("X-Content-Type-Options", "nosniff"),
+        ("Referrer-Policy", "no-referrer"),
+        ("Cross-Origin-Resource-Policy", "same-origin"),
+        ("Cross-Origin-Opener-Policy", "same-origin"),
+        ("Permissions-Policy", PERMISSIONS_POLICY),
+        ("Content-Security-Policy", content_security_policy),
+    )
 
 
 def _host_without_port(host: str) -> str | None:

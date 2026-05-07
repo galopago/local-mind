@@ -9,10 +9,14 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.web_http import (  # noqa: E402
     BROWSER_SOURCE_LOCAL_ONLY,
+    CONTENT_SECURITY_POLICY,
     HOST_HEADER_LOCAL_ONLY,
     HOST_HEADER_REQUIRED,
     LocalRateLimiter,
+    PERMISSIONS_POLICY,
+    SVG_CONTENT_SECURITY_POLICY,
     is_allowed_static_file,
+    local_security_headers,
     parse_bounded_int,
     resolve_raw_static_path,
     safe_resolve,
@@ -22,6 +26,25 @@ from link_core.web_http import (  # noqa: E402
 
 
 class WebHttpCoreTests(unittest.TestCase):
+    def test_local_security_headers_include_browser_isolation(self):
+        headers = dict(local_security_headers("1"))
+
+        self.assertEqual(headers["X-Link-API-Version"], "1")
+        self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(headers["Cross-Origin-Opener-Policy"], "same-origin")
+        self.assertEqual(headers["Permissions-Policy"], PERMISSIONS_POLICY)
+        self.assertEqual(headers["Content-Security-Policy"], CONTENT_SECURITY_POLICY)
+        self.assertIn("frame-ancestors 'none'", CONTENT_SECURITY_POLICY)
+        self.assertIn("camera=()", PERMISSIONS_POLICY)
+        self.assertNotIn("fullscreen=()", PERMISSIONS_POLICY)
+
+    def test_local_security_headers_can_use_strict_svg_policy(self):
+        headers = dict(local_security_headers("2", SVG_CONTENT_SECURITY_POLICY))
+
+        self.assertEqual(headers["X-Link-API-Version"], "2")
+        self.assertEqual(headers["Content-Security-Policy"], SVG_CONTENT_SECURITY_POLICY)
+        self.assertIn("script-src 'none'", SVG_CONTENT_SECURITY_POLICY)
+
     def test_local_rate_limiter_reports_retry_after_window(self):
         now = 100.0
 
