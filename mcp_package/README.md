@@ -8,20 +8,59 @@ Listed on the [official MCP Registry](https://registry.modelcontextprotocol.io) 
 
 Release notes: [CHANGELOG.md](https://github.com/gowtham0992/link/blob/main/CHANGELOG.md)
 
-## Install
+## What You Need
+
+`link-mcp` is the MCP server. It needs a Link wiki to read from. The normal
+wiki location is `~/link/wiki`, created by the main Link installers.
+
+Recommended setup:
+
+```bash
+git clone https://github.com/gowtham0992/link.git
+bash link/integrations/codex/install.sh   # or claude-code, cursor, kiro, vscode
+```
+
+The installer scaffolds `~/link/`, installs or upgrades `link-mcp`, writes agent
+instructions, and prints the exact MCP config for your machine.
+
+After install, ask your agent:
+
+```text
+is Link ready?
+brief me from Link before we continue
+query Link for what you know about this project
+```
+
+## MCP-Only Install
+
+Use this when you already have a Link wiki and only need the MCP package.
 
 ```bash
 python3 -m pip install --upgrade link-mcp
 ```
 
-If macOS/Homebrew Python reports `externally-managed-environment`, install into a dedicated venv:
+If macOS/Homebrew Python reports `externally-managed-environment`, use a
+dedicated venv:
 
 ```bash
 python3 -m venv ~/.link-mcp-venv
 ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp
 ```
 
-Then use the venv Python in your MCP config:
+Then add the server to your MCP client config. Use an absolute wiki path:
+
+```json
+{
+  "mcpServers": {
+    "link": {
+      "command": "python3",
+      "args": ["-m", "link_mcp", "--wiki", "/Users/YOU/link/wiki"]
+    }
+  }
+}
+```
+
+If you installed into the venv, use the venv Python:
 
 ```json
 {
@@ -34,48 +73,21 @@ Then use the venv Python in your MCP config:
 }
 ```
 
-Replace `/Users/YOU` with your absolute home path.
+Replace `/Users/YOU` with your absolute home path. The default wiki is
+`~/link/wiki/`; override with `--wiki /path/to/wiki`.
 
-## Quick setup (Kiro)
+## Agent Workflow
 
-```bash
-git clone https://github.com/gowtham0992/link.git
-bash link/integrations/kiro/install.sh
-```
+Most agents should call:
 
-This installs `link-mcp`, scaffolds `~/link/`, and registers the MCP server in `~/.kiro/settings/mcp.json` automatically.
+1. `link_status(include_validation=true)` when connecting or troubleshooting.
+2. `memory_brief(query="<current task>")` before personalized or project work.
+3. `query_link(query="<question>", budget="small")` for compact answer-ready context.
+4. `ingest_status()` when the user drops files into `raw/`.
+5. `validate_wiki(strict=true)` after ingest or large edits.
 
-## Manual setup (any MCP client)
-
-1. Scaffold your wiki:
-```bash
-git clone https://github.com/gowtham0992/link.git
-bash link/integrations/kiro/install.sh   # or claude-code, cursor, codex
-```
-
-2. Add to your MCP client config:
-```json
-{
-  "mcpServers": {
-    "link": {
-      "command": "python3",
-      "args": ["-m", "link_mcp"]
-    }
-  }
-}
-```
-
-Custom wiki path:
-```json
-{
-  "mcpServers": {
-    "link": {
-      "command": "python3",
-      "args": ["-m", "link_mcp", "--wiki", "~/my-wiki/wiki"]
-    }
-  }
-}
-```
+Use `remember_memory` only when the user explicitly approves saving durable
+memory. Use `propose_memories` or `capture_session` for proposal-only review.
 
 ## Tools
 
