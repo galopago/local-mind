@@ -43,7 +43,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 
 ROOT = Path(__file__).resolve().parent
@@ -173,6 +173,7 @@ from link_core.status import (
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
+    close_wiki_cache as _core_close_wiki_cache,
     graph_data as _core_graph_data,
     rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
@@ -2648,6 +2649,33 @@ def _timed(label: str, fn: Callable[[], object]) -> tuple[str, object, float]:
     return label, value, time.perf_counter() - start
 
 
+BENCHMARK_THRESHOLDS_SECONDS = {
+    "cache": 5.0,
+    "search": 1.0,
+    "query": 3.0,
+    "graph": 2.0,
+}
+
+
+def _benchmark_health(payload: Mapping[str, object]) -> dict[str, object]:
+    timings = payload.get("timings")
+    if not isinstance(timings, Mapping):
+        timings = {}
+    warnings: list[str] = []
+    for label, ceiling in BENCHMARK_THRESHOLDS_SECONDS.items():
+        elapsed = timings.get(label)
+        if isinstance(elapsed, (int, float)) and elapsed > ceiling:
+            warnings.append(f"{label} took {elapsed:.4f}s, above the {ceiling:.1f}s interactive target")
+    if int(payload.get("pages") or 0) >= 1000 and payload.get("search_backend") != "sqlite-fts":
+        warnings.append("large wiki is using token-index fallback; SQLite FTS would improve search headroom")
+    return {
+        "status": "warn" if warnings else "pass",
+        "label": "review" if warnings else "interactive",
+        "thresholds_seconds": BENCHMARK_THRESHOLDS_SECONDS,
+        "warnings": warnings,
+    }
+
+
 def benchmark(
     target: Path,
     query_text: str = "agent memory",
@@ -2700,6 +2728,8 @@ def benchmark(
         "timings": {key: round(value, 4) for key, value in timings.items()},
         "budget_report": budget_report,
     }
+    payload["health"] = _benchmark_health(payload)
+    _core_close_wiki_cache(cache)
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
@@ -2712,10 +2742,18 @@ def benchmark(
     print(f"Scale: {payload['pages']} pages · {payload['memories']} memories · {payload['edges']} edges")
     print(f"Search backend: {payload['search_backend']}")
     print(f"Results: {payload['search_results']} search results · {payload['context_items']} context items")
+    health = payload["health"]
+    if isinstance(health, Mapping):
+        print(f"Verdict: {health.get('label', 'unknown')}")
     print("")
     print("Timings")
     for key in ("cache", "search", "query", "graph"):
         print(f"- {key}: {payload['timings'][key]:.4f}s")
+    if isinstance(health, Mapping) and health.get("warnings"):
+        print("")
+        print("Warnings")
+        for warning in health["warnings"]:
+            print(f"- {warning}")
     if isinstance(budget_report, dict):
         packet_report = budget_report.get("context_packet")
         if isinstance(packet_report, dict):
