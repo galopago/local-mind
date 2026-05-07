@@ -131,6 +131,9 @@ from link_core.backup import (
     create_backup as _core_create_backup,
     list_backups as _core_list_backups,
 )
+from link_core.benchmark import (
+    benchmark_health as _core_benchmark_health,
+)
 from link_core.capture import (
     capture_filename as _core_capture_filename,
     capture_inbox as _core_capture_inbox,
@@ -2654,33 +2657,6 @@ def _timed(label: str, fn: Callable[[], object]) -> tuple[str, object, float]:
     return label, value, time.perf_counter() - start
 
 
-BENCHMARK_THRESHOLDS_SECONDS = {
-    "cache": 5.0,
-    "search": 1.0,
-    "query": 3.0,
-    "graph": 2.0,
-}
-
-
-def _benchmark_health(payload: Mapping[str, object]) -> dict[str, object]:
-    timings = payload.get("timings")
-    if not isinstance(timings, Mapping):
-        timings = {}
-    warnings: list[str] = []
-    for label, ceiling in BENCHMARK_THRESHOLDS_SECONDS.items():
-        elapsed = timings.get(label)
-        if isinstance(elapsed, (int, float)) and elapsed > ceiling:
-            warnings.append(f"{label} took {elapsed:.4f}s, above the {ceiling:.1f}s interactive target")
-    if int(payload.get("pages") or 0) >= 1000 and payload.get("search_backend") != "sqlite-fts":
-        warnings.append("large wiki is using token-index fallback; SQLite FTS would improve search headroom")
-    return {
-        "status": "warn" if warnings else "pass",
-        "label": "review" if warnings else "interactive",
-        "thresholds_seconds": BENCHMARK_THRESHOLDS_SECONDS,
-        "warnings": warnings,
-    }
-
-
 def benchmark(
     target: Path,
     query_text: str = "agent memory",
@@ -2733,7 +2709,7 @@ def benchmark(
         "timings": {key: round(value, 4) for key, value in timings.items()},
         "budget_report": budget_report,
     }
-    payload["health"] = _benchmark_health(payload)
+    payload["health"] = _core_benchmark_health(payload)
     _core_close_wiki_cache(cache)
     if json_output:
         print(json.dumps(payload, indent=2))

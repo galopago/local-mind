@@ -13,9 +13,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
+from link_core.benchmark import benchmark_health  # noqa: E402
 from link_core.memory import memory_records  # noqa: E402
 from link_core.query import query_link  # noqa: E402
-from link_core.wiki import build_backlinks, build_wiki_cache, graph_data, search_pages  # noqa: E402
+from link_core.wiki import build_backlinks, build_wiki_cache, close_wiki_cache, graph_data, search_pages  # noqa: E402
 
 DEFAULT_MAX_SECONDS = {
     "cache": 5.0,
@@ -162,7 +163,7 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
     max_seconds = max_seconds or DEFAULT_MAX_SECONDS
     check_timing_thresholds(timings, max_seconds)
 
-    return {
+    payload = {
         "wiki": str(wiki),
         "pages": len(cache["pages"]),
         "edges": len(graph["edges"]),
@@ -172,6 +173,10 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
         "timings": {key: round(value, 4) for key, value in timings.items()},
         "max_seconds": max_seconds,
     }
+    payload["health"] = benchmark_health(payload)
+    require(payload["health"]["status"] == "pass", "large-wiki benchmark health did not pass")
+    close_wiki_cache(cache)
+    return payload
 
 
 def main() -> int:

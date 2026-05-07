@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.memory import memory_records  # noqa: E402
 from link_core.query import query_link  # noqa: E402
-from link_core.wiki import build_backlinks, build_wiki_cache, graph_data  # noqa: E402
+from link_core.wiki import build_backlinks, build_wiki_cache, close_wiki_cache, graph_data  # noqa: E402
 
 SPEC = importlib.util.spec_from_file_location(
     "smoke_large_wiki", ROOT / "scripts/smoke_large_wiki.py"
@@ -115,12 +115,22 @@ class LargeWikiSmokeTests(unittest.TestCase):
         self.assertEqual(packet["follow_up"][0]["tool"], "query_link")
         self.assertEqual(len(graph["nodes"]), page_count + 30)
         self.assertGreaterEqual(len(graph["edges"]), page_count)
+        close_wiki_cache(cache)
 
     def test_large_wiki_smoke_enforces_timing_thresholds(self):
         smoke_large_wiki.check_timing_thresholds({"query": 0.01}, {"query": 0.02})
 
         with self.assertRaisesRegex(smoke_large_wiki.SmokeFailure, "above 0.0200s threshold"):
             smoke_large_wiki.check_timing_thresholds({"query": 0.03}, {"query": 0.02})
+
+    def test_large_wiki_smoke_reports_benchmark_health(self):
+        root = Path(tempfile.mkdtemp(prefix="link-large-wiki-health-"))
+
+        payload = smoke_large_wiki.run_smoke(root, 80)
+
+        self.assertEqual(payload["health"]["status"], "pass")
+        self.assertEqual(payload["health"]["label"], "interactive")
+        self.assertIn("thresholds_seconds", payload["health"])
 
 
 if __name__ == "__main__":
