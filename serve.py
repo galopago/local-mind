@@ -746,7 +746,7 @@ def _web_memory_audit_actions(
             "detail": "Accept, redact, or delete saved proposal-only raw captures.",
             "href": f"/captures{project_query}",
             "command": f"python3 link.py capture-inbox .{project_arg}",
-            "recommended": bool(captures["count"]),
+            "recommended": bool(captures["count"] or captures.get("read_warning_count")),
         },
         {
             "label": "Run doctor",
@@ -763,12 +763,7 @@ def _memory_audit(limit: int = 10, project: str | None = None) -> dict[str, obje
     project_name = _core_normalize_project(project)
     profile = _memory_profile(limit=limit, project=project_name)
     inbox = _memory_inbox(limit=limit, include_archived=True, project=project_name)
-    capture_items = _capture_records(limit=min(limit, 10), project=project_name)
-    captures = {
-        "count": len(capture_items),
-        "warning_count": sum(1 for capture in capture_items if capture["warning_count"]),
-        "items": capture_items,
-    }
+    captures = _capture_review_summary(project=project_name, limit=min(limit, 10))
     payload = _core_memory_audit_report(profile, inbox, captures, [], project=project_name)
     payload["next_actions"] = _web_memory_audit_actions(
         inbox,
@@ -1342,6 +1337,7 @@ def _render_memory_audit(project: str | None = None):
         f'<div class="stat"><span class="num">{profile["review_count"]}</span><span class="label">review</span></div>'
         f'<div class="stat"><span class="num">{captures["count"]}</span><span class="label">captures</span></div>'
         f'<div class="stat"><span class="num">{captures["warning_count"]}</span><span class="label">warnings</span></div>'
+        f'<div class="stat"><span class="num">{captures.get("read_warning_count", 0)}</span><span class="label">read warnings</span></div>'
         f'</div>'
     )
     risk_html = ""

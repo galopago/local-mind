@@ -472,9 +472,12 @@ class McpContractTests(unittest.TestCase):
 
         with patch.object(Path, "read_text", flaky_read_text):
             payload = json.loads(self.server.capture_inbox())
+            audit = json.loads(self.server.memory_audit())
 
         self.assertEqual(payload["read_warning_count"], 1)
         self.assertEqual(payload["read_warnings"][0]["capture"], "raw/memory-captures/locked.md")
+        self.assertIn("capture_read_warnings", [factor["code"] for factor in audit["risk_factors"]])
+        self.assertTrue(audit["next_actions"][1]["recommended"])
 
     def test_accept_capture_contract(self):
         capture = json.loads(self.server.capture_session(

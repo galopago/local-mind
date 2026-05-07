@@ -1261,13 +1261,20 @@ class LinkCliTests(unittest.TestCase):
                 inbox_code = link_cli.capture_inbox(target, json_output=True)
             with redirect_stdout(text_out):
                 text_code = link_cli.capture_inbox(target)
+            audit_out = StringIO()
+            with redirect_stdout(audit_out):
+                audit_code = link_cli.memory_audit(target, json_output=True)
         inbox = json.loads(inbox_out.getvalue())
+        audit = json.loads(audit_out.getvalue())
         text = text_out.getvalue()
 
         self.assertEqual(inbox_code, 0)
         self.assertEqual(text_code, 0)
+        self.assertEqual(audit_code, 0)
         self.assertEqual(inbox["read_warning_count"], 1)
         self.assertEqual(inbox["read_warnings"][0]["capture"], "raw/memory-captures/locked.md")
+        self.assertIn("capture_read_warnings", [factor["code"] for factor in audit["risk_factors"]])
+        self.assertTrue(audit["next_actions"][1]["recommended"])
         self.assertIn("Capture read warnings", text)
         self.assertIn("locked.md", text)
 

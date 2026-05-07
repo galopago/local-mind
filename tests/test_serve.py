@@ -668,10 +668,13 @@ class ServeTests(unittest.TestCase):
         with patch.object(Path, "read_text", flaky_read_text):
             status, payload = run_handler("GET", "/api/capture-inbox")
             html = serve._render_captures()
+            audit = serve._memory_audit()
 
         self.assertEqual(status, 200)
         self.assertEqual(payload["read_warning_count"], 1)
         self.assertEqual(payload["read_warnings"][0]["capture"], "raw/memory-captures/locked.md")
+        self.assertIn("capture_read_warnings", [item["code"] for item in audit["risk_factors"]])
+        self.assertTrue(audit["next_actions"][1]["recommended"])
         self.assertIn("Fix capture access", html)
         self.assertIn("locked.md", html)
 

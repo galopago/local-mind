@@ -3114,7 +3114,7 @@ def _cli_memory_audit_actions(
         {
             "label": "Review raw captures",
             "command": f'python3 link.py capture-inbox "{root}"{project_arg}',
-            "recommended": bool(captures["count"]),
+            "recommended": bool(captures["count"] or captures.get("read_warning_count")),
         },
         {
             "label": "Run doctor",
@@ -3165,7 +3165,8 @@ def memory_audit(target: Path, limit: int = 10, project: str | None = None, json
     )
     print(
         f"Raw captures: {payload['captures']['count']} saved · "
-        f"{payload['captures']['warning_count']} with secret-looking warnings"
+        f"{payload['captures']['warning_count']} with secret-looking warnings · "
+        f"{payload['captures'].get('read_warning_count', 0)} read warnings"
     )
     if payload["risk_factors"]:
         print("")

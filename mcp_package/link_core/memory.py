@@ -1328,6 +1328,7 @@ def memory_audit_report(
     review_count = int(inbox.get("review_count") or 0)
     capture_count = int(captures.get("count") or 0)
     capture_warning_count = int(captures.get("warning_count") or 0)
+    capture_read_warning_count = int(captures.get("read_warning_count") or 0)
     risk_factors: list[dict[str, object]] = []
     if review_count:
         risk_factors.append({
@@ -1346,6 +1347,12 @@ def memory_audit_report(
             "code": "capture_secret_warnings",
             "count": capture_warning_count,
             "message": f"{capture_warning_count} raw capture(s) contain secret-looking values.",
+        })
+    if capture_read_warning_count:
+        risk_factors.append({
+            "code": "capture_read_warnings",
+            "count": capture_read_warning_count,
+            "message": f"{capture_read_warning_count} raw capture(s) could not be read.",
         })
     return {
         "status": "needs_attention" if risk_factors else "healthy",
@@ -1369,6 +1376,7 @@ def add_capture_review_to_brief(
     result["captures"] = capture_payload
     capture_count = int(capture_payload.get("count") or 0)
     warning_count = int(capture_payload.get("warning_count") or 0)
+    read_warning_count = int(capture_payload.get("read_warning_count") or 0)
     if capture_count:
         plural = "s" if capture_count != 1 else ""
         guidance.append(
@@ -1376,6 +1384,8 @@ def add_capture_review_to_brief(
         )
     if warning_count:
         guidance.append("Redact raw captures with secret warnings before sharing snippets or using their contents.")
+    if read_warning_count:
+        guidance.append("Fix unreadable raw captures before deciding whether capture memory should be accepted or deleted.")
     result["agent_guidance"] = guidance
     return result
 

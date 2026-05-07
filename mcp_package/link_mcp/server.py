@@ -362,7 +362,7 @@ def _mcp_memory_audit_actions(
             "label": "Review raw captures",
             "tool": "capture_inbox",
             "command": f"capture_inbox({project_arg.lstrip(', ')})" if project_arg else "capture_inbox()",
-            "recommended": bool(captures["count"]),
+            "recommended": bool(captures["count"] or captures.get("read_warning_count")),
         },
         {
             "label": "Explain a memory",

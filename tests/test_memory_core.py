@@ -141,7 +141,7 @@ class MemoryCoreTests(unittest.TestCase):
     def test_memory_audit_report_builds_shared_risk_factors(self):
         profile = {"memory_count": 2}
         inbox = {"review_count": 1}
-        captures = {"count": 2, "warning_count": 1, "items": []}
+        captures = {"count": 2, "warning_count": 1, "read_warning_count": 1, "items": []}
         actions = [{"label": "Review memory inbox", "recommended": True}]
 
         audit = memory_audit_report(profile, inbox, captures, actions, project="Link Product")
@@ -150,13 +150,18 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(audit["project"], "link-product")
         self.assertEqual(
             [factor["code"] for factor in audit["risk_factors"]],
-            ["memory_review_backlog", "raw_capture_backlog", "capture_secret_warnings"],
+            [
+                "memory_review_backlog",
+                "raw_capture_backlog",
+                "capture_secret_warnings",
+                "capture_read_warnings",
+            ],
         )
         self.assertEqual(audit["next_actions"], actions)
 
     def test_add_capture_review_to_brief_adds_capture_guidance(self):
         payload = {"agent_guidance": ["Use memory first."]}
-        captures = {"count": 1, "warning_count": 1, "items": []}
+        captures = {"count": 1, "warning_count": 1, "read_warning_count": 1, "items": []}
 
         brief = add_capture_review_to_brief(payload, captures)
 
@@ -164,6 +169,7 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(payload["agent_guidance"], ["Use memory first."])
         self.assertIn("Review 1 saved raw capture", brief["agent_guidance"][1])
         self.assertIn("Redact raw captures", brief["agent_guidance"][2])
+        self.assertIn("Fix unreadable raw captures", brief["agent_guidance"][3])
 
     def test_memory_inbox_filters_project_scoped_memories(self):
         base = {
