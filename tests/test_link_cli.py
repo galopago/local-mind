@@ -1265,10 +1265,20 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(accept_code, 0)
         self.assertTrue(accepted["accepted"])
         self.assertEqual(accepted["capture"], capture["path"])
+        self.assertEqual(accepted["project"], "link")
         self.assertTrue(accepted["result"]["created"])
+        self.assertEqual(accepted["result"]["project"], "link")
         self.assertIn(f'source: "{capture["path"]}"', memory_text)
+        self.assertIn('project: "link"', memory_text)
         self.assertIn("session capture approval", memory_text)
         self.assertIn("accept-capture", log_text)
+
+        recall_out = StringIO()
+        with redirect_stdout(recall_out):
+            recall_code = link_cli.recall(target, "session capture approval", project="link", json_output=True)
+        recall = json.loads(recall_out.getvalue())
+        self.assertEqual(recall_code, 0)
+        self.assertEqual(recall["memories"][0]["project"], "link")
 
     def test_redact_capture_replaces_secret_like_values(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))

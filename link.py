@@ -2162,6 +2162,7 @@ def accept_capture(
         "accepted": bool(result.get("created")),
         "capture": rel_path,
         "proposal_index": index,
+        "project": str(result.get("project") or proposal.get("project") or ""),
         "proposal": proposal,
         "result": result,
     }

@@ -465,10 +465,16 @@ class McpContractTests(unittest.TestCase):
 
         self.assertTrue(accepted["accepted"])
         self.assertEqual(accepted["capture"], capture["path"])
+        self.assertEqual(accepted["project"], "link")
         self.assertTrue(accepted["result"]["created"])
+        self.assertEqual(accepted["result"]["project"], "link")
         self.assertIn(f'source: "{capture["path"]}"', memory_text)
+        self.assertIn('project: "link"', memory_text)
         self.assertIn("MCP capture approval", memory_text)
         self.assertIn("accept-capture", log_text)
+
+        recall = json.loads(self.server.recall_memory("MCP capture approval", project="link"))
+        self.assertEqual(recall["memories"][0]["project"], "link")
 
     def test_redact_capture_contract(self):
         fake_key = "sk-" + ("C" * 24)

@@ -31,6 +31,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added a visible review gate to `/propose`, including manual-review states for duplicate/conflict proposals before durable memory writes.
 - Kept web approval APIs on the safe path by ignoring duplicate/conflict override flags; use CLI or MCP only after explicit human review.
 - Fixed duplicate proposal CLI commands so project-scoped updates preserve the normalized project key.
+- Added top-level project reporting to accepted capture payloads so CLI and MCP agents can keep project-scoped memories straight.
 - Added MCP `link_status` and `/api/status` for a compact readiness summary with version, wiki path, page/memory counts, optional validation, and safe next actions.
 - Added search backend reporting to Link status payloads so agents and users can see whether local search is using SQLite FTS or the token fallback.
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.
