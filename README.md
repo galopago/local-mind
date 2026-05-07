@@ -162,6 +162,12 @@ remember that I prefer short release notes
 query Link for the release process
 ```
 
+Or print the starter prompt list any time:
+
+```bash
+link prompts
+```
+
 If a source might contain preferences or decisions, ask for proposals first:
 
 ```text
@@ -550,6 +556,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 |---------|-------------|
 | `link init [dir]` | Create or repair a normal Link wiki without demo content. |
 | `link serve [dir] [--port 3000]` | Start the local web viewer for a Link wiki. |
+| `link prompts [dir] [--project slug]` | Print first-run natural agent prompts plus the local readiness/check commands. |
 | `link status [--validate]` | Show local readiness, page/memory counts, optional validation summary, and next actions. |
 | `link backup [--label name] [--include-raw]` | Create a timestamped local `.link-backups/` archive of `wiki/`; raw sources are excluded unless explicitly requested. |
 | `link ingest-status` | Show pending raw files, graph index status, the next agent prompt, guided plan, and follow-up checks. |

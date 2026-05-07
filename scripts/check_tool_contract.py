@@ -27,6 +27,7 @@ EXPECTED_CLI_COMMANDS = {
     "memory-inbox",
     "migrate",
     "profile",
+    "prompts",
     "propose-memories",
     "query",
     "query-link",

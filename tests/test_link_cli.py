@@ -79,6 +79,37 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue((target / "link_core/frontmatter.py").exists())
 
+    def test_prompts_prints_first_run_agent_prompts(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-prompts-test-"))
+        target = tmp / "my-link"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.starter_prompts(target)
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link starter prompts:", out.getvalue())
+        self.assertIn("is Link ready?", out.getvalue())
+        self.assertIn("brief me from Link before we continue", out.getvalue())
+        self.assertIn("remember that I prefer local-first agent memory", out.getvalue())
+        self.assertIn("query Link for what you know about me", out.getvalue())
+        self.assertIn("propose memories from raw/<file>", out.getvalue())
+        self.assertIn("link status --validate", out.getvalue())
+
+    def test_prompts_json_supports_project_examples(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-prompts-test-"))
+        target = tmp / "my-link"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.starter_prompts(target, project="link", json_output=True)
+        payload = json.loads(out.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["project"], "link")
+        self.assertIn("this project uses Link", payload["prompts"][2]["prompt"])
+        self.assertIn("what this project remembers", payload["prompts"][3]["prompt"])
+
     def test_serve_runs_target_viewer(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-serve-test-"))
         target = tmp / "demo"

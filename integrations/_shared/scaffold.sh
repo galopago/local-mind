@@ -216,6 +216,8 @@ if [ -f "$TARGET_DIR/link.py" ]; then
     if [ "$MODE" = "--project" ]; then
         echo "  Check Link readiness:"
         echo "    python3 link.py status --validate"
+        echo "  Print starter prompts:"
+        echo "    python3 link.py prompts"
         echo "  Check wiki health:"
         echo "    python3 link.py doctor"
         echo "  Create a local backup:"
@@ -229,6 +231,8 @@ if [ -f "$TARGET_DIR/link.py" ]; then
     else
         echo "  Check Link readiness:"
         echo "    link status --validate"
+        echo "  Print starter prompts:"
+        echo "    link prompts"
         echo "  Check wiki health:"
         echo "    link doctor"
         echo "  Create a local backup:"

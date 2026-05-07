@@ -5,6 +5,7 @@ Usage:
   python link.py init [target]
   python link.py serve [target]
   python link.py demo [target]
+  python link.py prompts [target]
   python link.py status [target]
   python link.py backup [target]
   python link.py doctor [target]
@@ -3119,6 +3120,82 @@ def init_wiki(target: Path) -> int:
     return 0
 
 
+def starter_prompts(target: Path, project: str | None = None, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    project_name = project if project is not None else _default_project(target)
+    remember_prompt = (
+        "remember that this project uses Link for local agent memory"
+        if project_name
+        else "remember that I prefer local-first agent memory"
+    )
+    query_prompt = (
+        "query Link for what this project remembers"
+        if project_name
+        else "query Link for what you know about me"
+    )
+    prompts = [
+        {
+            "label": "Check readiness",
+            "prompt": "is Link ready?",
+            "when": "right after install or before troubleshooting",
+        },
+        {
+            "label": "Prime memory",
+            "prompt": "brief me from Link before we continue",
+            "when": "at the start of a session or task",
+        },
+        {
+            "label": "Save explicit memory",
+            "prompt": remember_prompt,
+            "when": "when you want future agents to remember a preference, decision, or project fact",
+        },
+        {
+            "label": "Ask with context",
+            "prompt": query_prompt,
+            "when": "when you want a compact answer-ready packet from memory and wiki context",
+        },
+        {
+            "label": "Ingest a source",
+            "prompt": "ingest raw/<file> into Link",
+            "when": "after dropping a source file into raw/",
+        },
+        {
+            "label": "Review memory proposals",
+            "prompt": "propose memories from raw/<file>",
+            "when": "when a source may contain preferences, decisions, or project context",
+        },
+    ]
+    commands = [
+        "link status --validate",
+        "link ingest-status",
+        "link memory-inbox",
+        "link benchmark \"agent memory\"",
+    ]
+    payload = {
+        "target": str(target),
+        "project": project_name,
+        "prompts": prompts,
+        "commands": commands,
+    }
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print(f"Link starter prompts: {target}")
+    if project_name:
+        print(f"Project: {project_name}")
+    print("")
+    print("Ask your agent")
+    for item in prompts:
+        print(f"- {item['prompt']}")
+        print(f"  When: {item['when']}")
+    print("")
+    print("Local checks")
+    for command in commands:
+        print(f"- {command}")
+    return 0
+
+
 def serve_wiki(target: Path, port: int = 3000) -> int:
     target = target.expanduser().resolve()
     serve_path = target / "serve.py"
@@ -3205,6 +3282,11 @@ def main(argv: list[str] | None = None) -> int:
     demo = sub.add_parser("demo", help="create a pre-ingested sample Link wiki")
     demo.add_argument("target", nargs="?", default=DEFAULT_DEMO_DIR)
     demo.add_argument("--force", action="store_true", help="replace an existing Link demo directory")
+
+    prompts_cmd = sub.add_parser("prompts", help="print first-run agent prompts and local checks")
+    prompts_cmd.add_argument("target", nargs="?", default=".")
+    prompts_cmd.add_argument("--project", default=None, help="project slug for project-scoped prompt examples")
+    prompts_cmd.add_argument("--json", action="store_true", help="print machine-readable prompt data")
 
     status_cmd = sub.add_parser("status", help="show Link readiness, counts, and next actions")
     status_cmd.add_argument("target", nargs="?", default=".")
@@ -3398,6 +3480,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "demo":
         create_demo(Path(args.target), force=args.force)
         return 0
+    if args.command == "prompts":
+        return starter_prompts(Path(args.target), project=args.project, json_output=args.json)
     if args.command == "status":
         return status(Path(args.target), include_validation=args.validate, json_output=args.json)
     if args.command == "backup":
