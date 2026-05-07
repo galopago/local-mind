@@ -3,13 +3,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .memory import default_project_for_target
+from .memory import default_project_for_target, normalize_project
 
 
 def starter_prompt_payload(target: Path, project: str | None = None) -> dict[str, object]:
     """Return natural agent prompts and local checks for a Link user."""
     target = target.expanduser().resolve()
-    project_name = project if project is not None else default_project_for_target(target)
+    project_name = normalize_project(project) if project is not None else default_project_for_target(target)
     remember_prompt = (
         "remember that this project uses Link for local agent memory"
         if project_name
