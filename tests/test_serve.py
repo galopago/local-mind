@@ -106,6 +106,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn("localStorage.getItem('link-theme')", html)
         self.assertIn("navigator.clipboard.writeText", html)
         self.assertIn("data-copy-text", html)
+        self.assertIn("data-raw-source-form", html)
+        self.assertIn("/api/raw-source", html)
         self.assertIn('<a href="/ingest">ingest</a>', html)
         self.assertIn('<a href="/brief">brief</a>', html)
         self.assertIn('<a href="/propose">propose</a>', html)
@@ -120,6 +122,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("header .header-top { display: flex;", serve.CSS)
         self.assertIn("header nav { display: flex; gap: 10px 16px;", serve.CSS)
         self.assertIn("flex-wrap: wrap; min-width: 0", serve.CSS)
+        self.assertIn(".raw-source-controls { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
         self.assertIn(".memory-grid { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
         self.assertIn(".memory-actions code, .memory-next code { word-break: break-word; }", serve.CSS)
 
@@ -1057,6 +1060,73 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(traversal_status, 404)
         self.assertFalse(traversal_payload["found"])
 
+    def test_raw_source_api_creates_local_source_for_ingest(self):
+        wiki = self.make_wiki()
+
+        status, payload = post_json(
+            "/api/raw-source",
+            {
+                "title": "Project Notes",
+                "filename": "Project Notes.md",
+                "text": "User wants a web path for adding Link sources.",
+            },
+        )
+        duplicate_status, duplicate_payload = post_json(
+            "/api/raw-source",
+            {
+                "title": "Project Notes",
+                "filename": "Project Notes.md",
+                "text": "# Project Notes\n\nSecond source.",
+            },
+        )
+        missing_header_status, missing_header = post_json(
+            "/api/raw-source",
+            {"title": "No Header", "text": "Should not save."},
+            local_action=False,
+        )
+
+        self.assertEqual(status, 201)
+        self.assertTrue(payload["created"])
+        self.assertEqual(payload["path"], "raw/project-notes.md")
+        self.assertEqual(payload["next_prompt"], "ingest raw/project-notes.md into Link")
+        self.assertTrue((wiki.parent / payload["path"]).exists())
+        self.assertIn("# Project Notes", (wiki.parent / payload["path"]).read_text(encoding="utf-8"))
+        self.assertIn("add-raw-source", (wiki / "log.md").read_text(encoding="utf-8"))
+        self.assertEqual(duplicate_status, 201)
+        self.assertEqual(duplicate_payload["path"], "raw/project-notes-2.md")
+        self.assertEqual(missing_header_status, 403)
+        self.assertFalse(missing_header["created"])
+
+    def test_raw_source_api_blocks_secret_and_unsafe_names(self):
+        wiki = self.make_wiki()
+
+        secret_status, secret_payload = post_json(
+            "/api/raw-source",
+            {
+                "title": "Secret",
+                "filename": "secret.md",
+                "text": "Do not save sk-" + ("a" * 25),
+            },
+        )
+        unsafe_status, unsafe_payload = post_json(
+            "/api/raw-source",
+            {
+                "title": "Unsafe",
+                "filename": "../unsafe.md",
+                "text": "Safe text.",
+            },
+        )
+        get_status, get_payload = run_handler("GET", "/api/raw-source")
+
+        self.assertEqual(secret_status, 422)
+        self.assertFalse(secret_payload["created"])
+        self.assertEqual(secret_payload["secret_warnings"], ["OpenAI API key"])
+        self.assertFalse((wiki.parent / "raw" / "secret.md").exists())
+        self.assertEqual(unsafe_status, 400)
+        self.assertIn("filename", unsafe_payload["error"])
+        self.assertEqual(get_status, 405)
+        self.assertIn("POST", get_payload["error"])
+
     def test_ingest_page_and_api_show_pending_raw(self):
         wiki = self.make_wiki()
         raw = wiki.parent / "raw"
@@ -1072,6 +1142,11 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["guidance"]["state"], "pending_raw")
         self.assertEqual(payload["safety"]["status"], "clear")
         self.assertEqual(payload["plan"]["batch"][0]["suggested_source_page"], "wiki/sources/new-source.md")
+        self.assertIn("Add Raw Source", html)
+        self.assertIn('data-raw-source-form', html)
+        self.assertIn('data-raw-source-status', html)
+        self.assertIn("Save to raw/", html)
+        self.assertIn("blocks secret-looking values", html)
         self.assertIn("Next step", html)
         self.assertIn("Raw safety: clear", html)
         self.assertIn("No secret-looking values detected in raw sources.", html)

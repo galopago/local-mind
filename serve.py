@@ -40,6 +40,10 @@ from link_core.log import (
     append_log as _core_append_log,
     utc_timestamp as _core_utc_timestamp,
 )
+from link_core.raw import (
+    RawSourceError as _RawSourceError,
+    create_raw_source as _core_create_raw_source,
+)
 from link_core.security import (
     clean_text_input as _clean_text_input,
     redact_secret_values as _redact_secret_values,
@@ -81,6 +85,7 @@ PORT = 3000
 API_VERSION = "1"
 MAX_POST_BYTES = 64 * 1024
 MAX_PROPOSAL_SOURCE_BYTES = 64 * 1024
+MAX_RAW_SOURCE_BYTES = 60 * 1024
 LOCAL_ACTION_HEADER = "X-Link-Local-Action"
 LOCAL_ACTION_VALUES = {"1", "true", "yes"}
 PROPOSAL_SOURCE_SUFFIXES = {
@@ -834,6 +839,34 @@ def _proposal_source_payload(source_path: str) -> tuple[dict[str, object], int]:
     return record, 200
 
 
+def _create_raw_source_payload(payload: dict[str, object]) -> tuple[dict[str, object], int]:
+    try:
+        result = _core_create_raw_source(
+            WIKI_DIR.parent,
+            title=payload.get("title", ""),
+            filename=payload.get("filename", ""),
+            text=payload.get("text", ""),
+            max_bytes=MAX_RAW_SOURCE_BYTES,
+        )
+    except _RawSourceError as exc:
+        return {
+            "created": False,
+            "error": str(exc),
+            "secret_warnings": exc.labels,
+        }, exc.status
+    _append_log(
+        _utc_timestamp(),
+        "add-raw-source",
+        f"Added {result['path']} from local web UI",
+        [
+            f"Raw source: {result['path']}",
+            f"Size bytes: {result['size_bytes']}",
+            "Secret warnings: none",
+        ],
+    )
+    return result, 201
+
+
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
@@ -1102,6 +1135,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .page-list li { padding: 6px 0; border-bottom: 1px solid var(--border-soft); }
 .page-list li:last-child { border-bottom: none; }
 .page-list .type { font-size: 11px; color: var(--subtle); font-family: sans-serif; margin-left: 6px; }
+.section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+                   margin-top: 28px; border-bottom: 1px solid var(--border-soft); }
+.section-heading h2 { margin: 0; border: 0; padding-bottom: 4px; }
+.section-heading a { font-size: 13px; font-family: sans-serif; font-weight: normal; }
 .memory-profile { margin: 18px 0; }
 .memory-profile .summary { color: var(--muted); font-family: sans-serif; margin-bottom: 16px; }
 .memory-profile .memory-meta { color: var(--subtle); font-size: 12px; font-family: sans-serif; }
@@ -1111,6 +1148,22 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .brief-form button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
                      border-radius: 4px; padding: 6px 10px; cursor: pointer; }
 .brief-form button:hover { background: var(--button-hover); }
+.raw-source-form { display: grid; gap: 10px; margin: 16px 0; padding: 12px;
+                   border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface); font-family: sans-serif; }
+.raw-source-form label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+.raw-source-form input,
+.raw-source-form textarea { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid var(--border);
+                            border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; }
+.raw-source-form textarea { min-height: 150px; resize: vertical; line-height: 1.45; }
+.raw-source-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.raw-source-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.raw-source-actions button,
+.raw-source-status button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
+                            border-radius: 4px; padding: 7px 10px; cursor: pointer; font: inherit; }
+.raw-source-actions button:hover,
+.raw-source-status button:hover { background: var(--button-hover); }
+.raw-source-status { min-height: 1.4em; color: var(--muted); font-family: sans-serif; font-size: 13px; line-height: 1.45; }
+.raw-source-status code { display: inline-block; margin: 4px 6px 4px 0; padding: 4px 6px; background: var(--surface-code); border-radius: 4px; }
 .proposal-form { display: grid; gap: 10px; margin: 16px 0; font-family: sans-serif; }
 .proposal-form textarea,
 .proposal-form input { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid var(--border);
@@ -1245,6 +1298,8 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--border
   .product-lanes { grid-template-columns: minmax(0, 1fr); }
   .memory-grid { grid-template-columns: minmax(0, 1fr); }
   .proposal-controls { grid-template-columns: minmax(0, 1fr); }
+  .raw-source-controls { grid-template-columns: minmax(0, 1fr); }
+  .section-heading,
   .memory-dashboard .section-heading { flex-wrap: wrap; }
   .memory-actions code, .memory-next code { word-break: break-word; }
   .graph-shell { grid-template-columns: 1fr; }
@@ -1433,6 +1488,100 @@ COPY_BUTTON_JS = """
         button.disabled = false;
       }, 1200);
     });
+  });
+})();
+"""
+
+
+RAW_SOURCE_JS = """
+(function() {
+  var form = document.querySelector('[data-raw-source-form]');
+  if (!form) return;
+  var statusEl = document.querySelector('[data-raw-source-status]');
+
+  function setStatus(text, tone) {
+    if (!statusEl) return;
+    statusEl.textContent = text || '';
+    statusEl.dataset.tone = tone || '';
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    var textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', 'true');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
+
+  function renderSaved(data) {
+    if (!statusEl) return;
+    statusEl.textContent = '';
+    var saved = document.createElement('span');
+    saved.textContent = 'Saved ' + (data.path || 'raw source') + '. Next: ';
+    statusEl.appendChild(saved);
+    var code = document.createElement('code');
+    code.textContent = data.next_prompt || '';
+    statusEl.appendChild(code);
+    var copy = document.createElement('button');
+    copy.type = 'button';
+    copy.textContent = 'Copy ingest prompt';
+    copy.addEventListener('click', async function() {
+      var label = copy.textContent;
+      copy.disabled = true;
+      try {
+        await copyText(data.next_prompt || '');
+        copy.textContent = 'Copied';
+      } catch (err) {
+        copy.textContent = 'Copy failed';
+      }
+      window.setTimeout(function() {
+        copy.textContent = label;
+        copy.disabled = false;
+      }, 1200);
+    });
+    statusEl.appendChild(copy);
+    var refresh = document.createElement('a');
+    refresh.href = '/ingest';
+    refresh.textContent = ' refresh ingest status';
+    statusEl.appendChild(refresh);
+  }
+
+  form.addEventListener('submit', async function(event) {
+    event.preventDefault();
+    var button = form.querySelector('button[type=\"submit\"]');
+    if (button) button.disabled = true;
+    setStatus('Saving source locally...');
+    try {
+      var payload = {
+        title: form.elements.title.value || '',
+        filename: form.elements.filename.value || '',
+        text: form.elements.text.value || ''
+      };
+      var response = await fetch('/api/raw-source', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Link-Local-Action': 'true'
+        },
+        body: JSON.stringify(payload)
+      });
+      var data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'source save failed');
+      form.reset();
+      renderSaved(data);
+    } catch (error) {
+      setStatus(error.message || 'source save failed', 'error');
+    } finally {
+      if (button) button.disabled = false;
+    }
   });
 })();
 """
@@ -1812,6 +1961,7 @@ document.addEventListener('keydown', function(e) {{
 <script>{THEME_CONTROL_JS}</script>
 <script>{MEMORY_ACTION_JS}</script>
 <script>{COPY_BUTTON_JS}</script>
+<script>{RAW_SOURCE_JS}</script>
 <script>{PROPOSAL_UI_JS}</script>
 </body>
 </html>"""
@@ -2540,10 +2690,27 @@ def _render_ingest():
             f'<ol>{step_html}</ol>{batch_html}{checks_html}</section>'
         )
 
+    raw_form = (
+        f'<section><div class="section-heading"><h2>Add Raw Source</h2><a href="/propose">memory proposals</a></div>'
+        f'<p class="summary">Paste a note, article excerpt, transcript, or project context. Link saves it under '
+        f'<code>raw/</code> locally, blocks secret-looking values, and gives you the exact ingest prompt.</p>'
+        f'<form class="raw-source-form" data-raw-source-form>'
+        f'<div class="raw-source-controls">'
+        f'<label>Title<input name="title" autocomplete="off" placeholder="Release notes, meeting transcript, project context"></label>'
+        f'<label>Filename optional<input name="filename" autocomplete="off" placeholder="release-notes.md"></label>'
+        f'</div>'
+        f'<label>Source text<textarea name="text" placeholder="Paste the source text to preserve locally before ingest."></textarea></label>'
+        f'<div class="raw-source-actions"><button type="submit">Save to raw/</button>'
+        f'<span>Nothing becomes durable memory until you approve memory proposals.</span></div>'
+        f'<div class="raw-source-status" data-raw-source-status aria-live="polite"></div>'
+        f'</form></section>'
+    )
+
     body = (
         f'<div class="breadcrumb"><a href="/">Link</a> / ingest</div>'
         f'<h1>Ingest</h1>'
         f'<p class="summary">{html.escape(str(guidance.get("summary") or "Check raw source ingest state."))}</p>'
+        f'{raw_form}'
         f'{stats}'
         f'{safety_html}'
         f'{next_html}'
@@ -3633,6 +3800,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             assert payload is not None
             self._json(_rebuild_backlinks_payload())
             return
+        if path == "/api/raw-source":
+            if not self._require_local_action_header({"created": False}):
+                return
+            payload, error, status = self._read_json_body()
+            if error:
+                self._json({"created": False, "error": error}, status=status)
+                return
+            assert payload is not None
+            result, http_status = _create_raw_source_payload(payload)
+            self._json(result, status=http_status)
+            return
         if path == "/api/propose-memories":
             payload, error, status = self._read_json_body()
             if error:
@@ -3854,6 +4032,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             source_path = query.get("path", [""])[0]
             payload, status = _proposal_source_payload(source_path)
             self._json(payload, status=status)
+        elif path == "/api/raw-source":
+            self._json({"error": "use POST with JSON body: {\"text\": \"...\"}"}, status=405)
         elif path == "/api/propose-memories":
             self._json({"error": "use POST with JSON body: {\"text\": \"...\"}"}, status=405)
         elif path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:

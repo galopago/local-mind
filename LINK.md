@@ -576,6 +576,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
 | `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions |
 | `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context: relevant memories, review warnings, capture status, and safe rules |
+| `POST /api/raw-source` | Header `X-Link-Local-Action: true`; save pasted source text under `raw/`, reject secret-looking values, and return the next ingest prompt |
 | `POST /api/propose-memories` | Propose memories from JSON `{ "text": "..." }` without writing pages |
 | `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; mark a memory reviewed |
 | `POST /api/archive-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "reason": "optional" }`; archive a memory from default recall |

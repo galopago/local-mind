@@ -228,6 +228,18 @@ project's memory.
 
 ### 2. Add One Source
 
+Open the local viewer and use **ingest -> Add Raw Source**:
+
+```bash
+link serve
+```
+
+Paste the note below into the form. Link saves it under `raw/`, blocks
+secret-looking values, and gives you the exact ingest prompt to copy into your
+agent chat.
+
+Prefer the terminal? This writes the same first source directly:
+
 ```bash
 cat > ~/link/raw/first-memory.md <<'EOF'
 ---
@@ -555,6 +567,7 @@ Common endpoints:
 | `GET /api/validate?strict=true` | Validate generated wiki pages; failed gates return HTTP 422 with structured findings. |
 | `GET /api/proposal-sources` | Local raw text sources for `/propose`, with redacted snippets and explicit load/redact/split actions. |
 | `GET /api/proposal-source?path=raw/file.md` | Load one safe raw text source into the proposal workflow; secret-warning files are refused until redacted. |
+| `POST /api/raw-source` | Header `X-Link-Local-Action: true`; saves pasted source text under `raw/`, refuses secret-looking values, and returns the next ingest prompt. |
 | `POST /api/propose-memories` | Returns memory proposals from pasted or loaded notes without writing pages; used by `/propose`. |
 | `POST /api/remember-memory` | Header `X-Link-Local-Action: true`; saves an explicitly approved memory through duplicate/conflict-safe core writes. |
 | `POST /api/update-memory` | Header `X-Link-Local-Action: true`; merges an approved proposal into an existing memory and resets review. |
