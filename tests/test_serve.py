@@ -1887,6 +1887,21 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(serve._parse_search_limit("bad"), (None, "limit must be an integer"))
         self.assertEqual(serve._parse_search_limit("0"), (None, "limit must be at least 1"))
 
+    def test_query_text_bounds_and_falls_back_across_names(self):
+        self.assertEqual(serve._query_text({"q": ["  agent memory  "]}, "q"), "agent memory")
+        self.assertEqual(serve._query_text({"q": [""], "query": ["fallback"]}, "q", "query"), "fallback")
+        self.assertEqual(serve._query_text({"q": ["x" * 600]}, "q"), "x" * serve.MAX_QUERY_TEXT)
+        self.assertEqual(serve._query_text({"project": ["x" * 100]}, "project", max_len=80), "x" * 80)
+
+    def test_search_api_bounds_query_text(self):
+        self.make_wiki()
+        long_query = "x" * 600
+
+        status, payload = run_handler("GET", f"/api/search?q={long_query}")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["query"], "x" * serve.MAX_QUERY_TEXT)
+
 
 if __name__ == "__main__":
     unittest.main()

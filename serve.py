@@ -140,6 +140,7 @@ RAW_DIR = ROOT / "raw"
 PORT = 3000
 API_VERSION = "1"
 MAX_POST_BYTES = 64 * 1024
+MAX_QUERY_TEXT = 500
 MAX_PROPOSAL_SOURCE_BYTES = 64 * 1024
 MAX_RAW_SOURCE_BYTES = 60 * 1024
 LOCAL_ACTION_HEADER = "X-Link-Local-Action"
@@ -318,6 +319,16 @@ def _page_links_payload(
 
 def _parse_search_limit(raw: object) -> tuple[int | None, str | None]:
     return _core_parse_bounded_int(raw, "limit", 20, 1, 50)
+
+
+def _query_text(query: dict[str, list[str]], *names: str, max_len: int = MAX_QUERY_TEXT) -> str:
+    for name in names:
+        values = query.get(name)
+        if values:
+            text = _clean_text_input(values[0], max_len=max_len)
+            if text:
+                return text
+    return ""
 
 
 def _utc_timestamp() -> str:
@@ -3051,34 +3062,36 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/ingest":
             self._ok(_render_ingest())
         elif path == "/brief":
-            brief_query = query.get("q", [""])[0] or query.get("query", [""])[0]
-            self._ok(_render_brief(query=brief_query, project=query.get("project", [""])[0]))
+            self._ok(_render_brief(
+                query=_query_text(query, "q", "query"),
+                project=_query_text(query, "project", max_len=80),
+            ))
         elif path == "/propose":
             self._ok(_render_propose(
                 project=query.get("project", [""])[0],
                 source=query.get("source", [""])[0],
             ))
         elif path == "/prompts":
-            self._ok(_render_prompts(project=query.get("project", [""])[0]))
+            self._ok(_render_prompts(project=_query_text(query, "project", max_len=80)))
         elif path == "/memory":
-            self._ok(_render_memory_dashboard(project=query.get("project", [""])[0]))
+            self._ok(_render_memory_dashboard(project=_query_text(query, "project", max_len=80)))
         elif path == "/audit":
-            self._ok(_render_memory_audit(project=query.get("project", [""])[0]))
+            self._ok(_render_memory_audit(project=_query_text(query, "project", max_len=80)))
         elif path == "/inbox":
-            self._ok(_render_inbox(project=query.get("project", [""])[0]))
+            self._ok(_render_inbox(project=_query_text(query, "project", max_len=80)))
         elif path == "/captures":
-            self._ok(_render_captures(project=query.get("project", [""])[0]))
+            self._ok(_render_captures(project=_query_text(query, "project", max_len=80)))
         elif path == "/explain-memory":
-            identifier = query.get("memory", [""])[0].strip() or query.get("name", [""])[0].strip()
+            identifier = _query_text(query, "memory", "name", max_len=300)
             self._ok(_render_explain_memory(identifier))
         elif path == "/profile":
-            self._ok(_render_profile(project=query.get("project", [""])[0]))
+            self._ok(_render_profile(project=_query_text(query, "project", max_len=80)))
         elif path == "/all":
             self._ok(_render_all())
         elif path == "/graph":
             self._ok(_render_graph())
         elif path == "/search":
-            self._ok(_render_search(query.get("q", [""])[0]))
+            self._ok(_render_search(_query_text(query, "q")))
         elif path.startswith("/page/"):
             page = _find_page(urllib.parse.unquote(path[6:]))
             if page: self._ok(_render_page(page))
@@ -3106,7 +3119,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             include_validation = query.get("validate", ["false"])[0].lower() in {"1", "true", "yes"}
             self._json(_link_status_payload(include_validation=include_validation))
         elif path == "/api/prompts":
-            self._json(_starter_prompts_payload(project=query.get("project", [""])[0]))
+            self._json(_starter_prompts_payload(project=_query_text(query, "project", max_len=80)))
         elif path == "/api/ingest-status":
             self._json(_ingest_status())
         elif path == "/api/backlinks":
@@ -3153,7 +3166,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 assert depth is not None
                 assert max_edges is not None
                 self._json(_get_graph_summary(
-                    topic=query.get("topic", [""])[0] or query.get("q", [""])[0],
+                    topic=_query_text(query, "topic", "q"),
                     limit=limit,
                     depth=depth,
                     max_edges=max_edges,
@@ -3163,40 +3176,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if error:
                 self._json({"error": error}, status=400)
             else:
-                self._json(_memory_profile(limit=limit, project=query.get("project", [""])[0]))
+                self._json(_memory_profile(limit=limit, project=_query_text(query, "project", max_len=80)))
         elif path == "/api/memory-dashboard":
             limit, error = _parse_search_limit(query.get("limit", ["12"])[0])
             if error:
                 self._json({"error": error}, status=400)
             else:
-                self._json(_memory_dashboard(limit=limit, project=query.get("project", [""])[0]))
+                self._json(_memory_dashboard(limit=limit, project=_query_text(query, "project", max_len=80)))
         elif path == "/api/memory-brief":
             limit, error = _parse_search_limit(query.get("limit", ["6"])[0])
             if error:
                 self._json({"error": error}, status=400)
             else:
-                brief_query = query.get("q", [""])[0] or query.get("query", [""])[0]
                 self._json(_memory_brief(
-                    query=brief_query,
+                    query=_query_text(query, "q", "query"),
                     limit=limit,
-                    project=query.get("project", [""])[0],
+                    project=_query_text(query, "project", max_len=80),
                 ))
         elif path == "/api/query-link":
-            query_text = query.get("q", [""])[0] or query.get("query", [""])[0]
+            query_text = _query_text(query, "q", "query")
             if not query_text.strip():
                 self._json({"found": False, "error": "query parameter required", "context_packet": []}, status=400)
             else:
                 self._json(_query_link(
                     query=query_text,
                     budget=query.get("budget", ["medium"])[0],
-                    project=query.get("project", [""])[0],
+                    project=_query_text(query, "project", max_len=80),
                 ))
         elif path == "/api/memory-audit":
             limit, error = _parse_search_limit(query.get("limit", ["10"])[0])
             if error:
                 self._json({"error": error}, status=400)
             else:
-                self._json(_memory_audit(limit=limit, project=query.get("project", [""])[0]))
+                self._json(_memory_audit(limit=limit, project=_query_text(query, "project", max_len=80)))
         elif path == "/api/memory-inbox":
             limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
             if error:
@@ -3206,7 +3218,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(_memory_inbox(
                     limit=limit,
                     include_archived=include_archived,
-                    project=query.get("project", [""])[0],
+                    project=_query_text(query, "project", max_len=80),
                 ))
         elif path == "/api/capture-inbox":
             limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
@@ -3215,7 +3227,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else:
                 self._json(_capture_inbox(
                     limit=limit,
-                    project=query.get("project", [""])[0],
+                    project=_query_text(query, "project", max_len=80),
                 ))
         elif path == "/api/proposal-sources":
             limit, error = _parse_search_limit(query.get("limit", ["50"])[0])
@@ -3234,7 +3246,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:
             self._json({"error": "use POST with JSON body: {\"memory\": \"...\"}"}, status=405)
         elif path == "/api/explain-memory":
-            identifier = query.get("memory", [""])[0].strip() or query.get("name", [""])[0].strip()
+            identifier = _query_text(query, "memory", "name", max_len=300)
             if not identifier:
                 self._json({"found": False, "error": "memory parameter required"}, status=400)
             else:
@@ -3243,7 +3255,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 except ValueError as exc:
                     self._json({"found": False, "error": str(exc)}, status=404)
         elif path == "/api/search":
-            q = query.get("q", [""])[0].strip()
+            q = _query_text(query, "q")
             limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
             if error:
                 self._json({"error": error, "results": []}, status=400)
@@ -3254,7 +3266,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 results = _search_pages(q, limit=limit)
                 self._json({"query": q, "count": len(results), "results": results})
         elif path == "/api/context":
-            topic = query.get("topic", [""])[0].strip() or query.get("q", [""])[0].strip()
+            topic = _query_text(query, "topic", "q")
             if not topic:
                 self._json({"error": "topic parameter required"}, status=400)
             else:
