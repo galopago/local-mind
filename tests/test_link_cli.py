@@ -539,6 +539,28 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(listing["count"], 1)
         self.assertEqual(listing["backups"][0]["name"], payload["name"])
 
+    def test_backup_reports_controlled_error_on_archive_failure(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-backup-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        original_add = tarfile.TarFile.add
+
+        def flaky_add(tar, name, *args, **kwargs):
+            if Path(name).name == "agent-memory.md":
+                raise OSError("permission denied")
+            return original_add(tar, name, *args, **kwargs)
+
+        out = StringIO()
+        with patch.object(tarfile.TarFile, "add", flaky_add):
+            with redirect_stdout(out):
+                code = link_cli.backup(target, label="partial", json_output=True)
+        payload = json.loads(out.getvalue())
+
+        self.assertEqual(code, 1)
+        self.assertFalse(payload["created"])
+        self.assertIn("backup failed", payload["error"])
+        self.assertEqual(list((target / ".link-backups").glob("*.tar.gz")), [])
+
     def test_migrate_repairs_schema_marker(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-migrate-test-"))
         target = tmp / "demo"

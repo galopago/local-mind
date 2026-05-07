@@ -4,12 +4,13 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.backup import create_backup, list_backups
+from link_core.backup import BackupError, create_backup, list_backups
 
 
 class BackupCoreTests(unittest.TestCase):
@@ -55,6 +56,21 @@ class BackupCoreTests(unittest.TestCase):
 
         with self.assertRaises(FileNotFoundError):
             create_backup(root)
+
+    def test_backup_failure_removes_partial_archive(self):
+        root = self.make_root()
+        original_add = tarfile.TarFile.add
+
+        def flaky_add(tar, name, *args, **kwargs):
+            if Path(name).name == "agent-memory.md":
+                raise OSError("permission denied")
+            return original_add(tar, name, *args, **kwargs)
+
+        with patch.object(tarfile.TarFile, "add", flaky_add):
+            with self.assertRaisesRegex(BackupError, "wiki/concepts/agent-memory.md"):
+                create_backup(root, label="partial")
+
+        self.assertEqual(list((root / ".link-backups").glob("*.tar.gz")), [])
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks are not available")
     def test_backup_skips_symlinks(self):

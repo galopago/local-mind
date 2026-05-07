@@ -116,6 +116,7 @@ from link_core.memory import (
     write_memory_page as _core_write_memory_page,
 )
 from link_core.backup import (
+    BackupError as _CoreBackupError,
     create_backup as _core_create_backup,
     list_backups as _core_list_backups,
 )
@@ -841,7 +842,7 @@ def backup_wiki(label: str = "mcp", include_raw: bool = False, list_only: bool =
             label=_clean_text_input(label, max_len=80) or "mcp",
             include_raw=include_raw,
         )
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, _CoreBackupError) as exc:
         return json.dumps({"created": False, "error": str(exc)}, ensure_ascii=False)
     return json.dumps(result, ensure_ascii=False)
 

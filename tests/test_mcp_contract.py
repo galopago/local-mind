@@ -176,6 +176,21 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("wiki/index.md", names)
         self.assertNotIn("raw/private-note.md", names)
 
+    def test_backup_wiki_contract_reports_archive_failure(self):
+        original_add = tarfile.TarFile.add
+
+        def flaky_add(tar, name, *args, **kwargs):
+            if Path(name).name == "agent-memory.md":
+                raise OSError("permission denied")
+            return original_add(tar, name, *args, **kwargs)
+
+        with patch.object(tarfile.TarFile, "add", flaky_add):
+            payload = json.loads(self.server.backup_wiki(label="partial"))
+
+        self.assertFalse(payload["created"])
+        self.assertIn("backup failed", payload["error"])
+        self.assertEqual(list((self.target / ".link-backups").glob("*.tar.gz")), [])
+
     def test_ingest_status_contract(self):
         payload = json.loads(self.server.ingest_status())
 

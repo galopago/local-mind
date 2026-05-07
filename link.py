@@ -130,6 +130,7 @@ from link_core.memory import (
     write_memory_page as _core_write_memory_page,
 )
 from link_core.backup import (
+    BackupError as _CoreBackupError,
     create_backup as _core_create_backup,
     list_backups as _core_list_backups,
 )
@@ -1580,7 +1581,7 @@ def backup(
 
     try:
         payload = _core_create_backup(target, label=label, include_raw=include_raw)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, _CoreBackupError) as exc:
         if json_output:
             print(json.dumps({"created": False, "error": str(exc)}, indent=2))
         else:

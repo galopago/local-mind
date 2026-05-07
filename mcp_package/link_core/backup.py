@@ -12,6 +12,10 @@ BACKUP_DIR_NAME = ".link-backups"
 DEFAULT_BACKUP_LIMIT = 20
 
 
+class BackupError(RuntimeError):
+    """Raised when a backup archive cannot be completed safely."""
+
+
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -92,13 +96,22 @@ def create_backup(
         included_roots.append(("raw", raw_dir))
 
     file_count = 0
-    with tarfile.open(backup_path, "w:gz") as tar:
-        for prefix, source_root in included_roots:
-            for path in _iter_files(source_root):
-                rel = path.relative_to(source_root)
-                arcname = (Path(prefix) / rel).as_posix()
-                tar.add(path, arcname=arcname, recursive=False)
-                file_count += 1
+    current_arcname = ""
+    try:
+        with tarfile.open(backup_path, "w:gz") as tar:
+            for prefix, source_root in included_roots:
+                for path in _iter_files(source_root):
+                    rel = path.relative_to(source_root)
+                    current_arcname = (Path(prefix) / rel).as_posix()
+                    tar.add(path, arcname=current_arcname, recursive=False)
+                    file_count += 1
+    except (OSError, tarfile.TarError) as exc:
+        try:
+            backup_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        detail = f" while adding {current_arcname}" if current_arcname else ""
+        raise BackupError(f"backup failed{detail}: {exc}") from exc
 
     pruned = _prune_backups(backup_dir, int(max_backups))
     return {
