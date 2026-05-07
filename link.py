@@ -168,6 +168,9 @@ from link_core.security import (
 from link_core.query import (
     query_link as _core_query_link,
 )
+from link_core.prompts import (
+    starter_prompt_payload as _core_starter_prompt_payload,
+)
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
 )
@@ -3121,77 +3124,22 @@ def init_wiki(target: Path) -> int:
 
 
 def starter_prompts(target: Path, project: str | None = None, json_output: bool = False) -> int:
-    target = target.expanduser().resolve()
-    project_name = project if project is not None else _default_project(target)
-    remember_prompt = (
-        "remember that this project uses Link for local agent memory"
-        if project_name
-        else "remember that I prefer local-first agent memory"
-    )
-    query_prompt = (
-        "query Link for what this project remembers"
-        if project_name
-        else "query Link for what you know about me"
-    )
-    prompts = [
-        {
-            "label": "Check readiness",
-            "prompt": "is Link ready?",
-            "when": "right after install or before troubleshooting",
-        },
-        {
-            "label": "Prime memory",
-            "prompt": "brief me from Link before we continue",
-            "when": "at the start of a session or task",
-        },
-        {
-            "label": "Save explicit memory",
-            "prompt": remember_prompt,
-            "when": "when you want future agents to remember a preference, decision, or project fact",
-        },
-        {
-            "label": "Ask with context",
-            "prompt": query_prompt,
-            "when": "when you want a compact answer-ready packet from memory and wiki context",
-        },
-        {
-            "label": "Ingest a source",
-            "prompt": "ingest raw/<file> into Link",
-            "when": "after dropping a source file into raw/",
-        },
-        {
-            "label": "Review memory proposals",
-            "prompt": "propose memories from raw/<file>",
-            "when": "when a source may contain preferences, decisions, or project context",
-        },
-    ]
-    commands = [
-        "link status --validate",
-        "link ingest-status",
-        "link memory-inbox",
-        "link benchmark \"agent memory\"",
-    ]
-    payload = {
-        "target": str(target),
-        "project": project_name,
-        "prompts": prompts,
-        "commands": commands,
-    }
+    payload = _core_starter_prompt_payload(target, project=project)
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
 
-    print(f"Link starter prompts: {target}")
-    if project_name:
-        print(f"Project: {project_name}")
+    print(f"Link starter prompts: {payload['target']}")
+    if payload["project"]:
+        print(f"Project: {payload['project']}")
     print("")
     print("Ask your agent")
-    for item in prompts:
+    for item in payload["prompts"]:
         print(f"- {item['prompt']}")
         print(f"  When: {item['when']}")
     print("")
     print("Local checks")
-    for command in commands:
+    for command in payload["commands"]:
         print(f"- {command}")
     return 0
 

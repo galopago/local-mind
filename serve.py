@@ -48,6 +48,9 @@ from link_core.security import (
 from link_core.query import (
     query_link as _core_query_link,
 )
+from link_core.prompts import (
+    starter_prompt_payload as _core_starter_prompt_payload,
+)
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
 )
@@ -1660,6 +1663,7 @@ def _header_html():
   </div>
   <nav>
     <a href="/">home</a>
+    <a href="/prompts">prompts</a>
     <a href="/ingest">ingest</a>
     <a href="/brief">brief</a>
     <a href="/propose">propose</a>
@@ -1799,6 +1803,42 @@ def _render_home():
     )
 
     return _layout("Link", f"<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>{lanes}{prompts}{stats}{sections}")
+
+
+def _starter_prompts_payload(project: str | None = None) -> dict[str, object]:
+    return _core_starter_prompt_payload(ROOT, project=project)
+
+
+def _render_prompts(project: str | None = None):
+    payload = _starter_prompts_payload(project=project)
+    prompt_rows = ""
+    for item in payload.get("prompts", []):
+        if not isinstance(item, dict):
+            continue
+        prompt_rows += (
+            f'<article class="proposal-card">'
+            f'<h3>{html.escape(str(item.get("label") or "Prompt"))}</h3>'
+            f'<code class="proposal-command">{html.escape(str(item.get("prompt") or ""))}</code>'
+            f'<p class="summary">{html.escape(str(item.get("when") or ""))}</p>'
+            f'</article>'
+        )
+    command_rows = "".join(
+        f'<li><code>{html.escape(str(command))}</code></li>'
+        for command in payload.get("commands", [])
+    )
+    project_line = (
+        f'<p class="summary">Project examples are scoped to <code>{html.escape(str(payload["project"]))}</code>.</p>'
+        if payload.get("project")
+        else '<p class="summary">These prompts work for a personal Link wiki. Add <code>?project=slug</code> for project wording.</p>'
+    )
+    body = (
+        f'<div class="breadcrumb"><a href="/">Link</a> / prompts</div>'
+        f'<h1>Starter Prompts</h1>'
+        f'{project_line}'
+        f'<section><h2>Ask Your Agent</h2><div class="proposal-results">{prompt_rows}</div></section>'
+        f'<section><h2>Local Checks</h2><ul class="page-list">{command_rows}</ul></section>'
+    )
+    return _layout("Starter Prompts", body)
 
 
 def _render_page(page_path):
@@ -3519,6 +3559,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 project=query.get("project", [""])[0],
                 source=query.get("source", [""])[0],
             ))
+        elif path == "/prompts":
+            self._ok(_render_prompts(project=query.get("project", [""])[0]))
         elif path == "/memory":
             self._ok(_render_memory_dashboard(project=query.get("project", [""])[0]))
         elif path == "/audit":
@@ -3547,6 +3589,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/status":
             include_validation = query.get("validate", ["false"])[0].lower() in {"1", "true", "yes"}
             self._json(_link_status_payload(include_validation=include_validation))
+        elif path == "/api/prompts":
+            self._json(_starter_prompts_payload(project=query.get("project", [""])[0]))
         elif path == "/api/ingest-status":
             self._json(_ingest_status())
         elif path == "/api/backlinks":

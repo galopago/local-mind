@@ -522,6 +522,7 @@ Common endpoints:
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions. |
+| `GET /api/prompts?project=slug` | First-run natural agent prompts plus local readiness/check commands; same payload as `link prompts --json`. |
 | `GET /api/ingest-status` | Raw ingest state with pending files, graph health, exact agent prompt, guided plan, and follow-up commands. |
 | `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |

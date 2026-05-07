@@ -144,11 +144,28 @@ class ServeTests(unittest.TestCase):
 
         html = serve._render_home()
 
+        self.assertIn('<a href="/prompts">prompts</a>', html)
         self.assertIn("Try These Prompts", html)
         self.assertIn("is Link ready?", html)
         self.assertIn("brief me from Link before we continue", html)
         self.assertIn("ingest raw/&lt;file&gt; into Link", html)
         self.assertIn("query Link for what you know about me", html)
+
+    def test_prompts_page_and_api_share_starter_prompts(self):
+        self.make_wiki()
+
+        html = serve._render_prompts(project="link")
+        status, payload = run_handler("GET", "/api/prompts?project=link")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["project"], "link")
+        self.assertEqual(payload["prompts"][0]["prompt"], "is Link ready?")
+        self.assertIn("this project uses Link", payload["prompts"][2]["prompt"])
+        self.assertIn("Starter Prompts", html)
+        self.assertIn("Ask Your Agent", html)
+        self.assertIn("Local Checks", html)
+        self.assertIn("Project examples are scoped", html)
+        self.assertIn("link status --validate", html)
 
     def test_css_has_explicit_black_dark_theme(self):
         self.assertIn(':root[data-theme="dark"]', serve.CSS)
