@@ -105,11 +105,17 @@ def validate_wiki(wiki_dir: Path, *, strict: bool = False) -> dict[str, Any]:
             findings.append(_finding("error", "missing_required_path", rel, f"Missing required path: {rel}"))
 
     stems = _page_stems(wiki_dir)
+    unreadable_pages: set[str] = set()
     for page in _markdown_pages(wiki_dir):
         rel = page.relative_to(wiki_dir).as_posix()
         if rel in {"index.md", "log.md"}:
             continue
-        text = page.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = page.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            unreadable_pages.add(rel)
+            findings.append(_finding("error", "unreadable_page", rel, f"Could not read wiki page: {exc}"))
+            continue
         meta, body = parse_frontmatter(text)
         top_dir = rel.split("/", 1)[0]
         expected_type = TYPE_DIRECTORIES.get(top_dir)
@@ -154,8 +160,14 @@ def validate_wiki(wiki_dir: Path, *, strict: bool = False) -> dict[str, Any]:
     )
     if backlink_error:
         findings.append(_finding("error", "invalid_backlinks", "_backlinks.json", backlink_error))
-    elif _normalize_links(backlinks) != _normalize_links(build_backlinks(wiki_dir, body_only=False)):
-        findings.append(_finding("error", "stale_backlinks", "_backlinks.json", "Backlink index is stale; run rebuild-backlinks."))
+    elif not unreadable_pages:
+        try:
+            expected_backlinks = build_backlinks(wiki_dir, body_only=False)
+        except OSError as exc:
+            findings.append(_finding("error", "backlink_rebuild_failed", "_backlinks.json", f"Could not rebuild backlinks: {exc}"))
+        else:
+            if _normalize_links(backlinks) != _normalize_links(expected_backlinks):
+                findings.append(_finding("error", "stale_backlinks", "_backlinks.json", "Backlink index is stale; run rebuild-backlinks."))
 
     error_count = sum(1 for finding in findings if finding["severity"] == "error")
     warning_count = sum(1 for finding in findings if finding["severity"] == "warning")
@@ -169,4 +181,3 @@ def validate_wiki(wiki_dir: Path, *, strict: bool = False) -> dict[str, Any]:
         "finding_count": len(findings),
         "findings": findings,
     }
-

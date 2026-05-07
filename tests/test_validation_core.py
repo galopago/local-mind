@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -76,7 +77,32 @@ class ValidationCoreTests(unittest.TestCase):
         self.assertIn("dead_wikilink", codes)
         self.assertIn("stale_backlinks", codes)
 
+    def test_validate_wiki_reports_unreadable_pages(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/locked-page.md",
+            "---\ntype: concept\ntitle: Locked Page\n---\n\n"
+            "# Locked Page\n\n"
+            "> **TLDR:** A locked page.\n\n"
+            "## Overview\n\nCannot read this.\n\n"
+            "## Sources\n\n- [[locked-page]]\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki, body_only=False)), encoding="utf-8")
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked-page.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            payload = validate_wiki(wiki)
+
+        self.assertFalse(payload["passed"])
+        self.assertIn("unreadable_page", {finding["code"] for finding in payload["findings"]})
+        self.assertNotIn("stale_backlinks", {finding["code"] for finding in payload["findings"]})
+
 
 if __name__ == "__main__":
     unittest.main()
-
