@@ -167,9 +167,22 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn(("X-Link-API-Version", serve.API_VERSION), headers)
         self.assertIn(("X-Content-Type-Options", "nosniff"), headers)
+        self.assertIn(("Cross-Origin-Opener-Policy", "same-origin"), headers)
+        self.assertIn(("Permissions-Policy", serve.PERMISSIONS_POLICY), headers)
         self.assertIn(("Content-Security-Policy", serve.CONTENT_SECURITY_POLICY), headers)
         self.assertIn("connect-src 'self'", serve.CONTENT_SECURITY_POLICY)
         self.assertIn("frame-ancestors 'none'", serve.CONTENT_SECURITY_POLICY)
+        self.assertIn("camera=()", serve.PERMISSIONS_POLICY)
+        self.assertNotIn("fullscreen=()", serve.PERMISSIONS_POLICY)
+
+    def test_json_responses_are_not_browser_cached(self):
+        self.make_wiki()
+
+        status, payload, headers = run_handler_with_headers("GET", "/api/status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["api_version"], serve.API_VERSION)
+        self.assertEqual(headers["Cache-Control"], "no-store")
 
     def test_svg_security_headers_use_strict_policy(self):
         handler = object.__new__(serve.Handler)

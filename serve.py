@@ -148,6 +148,10 @@ CONTENT_SECURITY_POLICY = (
     "base-uri 'none'; "
     "frame-ancestors 'none'"
 )
+PERMISSIONS_POLICY = (
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
+    "serial=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=()"
+)
 SVG_CONTENT_SECURITY_POLICY = (
     "default-src 'none'; "
     "img-src 'self' data:; "
@@ -3299,6 +3303,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self._security_headers()
+        self.send_header("Cache-Control", "no-store")
         for key, value in (headers or {}).items():
             self.send_header(str(key), str(value))
         self.send_header("Content-Length", str(len(encoded)))
@@ -3388,6 +3393,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Permissions-Policy", PERMISSIONS_POLICY)
         self.send_header("Content-Security-Policy", content_security_policy)
 
     def _file(self, fpath, content_type):
