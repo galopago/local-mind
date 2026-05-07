@@ -3330,6 +3330,9 @@ def starter_prompts(target: Path, project: str | None = None, json_output: bool 
 
 def serve_wiki(target: Path, port: int = 3000) -> int:
     target = target.expanduser().resolve()
+    if port < 1 or port > 65535:
+        print("--port must be between 1 and 65535")
+        return 1
     serve_path = target / "serve.py"
     if not serve_path.exists():
         print(f"Link viewer missing: {serve_path}")

@@ -133,6 +133,19 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Link viewer missing", out.getvalue())
         self.assertIn("link init", out.getvalue())
 
+    def test_serve_validates_port_before_spawning_viewer(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-serve-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with patch.object(link_cli.subprocess, "run") as run, redirect_stdout(out):
+            code = link_cli.serve_wiki(target, port=70000)
+
+        self.assertEqual(code, 1)
+        run.assert_not_called()
+        self.assertIn("--port must be between 1 and 65535", out.getvalue())
+
     def test_demo_creates_preingested_wiki(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-demo-test-"))
         target = tmp / "demo"
