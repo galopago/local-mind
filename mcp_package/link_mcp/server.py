@@ -91,6 +91,7 @@ MAX_CAPTURE_INPUT = 12000
 from link_core.memory import (
     add_capture_review_to_brief as _core_add_capture_review_to_brief,
     count_values as _core_count_values,
+    default_project_for_target as _core_default_project_for_target,
     forget_memory_page as _core_forget_memory_page,
     mark_memory_reviewed as _core_mark_memory_reviewed,
     memory_brief as _core_memory_brief,
@@ -180,10 +181,7 @@ def _parse_limit(value, default: int = 20, max_limit: int = 50) -> int:
 
 
 def _default_project() -> str:
-    root = WIKI_DIR.parent
-    if (root / ".git").exists():
-        return _core_slugify(root.name, fallback="")
-    return ""
+    return _core_default_project_for_target(WIKI_DIR)
 
 
 def _wiki_mtime() -> float:

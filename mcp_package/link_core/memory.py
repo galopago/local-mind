@@ -107,6 +107,15 @@ def normalize_project(value: str | None) -> str:
     return slugify(value or "", fallback="")
 
 
+def default_project_for_target(target: Path) -> str:
+    resolved = target.expanduser().resolve()
+    if resolved.name == "wiki" and (resolved / "index.md").exists():
+        resolved = resolved.parent
+    if (resolved / ".git").exists():
+        return normalize_project(resolved.name)
+    return ""
+
+
 def memory_title(text: str, explicit_title: str | None = None) -> str:
     if explicit_title and explicit_title.strip():
         return explicit_title.strip()

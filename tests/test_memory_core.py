@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.memory import (  # noqa: E402
     add_capture_review_to_brief,
+    default_project_for_target,
     extract_wikilinks,
     forget_memory_page,
     mark_memory_reviewed,
@@ -31,6 +32,17 @@ from link_core.memory import (  # noqa: E402
 
 
 class MemoryCoreTests(unittest.TestCase):
+    def test_default_project_for_target_uses_git_root_name(self):
+        root = Path(tempfile.mkdtemp(prefix="link-memory-project-")) / "Link Product"
+        wiki = root / "wiki"
+        wiki.mkdir(parents=True)
+        (root / ".git").mkdir()
+        (wiki / "index.md").write_text("# Index\n", encoding="utf-8")
+
+        self.assertEqual(default_project_for_target(root), "link-product")
+        self.assertEqual(default_project_for_target(wiki), "link-product")
+        self.assertEqual(default_project_for_target(Path(tempfile.mkdtemp(prefix="link-no-project-"))), "")
+
     def test_memory_records_profile_and_recall(self):
         root = Path(tempfile.mkdtemp(prefix="link-memory-core-"))
         wiki = root / "wiki"

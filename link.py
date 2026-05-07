@@ -104,6 +104,7 @@ if (_BUNDLED_CORE / "link_core").exists():
 from link_core.memory import (
     add_capture_review_to_brief as _core_add_capture_review_to_brief,
     count_values as _core_count_values,
+    default_project_for_target as _core_default_project_for_target,
     forget_memory_page as _core_forget_memory_page,
     mark_memory_reviewed as _core_mark_memory_reviewed,
     memory_brief as _core_memory_brief,
@@ -807,10 +808,7 @@ def _resolve_link_root(target: Path) -> Path:
 
 
 def _default_project(target: Path) -> str:
-    root = _resolve_link_root(target)
-    if (root / ".git").exists():
-        return _core_slugify(root.name, fallback="")
-    return ""
+    return _core_default_project_for_target(target)
 
 
 def _utc_timestamp() -> str:
