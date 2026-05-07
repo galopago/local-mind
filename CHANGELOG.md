@@ -155,6 +155,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added README trust-gate guidance for ingest safety, proposal review, validation, benchmark readiness, duplicate/conflict checks, and first-run benchmarking.
 - Added a first-use smoke test for init, demo, status, query, brief, remember, capture, ingest-status, and validation workflows.
 - Added `link prompts` coverage to the first-use smoke so CI validates the first-run agent prompt path.
+- Added `doctor --fix` coverage for schema marker creation so one-command repairs stay release-gated.
 - Added large-wiki smoke coverage for smart query budgets and graph generation across hundreds of pages.
 - Added timing thresholds to large-wiki smoke coverage so major search/query/graph performance regressions fail early.
 - Added release hygiene checks that protect the public agent instruction contract for `query_link`, `validate_wiki`, and `memory_brief`.

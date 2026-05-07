@@ -1731,8 +1731,10 @@ class LinkCliTests(unittest.TestCase):
         self.assertTrue((target / "wiki/concepts").is_dir())
         self.assertTrue((target / "wiki/memories").is_dir())
         self.assertTrue((target / "wiki/_backlinks.json").exists())
+        self.assertTrue((target / "wiki/_link_schema.json").exists())
         self.assertIn("created raw", out.getvalue())
         self.assertIn("created wiki/index.md", out.getvalue())
+        self.assertIn("schema: wrote _link_schema.json", out.getvalue())
         self.assertIn("Result: healthy", out.getvalue())
 
     def test_doctor_fix_does_not_hide_content_errors(self):
