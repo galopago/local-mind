@@ -264,6 +264,24 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Post-ingest checks:", out.getvalue())
         self.assertIn("link status --validate", out.getvalue())
 
+    def test_ingest_status_reports_represented_completion(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.ingest_status(target)
+
+        text = out.getvalue()
+        self.assertEqual(code, 0)
+        self.assertIn("Pending ingest: 0", text)
+        self.assertIn("Ingest completion: All 3 raw source(s) are represented", text)
+        self.assertIn("raw/agent-memory-session.md -> wiki/sources/agent-memory-session.md", text)
+        self.assertIn("Memory review: propose memories from raw/agent-memory-session.md", text)
+        self.assertIn("Retrieval check: query Link for agent memory session", text)
+        self.assertIn("Next check: brief me from Link before we continue", text)
+
     def test_ingest_status_warns_before_secret_raw_ingest(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
         target = tmp / "demo"

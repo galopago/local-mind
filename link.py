@@ -1658,6 +1658,35 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
             for check in post_checks[:6]:
                 print(f"  - {check}")
 
+    completion = status.get("completion") if isinstance(status.get("completion"), dict) else {}
+    completion_items = completion.get("items") if isinstance(completion.get("items"), list) else []
+    if completion_items:
+        print("")
+        print(f"Ingest completion: {completion.get('summary')}")
+        for item in completion_items[:8]:
+            pages = item.get("source_pages") if isinstance(item.get("source_pages"), list) else []
+            page_labels = []
+            for page in pages:
+                if isinstance(page, dict):
+                    label = page.get("path") or page.get("name")
+                    if label:
+                        page_labels.append(str(label))
+            target_pages = ", ".join(page_labels) if page_labels else "source page missing"
+            print(f"  - {item.get('raw')} -> {target_pages}")
+            memory_prompt = item.get("memory_prompt")
+            if memory_prompt:
+                print(f"    Memory review: {memory_prompt}")
+            query_prompt = item.get("query_prompt")
+            if query_prompt:
+                print(f"    Retrieval check: {query_prompt}")
+        if completion.get("has_more"):
+            represented_count = int(completion.get("represented_count") or 0)
+            shown_count = int(completion.get("shown_count") or 0)
+            print(f"  ... {represented_count - shown_count} more represented raw source(s)")
+        next_prompt = completion.get("next_prompt")
+        if next_prompt:
+            print(f"  Next check: {next_prompt}")
+
     return 0
 
 
