@@ -1091,6 +1091,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .trust-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
 .trust-grid div { border: 1px solid var(--border-soft); border-radius: 4px; padding: 10px; font-family: sans-serif; background: var(--surface); }
 .trust-grid strong { display: block; font-size: 12px; color: var(--subtle); margin-bottom: 4px; }
+.prompt-strip { margin: 16px 0; padding: 12px; border: 1px solid var(--border-soft); border-radius: 4px; background: var(--surface-muted); }
+.prompt-strip h2 { margin-top: 0; font-size: 17px; }
+.prompt-strip p { color: var(--muted); margin-bottom: 10px; }
+.prompt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.prompt-grid code { display: block; padding: 8px; background: var(--surface-code); border-radius: 4px; white-space: normal; }
 .log-entry { white-space: pre-wrap; font-size: 12px; }
 
 mark { background: var(--mark-bg); color: inherit; border-radius: 2px; padding: 0 1px; }
@@ -1634,8 +1639,20 @@ def _render_home():
         '<p>Ask <code>query Link for ...</code> or open a memory brief. Link combines reviewed memory, wiki pages, and graph context.</p></section>'
         '</div>'
     )
+    prompts = (
+        '<section class="prompt-strip" aria-label="First Link prompts">'
+        '<h2>Try These Prompts</h2>'
+        '<p>Ask from Codex, Claude, Cursor, Kiro, or any agent with Link installed.</p>'
+        '<div class="prompt-grid">'
+        '<code>is Link ready?</code>'
+        '<code>brief me from Link before we continue</code>'
+        '<code>ingest raw/&lt;file&gt; into Link</code>'
+        '<code>remember that I prefer local-first agent memory</code>'
+        '<code>query Link for what you know about me</code>'
+        '</div></section>'
+    )
 
-    return _layout("Link", f"<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>{lanes}{stats}{sections}")
+    return _layout("Link", f"<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>{lanes}{prompts}{stats}{sections}")
 
 
 def _render_page(page_path):

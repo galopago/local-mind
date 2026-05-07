@@ -114,6 +114,17 @@ class ServeTests(unittest.TestCase):
         self.assertIn(".memory-grid { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
         self.assertIn(".memory-actions code, .memory-next code { word-break: break-word; }", serve.CSS)
 
+    def test_home_page_shows_first_agent_prompts(self):
+        self.make_wiki()
+
+        html = serve._render_home()
+
+        self.assertIn("Try These Prompts", html)
+        self.assertIn("is Link ready?", html)
+        self.assertIn("brief me from Link before we continue", html)
+        self.assertIn("ingest raw/&lt;file&gt; into Link", html)
+        self.assertIn("query Link for what you know about me", html)
+
     def test_css_has_explicit_black_dark_theme(self):
         self.assertIn(':root[data-theme="dark"]', serve.CSS)
         self.assertIn("--bg: #000000;", serve.CSS)
