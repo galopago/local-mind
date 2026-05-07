@@ -79,6 +79,9 @@ class WikiCoreTests(unittest.TestCase):
 
         self.assertEqual(search[0]["name"], "agent-memory")
         self.assertIn("date_published", search[0])
+        self.assertIn(cache["search_backend"], {"sqlite-fts", "token-index"})
+        if cache["search_backend"] == "sqlite-fts":
+            self.assertIsNotNone(cache["fts_index"])
         self.assertIn("durable", cache["meta_words_index"]["agent-memory"])
         self.assertIn("references", cache["text_words_index"]["link"])
         self.assertEqual(context["primary"], "agent-memory")
@@ -117,6 +120,23 @@ class WikiCoreTests(unittest.TestCase):
         self.assertEqual(results[0]["name"], "local-memory")
         self.assertNotIn("agent-only", {result["name"] for result in results})
         self.assertNotIn("memory-only", {result["name"] for result in results})
+
+    def test_search_falls_back_without_optional_fts_index(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n\n"
+            "# Agent Memory\n\n"
+            "Source-backed local memory for agents.\n",
+        )
+        cache = build_wiki_cache(wiki)
+        cache["fts_index"] = None
+        cache["search_backend"] = "token-index"
+
+        results = search_pages("local memory", cache, limit=5)
+
+        self.assertEqual(results[0]["name"], "agent-memory")
 
     def test_backlinks_loader_and_builder_shapes(self):
         wiki = self.make_wiki()

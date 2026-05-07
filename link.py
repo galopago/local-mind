@@ -2692,6 +2692,7 @@ def benchmark(
         "pages": len(cache.get("pages", [])),
         "memories": len(_memory_records(wiki_dir)),
         "edges": len(graph.get("edges", [])) if isinstance(graph, dict) else 0,
+        "search_backend": str(cache.get("search_backend") or "token-index"),
         "search_results": len(results) if isinstance(results, list) else 0,
         "context_items": len(packet.get("context_packet", [])) if isinstance(packet, dict) else 0,
         "found": bool(packet.get("found")) if isinstance(packet, dict) else False,
@@ -2708,6 +2709,7 @@ def benchmark(
         print(f"Project: {project_name}")
     print("")
     print(f"Scale: {payload['pages']} pages · {payload['memories']} memories · {payload['edges']} edges")
+    print(f"Search backend: {payload['search_backend']}")
     print(f"Results: {payload['search_results']} search results · {payload['context_items']} context items")
     print("")
     print("Timings")

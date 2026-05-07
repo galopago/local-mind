@@ -782,6 +782,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertGreaterEqual(payload["pages"], 1)
         self.assertGreaterEqual(payload["memories"], 1)
         self.assertGreaterEqual(payload["edges"], 1)
+        self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
         self.assertEqual(payload["budget"], "small")
         self.assertIn("cache", payload["timings"])
         self.assertIn("search", payload["timings"])

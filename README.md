@@ -37,6 +37,8 @@ project constraints, and why something matters. Link makes that context durable:
 - **Graph context:** pages know what links in, what links out, and what sits nearby.
 - **MCP-native:** every local agent can use the same memory layer.
 - **Local-first:** no hosted backend, no telemetry, no cloud lock-in.
+- **Fast local search:** optional in-memory SQLite FTS accelerates large wikis
+  when available; Link falls back to its token index when it is not.
 - **Inspectable:** Markdown files, backlinks, logs, and review states are yours.
 
 ## Quick Start
@@ -587,6 +589,8 @@ Link is local-first:
 - No telemetry.
 - No hosted backend.
 - No external API calls from `serve.py` or `link-mcp`.
+- SQLite search, when available, is an in-memory derived index. Markdown remains
+  the source of truth and no SQLite server is required.
 - Raw sources and generated wiki pages are ignored by git by default.
 - `link backup` and MCP `backup_wiki` write local `.link-backups/` archives;
   `raw/` is excluded unless you explicitly pass `--include-raw`.

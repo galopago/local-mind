@@ -88,6 +88,8 @@ class McpContractTests(unittest.TestCase):
         self.server, self.previous_modules, self.previous_argv, self.module_name = import_mcp_server(self.target / "wiki")
 
     def tearDown(self):
+        if hasattr(self.server, "_clear_cache"):
+            self.server._clear_cache()
         sys.modules.pop(self.module_name, None)
         restore_mcp_modules(self.previous_modules)
         sys.argv = self.previous_argv

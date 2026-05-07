@@ -62,6 +62,7 @@ from link_core.capture import (
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
+    close_wiki_cache as _core_close_wiki_cache,
     context_for_topic as _core_context_for_topic,
     graph_data as _core_graph_data,
     load_backlinks_index as _core_load_backlinks_index,
@@ -109,15 +110,22 @@ _pages_cache_mtime: float = 0.0
 _page_index: dict[str, Path] = {}  # stem.lower() → path
 _fulltext_index: dict[str, str] = {}  # stem.lower() → full text (for search)
 _normalized_fulltext_index: dict[str, str] = {}  # punctuation-normalized full text
+_text_words_index: dict[str, set[str]] = {}  # stem.lower() → normalized fulltext words
+_meta_words_index: dict[str, set[str]] = {}  # stem.lower() → normalized metadata words
 _snippet_index: dict[str, str] = {}  # stem.lower() → pre-extracted first snippet
 _token_index: dict[str, set[str]] = {}  # token → set of page stems that contain it
 _page_map: dict[str, dict] = {}  # stem.lower() → page dict (for O(1) lookup in search)
 _meta_token_index: dict[str, set[str]] = {}  # token → stems with that token in title/alias/tag/tldr
+_fts_index = None
+_search_backend = "token-index"
 
 def _invalidate_pages_cache() -> None:
-    global _pages_cache, _pages_cache_mtime
+    global _pages_cache, _pages_cache_mtime, _fts_index, _search_backend
+    _core_close_wiki_cache({"fts_index": _fts_index})
     _pages_cache = None
     _pages_cache_mtime = 0.0
+    _fts_index = None
+    _search_backend = "token-index"
 
 
 def _wiki_mtime() -> float:
@@ -125,20 +133,25 @@ def _wiki_mtime() -> float:
 
 
 def _get_all_pages() -> list:
-    global _pages_cache, _pages_cache_mtime, _page_index, _fulltext_index, _normalized_fulltext_index, _snippet_index, _token_index, _page_map, _meta_token_index
+    global _pages_cache, _pages_cache_mtime, _page_index, _fulltext_index, _normalized_fulltext_index, _text_words_index, _meta_words_index, _snippet_index, _token_index, _page_map, _meta_token_index, _fts_index, _search_backend
     mtime = _wiki_mtime()
     if _pages_cache is not None and mtime == _pages_cache_mtime:
         return _pages_cache
+    _core_close_wiki_cache({"fts_index": _fts_index})
     cache = _core_build_wiki_cache(WIKI_DIR)
     _pages_cache = cache["pages"]
     _pages_cache_mtime = mtime
     _page_index = cache["page_index"]
     _fulltext_index = cache["fulltext"]
     _normalized_fulltext_index = cache["normalized_fulltext"]
+    _text_words_index = cache["text_words_index"]
+    _meta_words_index = cache["meta_words_index"]
     _snippet_index = cache["snippet_index"]
     _token_index = cache["token_index"]
     _meta_token_index = cache["meta_token_index"]
     _page_map = cache["page_map"]
+    _fts_index = cache.get("fts_index")
+    _search_backend = str(cache.get("search_backend") or "token-index")
     return _pages_cache
 
 
@@ -149,10 +162,14 @@ def _current_wiki_cache() -> dict[str, object]:
         "page_index": _page_index,
         "fulltext": _fulltext_index,
         "normalized_fulltext": _normalized_fulltext_index,
+        "text_words_index": _text_words_index,
+        "meta_words_index": _meta_words_index,
         "snippet_index": _snippet_index,
         "token_index": _token_index,
         "meta_token_index": _meta_token_index,
         "page_map": _page_map,
+        "fts_index": _fts_index,
+        "search_backend": _search_backend,
     }
 
 

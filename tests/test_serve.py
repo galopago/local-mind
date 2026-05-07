@@ -11,6 +11,9 @@ from link_core.schema import write_schema
 
 
 def reset_wiki(wiki_dir: Path) -> None:
+    close = getattr(getattr(serve, "_fts_index", None), "close", None)
+    if callable(close):
+        close()
     serve.WIKI_DIR = wiki_dir
     serve.RAW_DIR = wiki_dir.parent / "raw"
     serve._pages_cache = None
@@ -18,10 +21,14 @@ def reset_wiki(wiki_dir: Path) -> None:
     serve._page_index = {}
     serve._fulltext_index = {}
     serve._normalized_fulltext_index = {}
+    serve._text_words_index = {}
+    serve._meta_words_index = {}
     serve._snippet_index = {}
     serve._token_index = {}
     serve._page_map = {}
     serve._meta_token_index = {}
+    serve._fts_index = None
+    serve._search_backend = "token-index"
 
 
 def write_page(wiki_dir: Path, rel: str, text: str) -> Path:

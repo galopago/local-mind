@@ -156,6 +156,7 @@ from link_core.schema import (
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
+    close_wiki_cache as _core_close_wiki_cache,
     context_for_topic as _core_context_for_topic,
     graph_data as _core_graph_data,
     load_backlinks_index as _core_load_backlinks_index,
@@ -188,12 +189,20 @@ def _wiki_mtime() -> float:
     return _core_wiki_mtime(WIKI_DIR)
 
 
+def _clear_cache() -> None:
+    global _cache, _cache_mtime
+    _core_close_wiki_cache(_cache)
+    _cache = {}
+    _cache_mtime = 0.0
+
+
 def _build_cache() -> dict:
     global _cache, _cache_mtime
     mtime = _wiki_mtime()
     if _cache and mtime == _cache_mtime:
         return _cache
 
+    _core_close_wiki_cache(_cache)
     _cache = _core_build_wiki_cache(WIKI_DIR)
     _cache_mtime = mtime
     return _cache
@@ -318,10 +327,8 @@ def _link_status(include_validation: bool = False) -> dict[str, object]:
 
 
 def _migrate_wiki() -> dict[str, object]:
-    global _cache, _cache_mtime
     payload = _core_migrate_wiki(WIKI_DIR)
-    _cache = {}
-    _cache_mtime = 0.0
+    _clear_cache()
     return payload
 
 
@@ -468,7 +475,7 @@ Captured locally for Link memory review. This raw note is proposal-only until th
             f"Proposals: {proposals['count']}",
         ],
     )
-    _cache.clear()
+    _clear_cache()
     return {
         "captured": True,
         "path": rel_path,
@@ -693,7 +700,7 @@ def _set_memory_status(identifier: str, status: str, reason: str = "") -> dict[s
         log_writer=_append_log,
     )
     if result["updated"]:
-        _cache.clear()
+        _clear_cache()
     return result
 
 
@@ -708,7 +715,7 @@ def _forget_memory(identifier: str, confirm: bool = False) -> dict[str, object]:
         rebuild_backlinks=_rebuild_memory_backlinks,
     )
     if result.get("forgotten"):
-        _cache.clear()
+        _clear_cache()
     return result
 
 
@@ -723,7 +730,7 @@ def _mark_memory_reviewed(identifier: str, note: str = "") -> dict[str, object]:
         log_writer=_append_log,
     )
     if result["updated"]:
-        _cache.clear()
+        _clear_cache()
     return result
 
 
@@ -744,7 +751,7 @@ def _update_memory_page(
         allow_conflict=allow_conflict,
         **options,
     )
-    _cache.clear()
+    _clear_cache()
     return result
 
 
@@ -765,7 +772,7 @@ def _write_memory_page(
         **options,
     )
     if result.get("created"):
-        _cache.clear()
+        _clear_cache()
     return result
 
 
@@ -1278,10 +1285,8 @@ def rebuild_index() -> str:
     Run this after ingesting sources or making large page edits so the
     human-readable wiki catalog reflects all pages grouped by category.
     """
-    global _cache, _cache_mtime
     result = _core_rebuild_index(WIKI_DIR, cache=_build_cache())
-    _cache = {}
-    _cache_mtime = 0.0
+    _clear_cache()
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -1297,10 +1302,7 @@ def rebuild_backlinks() -> str:
     bl_path = WIKI_DIR / "_backlinks.json"
     bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
-    # Invalidate cache
-    global _cache, _cache_mtime
-    _cache = {}
-    _cache_mtime = 0.0
+    _clear_cache()
 
     return json.dumps({"rebuilt": True, "pages_indexed": len(result["backlinks"])})
 

@@ -166,6 +166,7 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
         "wiki": str(wiki),
         "pages": len(cache["pages"]),
         "edges": len(graph["edges"]),
+        "search_backend": str(cache.get("search_backend") or "token-index"),
         "context_items": len(packet.get("context_packet", [])),
         "search_results": len(results),
         "timings": {key: round(value, 4) for key, value in timings.items()},

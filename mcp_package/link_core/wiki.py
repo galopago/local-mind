@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import json
 import re
+try:
+    import sqlite3
+except Exception:  # pragma: no cover - depends on the host Python build
+    sqlite3 = None  # type: ignore[assignment]
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -40,6 +44,135 @@ def normalized_search_text(value: object) -> str:
 
 def _search_words(value: object) -> set[str]:
     return {word for word in re.split(r"\W+", normalized_search_text(value)) if len(word) >= 3}
+
+
+def _search_terms(value: object) -> list[str]:
+    seen: set[str] = set()
+    terms: list[str] = []
+    for word in re.split(r"\W+", normalized_search_text(value)):
+        if len(word) < 3 or word in seen:
+            continue
+        seen.add(word)
+        terms.append(word)
+    return terms
+
+
+def _build_fts_index(pages: list[dict[str, Any]], fulltext: dict[str, str]) -> Any | None:
+    """Build an optional in-memory SQLite FTS index.
+
+    Markdown remains the source of truth. This index is derived, local, and
+    rebuilt with the normal wiki cache; hosts without sqlite/FTS fall back to
+    the token index.
+    """
+    if sqlite3 is None or not pages:
+        return None
+    conn = None
+    try:
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE VIRTUAL TABLE page_fts USING fts5(name UNINDEXED, title, metadata, body)")
+        rows = []
+        for page in pages:
+            stem = str(page["name"]).lower()
+            metadata = " ".join([
+                stem,
+                str(page.get("type") or ""),
+                str(page.get("category") or ""),
+                str(page.get("tldr") or ""),
+                " ".join(str(alias) for alias in page.get("aliases", [])),
+                " ".join(str(tag) for tag in page.get("tags", [])),
+            ])
+            rows.append((stem, str(page.get("title") or ""), metadata, fulltext.get(stem, "")))
+        conn.executemany("INSERT INTO page_fts(name, title, metadata, body) VALUES (?, ?, ?, ?)", rows)
+        return _FtsIndex(conn)
+    except Exception:
+        if conn is not None:
+            conn.close()
+        return None
+
+
+def _fts_expr(terms: list[str], operator: str) -> str:
+    return f" {operator} ".join(f'"{term}"' for term in terms)
+
+
+class _FtsIndex:
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+
+    def search(self, query: str, limit: int) -> list[str]:
+        terms = _search_terms(query)
+        if not terms:
+            return []
+        expressions = [_fts_expr(terms, "AND")]
+        if len(terms) > 1:
+            expressions.append(_fts_expr(terms, "OR"))
+        for expression in expressions:
+            try:
+                rows = self._conn.execute(
+                    "SELECT name FROM page_fts WHERE page_fts MATCH ? ORDER BY bm25(page_fts) LIMIT ?",
+                    (expression, max(1, limit)),
+                ).fetchall()
+            except Exception:
+                continue
+            names = [str(row[0]) for row in rows]
+            if names:
+                return names
+        return []
+
+    def close(self) -> None:
+        conn = self._conn
+        if conn is None:
+            return
+        self._conn = None
+        conn.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
+def _fts_candidates(cache: dict[str, Any], query: str, limit: int) -> list[str]:
+    index = cache.get("fts_index")
+    if not isinstance(index, _FtsIndex):
+        return []
+    return index.search(query, limit)
+
+
+def _exact_search_candidates(q_lower: str, q_normalized: str, pages: list[dict[str, Any]]) -> set[str]:
+    candidates: set[str] = set()
+    for page in pages:
+        stem = str(page.get("name") or "").lower()
+        if not stem:
+            continue
+        title = str(page.get("title") or "")
+        if q_lower == stem or (q_normalized and q_normalized == normalized_search_text(stem)):
+            candidates.add(stem)
+            continue
+        if q_lower in title.lower() or (q_normalized and q_normalized in normalized_search_text(title)):
+            candidates.add(stem)
+            continue
+        aliases = page.get("aliases", [])
+        tags = page.get("tags", [])
+        tldr = str(page.get("tldr") or "")
+        if any(q_lower in str(alias).lower() or (q_normalized and q_normalized in normalized_search_text(alias)) for alias in aliases):
+            candidates.add(stem)
+            continue
+        if any(q_lower in str(tag).lower() or (q_normalized and q_normalized in normalized_search_text(tag)) for tag in tags):
+            candidates.add(stem)
+            continue
+        if q_lower in tldr.lower() or (q_normalized and q_normalized in normalized_search_text(tldr)):
+            candidates.add(stem)
+    return candidates
+
+
+def close_wiki_cache(cache: dict[str, Any]) -> None:
+    index = cache.get("fts_index") if isinstance(cache, dict) else None
+    close = getattr(index, "close", None)
+    if callable(close):
+        close()
+    if isinstance(cache, dict):
+        cache["fts_index"] = None
 
 
 def wiki_mtime(wiki_dir: Path) -> float:
@@ -167,6 +300,7 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
             " ".join(str(tag) for tag in tags_raw),
         ]))
 
+    fts_index = _build_fts_index(pages, fulltext)
     return {
         "mtime": wiki_mtime(wiki_dir),
         "pages": pages,
@@ -179,6 +313,8 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
         "token_index": token_index,
         "meta_token_index": meta_token_index,
         "page_map": {page["name"].lower(): page for page in pages},
+        "fts_index": fts_index,
+        "search_backend": "sqlite-fts" if fts_index is not None else "token-index",
     }
 
 
@@ -261,6 +397,15 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
             candidates = {page["name"].lower() for page in pages}
     else:
         candidates = {page["name"].lower() for page in pages}
+
+    candidate_cap = max(limit * 25, 200)
+    fts_candidates = _fts_candidates(cache, q, limit=candidate_cap)
+    if fts_candidates:
+        fts_set = set(fts_candidates)
+        if len(candidates) > candidate_cap:
+            candidates = fts_set | _exact_search_candidates(q_lower, q_normalized, pages)
+        else:
+            candidates = candidates | fts_set
 
     scored: list[tuple[int, dict[str, Any]]] = []
     for stem in candidates:
