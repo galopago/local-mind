@@ -39,46 +39,10 @@ project constraints, and why something matters. Link makes that context durable:
 - **Local-first:** no hosted backend, no telemetry, no cloud lock-in.
 - **Inspectable:** Markdown files, backlinks, logs, and review states are yours.
 
-## Sources, Wiki, And Memory
-
-Link has one simple rule:
-
-```text
-Sources become wiki knowledge.
-Explicit "remember" becomes agent memory.
-Queries use both.
-```
-
-That means raw files do not silently personalize future agents. When you add a
-source and ask Link to ingest it, Link creates source-backed wiki pages, updates
-concept/entity pages, rebuilds backlinks, and validates the graph. When you say
-`remember ...`, Link saves a durable memory that future agents may use as user
-or project context.
-
-Use these three moves:
-
-```text
-ingest raw/file.md into Link
-remember that I prefer short release notes
-query Link for the release process
-```
-
-If a source might contain preferences or decisions, ask for proposals first:
-
-```text
-propose memories from raw/file.md
-```
-
-Then approve only the memories you want agents to carry forward.
-
-You can also open `/propose`, paste source or session notes, or jump there from
-a pending raw file on `/ingest`. Link loads that source into the proposal form
-and returns proposal-only candidates. Nothing is written until you approve a
-memory through your agent or the CLI.
-
 ## Quick Start
 
-Try Link with a finished, pre-ingested wiki:
+Start with the finished demo. It already has raw sources, wiki pages, one local
+memory, backlinks, graph data, and a query packet ready to inspect.
 
 ```bash
 git clone https://github.com/gowtham0992/link.git
@@ -109,6 +73,15 @@ python3 link.py status --validate link-demo
 The first query should return a compact packet with a relevant memory, the best
 wiki page, nearby graph context, and agent guidance. The demo also writes
 `link-demo/START_HERE.md` with the exact prompts and checks to try.
+
+After the demo:
+
+| Goal | Go to |
+|------|-------|
+| Use Link with your agent | [First 10 Minutes](#first-10-minutes) |
+| Understand the storage model | [Sources, Wiki, And Memory](#sources-wiki-and-memory) |
+| Configure only MCP | [I Want MCP Only](#i-want-mcp-only) |
+| Contribute to Link | [Contributing](#contributing) |
 
 ## What You Get
 
@@ -162,6 +135,41 @@ source or log evidence supports it.
 <p align="center">
   <img src="docs/assets/link-explain-memory-dark.png" alt="Link Explain Memory view in dark mode" width="860">
 </p>
+
+## Sources, Wiki, And Memory
+
+Link has one simple rule:
+
+```text
+Sources become wiki knowledge.
+Explicit "remember" becomes agent memory.
+Queries use both.
+```
+
+Raw files do not silently personalize future agents. When you drop a source into
+`raw/` and ask Link to ingest it, Link creates source-backed wiki pages, updates
+concept/entity pages, rebuilds backlinks, and validates the graph. When you say
+`remember ...`, Link saves durable memory that future agents may use as user or
+project context.
+
+Use these three moves:
+
+```text
+ingest raw/file.md into Link
+remember that I prefer short release notes
+query Link for the release process
+```
+
+If a source might contain preferences or decisions, ask for proposals first:
+
+```text
+propose memories from raw/file.md
+```
+
+Then approve only the memories you want agents to carry forward. You can also
+open `/propose`, paste notes, or jump there from a pending raw file on `/ingest`.
+Link returns proposal-only candidates. Nothing is written until you approve a
+memory through your agent or the CLI.
 
 ## First 10 Minutes
 
@@ -361,19 +369,10 @@ Then use that Python in your MCP config:
 }
 ```
 
-### I Want To Develop Link
-
-```bash
-python3 -m unittest discover -s tests
-python3 scripts/smoke_first_use.py
-python3 scripts/smoke_large_wiki.py --pages 1000
-python3 scripts/check_release_hygiene.py
-python3 scripts/check_runtime_duplication.py
-python3 scripts/check_tool_contract.py
-git diff --check
-```
-
 ## Daily Workflow
+
+Most days, you only need three habits: add sources, save explicit memories, and
+ask Link for a brief before important work.
 
 Add source material:
 
@@ -670,6 +669,7 @@ link/
 - Confidence tags make uncertainty visible.
 - `log.md` records wiki operations.
 - Pages mature from seed to established.
-- Agents should use MCP `get_context` or `/api/context` before reading files manually.
+- Agents should use `query_link` first, then follow up with graph/context tools
+  only when the compact packet is insufficient.
 - The local web viewer has no runtime dependencies beyond Python stdlib.
 - The wiki is plain Markdown, so it works with git, Obsidian, and normal editors.
