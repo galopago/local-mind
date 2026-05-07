@@ -3230,6 +3230,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         if path == "/api/rebuild-index":
+            if not self._require_local_action_header({"rebuilt": False}):
+                return
             payload, error, status = self._read_json_body()
             if error:
                 self._json({"rebuilt": False, "error": error}, status=status)
@@ -3238,6 +3240,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(_rebuild_index_payload())
             return
         if path == "/api/rebuild-backlinks":
+            if not self._require_local_action_header({"rebuilt": False}):
+                return
             payload, error, status = self._read_json_body()
             if error:
                 self._json({"rebuilt": False, "error": error}, status=status)
@@ -3507,13 +3511,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
 
-    def _require_local_action_header(self) -> bool:
+    def _require_local_action_header(self, error_payload: dict[str, object] | None = None) -> bool:
         value = self.headers.get(LOCAL_ACTION_HEADER, "").strip().lower()
         if value in LOCAL_ACTION_VALUES:
             return True
+        payload = dict(error_payload or {"updated": False})
+        payload["error"] = f"{LOCAL_ACTION_HEADER} header required for local mutations"
         self._json({
-            "updated": False,
-            "error": f"{LOCAL_ACTION_HEADER} header required for local memory mutations",
+            **payload,
         }, status=403)
         return False
 

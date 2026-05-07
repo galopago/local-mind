@@ -981,22 +981,48 @@ class ServeTests(unittest.TestCase):
 
         get_status, get_payload = run_handler("GET", "/api/rebuild-backlinks")
         bad_post_status, bad_post_payload = run_handler("POST", "/api/rebuild-backlinks")
-        post_status, post_payload = run_handler(
+        missing_header_status, missing_header_payload = run_handler(
             "POST",
             "/api/rebuild-backlinks",
             body=b"{}",
             headers={"Content-Type": "application/json", "Content-Length": "2"},
         )
+        post_status, post_payload = run_handler(
+            "POST",
+            "/api/rebuild-backlinks",
+            body=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": "2",
+                "X-Link-Local-Action": "true",
+            },
+        )
         rebuilt = json.loads(backlinks_path.read_text(encoding="utf-8"))
 
         self.assertEqual(get_status, 405)
         self.assertIn("use POST", get_payload["error"])
-        self.assertEqual(bad_post_status, 415)
+        self.assertEqual(bad_post_status, 403)
         self.assertFalse(bad_post_payload["rebuilt"])
+        self.assertIn("X-Link-Local-Action", bad_post_payload["error"])
+        self.assertEqual(missing_header_status, 403)
+        self.assertFalse(missing_header_payload["rebuilt"])
+        self.assertIn("X-Link-Local-Action", missing_header_payload["error"])
         self.assertEqual(post_status, 200)
         self.assertTrue(post_payload["rebuilt"])
         self.assertEqual(rebuilt["backlinks"], {"b": ["a"]})
         self.assertEqual(rebuilt["forward"], {"a": ["b"]})
+
+    def test_rebuild_backlinks_rejects_bad_json_after_local_header(self):
+        wiki = self.make_wiki()
+
+        bad_post_status, bad_post_payload = run_handler(
+            "POST",
+            "/api/rebuild-backlinks",
+            headers={"X-Link-Local-Action": "true"},
+        )
+
+        self.assertEqual(bad_post_status, 415)
+        self.assertFalse(bad_post_payload["rebuilt"])
 
     def test_rebuild_index_requires_json_post(self):
         wiki = self.make_wiki()
@@ -1010,22 +1036,48 @@ class ServeTests(unittest.TestCase):
 
         get_status, get_payload = run_handler("GET", "/api/rebuild-index")
         bad_post_status, bad_post_payload = run_handler("POST", "/api/rebuild-index")
-        post_status, post_payload = run_handler(
+        missing_header_status, missing_header_payload = run_handler(
             "POST",
             "/api/rebuild-index",
             body=b"{}",
             headers={"Content-Type": "application/json", "Content-Length": "2"},
         )
+        post_status, post_payload = run_handler(
+            "POST",
+            "/api/rebuild-index",
+            body=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": "2",
+                "X-Link-Local-Action": "true",
+            },
+        )
         index_text = index_path.read_text(encoding="utf-8")
 
         self.assertEqual(get_status, 405)
         self.assertIn("use POST", get_payload["error"])
-        self.assertEqual(bad_post_status, 415)
+        self.assertEqual(bad_post_status, 403)
         self.assertFalse(bad_post_payload["rebuilt"])
+        self.assertIn("X-Link-Local-Action", bad_post_payload["error"])
+        self.assertEqual(missing_header_status, 403)
+        self.assertFalse(missing_header_payload["rebuilt"])
+        self.assertIn("X-Link-Local-Action", missing_header_payload["error"])
         self.assertEqual(post_status, 200)
         self.assertTrue(post_payload["rebuilt"])
         self.assertIn("[[a]]", index_text)
         self.assertEqual(post_payload["category_counts"]["concepts"], 1)
+
+    def test_rebuild_index_rejects_bad_json_after_local_header(self):
+        wiki = self.make_wiki()
+
+        bad_post_status, bad_post_payload = run_handler(
+            "POST",
+            "/api/rebuild-index",
+            headers={"X-Link-Local-Action": "true"},
+        )
+
+        self.assertEqual(bad_post_status, 415)
+        self.assertFalse(bad_post_payload["rebuilt"])
 
     def test_validate_api_reports_wiki_gate_status(self):
         wiki = self.make_wiki()

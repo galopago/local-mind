@@ -119,6 +119,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Fixed project-mode installer output so MCP wiki paths are absolute and next-step hints point at the project wiki instead of `~/link`.
 - Fixed search/context matching for natural queries against hyphenated page slugs, e.g. `local first software` now finds `local-first-software`.
 - Hardened backlink rebuild over HTTP so local web rebuilds require JSON POST instead of a mutating GET.
+- Hardened HTTP rebuild actions so local web index/backlink mutations require the explicit local-action header.
 - Hardened `/raw/` static serving so the local web viewer only serves supported media/PDF source assets.
 - Tightened raw asset path resolution so `/raw/` URLs cannot route through non-raw static allowlists, including encoded parent-directory paths.
 - Hardened HTTP memory mutation endpoints with an explicit `X-Link-Local-Action: true` header required by non-UI clients.

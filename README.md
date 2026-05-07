@@ -506,8 +506,7 @@ from other explicit projects out of recall and duplicate/conflict checks.
 `serve.py` exposes Link locally while the web viewer is running.
 
 Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do not
-expose it to the internet without adding auth. HTTP memory writes are limited to
-review, archive, and restore actions, and require
+expose it to the internet without adding auth. HTTP write actions require
 `X-Link-Local-Action: true`; proposal analysis does not write pages.
 
 Common endpoints:
@@ -535,8 +534,8 @@ Common endpoints:
 | `GET /api/search?q=<query>` | Ranked search by title, alias, tag, TLDR, and full text. |
 | `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
 | `GET /api/graph` | Nodes and edges for graph visualization. |
-| `POST /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning wikilinks. |
-| `POST /api/rebuild-index` | Regenerate `wiki/index.md` from current pages. |
+| `POST /api/rebuild-backlinks` | Header `X-Link-Local-Action: true`; rebuild `_backlinks.json` by scanning wikilinks. |
+| `POST /api/rebuild-index` | Header `X-Link-Local-Action: true`; regenerate `wiki/index.md` from current pages. |
 
 ## Command Reference
 
