@@ -192,13 +192,14 @@ _meta_token_index: dict[str, set[str]] = {}  # token → stems with that token i
 _forward_links_index: dict[str, list[str]] = {}  # page name → canonical outbound wikilinks
 _fts_index = None
 _search_backend = "token-index"
+_cache_read_warnings: list[dict[str, str]] = []
 _mutation_rate_limiter = _CoreLocalRateLimiter(
     max_events=MUTATION_RATE_LIMIT,
     window_seconds=MUTATION_RATE_WINDOW_SECONDS,
 )
 
 def _invalidate_pages_cache() -> None:
-    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _forward_links_index, _fts_index, _search_backend
+    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _forward_links_index, _fts_index, _search_backend, _cache_read_warnings
     _core_close_wiki_cache({"fts_index": _fts_index})
     _pages_cache = None
     _pages_cache_mtime = 0.0
@@ -206,6 +207,7 @@ def _invalidate_pages_cache() -> None:
     _forward_links_index = {}
     _fts_index = None
     _search_backend = "token-index"
+    _cache_read_warnings = []
 
 
 def _wiki_mtime() -> float:
@@ -213,7 +215,7 @@ def _wiki_mtime() -> float:
 
 
 def _get_all_pages(force_check: bool = False) -> list:
-    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _page_index, _fulltext_index, _normalized_fulltext_index, _text_words_index, _meta_words_index, _snippet_index, _token_index, _page_map, _meta_token_index, _forward_links_index, _fts_index, _search_backend
+    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _page_index, _fulltext_index, _normalized_fulltext_index, _text_words_index, _meta_words_index, _snippet_index, _token_index, _page_map, _meta_token_index, _forward_links_index, _fts_index, _search_backend, _cache_read_warnings
     now = time.monotonic()
     if (
         _pages_cache is not None
@@ -242,6 +244,7 @@ def _get_all_pages(force_check: bool = False) -> list:
     _forward_links_index = cache.get("forward_links_index", {})
     _fts_index = cache.get("fts_index")
     _search_backend = str(cache.get("search_backend") or "token-index")
+    _cache_read_warnings = cache.get("read_warnings") if isinstance(cache.get("read_warnings"), list) else []
     return _pages_cache
 
 
@@ -261,6 +264,8 @@ def _current_wiki_cache() -> dict[str, object]:
         "forward_links_index": _forward_links_index,
         "fts_index": _fts_index,
         "search_backend": _search_backend,
+        "read_warning_count": len(_cache_read_warnings),
+        "read_warnings": _cache_read_warnings,
     }
 
 

@@ -32,6 +32,7 @@ def reset_wiki(wiki_dir: Path) -> None:
     serve._meta_token_index = {}
     serve._fts_index = None
     serve._search_backend = "token-index"
+    serve._cache_read_warnings = []
     serve._mutation_rate_limiter = serve._CoreLocalRateLimiter(
         max_events=serve.MUTATION_RATE_LIMIT,
         window_seconds=serve.MUTATION_RATE_WINDOW_SECONDS,
@@ -840,8 +841,8 @@ class ServeTests(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertFalse(payload["ready"])
-        self.assertEqual(payload["page_count"], 0)
-        self.assertEqual(payload["warnings"][0]["code"], "cache_unavailable")
+        self.assertEqual(payload["page_count"], 2)
+        self.assertEqual(payload["warnings"][0]["code"], "cache_read_warnings")
 
     def test_memory_inbox_and_explain_render_action_commands(self):
         wiki = self.make_wiki()

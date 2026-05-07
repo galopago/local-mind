@@ -96,6 +96,25 @@ class WikiCoreTests(unittest.TestCase):
         self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
         self.assertIn({"source": "agent-memory", "target": "retrieval"}, graph["edges"])
 
+    def test_build_wiki_cache_reports_read_warnings(self):
+        wiki = self.make_wiki()
+        write_page(wiki, "concepts/readable.md", "---\ntype: concept\ntitle: Readable\n---\n# Readable\n")
+        write_page(wiki, "concepts/locked.md", "---\ntype: concept\ntitle: Locked\n---\n# Locked\n")
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            cache = build_wiki_cache(wiki)
+
+        self.assertEqual(cache["read_warning_count"], 1)
+        self.assertEqual(cache["read_warnings"][0]["page"], "wiki/concepts/locked.md")
+        self.assertIn("readable", cache["page_map"])
+        self.assertNotIn("locked", cache["page_map"])
+
     def test_graph_data_uses_cached_forward_links_without_rereading_pages(self):
         wiki = self.make_wiki()
         write_page(

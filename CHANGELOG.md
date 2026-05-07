@@ -39,7 +39,8 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Hardened wiki validation so unreadable pages become structured `unreadable_page` errors instead of crashing validation.
 - Hardened backlink rebuild commands so unreadable pages return controlled CLI, MCP, and local web errors.
 - Hardened index rebuild commands so unreadable pages return controlled CLI, MCP, and local web errors.
-- Hardened MCP and local web status calls so unreadable pages produce `cache_unavailable` readiness warnings instead of crashing.
+- Hardened MCP and local web status calls so cache issues produce readiness warnings instead of crashing.
+- Made the shared wiki cache skip unreadable pages with `cache_read_warnings` so search/query/graph can continue over readable pages.
 - Added MCP `link_status` and `/api/status` for a compact readiness summary with version, wiki path, page/memory counts, optional validation, and safe next actions.
 - Added search backend reporting to Link status payloads so agents and users can see whether local search is using SQLite FTS or the token fallback.
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.

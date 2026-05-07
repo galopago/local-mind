@@ -91,12 +91,20 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
     token_index: dict[str, set[str]] = {}
     meta_token_index: dict[str, set[str]] = {}
     raw_forward_links: dict[str, list[str]] = {}
+    read_warnings: list[dict[str, str]] = []
 
     for md in sorted(wiki_dir.rglob("*.md")):
         if md.name.startswith("."):
             continue
         rel = md.relative_to(wiki_dir)
-        text = md.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = md.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            read_warnings.append({
+                "page": f"wiki/{rel.as_posix()}",
+                "error": str(exc) or exc.__class__.__name__,
+            })
+            continue
         meta, body = parse_frontmatter(text)
 
         title = str(meta.get("title") or _heading_title(body) or md.stem)
@@ -199,6 +207,8 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
         "forward_links_index": forward_links_index,
         "fts_index": fts_index,
         "search_backend": "sqlite-fts" if fts_index is not None else "token-index",
+        "read_warning_count": len(read_warnings),
+        "read_warnings": read_warnings,
     }
 
 
@@ -844,6 +854,13 @@ def rebuild_index(
     owns_cache = cache is None
     cache = cache or build_wiki_cache(wiki_dir)
     try:
+        read_warning_count = int(cache.get("read_warning_count") or 0)
+        if read_warning_count:
+            read_warnings = cache.get("read_warnings") or []
+            first_warning = read_warnings[0] if isinstance(read_warnings, list) and read_warnings else {}
+            page = first_warning.get("page") if isinstance(first_warning, dict) else ""
+            detail = f" starting at {page}" if page else ""
+            raise OSError(f"could not read {read_warning_count} wiki page(s){detail}")
         markdown = build_index_markdown(wiki_dir, cache=cache, generated_at=generated_at)
         index_path = wiki_dir / "index.md"
         index_path.write_text(markdown, encoding="utf-8")

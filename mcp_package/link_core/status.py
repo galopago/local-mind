@@ -62,6 +62,13 @@ def link_status(
                 wiki_cache = cache
             pages = list(wiki_cache.get("pages", []))
             search_backend = str(wiki_cache.get("search_backend") or "token-index")
+            read_warning_count = int(wiki_cache.get("read_warning_count") or 0)
+            if read_warning_count:
+                warnings.append({
+                    "code": "cache_read_warnings",
+                    "message": f"{read_warning_count} wiki page(s) could not be read; search and page counts may be incomplete.",
+                    "detail": str((wiki_cache.get("read_warnings") or [])[:5]),
+                })
         except Exception as exc:
             pages = []
             warnings.append(_warning(
@@ -105,7 +112,8 @@ def link_status(
         for page in pages
         if str(page.get("path") or "") not in {"wiki/index.md", "wiki/log.md"}
     )
-    ready = not missing and bool(pages) and (
+    cache_degraded = any(warning.get("code") in {"cache_unavailable", "cache_read_warnings"} for warning in warnings)
+    ready = not missing and bool(pages) and not cache_degraded and (
         not include_validation or bool(validation_summary.get("passed"))
     )
     schema = schema_status(wiki_dir)

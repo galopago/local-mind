@@ -158,8 +158,8 @@ class McpContractTests(unittest.TestCase):
             payload = json.loads(self.server.link_status())
 
         self.assertFalse(payload["ready"])
-        self.assertEqual(payload["page_count"], 0)
-        self.assertEqual(payload["warnings"][0]["code"], "cache_unavailable")
+        self.assertGreater(payload["page_count"], 0)
+        self.assertEqual(payload["warnings"][0]["code"], "cache_read_warnings")
 
     def test_starter_prompts_contract(self):
         payload = json.loads(self.server.starter_prompts(project="Client Launch"))

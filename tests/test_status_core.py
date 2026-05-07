@@ -116,6 +116,17 @@ class StatusCoreTests(unittest.TestCase):
         self.assertEqual(payload["warnings"][0]["detail"], "cache failed")
         self.assertEqual(payload["warnings"][1]["detail"], "memory failed")
 
+    def test_link_status_surfaces_cache_read_warnings(self):
+        wiki = self.make_wiki()
+        cache = build_wiki_cache(wiki)
+        cache["read_warning_count"] = 1
+        cache["read_warnings"] = [{"page": "wiki/concepts/locked.md", "error": "permission denied"}]
+
+        payload = link_status(wiki, cache=cache)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["warnings"][0]["code"], "cache_read_warnings")
+
 
 if __name__ == "__main__":
     unittest.main()
