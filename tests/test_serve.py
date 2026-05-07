@@ -226,6 +226,16 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
         self.assertEqual(headers["Cache-Control"], "no-store")
 
+    def test_head_status_sends_headers_without_body(self):
+        self.make_wiki()
+
+        status, body, headers = run_handler_raw("HEAD", "/api/status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        self.assertEqual(headers["Cache-Control"], "no-store")
+
     def test_svg_security_headers_use_strict_policy(self):
         handler = object.__new__(serve.Handler)
         headers = []
@@ -378,6 +388,20 @@ class ServeTests(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(body, b"private image bytes")
+        self.assertEqual(headers["Content-Type"], "image/png")
+        self.assertEqual(headers["Cache-Control"], "no-store")
+
+    def test_head_raw_static_sends_headers_without_body(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        asset = raw / "asset.png"
+        asset.write_bytes(b"private image bytes")
+
+        status, body, headers = run_handler_raw("HEAD", "/raw/asset.png")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"")
         self.assertEqual(headers["Content-Type"], "image/png")
         self.assertEqual(headers["Cache-Control"], "no-store")
 

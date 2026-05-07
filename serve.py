@@ -2890,8 +2890,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
         """HEAD requests: send headers only, no body."""
         self._head_only = True
-        self.do_GET()
-        self._head_only = False
+        try:
+            self.do_GET()
+        finally:
+            self._head_only = False
 
     def do_OPTIONS(self):
         self._head_only = False

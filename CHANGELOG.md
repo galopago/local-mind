@@ -57,6 +57,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added browser isolation and permissions-policy headers, and marked local JSON API responses `Cache-Control: no-store`.
 - Marked local HTML pages and served static/raw files `Cache-Control: no-store` so private memory pages and source media are not browser-cached.
 - Returned hardened JSON `405` responses for unsupported local HTTP methods, including `TRACE` and `CONNECT`, instead of default server HTML.
+- Hardened `HEAD` handling so local health/static checks return headers without bodies and always reset response state.
 - Added an interactive-readiness verdict and threshold warnings to `link benchmark` so larger local wikis are easier to evaluate.
 - Added shared benchmark health checks to the large-wiki smoke so user-facing and CI scale verdicts stay aligned.
 - Tightened ownership of generated search caches in CLI query and index rebuild paths so in-memory SQLite indexes are closed when short-lived operations finish.
