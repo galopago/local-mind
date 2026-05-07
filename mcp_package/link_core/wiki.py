@@ -605,6 +605,75 @@ def graph_summary(
     }
 
 
+def list_pages(
+    cache: dict[str, Any],
+    category: str = "",
+    page_type: str = "",
+    maturity: str = "",
+    limit: int = 100,
+    offset: int = 0,
+    include_all: bool = False,
+) -> dict[str, Any]:
+    """Return filtered page metadata, bounded by default for agent context."""
+    pages = list(cache.get("pages", []))
+    category = str(category or "").strip().lower()
+    page_type = str(page_type or "").strip().lower()
+    maturity = str(maturity or "").strip().lower()
+    if category:
+        pages = [page for page in pages if str(page.get("category") or "").lower() == category]
+    if page_type:
+        pages = [page for page in pages if str(page.get("type") or "").lower() == page_type]
+    if maturity:
+        pages = [page for page in pages if str(page.get("maturity") or "").lower() == maturity]
+
+    total = len(pages)
+    offset = _bounded_int(offset, 0, 0, max(total, 0))
+    limit = _bounded_int(limit, 100, 1, 1000)
+    if include_all:
+        returned_pages = pages[offset:]
+        effective_limit: int | None = None
+    else:
+        returned_pages = pages[offset: offset + limit]
+        effective_limit = limit
+    next_offset = offset + len(returned_pages)
+    truncated = next_offset < total
+
+    follow_up: list[dict[str, Any]] = []
+    if truncated:
+        follow_up.append({
+            "tool": "get_pages",
+            "arguments": {
+                "category": category,
+                "page_type": page_type,
+                "maturity": maturity,
+                "limit": limit,
+                "offset": next_offset,
+            },
+        })
+    follow_up.append({"tool": "search_wiki", "when": "Use when you know what topic or text you need."})
+    follow_up.append({"tool": "query_link", "when": "Use for answer-ready memory plus wiki context."})
+
+    return {
+        "count": total,
+        "total": total,
+        "returned_count": len(returned_pages),
+        "offset": offset,
+        "limit": effective_limit,
+        "truncated": truncated,
+        "filters": {
+            "category": category,
+            "page_type": page_type,
+            "maturity": maturity,
+        },
+        "pages": returned_pages,
+        "agent_guidance": [
+            "This page list is metadata only and may be paginated for context safety.",
+            "Use search_wiki, query_link, or get_context instead of paging through the whole wiki when answering a question.",
+        ],
+        "follow_up": follow_up,
+    }
+
+
 def _index_pages(cache: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         page for page in cache["pages"]

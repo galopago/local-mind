@@ -121,7 +121,7 @@ memory. Use `propose_memories` or `capture_session` for proposal-only review.
 | `forget_memory(identifier, confirm?)` | Permanently delete a memory only after explicit user confirmation; prefer archive for reversible cleanup. |
 | `search_wiki(query, limit?)` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets. |
 | `get_context(topic)` | **Primary tool.** Best matching page (full content) + inbound/forward graph links in one call. |
-| `get_pages(category?, type?, maturity?)` | All pages with metadata. Filter by category, type, or maturity. |
+| `get_pages(category?, type?, maturity?, limit?, offset?, include_all?)` | Bounded page metadata list with filters and follow-up pagination actions; set `include_all=true` only for explicit full metadata export. |
 | `get_backlinks(page_name)` | Inbound + forward links for a page. |
 | `get_graph_summary(topic?, limit?, depth?, max_edges?)` | Bounded graph overview or topic neighborhood for large wikis and agent context budgets. |
 | `get_graph()` | Full graph export with all nodes + edges; prefer `get_graph_summary` first on large wikis. |

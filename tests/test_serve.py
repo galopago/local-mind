@@ -910,6 +910,22 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
 
+    def test_page_list_payload_is_bounded_for_api_agents(self):
+        wiki = self.make_wiki()
+        for index in range(5):
+            write_page(
+                wiki,
+                f"concepts/page-{index}.md",
+                f"---\ntype: concept\ntitle: Page {index}\n---\n# Page {index}\n",
+            )
+
+        payload = serve._page_list_payload(category="concepts", limit=2)
+
+        self.assertEqual(payload["count"], 5)
+        self.assertEqual(payload["returned_count"], 2)
+        self.assertTrue(payload["truncated"])
+        self.assertEqual(payload["follow_up"][0]["tool"], "get_pages")
+
     def test_graph_tooltip_exists_before_graph_script(self):
         wiki = self.make_wiki()
         write_page(

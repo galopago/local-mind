@@ -67,7 +67,7 @@ mcp = FastMCP(
         "long chat or session notes that should be stored locally before memory "
         "approval, and capture_inbox to review saved captures before accepting, "
         "redacting, or deleting them; use propose_memories when no raw capture is needed. Use search_wiki to find "
-        "general pages and get_context to retrieve a topic with its full graph "
+        "specific pages and get_pages for bounded metadata lists; use get_context to retrieve a topic with its full graph "
         "neighborhood. Use get_graph_summary for bounded graph orientation on "
         "large wikis; use get_graph only for explicit full graph exports. After "
         "ingesting sources or substantially editing wiki "
@@ -166,6 +166,7 @@ from link_core.wiki import (
     context_for_topic as _core_context_for_topic,
     graph_data as _core_graph_data,
     graph_summary as _core_graph_summary,
+    list_pages as _core_list_pages,
     load_backlinks_index as _core_load_backlinks_index,
     rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
@@ -1235,29 +1236,41 @@ def get_context(topic: str) -> str:
 
 
 @mcp.tool()
-def get_pages(category: str = "", page_type: str = "", maturity: str = "") -> str:
-    """List all pages in the Link wiki with metadata.
+def get_pages(
+    category: str = "",
+    page_type: str = "",
+    maturity: str = "",
+    limit: int = 100,
+    offset: int = 0,
+    include_all: bool = False,
+) -> str:
+    """List Link wiki pages with metadata, bounded by default.
 
     Optional filters:
     - category: "memories", "concepts", "entities", "sources", "comparisons", "explorations"
     - page_type: "memory", "concept", "entity", "source", "comparison", "exploration"
     - maturity: "seed", "growing", "mature", "established"
+    - limit: max returned pages, clamped to 1..1000; default 100
+    - offset: pagination offset
+    - include_all: true only when the user explicitly needs a full metadata export
 
     Returns pages with: name, title, category, type, tags, aliases, maturity,
     source_count, tldr, date_updated. Does not include full page content.
+    Use search_wiki, query_link, or get_context instead of paging through the
+    whole wiki when answering a question.
     """
-    c = _build_cache()
-    pages = c["pages"]
-    category = _clean_text_input(category).lower()
-    page_type = _clean_text_input(page_type).lower()
-    maturity = _clean_text_input(maturity).lower()
-    if category:
-        pages = [p for p in pages if p["category"] == category]
-    if page_type:
-        pages = [p for p in pages if p["type"] == page_type]
-    if maturity:
-        pages = [p for p in pages if p["maturity"] == maturity]
-    return json.dumps({"count": len(pages), "pages": pages}, ensure_ascii=False)
+    return json.dumps(
+        _core_list_pages(
+            _build_cache(),
+            category=_clean_text_input(category).lower(),
+            page_type=_clean_text_input(page_type).lower(),
+            maturity=_clean_text_input(maturity).lower(),
+            limit=limit,
+            offset=offset,
+            include_all=include_all,
+        ),
+        ensure_ascii=False,
+    )
 
 
 @mcp.tool()

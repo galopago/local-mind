@@ -227,10 +227,19 @@ class McpContractTests(unittest.TestCase):
         sources = json.loads(self.server.get_pages(page_type="source"))
 
         self.assertEqual(concepts["count"], 5)
+        self.assertEqual(concepts["returned_count"], 5)
         self.assertEqual({page["category"] for page in concepts["pages"]}, {"concepts"})
         self.assertIn("agent-memory", {page["name"] for page in mature["pages"]})
         self.assertEqual(sources["count"], 3)
         self.assertEqual({page["type"] for page in sources["pages"]}, {"source"})
+
+    def test_get_pages_is_bounded_for_large_agent_contexts(self):
+        payload = json.loads(self.server.get_pages(limit=2))
+
+        self.assertGreater(payload["count"], 2)
+        self.assertEqual(payload["returned_count"], 2)
+        self.assertTrue(payload["truncated"])
+        self.assertEqual(payload["follow_up"][0]["tool"], "get_pages")
 
     def test_get_backlinks_contract(self):
         payload = json.loads(self.server.get_backlinks("agent-memory"))

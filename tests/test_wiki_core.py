@@ -18,6 +18,7 @@ from link_core.wiki import (  # noqa: E402
     context_for_topic,
     graph_data,
     graph_summary,
+    list_pages,
     load_backlinks_index,
     rebuild_index,
     search_pages,
@@ -108,6 +109,28 @@ class WikiCoreTests(unittest.TestCase):
             graph = graph_data(cache)
 
         self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
+
+    def test_list_pages_is_bounded_and_paginated_by_default(self):
+        wiki = self.make_wiki()
+        for index in range(5):
+            write_page(
+                wiki,
+                f"concepts/page-{index}.md",
+                f"---\ntype: concept\ntitle: Page {index}\nmaturity: growing\n---\n# Page {index}\n",
+            )
+        cache = build_wiki_cache(wiki)
+
+        first = list_pages(cache, category="concepts", limit=2)
+        second = list_pages(cache, category="concepts", limit=2, offset=2)
+        full = list_pages(cache, category="concepts", limit=2, include_all=True)
+
+        self.assertEqual(first["count"], 5)
+        self.assertEqual(first["returned_count"], 2)
+        self.assertTrue(first["truncated"])
+        self.assertEqual(first["follow_up"][0]["arguments"]["offset"], 2)
+        self.assertEqual(second["returned_count"], 2)
+        self.assertEqual(full["returned_count"], 5)
+        self.assertFalse(full["truncated"])
 
     def test_graph_summary_caps_overview_for_agent_context(self):
         wiki = self.make_wiki()

@@ -517,6 +517,7 @@ Most agents should start with:
 | `memory_profile` | You need to know what Link remembers about the user/project. |
 | `memory_inbox` | You need review items with the safest next action for each memory. |
 | `recall_memory` | You need preferences, decisions, facts, or project context with recall readiness. |
+| `get_pages` | You need a bounded page metadata list with filters and pagination. Use `search_wiki`/`query_link` instead of paging through the whole wiki to answer a question. |
 | `get_context` | You need a topic plus its graph neighborhood. |
 | `get_graph_summary` | You need a bounded graph overview or topic neighborhood without loading every node and edge into agent context. |
 | `search_wiki` | You need ranked search across the wiki. |
@@ -560,7 +561,8 @@ Common endpoints:
 | `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions. |
 | `GET /api/prompts?project=slug` | First-run natural agent prompts plus local readiness/check commands; same payload as `link prompts --json`. |
 | `GET /api/ingest-status` | Raw ingest state with pending files, represented-source completion cards, safety summary, graph health, exact agent prompt, guided plan, and follow-up commands. |
-| `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
+| `GET /api/page-list?limit=100&offset=0` | Bounded page metadata list for agents and large wikis, with follow-up pagination actions. |
+| `GET /api/pages` | Full page metadata list for local UI/export use. Prefer `/api/page-list` for agents. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |
 | `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context for an agent, including relevant memories, review warnings, and capture status. |
 | `GET /api/memory-audit?project=<slug>` | Read-only memory health report with backlog, capture risks, and next actions. |

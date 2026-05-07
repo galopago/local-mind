@@ -99,6 +99,7 @@ from link_core.wiki import (
     context_for_topic as _core_context_for_topic,
     graph_data as _core_graph_data,
     graph_summary as _core_graph_summary,
+    list_pages as _core_list_pages,
     load_backlinks_index as _core_load_backlinks_index,
     rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
@@ -233,6 +234,25 @@ def _find_page(name: str) -> Path | None:
 # Keep _all_pages as alias for API compatibility
 def _all_pages() -> list:
     return _get_all_pages()
+
+
+def _page_list_payload(
+    category: str = "",
+    page_type: str = "",
+    maturity: str = "",
+    limit: int = 100,
+    offset: int = 0,
+    include_all: bool = False,
+) -> dict:
+    return _core_list_pages(
+        _current_wiki_cache(),
+        category=category,
+        page_type=page_type,
+        maturity=maturity,
+        limit=limit,
+        offset=offset,
+        include_all=include_all,
+    )
 
 
 def _load_backlinks_index() -> tuple[dict, str | None]:
@@ -2905,6 +2925,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else: self._err(urllib.parse.unquote(path[6:]))
         elif path == "/api/pages":
             self._json(_all_pages())
+        elif path == "/api/page-list":
+            limit, limit_error = _parse_bounded_int(query.get("limit", ["100"])[0], "limit", 100, 1, 1000)
+            offset, offset_error = _parse_bounded_int(query.get("offset", ["0"])[0], "offset", 0, 0, 1000000)
+            error = limit_error or offset_error
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                assert limit is not None
+                assert offset is not None
+                self._json(_page_list_payload(
+                    category=query.get("category", [""])[0],
+                    page_type=query.get("type", [""])[0] or query.get("page_type", [""])[0],
+                    maturity=query.get("maturity", [""])[0],
+                    limit=limit,
+                    offset=offset,
+                    include_all=query.get("all", ["false"])[0].lower() in {"1", "true", "yes"},
+                ))
         elif path == "/api/status":
             include_validation = query.get("validate", ["false"])[0].lower() in {"1", "true", "yes"}
             self._json(_link_status_payload(include_validation=include_validation))
