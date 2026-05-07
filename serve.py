@@ -1108,6 +1108,7 @@ mark { background: var(--mark-bg); color: inherit; border-radius: 2px; padding: 
 .graph-control select { border: 1px solid var(--border); background: var(--surface); color: var(--text);
                         border-radius: 4px; padding: 5px 8px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; }
 .graph-control input { width: 180px; }
+.graph-control select:disabled { color: var(--button-disabled); cursor: not-allowed; opacity: 0.65; }
 .graph-status { color: var(--muted); margin-left: auto; }
 .graph-inspector { border: 1px solid var(--border-soft); border-radius: 4px; padding: 12px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; color: var(--muted); background: var(--surface); }
 .graph-inspector strong { display: block; color: var(--text-strong); font-size: 15px; margin-bottom: 6px; overflow-wrap: anywhere; }
@@ -2349,6 +2350,8 @@ def _render_graph():
   var categoryValue = 'all';
   var depthValue = 'all';
   var visibleCache = null;
+  var renderQueued = false;
+  var animationRunning = false;
 
   function resize() {{
     W = canvas.clientWidth; H = canvas.clientHeight;
@@ -2428,6 +2431,7 @@ def _render_graph():
   }}
   function updateStatus() {{
     if (!status) return;
+    syncDepthControl();
     var currentNodes = visibleNodes();
     var currentEdges = visibleEdges();
     var parts = [
@@ -2446,6 +2450,17 @@ def _render_graph():
     if (locked) parts.push(locked + ' placed');
     if (selectedNode) parts.push('selected ' + selectedNode.id);
     status.textContent = parts.join(' · ');
+  }}
+
+  function syncDepthControl() {{
+    if (!depthFilter) return;
+    if (!selectedNode && depthValue !== 'all') {{
+      depthValue = 'all';
+      depthFilter.value = 'all';
+      invalidateFilters();
+    }}
+    depthFilter.disabled = !selectedNode;
+    depthFilter.title = selectedNode ? 'Limit graph to the selected node neighborhood.' : 'Select a node before filtering by neighborhood.';
   }}
 
   function updateInspector() {{
@@ -2481,9 +2496,10 @@ def _render_graph():
     selectedNode = node;
     hoverNode = node;
     invalidateFilters();
+    syncDepthControl();
     updateInspector();
     updateStatus();
-    draw();
+    drawSoon();
   }}
 
   function openNode(node) {{
@@ -2562,6 +2578,7 @@ def _render_graph():
     var time = frame * 0.018;
     var currentNodes = visibleNodes();
     var currentEdges = visibleEdges();
+    var animateFlow = !motionPaused && !graphTooLargeForMotion();
 
     // Edges — double draw: blurred glow + sharp line + flow particle
     currentEdges.forEach(function(e) {{
@@ -2586,7 +2603,7 @@ def _render_graph():
       ctx.stroke();
 
       // Flow particle
-      if (activeEdge) {{
+      if (activeEdge && animateFlow) {{
         var flowT = ((time * 0.5 + (a.x + b.y) * 0.001) % 2) / 2;
         var px = a.x + (b.x - a.x) * flowT;
         var py = a.y + (b.y - a.y) * flowT;
@@ -2647,8 +2664,32 @@ def _render_graph():
     }});
   }}
 
+  function shouldRunContinuously() {{
+    return !motionPaused && !graphTooLargeForMotion();
+  }}
+
+  function drawSoon() {{
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(function() {{
+      renderQueued = false;
+      draw();
+    }});
+  }}
+
+  function startLoop() {{
+    if (animationRunning) return;
+    animationRunning = true;
+    requestAnimationFrame(loop);
+  }}
+
   function loop() {{
-    if (!motionPaused && frame < SETTLE) {{
+    if (!shouldRunContinuously()) {{
+      animationRunning = false;
+      drawSoon();
+      return;
+    }}
+    if (frame < SETTLE) {{
       simulate();
       // Auto-fit once physics has mostly settled
       if (frame === SETTLE - 1) {{ autoFit(); fitted = true; }}
@@ -2691,6 +2732,7 @@ def _render_graph():
     autoFit();
     updateInspector();
     updateStatus();
+    drawSoon();
   }}
 
   function setMotionPaused(next) {{
@@ -2700,6 +2742,8 @@ def _render_graph():
       motionButton.textContent = graphTooLargeForMotion() ? 'Motion capped' : (motionPaused ? 'Motion paused' : 'Motion on');
     }}
     updateStatus();
+    if (shouldRunContinuously()) startLoop();
+    else drawSoon();
   }}
 
   function setFullscreen(next) {{
@@ -2711,7 +2755,7 @@ def _render_graph():
       resize();
       autoFit();
       updateStatus();
-      draw();
+      drawSoon();
     }}, 0);
   }}
 
@@ -2740,10 +2784,12 @@ def _render_graph():
       var w = toWorld(sx, sy);
       pos[dragging.id].x = w.x + dragOffX; pos[dragging.id].y = w.y + dragOffY;
       updateStatus();
+      drawSoon();
     }} else if (panning) {{
       panX = (sx - panStartX) / zoom; panY = (sy - panStartY) / zoom;
       if (movedPastThreshold(sx, sy)) didPan = true;
       updateStatus();
+      drawSoon();
     }} else {{
       var hit = hitTest(sx, sy);
       hoverNode = hit;
@@ -2757,6 +2803,7 @@ def _render_graph():
         tooltip.style.display = 'none';
         canvas.style.cursor = 'grab';
       }}
+      drawSoon();
     }}
   }});
 
@@ -2766,6 +2813,7 @@ def _render_graph():
       dragging = null;
       suppressClick = didDrag;
       updateStatus();
+      drawSoon();
     }}
     if (panning) {{ suppressClick = didPan; }}
     panning = false;
@@ -2775,6 +2823,7 @@ def _render_graph():
   canvas.addEventListener('mouseleave', function() {{
     hoverNode = null;
     if (tooltip) tooltip.style.display = 'none';
+    drawSoon();
   }});
 
   canvas.addEventListener('click', function(e) {{
@@ -2802,24 +2851,26 @@ def _render_graph():
     panX += after.x - before.x;
     panY += after.y - before.y;
     updateStatus();
+    drawSoon();
   }}, {{ passive: false }});
 
   canvas.addEventListener('keydown', function(e) {{
-    if (e.key === '+' || e.key === '=') {{ zoom = Math.min(6, zoom * 1.12); updateStatus(); e.preventDefault(); }}
-    if (e.key === '-' || e.key === '_') {{ zoom = Math.max(0.15, zoom * 0.9); updateStatus(); e.preventDefault(); }}
+    if (e.key === '+' || e.key === '=') {{ zoom = Math.min(6, zoom * 1.12); updateStatus(); drawSoon(); e.preventDefault(); }}
+    if (e.key === '-' || e.key === '_') {{ zoom = Math.max(0.15, zoom * 0.9); updateStatus(); drawSoon(); e.preventDefault(); }}
     if (e.key === '0') {{ resetView(); e.preventDefault(); }}
     if (e.key === 'Enter' && hoverNode) {{ openNode(hoverNode); e.preventDefault(); }}
     if (e.key === 'Escape') {{
       if (frameEl && frameEl.classList.contains('is-fullscreen')) {{
         setFullscreen(false);
       }} else {{
-        selectedNode = null; invalidateFilters(); updateInspector(); updateStatus(); draw();
+        selectedNode = null; invalidateFilters(); updateInspector(); updateStatus(); drawSoon();
       }}
       e.preventDefault();
     }}
     if (e.key === 'l' || e.key === 'L') {{
       showAllLabels = !showAllLabels;
       if (labelsButton) labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
+      drawSoon();
       e.preventDefault();
     }}
   }});
@@ -2828,6 +2879,7 @@ def _render_graph():
   if (labelsButton) labelsButton.addEventListener('click', function() {{
     showAllLabels = !showAllLabels;
     labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
+    drawSoon();
   }});
   if (motionButton) motionButton.addEventListener('click', function() {{
     setMotionPaused(!motionPaused);
@@ -2840,7 +2892,7 @@ def _render_graph():
     searchInput.addEventListener('input', function() {{
       searchTerm = searchInput.value.trim().toLowerCase();
       updateStatus();
-      draw();
+      drawSoon();
     }});
     searchInput.addEventListener('keydown', function(e) {{
       if (e.key !== 'Enter') return;
@@ -2855,7 +2907,7 @@ def _render_graph():
     setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
-    draw();
+    drawSoon();
   }});
   if (depthFilter) depthFilter.addEventListener('change', function() {{
     depthValue = depthFilter.value || 'all';
@@ -2863,16 +2915,17 @@ def _render_graph():
     setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
-    draw();
+    drawSoon();
   }});
 
-  window.addEventListener('resize', function() {{ resize(); if (fitted) autoFit(); updateStatus(); }});
+  window.addEventListener('resize', function() {{ resize(); if (fitted) autoFit(); updateStatus(); drawSoon(); }});
   resize();
   if (motionPaused) {{ autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
   updateInspector();
   updateStatus();
-  loop();
+  if (shouldRunContinuously()) startLoop();
+  else drawSoon();
 }})();
 </script>"""
 

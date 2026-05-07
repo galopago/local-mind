@@ -1079,6 +1079,9 @@ class ServeTests(unittest.TestCase):
         self.assertIn('<option value="concepts">concepts</option>', html)
         self.assertIn("function visibleNodes()", html)
         self.assertIn("function visibleEdges()", html)
+        self.assertIn("function syncDepthControl()", html)
+        self.assertIn("depthFilter.disabled = !selectedNode;", html)
+        self.assertIn("Select a node before filtering by neighborhood.", html)
         self.assertIn("var LARGE_GRAPH_LIMIT = 350;", html)
         self.assertIn("function graphTooLargeForMotion()", html)
         self.assertIn("searchInput.addEventListener('input'", html)
@@ -1122,6 +1125,12 @@ class ServeTests(unittest.TestCase):
         self.assertIn("if (simNodes.length > LARGE_GRAPH_LIMIT) return;", html)
         self.assertIn("if (graphTooLargeForMotion()) parts.push('motion capped');", html)
         self.assertIn("motionButton.textContent = graphTooLargeForMotion() ? 'Motion capped'", html)
+        self.assertIn("var renderQueued = false;", html)
+        self.assertIn("function shouldRunContinuously()", html)
+        self.assertIn("function drawSoon()", html)
+        self.assertIn("var animateFlow = !motionPaused && !graphTooLargeForMotion();", html)
+        self.assertIn("if (activeEdge && animateFlow)", html)
+        self.assertIn("if (shouldRunContinuously()) startLoop();", html)
 
     def test_graph_script_embeds_titles_safely(self):
         wiki = self.make_wiki()
