@@ -6,11 +6,51 @@ from pathlib import Path
 from typing import Callable
 
 from .frontmatter import parse_frontmatter
-from .memory import normalize_project
+from .memory import normalize_project, slugify
 from .security import redact_secret_values, secret_value_warnings
 
 
 CaptureCommands = Callable[[str], dict[str, str]]
+
+
+def capture_title(
+    text: str,
+    source: str = "",
+    title: str | None = None,
+    *,
+    default_source: str = "inline",
+    path_source: bool = False,
+    max_source_len: int = 120,
+) -> str:
+    """Build a stable human-readable title for saved raw memory captures."""
+    if title and title.strip():
+        return " ".join(title.split())
+
+    source_value = " ".join(str(source or "").split())
+    if source_value and source_value != default_source:
+        if path_source:
+            stem = Path(source_value).stem.replace("-", " ").replace("_", " ").strip()
+            if stem:
+                return f"Memory capture: {stem.title()}"
+        else:
+            return f"Memory capture: {source_value[:max_source_len]}"
+
+    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "Session notes")
+    short = " ".join(first_line.split()[:10]).strip(" .")
+    return f"Memory capture: {short or 'Session notes'}"
+
+
+def capture_filename(timestamp: str, title: str, raw_dir: Path) -> Path:
+    """Return a unique capture path under raw_dir for the given timestamp/title."""
+    safe_stamp = str(timestamp).replace("-", "").replace(":", "")
+    title_slug = slugify(title.replace("Memory capture:", ""), fallback="session-notes")
+    base = f"{safe_stamp}-{title_slug}"
+    candidate = raw_dir / f"{base}.md"
+    counter = 2
+    while candidate.exists():
+        candidate = raw_dir / f"{base}-{counter}.md"
+        counter += 1
+    return candidate
 
 
 def resolve_capture_file(root: Path, capture: str, *, max_len: int | None = None) -> Path | None:

@@ -129,9 +129,11 @@ from link_core.backup import (
     list_backups as _core_list_backups,
 )
 from link_core.capture import (
+    capture_filename as _core_capture_filename,
     capture_inbox as _core_capture_inbox,
     capture_notes_from_markdown as _core_capture_notes_from_markdown,
     capture_records as _core_capture_records,
+    capture_title as _core_capture_title,
     cli_capture_commands as _core_cli_capture_commands,
     resolve_capture_file as _core_resolve_capture_file,
 )
@@ -1779,31 +1781,6 @@ def propose_memories(
     return 0
 
 
-def _capture_title(text: str, source: str, title: str | None = None) -> str:
-    if title and title.strip():
-        return " ".join(title.split())
-    if source != "inline":
-        stem = Path(source).stem.replace("-", " ").replace("_", " ").strip()
-        if stem:
-            return f"Memory capture: {stem.title()}"
-    first_line = next((line.strip() for line in text.splitlines() if line.strip()), "Session notes")
-    words = first_line.split()
-    short = " ".join(words[:10]).strip(" .")
-    return f"Memory capture: {short or 'Session notes'}"
-
-
-def _capture_filename(timestamp: str, title: str, raw_dir: Path) -> Path:
-    safe_stamp = timestamp.replace("-", "").replace(":", "")
-    slug = _core_slugify(title.replace("Memory capture:", ""), fallback="session-notes")
-    base = f"{safe_stamp}-{slug}"
-    candidate = raw_dir / f"{base}.md"
-    counter = 2
-    while candidate.exists():
-        candidate = raw_dir / f"{base}-{counter}.md"
-        counter += 1
-    return candidate
-
-
 def capture_session(
     target: Path,
     source_input: str,
@@ -1826,11 +1803,11 @@ def capture_session(
 
     timestamp = _utc_timestamp()
     project_name = project or _default_project(root)
-    capture_title = _capture_title(text, source, title)
+    capture_title = _core_capture_title(text, source, title, default_source="inline", path_source=True)
     secret_warnings = _secret_value_warnings(text)
     capture_dir = root / "raw" / "memory-captures"
     capture_dir.mkdir(parents=True, exist_ok=True)
-    capture_path = _capture_filename(timestamp, capture_title, capture_dir)
+    capture_path = _core_capture_filename(timestamp, capture_title, capture_dir)
     project_line = f'project: "{_frontmatter_string(project_name)}"\n' if project_name else ""
     capture_path.write_text(
         f"""---

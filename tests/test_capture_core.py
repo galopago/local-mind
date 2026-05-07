@@ -3,15 +3,50 @@ import unittest
 from pathlib import Path
 
 from mcp_package.link_core.capture import (
+    capture_filename,
     capture_inbox,
     capture_notes_from_markdown,
     capture_records,
+    capture_title,
     mcp_capture_commands,
     resolve_capture_file,
 )
 
 
 class CaptureCoreTests(unittest.TestCase):
+    def test_capture_title_uses_explicit_title_first(self):
+        self.assertEqual(
+            capture_title("ignored", "inline", "  Sprint   planning notes  "),
+            "Sprint planning notes",
+        )
+
+    def test_capture_title_supports_cli_path_sources(self):
+        self.assertEqual(
+            capture_title("", "raw/first-memory.md", path_source=True),
+            "Memory capture: First Memory",
+        )
+
+    def test_capture_title_supports_mcp_source_labels(self):
+        self.assertEqual(
+            capture_title("", "daily standup", default_source="mcp"),
+            "Memory capture: daily standup",
+        )
+
+    def test_capture_title_falls_back_to_first_note_line(self):
+        self.assertEqual(
+            capture_title("\n\nRemember that Link is local agent memory.\nMore detail."),
+            "Memory capture: Remember that Link is local agent memory",
+        )
+
+    def test_capture_filename_is_unique_and_slugged(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-filename-"))
+        first = capture_filename("2026-05-06T01:02:03Z", "Memory capture: First Memory", root)
+        first.write_text("# first\n", encoding="utf-8")
+        second = capture_filename("2026-05-06T01:02:03Z", "Memory capture: First Memory", root)
+
+        self.assertEqual(first.name, "20260506T010203Z-first-memory.md")
+        self.assertEqual(second.name, "20260506T010203Z-first-memory-2.md")
+
     def test_resolve_capture_file_accepts_supported_root_relative_forms(self):
         root = Path(tempfile.mkdtemp(prefix="link-capture-core-"))
         capture_dir = root / "raw" / "memory-captures"
