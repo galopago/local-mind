@@ -1518,6 +1518,25 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Radial glow stays off in large overview mode except for focused nodes.", html)
         self.assertIn("ctx.fillStyle = fastRender ? color + '28' : color + '40';", html)
 
+    def test_graph_caps_default_overview_for_huge_visible_sets(self):
+        wiki = self.make_wiki()
+        for index in range(700):
+            write_page(
+                wiki,
+                f"concepts/topic-{index}.md",
+                "---\ntype: concept\ntitle: Topic\n---\n"
+                f"# Topic {index}\n\n[[topic-{(index + 1) % 700}]]\n",
+            )
+        reset_wiki(wiki)
+
+        html = serve._render_graph()
+
+        self.assertIn("var OVERVIEW_NODE_LIMIT = 650;", html)
+        self.assertIn("function capEligibleNodes(eligible)", html)
+        self.assertIn(".slice(0, OVERVIEW_NODE_LIMIT)", html)
+        self.assertIn("if (searchMatches(n)) keep[n.id] = true;", html)
+        self.assertIn("parts.push('overview capped');", html)
+
     def test_graph_labels_are_sparse_for_large_visible_sets(self):
         wiki = self.make_wiki()
         write_page(

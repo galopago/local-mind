@@ -1829,6 +1829,7 @@ def _render_graph():
   var LARGE_LABEL_LIMIT = 160;
   var FAST_RENDER_NODE_LIMIT = 450;
   var FAST_RENDER_EDGE_LIMIT = 1200;
+  var OVERVIEW_NODE_LIMIT = 650;
   var nodeById = {{}};
   nodes.forEach(function(n) {{ nodeById[n.id] = n; }});
 
@@ -1913,15 +1914,37 @@ def _render_graph():
     }}
     return seen;
   }}
+  function capEligibleNodes(eligible) {{
+    if (eligible.length <= OVERVIEW_NODE_LIMIT) return eligible;
+    var keep = {{}};
+    eligible
+      .slice()
+      .sort(function(a, b) {{
+        var degreeDiff = (degree[b.id] || 0) - (degree[a.id] || 0);
+        if (degreeDiff) return degreeDiff;
+        return String(a.title || a.id).localeCompare(String(b.title || b.id));
+      }})
+      .slice(0, OVERVIEW_NODE_LIMIT)
+      .forEach(function(n) {{ keep[n.id] = true; }});
+    eligible.forEach(function(n) {{
+      if (searchMatches(n)) keep[n.id] = true;
+      if (selectedNode && (n.id === selectedNode.id || isNeighbor(selectedNode.id, n.id))) keep[n.id] = true;
+    }});
+    return eligible.filter(function(n) {{ return keep[n.id]; }});
+  }}
   function visibleIds() {{
     if (visibleCache) return visibleCache;
     var byDepth = depthMap();
     var ids = {{}};
+    var eligible = [];
     nodes.forEach(function(n) {{
       var categoryOk = categoryValue === 'all' || n.category === categoryValue;
       var depthOk = !byDepth || byDepth[n.id] !== undefined;
       var keepSelected = selectedNode && selectedNode.id === n.id;
-      ids[n.id] = (categoryOk || keepSelected) && depthOk;
+      if ((categoryOk || keepSelected) && depthOk) eligible.push(n);
+    }});
+    capEligibleNodes(eligible).forEach(function(n) {{
+      ids[n.id] = true;
     }});
     visibleCache = ids;
     return ids;
@@ -1980,6 +2003,7 @@ def _render_graph():
     if (graphTooLargeForMotion()) parts.push('motion capped');
     if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');
     if (graphNeedsFastRender(currentNodes, currentEdges)) parts.push('fast render');
+    if (nodes.length > OVERVIEW_NODE_LIMIT && currentNodes.length < nodes.length) parts.push('overview capped');
     if (showAllLabels) parts.push('labels all');
     if (searchTerm) {{
       var matches = currentNodes.filter(searchMatches).length;
