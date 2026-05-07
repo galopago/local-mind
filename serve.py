@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Link — local wiki viewer. python serve.py → http://localhost:3000"""
 from __future__ import annotations
-import html, http.server, json, re, socketserver, sys, time, urllib.parse
+import errno, html, http.server, json, re, socketserver, sys, time, urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -3418,18 +3418,34 @@ def _parse_serve_port(argv: list[str], default: int = PORT) -> int:
                 port = int(arg.split("=", 1)[1])
             except ValueError as exc:
                 raise SystemExit("--port must be an integer") from exc
+    if port < 1 or port > 65535:
+        raise SystemExit("--port must be between 1 and 65535")
     return port
+
+
+def _serve_bind_error_message(exc: OSError, port: int) -> str:
+    if exc.errno in {errno.EADDRINUSE, 48, 98}:
+        next_port = port + 1 if port < 65535 else 3000
+        return (
+            f"Link could not start because localhost:{port} is already in use.\n"
+            f"Try another port, for example: python serve.py --port {next_port}"
+        )
+    return f"Link could not start local server on localhost:{port}: {exc}"
 
 
 def main():
     global PORT
     PORT = _parse_serve_port(sys.argv[1:], default=PORT)
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as s:
-        print(f"  Link → http://localhost:{PORT}")
-        print("  Local-only: bound to 127.0.0.1; no public host mode.")
-        try: s.serve_forever()
-        except KeyboardInterrupt: print("\n  stopped.")
+    try:
+        with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as s:
+            print(f"  Link → http://localhost:{PORT}")
+            print("  Local-only: bound to 127.0.0.1; no public host mode.")
+            try: s.serve_forever()
+            except KeyboardInterrupt: print("\n  stopped.")
+    except OSError as exc:
+        print(_serve_bind_error_message(exc, PORT), file=sys.stderr)
+        raise SystemExit(1) from exc
 
 
 if __name__ == "__main__":

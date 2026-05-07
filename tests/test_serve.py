@@ -283,9 +283,21 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(serve._parse_serve_port(["--port", "3010"], default=3000), 3010)
         self.assertEqual(serve._parse_serve_port(["--port=3011"], default=3000), 3011)
         with self.assertRaises(SystemExit):
+            serve._parse_serve_port(["--port", "0"], default=3000)
+        with self.assertRaises(SystemExit):
+            serve._parse_serve_port(["--port=65536"], default=3000)
+        with self.assertRaises(SystemExit):
             serve._parse_serve_port(["--host", "0.0.0.0"], default=3000)
         with self.assertRaises(SystemExit):
             serve._parse_serve_port(["--bind=0.0.0.0"], default=3000)
+
+    def test_server_bind_error_message_suggests_next_port(self):
+        message = serve._serve_bind_error_message(OSError(48, "Address already in use"), 3000)
+        high_port_message = serve._serve_bind_error_message(OSError(48, "Address already in use"), 65535)
+
+        self.assertIn("localhost:3000 is already in use", message)
+        self.assertIn("python serve.py --port 3001", message)
+        self.assertIn("python serve.py --port 3000", high_port_message)
 
     def test_home_page_shows_first_agent_prompts(self):
         self.make_wiki()
