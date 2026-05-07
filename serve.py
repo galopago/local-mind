@@ -2378,7 +2378,11 @@ def _render_ingest():
     pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
     represented = status.get("represented_raw") if isinstance(status.get("represented_raw"), list) else []
     safety = status.get("safety") if isinstance(status.get("safety"), dict) else {}
-    first_raw = str(pending[0].get("raw") or "raw/<file>") if pending else "raw/<file>"
+    plan_batch = plan.get("batch") if isinstance(plan.get("batch"), list) else []
+    plan_first = plan_batch[0] if plan_batch and isinstance(plan_batch[0], dict) else {}
+    first_raw = str(plan_first.get("raw") or "")
+    if not first_raw:
+        first_raw = str(pending[0].get("raw") or "raw/<file>") if pending else "raw/<file>"
     ingest_prompt = agent_prompt or f"ingest {first_raw} into Link"
     memory_prompt = str(plan.get("memory_prompt") or f"propose memories from {first_raw}")
     propose_href = "/propose?source=" + urllib.parse.quote(first_raw) if pending else "/propose"

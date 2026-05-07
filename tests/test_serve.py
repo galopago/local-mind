@@ -1096,6 +1096,10 @@ class ServeTests(unittest.TestCase):
         wiki = self.make_wiki()
         raw = wiki.parent / "raw"
         raw.mkdir()
+        (raw / "a-safe-note.md").write_text(
+            "# Safe note\n\nThis should stay available for memory proposals.\n",
+            encoding="utf-8",
+        )
         (raw / "secret-note.md").write_text(
             "# Secret note\n\nDo not ingest sk-" + ("a" * 25) + "\n",
             encoding="utf-8",
@@ -1117,6 +1121,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("redact secret-looking values in raw/secret-note.md before ingest", html)
         self.assertIn("secret warning: OpenAI API key", html)
         self.assertIn("redact before ingest", html)
+        self.assertIn('/propose?source=raw/a-safe-note.md', html)
         self.assertNotIn('/propose?source=raw/secret-note.md', html)
 
     def test_rebuild_backlinks_requires_json_post(self):
