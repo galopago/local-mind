@@ -674,14 +674,6 @@ def resolve_memory_page(
                 (record for record in record_list if str(record.get("name") or "") == candidate.stem),
                 None,
             )
-            if record is None:
-                record = next(
-                    (
-                        record for record in memory_records(wiki_dir)
-                        if str(record.get("name") or "") == candidate.stem
-                    ),
-                    None,
-                )
             return candidate, dict(record) if record else None, None
 
     lowered = needle.lower()

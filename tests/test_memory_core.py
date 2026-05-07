@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -551,6 +552,13 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(path, (memories / "prefer-focused-commits.md").resolve())
         self.assertEqual(record["title"], "Prefer focused commits")
+
+        with patch("link_core.memory.memory_records", return_value=[]) as mocked_records:
+            path, record, error = resolve_memory_page(wiki, "wiki/memories/prefer-focused-commits.md")
+        self.assertIsNone(error)
+        self.assertEqual(path, (memories / "prefer-focused-commits.md").resolve())
+        self.assertIsNone(record)
+        self.assertEqual(mocked_records.call_count, 1)
 
         path, record, error = resolve_memory_page(wiki, "../log.md")
         self.assertIsNone(path)
