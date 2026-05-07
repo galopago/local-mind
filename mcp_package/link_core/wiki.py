@@ -216,6 +216,7 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
         return []
     q_lower = q.lower()
     q_normalized = normalized_search_text(q)
+    query_tokens = [token for token in re.split(r"\W+", q_lower) if len(token) >= 3]
     pages = cache["pages"]
     page_map = cache["page_map"]
     token_index = cache["token_index"]
@@ -227,6 +228,17 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
     is_single_token = bool(re.match(r"^\w+$", q_lower))
     if is_single_token and q_lower in token_index:
         candidates = token_index[q_lower] | meta_token_index.get(q_lower, set())
+    elif query_tokens:
+        token_sets = [
+            token_index.get(token, set()) | meta_token_index.get(token, set())
+            for token in query_tokens
+            if token in token_index or token in meta_token_index
+        ]
+        if token_sets:
+            intersection = set.intersection(*token_sets)
+            candidates = intersection if intersection else set.union(*token_sets)
+        else:
+            candidates = {page["name"].lower() for page in pages}
     else:
         candidates = {page["name"].lower() for page in pages}
 
@@ -242,6 +254,16 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
         tags = page.get("tags", [])
         tldr = page.get("tldr", "")
         text_lower = fulltext.get(stem, "")
+        meta_words = set(re.split(
+            r"\W+",
+            normalized_search_text(" ".join([
+                str(page["title"]),
+                stem,
+                str(tldr),
+                " ".join(str(alias) for alias in aliases),
+                " ".join(str(tag) for tag in tags),
+            ])),
+        ))
 
         if q_lower in str(page["title"]).lower() or (q_normalized and q_normalized in title_normalized):
             score += 10
@@ -256,6 +278,14 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
         text_normalized = normalized_fulltext.get(stem, "")
         if text_lower and (q_lower in text_lower or (q_normalized and q_normalized in text_normalized)):
             score += 2
+        if query_tokens and all(token in meta_words for token in query_tokens):
+            score += 6
+        elif query_tokens and any(token in meta_words for token in query_tokens):
+            score += 1
+        if query_tokens and text_normalized:
+            text_words = set(re.split(r"\W+", text_normalized))
+            if all(token in text_words for token in query_tokens):
+                score += 2
         if score > 0:
             scored.append((score, {**page, "score": score, "snippet": snippet_index.get(stem, "")}))
 

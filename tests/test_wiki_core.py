@@ -86,6 +86,36 @@ class WikiCoreTests(unittest.TestCase):
         self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
         self.assertIn({"source": "agent-memory", "target": "retrieval"}, graph["edges"])
 
+    def test_multi_token_search_uses_token_relevance_without_exact_phrase(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/local-memory.md",
+            "---\ntype: concept\ntitle: Local Recall\n---\n\n"
+            "# Local Recall\n\n"
+            "Agent workflows keep durable project notes as private memory.\n",
+        )
+        write_page(
+            wiki,
+            "concepts/agent-only.md",
+            "---\ntype: concept\ntitle: Agent Runtime\n---\n\n"
+            "# Agent Runtime\n\n"
+            "Agent execution details without user preference storage.\n",
+        )
+        write_page(
+            wiki,
+            "concepts/memory-only.md",
+            "---\ntype: concept\ntitle: Memory Archive\n---\n\n"
+            "# Memory Archive\n\n"
+            "Memory storage details for archival notes.\n",
+        )
+
+        results = search_pages("agent memory", build_wiki_cache(wiki), limit=5)
+
+        self.assertEqual(results[0]["name"], "local-memory")
+        self.assertNotIn("agent-only", {result["name"] for result in results})
+        self.assertNotIn("memory-only", {result["name"] for result in results})
+
     def test_backlinks_loader_and_builder_shapes(self):
         wiki = self.make_wiki()
         write_page(
