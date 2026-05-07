@@ -1,15 +1,22 @@
-# Integrations
+# Link Integrations
 
-One-step setup for your AI tool. Default is global — one central wiki at `~/link/` that works across all projects.
+One-step setup for local agents. The default mode creates one central Link wiki
+at `~/link/` and teaches your agent how to use it as local personal memory.
 
 ## Quick start
 
 ```bash
 git clone https://github.com/gowtham0992/link.git ~/link-repo
-bash ~/link-repo/integrations/kiro/install.sh
+bash ~/link-repo/integrations/codex/install.sh
 ```
 
-That's it. Kiro now knows about Link in every project, and your wiki lives at `~/link/`.
+Pick the installer that matches your agent. After install, try:
+
+```text
+is Link ready?
+brief me from Link before we continue
+query Link for what you know about this project
+```
 
 ## All integrations
 
@@ -31,12 +38,17 @@ That's it. Kiro now knows about Link in every project, and your wiki lives at `~
 
 ## What the install does
 
-1. Writes a small instruction file for your tool (so it knows Link exists)
-2. Scaffolds wiki structure at `~/link/` (or current dir with `--project`)
-3. Installs or upgrades `link-mcp` using normal pip first, then `~/.link-mcp-venv` if system Python is externally managed
-4. Adds `~/.local/bin/link` for global installs, so local checks are short: `link status --validate`
+1. Upserts a small Link instruction block without overwriting your existing instructions.
+2. Scaffolds wiki structure at `~/link/` or the current directory with `--project`.
+3. Installs or upgrades `link-mcp`, using `~/.link-mcp-venv` when system Python is externally managed.
+4. Writes `.link-mcp-python` so clients can use the Python that actually has `link-mcp`.
+5. Adds `~/.local/bin/link` for global installs, so checks are short: `link status --validate`.
+6. Prints next prompts and verification commands for your install mode.
 
-The instruction file is minimal — it just tells the agent that Link exists and to read `LINK.md` when you say "ingest", "query", "lint", or "research". It doesn't interfere with normal coding work.
+The instruction file is intentionally small. It tells the agent to check
+`link_status`, use `query_link` for compact context, use `memory_brief` before
+personalized/project work, validate after ingest, and read `LINK.md` only when it
+needs the full local protocol.
 
 ## Uninstall
 
