@@ -84,6 +84,15 @@ from link_core.web_layout import (
     render_header_html as _core_render_header_html,
     render_layout as _core_render_layout,
 )
+from link_core.web_graph import (
+    GRAPH_CATEGORY_COLORS as _core_graph_category_colors,
+    GRAPH_INITIAL_SUMMARY_EDGE_LIMIT as _core_graph_initial_summary_edge_limit,
+    GRAPH_INITIAL_SUMMARY_NODE_LIMIT as _core_graph_initial_summary_node_limit,
+    graph_category_options as _core_graph_category_options,
+    graph_initial_payload as _core_graph_initial_payload,
+    graph_legend_items as _core_graph_legend_items,
+    graph_needs_bounded_overview as _core_graph_needs_bounded_overview,
+)
 from link_core.web_http import (
     is_allowed_static_file as _core_is_allowed_static_file,
     is_relative_to as _core_is_relative_to,
@@ -147,9 +156,6 @@ RAW_STATIC_TYPES = {
     ".svg": "image/svg+xml",
     ".pdf": "application/pdf",
 }
-GRAPH_INITIAL_FULL_NODE_LIMIT = 900
-GRAPH_INITIAL_SUMMARY_NODE_LIMIT = 250
-GRAPH_INITIAL_SUMMARY_EDGE_LIMIT = 1000
 
 # ---------------------------------------------------------------------------
 # In-memory caches — invalidated on each request by mtime check
@@ -1804,41 +1810,28 @@ def _render_explain_memory(identifier: str):
 
 def _render_graph():
     full_graph = _get_graph_data()
-    full_nodes = [n for n in full_graph["nodes"] if n["category"] != "root"]
-    full_ids = {n["id"] for n in full_nodes}
-    full_edges = [
-        e for e in full_graph["edges"]
-        if e["source"] in full_ids and e["target"] in full_ids
-    ]
-    total_node_count = len(full_nodes)
-    total_edge_count = len(full_edges)
-    graph_mode = "full"
-    graph_note = ""
-    candidate_edges = full_edges
-    if total_node_count > GRAPH_INITIAL_FULL_NODE_LIMIT:
+    summary_graph = None
+    if _core_graph_needs_bounded_overview(full_graph):
         summary = _get_graph_summary(
-            limit=GRAPH_INITIAL_SUMMARY_NODE_LIMIT,
+            limit=_core_graph_initial_summary_node_limit,
             depth=1,
-            max_edges=GRAPH_INITIAL_SUMMARY_EDGE_LIMIT,
+            max_edges=_core_graph_initial_summary_edge_limit,
         )
-        visible_nodes = list(summary.get("nodes", []))
-        candidate_edges = list(summary.get("edges", []))
-        graph_mode = "summary"
-        graph_note = (
-            f" Showing a fast overview of {len(visible_nodes)} high-signal nodes first; "
-            f"load the full graph only when you need every page."
-        )
-    else:
-        visible_nodes = full_nodes
-    visible_ids = {n["id"] for n in visible_nodes}
-    visible_edges = [
-        e for e in candidate_edges
-        if e["source"] in visible_ids and e["target"] in visible_ids
-    ]
+        summary_graph = {
+            "nodes": summary.get("nodes", []),
+            "edges": summary.get("edges", []),
+        }
+    graph_view = _core_graph_initial_payload(full_graph, summary_graph=summary_graph)
+    visible_nodes = graph_view["nodes"]
+    visible_edges = graph_view["edges"]
+    node_count = int(graph_view["node_count"])
+    edge_count = int(graph_view["edge_count"])
+    total_node_count = int(graph_view["total_node_count"])
+    total_edge_count = int(graph_view["total_edge_count"])
+    graph_mode = str(graph_view["graph_mode"])
+    graph_note = str(graph_view["graph_note"])
     nodes_json = _json_for_script(visible_nodes)
     edges_json = _json_for_script(visible_edges)
-    node_count = len(visible_nodes)
-    edge_count = len(visible_edges)
 
     if node_count == 0:
         body = (
@@ -1851,15 +1844,8 @@ def _render_graph():
         )
         return _layout("Knowledge Graph", body)
 
-    # Category → color mapping
-    cat_colors = {"concepts": "#4e79a7", "entities": "#f28e2b", "memories": "#edc948",
-                  "sources": "#59a14f", "comparisons": "#e15759",
-                  "explorations": "#76b7b2", "root": "#bab0ac"}
-    categories = sorted({str(n["category"]) for n in visible_nodes if n["category"] != "root"})
-    category_options = '<option value="all">all types</option>' + "".join(
-        f'<option value="{html.escape(category, quote=True)}">{html.escape(category)}</option>'
-        for category in categories
-    )
+    cat_colors = _core_graph_category_colors
+    category_options = _core_graph_category_options(visible_nodes)
 
     graph_js = f"""
 <script>
@@ -2704,10 +2690,7 @@ def _render_graph():
 }})();
 </script>"""
 
-    legend_items = "".join(
-        f'<span style="background:{c}"></span>{cat} '
-        for cat, c in cat_colors.items() if cat != "root"
-    )
+    legend_items = _core_graph_legend_items(cat_colors)
     load_full_button = ""
     if graph_mode != "full":
         load_full_button = (
