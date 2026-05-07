@@ -315,6 +315,10 @@ link memory-audit
 link verify-mcp
 ```
 
+`link verify-mcp` should report `Result: ready`. It checks the `link-mcp`
+package version, MCP SDK dependency, wiki path, and the config block your agent
+needs.
+
 Then ask your MCP-enabled agent:
 
 ```text
@@ -632,7 +636,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link validate [--strict]` | Validate agent-generated wiki pages after ingest: frontmatter, type/directory alignment, required sections, dead links, and backlink freshness. |
 | `link rebuild-index` | Regenerate `wiki/index.md` from current pages so the human-readable catalog is complete. |
 | `link rebuild-backlinks` | Regenerate `wiki/_backlinks.json`. |
-| `link verify-mcp` | Verify `link-mcp` import and print MCP config. |
+| `link verify-mcp` | Verify `link-mcp` version parity, MCP SDK dependency, wiki path, and print MCP config. |
 | `python3 link.py demo` | From a source checkout, create `./link-demo` with a pre-ingested sample wiki. |
 
 ## Privacy And Safety
