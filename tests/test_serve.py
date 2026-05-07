@@ -1321,6 +1321,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn("depthFilter.disabled = !selectedNode;", html)
         self.assertIn("Select a node before filtering by neighborhood.", html)
         self.assertIn("var LARGE_GRAPH_LIMIT = 350;", html)
+        self.assertIn("var LARGE_LABEL_LIMIT = 160;", html)
+        self.assertIn("function syncLabelsButton()", html)
         self.assertIn("function graphTooLargeForMotion()", html)
         self.assertIn("searchInput.addEventListener('input'", html)
 
@@ -1369,6 +1371,22 @@ class ServeTests(unittest.TestCase):
         self.assertIn("var animateFlow = !motionPaused && !graphTooLargeForMotion();", html)
         self.assertIn("if (activeEdge && animateFlow)", html)
         self.assertIn("if (shouldRunContinuously()) startLoop();", html)
+
+    def test_graph_labels_are_sparse_for_large_visible_sets(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n",
+        )
+
+        html = serve._render_graph()
+
+        self.assertIn("function graphTooLargeForDefaultLabels()", html)
+        self.assertIn("if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');", html)
+        self.assertIn("labelsButton.textContent = showAllLabels ? 'Hide labels'", html)
+        self.assertIn("var largeLabelSet = currentNodes.length > LARGE_LABEL_LIMIT;", html)
+        self.assertIn("var defaultSparseLabel = !largeLabelSet", html)
 
     def test_graph_script_embeds_titles_safely(self):
         wiki = self.make_wiki()

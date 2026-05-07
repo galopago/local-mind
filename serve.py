@@ -2746,6 +2746,7 @@ def _render_graph():
   var NODE_R = 6;
   var LABEL_FONT = '11px -apple-system, sans-serif';
   var LARGE_GRAPH_LIMIT = 350;
+  var LARGE_LABEL_LIMIT = 160;
   var nodeById = {{}};
   nodes.forEach(function(n) {{ nodeById[n.id] = n; }});
 
@@ -2854,6 +2855,14 @@ def _render_graph():
   function graphTooLargeForMotion() {{
     return visibleNodes().length > LARGE_GRAPH_LIMIT;
   }}
+  function graphTooLargeForDefaultLabels() {{
+    return visibleNodes().length > LARGE_LABEL_LIMIT;
+  }}
+  function syncLabelsButton() {{
+    if (!labelsButton) return;
+    labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
+    labelsButton.textContent = showAllLabels ? 'Hide labels' : (graphTooLargeForDefaultLabels() ? 'Show labels' : 'Labels');
+  }}
   function nodeRadius(n) {{
     if (n.category === 'sources') return 4.5;
     if (n.category === 'memories') return 6.4;
@@ -2884,6 +2893,8 @@ def _render_graph():
     if (categoryValue !== 'all') parts.push(categoryValue);
     if (depthValue !== 'all') parts.push('depth ' + depthValue);
     if (graphTooLargeForMotion()) parts.push('motion capped');
+    if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');
+    if (showAllLabels) parts.push('labels all');
     if (searchTerm) {{
       var matches = currentNodes.filter(searchMatches).length;
       parts.push(matches + ' match' + (matches === 1 ? '' : 'es'));
@@ -2892,6 +2903,7 @@ def _render_graph():
     if (locked) parts.push(locked + ' placed');
     if (selectedNode) parts.push('selected ' + selectedNode.id);
     status.textContent = parts.join(' · ');
+    syncLabelsButton();
   }}
 
   function syncDepthControl() {{
@@ -3023,6 +3035,7 @@ def _render_graph():
     var currentNodes = visibleNodes();
     var currentEdges = visibleEdges();
     var animateFlow = !motionPaused && !graphTooLargeForMotion();
+    var largeLabelSet = currentNodes.length > LARGE_LABEL_LIMIT;
 
     // Edges — double draw: blurred glow + sharp line + flow particle
     currentEdges.forEach(function(e) {{
@@ -3093,7 +3106,8 @@ def _render_graph():
 
       // Labels stay sparse until a node is hovered.
       var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
-      var showLabel = showAllLabels || matched || (hoverNode ? activeNode : (n.category !== 'sources' && degree[n.id] >= 2));
+      var defaultSparseLabel = !largeLabelSet && n.category !== 'sources' && degree[n.id] >= 2;
+      var showLabel = showAllLabels || selected || matched || (hoverNode ? activeNode : defaultSparseLabel);
       if (showLabel) {{
         ctx.font = LABEL_FONT;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -3313,7 +3327,8 @@ def _render_graph():
     }}
     if (e.key === 'l' || e.key === 'L') {{
       showAllLabels = !showAllLabels;
-      if (labelsButton) labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
+      syncLabelsButton();
+      updateStatus();
       drawSoon();
       e.preventDefault();
     }}
@@ -3322,7 +3337,8 @@ def _render_graph():
   if (resetButton) resetButton.addEventListener('click', resetView);
   if (labelsButton) labelsButton.addEventListener('click', function() {{
     showAllLabels = !showAllLabels;
-    labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
+    syncLabelsButton();
+    updateStatus();
     drawSoon();
   }});
   if (motionButton) motionButton.addEventListener('click', function() {{
@@ -3376,6 +3392,7 @@ def _render_graph():
   resize();
   if (motionPaused) {{ autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
+  syncLabelsButton();
   updateInspector();
   updateStatus();
   if (shouldRunContinuously()) startLoop();
