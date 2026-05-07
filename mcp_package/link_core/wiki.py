@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .files import atomic_write_text
+from .files import atomic_write_json, atomic_write_text
 from .frontmatter import parse_frontmatter
 from .search import (
     build_fts_index,
@@ -19,6 +19,7 @@ from .search import (
 
 
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
+PERSISTENT_CACHE_SCHEMA_VERSION = 1
 INDEX_CATEGORY_ORDER = (
     "memories",
     "concepts",
@@ -81,7 +82,110 @@ def _body_snippet(body: str) -> str:
     return body_lines[0][:200] if body_lines else ""
 
 
-def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
+def _markdown_page_paths(wiki_dir: Path) -> list[Path]:
+    return sorted(path for path in wiki_dir.rglob("*.md") if not path.name.startswith("."))
+
+
+def _persistent_cache_path(wiki_dir: Path) -> Path:
+    return wiki_dir.parent / ".link-cache" / f"wiki-cache-v{PERSISTENT_CACHE_SCHEMA_VERSION}.json"
+
+
+def _page_signatures(wiki_dir: Path, page_paths: list[Path]) -> list[dict[str, Any]]:
+    signatures: list[dict[str, Any]] = []
+    for path in page_paths:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        signatures.append({
+            "path": path.relative_to(wiki_dir).as_posix(),
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+            "mode": stat.st_mode,
+        })
+    return signatures
+
+
+def _load_persistent_records(
+    cache_path: Path,
+    signatures: list[dict[str, Any]],
+) -> list[dict[str, str]] | None:
+    try:
+        payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("schema_version") != PERSISTENT_CACHE_SCHEMA_VERSION:
+        return None
+    if payload.get("signatures") != signatures:
+        return None
+    records = payload.get("records")
+    if not isinstance(records, list):
+        return None
+    loaded: list[dict[str, str]] = []
+    for item in records:
+        if not isinstance(item, dict):
+            return None
+        rel = item.get("path")
+        text = item.get("text")
+        if not isinstance(rel, str) or not isinstance(text, str):
+            return None
+        loaded.append({"path": rel, "text": text})
+    return loaded
+
+
+def _write_persistent_records(
+    cache_path: Path,
+    signatures: list[dict[str, Any]],
+    records: list[dict[str, str]],
+) -> bool:
+    try:
+        atomic_write_json(
+            cache_path,
+            {
+                "schema_version": PERSISTENT_CACHE_SCHEMA_VERSION,
+                "signatures": signatures,
+                "records": records,
+            },
+        )
+    except OSError:
+        return False
+    return True
+
+
+def build_wiki_cache(wiki_dir: Path, *, use_persistent_cache: bool = True) -> dict[str, Any]:
+    use_persistent_cache = use_persistent_cache and wiki_dir.exists()
+    page_paths = _markdown_page_paths(wiki_dir)
+    signatures = _page_signatures(wiki_dir, page_paths)
+    persistent_cache_path = _persistent_cache_path(wiki_dir)
+    cache_records = (
+        _load_persistent_records(persistent_cache_path, signatures)
+        if use_persistent_cache
+        else None
+    )
+    cache_hit = cache_records is not None
+
+    records: list[dict[str, str]] = []
+    read_warnings: list[dict[str, str]] = []
+    if cache_records is not None:
+        records = cache_records
+    else:
+        for md in page_paths:
+            rel = md.relative_to(wiki_dir)
+            try:
+                text = md.read_text(encoding="utf-8", errors="replace")
+            except OSError as exc:
+                read_warnings.append({
+                    "page": f"wiki/{rel.as_posix()}",
+                    "error": str(exc) or exc.__class__.__name__,
+                })
+                continue
+            records.append({"path": rel.as_posix(), "text": text})
+    cache_written = False
+    if use_persistent_cache and not cache_hit and not read_warnings:
+        cache_written = _write_persistent_records(persistent_cache_path, signatures, records)
+
     pages: list[dict[str, Any]] = []
     page_index: dict[str, Path] = {}
     fulltext: dict[str, str] = {}
@@ -92,20 +196,11 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
     token_index: dict[str, set[str]] = {}
     meta_token_index: dict[str, set[str]] = {}
     raw_forward_links: dict[str, list[str]] = {}
-    read_warnings: list[dict[str, str]] = []
 
-    for md in sorted(wiki_dir.rglob("*.md")):
-        if md.name.startswith("."):
-            continue
-        rel = md.relative_to(wiki_dir)
-        try:
-            text = md.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
-            read_warnings.append({
-                "page": f"wiki/{rel.as_posix()}",
-                "error": str(exc) or exc.__class__.__name__,
-            })
-            continue
+    for record in records:
+        rel = Path(record["path"])
+        md = wiki_dir / rel
+        text = record["text"]
         meta, body = parse_frontmatter(text)
 
         title = str(meta.get("title") or _heading_title(body) or md.stem)
@@ -210,6 +305,13 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
         "search_backend": "sqlite-fts" if fts_index is not None else "token-index",
         "read_warning_count": len(read_warnings),
         "read_warnings": read_warnings,
+        "persistent_cache": {
+            "enabled": use_persistent_cache,
+            "hit": cache_hit,
+            "written": cache_written,
+            "path": str(persistent_cache_path),
+            "schema_version": PERSISTENT_CACHE_SCHEMA_VERSION,
+        },
     }
 
 

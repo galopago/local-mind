@@ -124,6 +124,63 @@ class WikiCoreTests(unittest.TestCase):
         self.assertEqual(cache["read_warnings"][0]["page"], "wiki/concepts/locked.md")
         self.assertIn("readable", cache["page_map"])
         self.assertNotIn("locked", cache["page_map"])
+        self.assertFalse((wiki.parent / ".link-cache/wiki-cache-v1.json").exists())
+
+    def test_build_wiki_cache_uses_persistent_page_records_when_unchanged(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n> **TLDR:** Durable context.\n",
+        )
+
+        first = build_wiki_cache(wiki)
+        self.assertFalse(first["persistent_cache"]["hit"])
+        self.assertTrue(first["persistent_cache"]["written"])
+        self.assertTrue((wiki.parent / ".link-cache/wiki-cache-v1.json").exists())
+
+        original_read_text = Path.read_text
+
+        def no_markdown_reads(path: Path, *args, **kwargs):
+            if path.suffix == ".md":
+                raise AssertionError("unchanged persistent cache should avoid markdown reads")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", no_markdown_reads):
+            second = build_wiki_cache(wiki)
+
+        self.assertTrue(second["persistent_cache"]["hit"])
+        self.assertIn("agent-memory", second["page_map"])
+        self.assertIn("durable", second["fulltext"]["agent-memory"])
+
+    def test_build_wiki_cache_invalidates_persistent_records_after_page_edit(self):
+        wiki = self.make_wiki()
+        page = write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n> **TLDR:** Old context.\n",
+        )
+        build_wiki_cache(wiki)
+        time.sleep(0.01)
+        page.write_text(
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n> **TLDR:** New context.\n",
+            encoding="utf-8",
+        )
+
+        cache = build_wiki_cache(wiki)
+
+        self.assertFalse(cache["persistent_cache"]["hit"])
+        self.assertIn("new context", cache["fulltext"]["agent-memory"])
+
+    def test_build_wiki_cache_does_not_create_persistent_cache_for_missing_wiki(self):
+        root = Path(tempfile.mkdtemp(prefix="link-wiki-core-"))
+        wiki = root / "missing-wiki"
+
+        cache = build_wiki_cache(wiki)
+
+        self.assertEqual(cache["pages"], [])
+        self.assertFalse(cache["persistent_cache"]["enabled"])
+        self.assertFalse((root / ".link-cache").exists())
 
     def test_graph_data_uses_cached_forward_links_without_rereading_pages(self):
         wiki = self.make_wiki()

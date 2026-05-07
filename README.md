@@ -348,6 +348,7 @@ raw sources -> agent ingest -> Markdown wiki -> backlinks/graph -> MCP recall
 | `wiki/memories/` | Preferences, decisions, project facts, and user context. |
 | `wiki/_backlinks.json` | Reverse and forward graph index for HTTP and MCP. |
 | `wiki/log.md` | Append-only audit trail of ingest, memory, and maintenance operations. |
+| `.link-cache/` | Ignored local performance cache derived from wiki pages; safe to delete. |
 
 You own the files. Agents maintain them.
 
@@ -720,6 +721,7 @@ local MCP credentials in a PR.
 link/
 ├── LINK.md              # schema and instructions for agents
 ├── raw/                 # source documents, ignored by git
+├── .link-cache/         # local derived cache, ignored by git
 ├── wiki/                # compiled knowledge, ignored by git except scaffolding
 │   ├── index.md         # master catalog
 │   ├── _backlinks.json  # reverse and forward link index
