@@ -67,6 +67,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added an interactive-readiness verdict and threshold warnings to `link benchmark` so larger local wikis are easier to evaluate.
 - Added shared benchmark health checks to the large-wiki smoke so user-facing and CI scale verdicts stay aligned.
 - Tightened ownership of generated search caches in CLI query and index rebuild paths so in-memory SQLite indexes are closed when short-lived operations finish.
+- Hardened smart query budget normalization so unexpected or oversized adapter values safely fall back to `medium`.
 - Added an explicit local HTTP API version header and status field for future integration compatibility.
 - Added wiki schema markers with safe `link migrate`/MCP `migrate_wiki` migrations for future local format changes.
 - Added first-run agent prompts to installer output so new users can immediately try brief, remember, and query workflows.

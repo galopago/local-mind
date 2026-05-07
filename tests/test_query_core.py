@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.memory import memory_records  # noqa: E402
-from link_core.query import query_link  # noqa: E402
+from link_core.query import normalize_budget, query_link  # noqa: E402
 from link_core.wiki import build_backlinks, build_wiki_cache  # noqa: E402
 
 
@@ -20,6 +20,13 @@ def write_page(wiki: Path, rel: str, text: str) -> None:
 
 
 class QueryCoreTests(unittest.TestCase):
+    def test_normalize_budget_accepts_only_bounded_known_values(self):
+        self.assertEqual(normalize_budget(" SMALL "), "small")
+        self.assertEqual(normalize_budget("large"), "large")
+        self.assertEqual(normalize_budget("x" * 1000), "medium")
+        self.assertEqual(normalize_budget(123), "medium")
+        self.assertEqual(normalize_budget(None), "medium")
+
     def test_query_link_returns_budgeted_memory_and_graph_context(self):
         root = Path(tempfile.mkdtemp(prefix="link-query-core-"))
         wiki = root / "wiki"

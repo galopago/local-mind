@@ -43,8 +43,8 @@ BUDGETS: dict[str, dict[str, int]] = {
 }
 
 
-def normalize_budget(value: str | None) -> str:
-    budget = (value or "medium").strip().lower()
+def normalize_budget(value: object | None) -> str:
+    budget = str(value if value is not None else "medium").strip().lower()[:20]
     return budget if budget in BUDGETS else "medium"
 
 
