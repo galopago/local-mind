@@ -172,6 +172,12 @@ from link_core.query import (
 from link_core.prompts import (
     starter_prompt_payload as _core_starter_prompt_payload,
 )
+from link_core.web_graph import (
+    GRAPH_INITIAL_SUMMARY_EDGE_LIMIT as _core_graph_initial_summary_edge_limit,
+    GRAPH_INITIAL_SUMMARY_NODE_LIMIT as _core_graph_initial_summary_node_limit,
+    graph_initial_payload as _core_graph_initial_payload,
+    graph_needs_bounded_overview as _core_graph_needs_bounded_overview,
+)
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
 )
@@ -2763,6 +2769,24 @@ def _timed(label: str, fn: Callable[[], object]) -> tuple[str, object, float]:
     return label, value, time.perf_counter() - start
 
 
+def _benchmark_graph_initial_payload(cache: dict[str, object], full_graph: object) -> dict[str, object]:
+    if not isinstance(full_graph, Mapping):
+        return _core_graph_initial_payload({"nodes": [], "edges": []})
+    summary_graph = None
+    if _core_graph_needs_bounded_overview(full_graph):
+        summary = _core_graph_summary(
+            cache,
+            limit=_core_graph_initial_summary_node_limit,
+            depth=1,
+            max_edges=_core_graph_initial_summary_edge_limit,
+        )
+        summary_graph = {
+            "nodes": summary.get("nodes", []),
+            "edges": summary.get("edges", []),
+        }
+    return _core_graph_initial_payload(full_graph, summary_graph=summary_graph)
+
+
 def benchmark(
     target: Path,
     query_text: str = "agent memory",
@@ -2807,10 +2831,16 @@ def benchmark(
     timings[label] = elapsed
     label, graph, elapsed = _timed("graph", lambda: _core_graph_data(cache))
     timings[label] = elapsed
+    label, graph_initial_payload, elapsed = _timed(
+        "graph_initial",
+        lambda: _benchmark_graph_initial_payload(cache, graph),
+    )
+    timings[label] = elapsed
 
     budget_report = packet.get("budget_report", {}) if isinstance(packet, dict) else {}
     graph_summary_info = graph_summary_payload if isinstance(graph_summary_payload, Mapping) else {}
     page_list_info = page_list_payload if isinstance(page_list_payload, Mapping) else {}
+    graph_initial_info = graph_initial_payload if isinstance(graph_initial_payload, Mapping) else {}
     payload = {
         "target": str(target),
         "wiki": str(wiki_dir),
@@ -2828,6 +2858,13 @@ def benchmark(
         "page_list": {
             "returned_count": page_list_info.get("returned_count", 0),
             "truncated": bool(page_list_info.get("truncated")),
+        },
+        "graph_initial": {
+            "mode": graph_initial_info.get("graph_mode", "unknown"),
+            "nodes": graph_initial_info.get("node_count", 0),
+            "edges": graph_initial_info.get("edge_count", 0),
+            "total_nodes": graph_initial_info.get("total_node_count", 0),
+            "total_edges": graph_initial_info.get("total_edge_count", 0),
         },
         "search_backend": str(cache.get("search_backend") or "token-index"),
         "search_results": len(results) if isinstance(results, list) else 0,
@@ -2851,6 +2888,7 @@ def benchmark(
     print(f"Search backend: {payload['search_backend']}")
     graph_summary_info = payload["graph_summary"]
     page_list_info = payload["page_list"]
+    graph_initial_info = payload["graph_initial"]
     print(f"Results: {payload['search_results']} search results · {payload['context_items']} context items")
     if isinstance(graph_summary_info, Mapping) and isinstance(page_list_info, Mapping):
         print(
@@ -2859,6 +2897,12 @@ def benchmark(
             f"{graph_summary_info.get('returned_edges', 0)} edges · "
             f"page list {page_list_info.get('returned_count', 0)} pages"
         )
+    if isinstance(graph_initial_info, Mapping):
+        print(
+            "Graph page initial load: "
+            f"{graph_initial_info.get('mode', 'unknown')} · "
+            f"{graph_initial_info.get('nodes', 0)}/{graph_initial_info.get('total_nodes', 0)} nodes"
+        )
     health = payload["health"]
     if isinstance(health, Mapping):
         print(f"Verdict: {health.get('label', 'unknown')}")
@@ -2866,7 +2910,7 @@ def benchmark(
             print(f"Health: {health.get('summary')}")
     print("")
     print("Timings")
-    for key in ("cache", "search", "query", "graph_summary", "page_list", "graph"):
+    for key in ("cache", "search", "query", "graph_summary", "page_list", "graph_initial", "graph"):
         print(f"- {key}: {payload['timings'][key]:.4f}s")
     if isinstance(health, Mapping) and health.get("warnings"):
         print("")

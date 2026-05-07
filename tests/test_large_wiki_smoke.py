@@ -133,8 +133,11 @@ class LargeWikiSmokeTests(unittest.TestCase):
         self.assertIn("thresholds_seconds", payload["health"])
         self.assertIn("graph_summary", payload["timings"])
         self.assertIn("page_list", payload["timings"])
+        self.assertIn("graph_initial", payload["timings"])
         self.assertLessEqual(payload["graph_summary"]["returned_nodes"], 40)
         self.assertEqual(payload["page_list"]["returned_count"], 100)
+        self.assertEqual(payload["graph_initial"]["mode"], "full")
+        self.assertEqual(payload["graph_initial"]["nodes"], payload["graph_initial"]["total_nodes"])
 
 
 if __name__ == "__main__":

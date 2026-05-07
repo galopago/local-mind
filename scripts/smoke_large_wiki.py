@@ -16,6 +16,12 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 from link_core.benchmark import benchmark_health  # noqa: E402
 from link_core.memory import memory_records  # noqa: E402
 from link_core.query import query_link  # noqa: E402
+from link_core.web_graph import (  # noqa: E402
+    GRAPH_INITIAL_SUMMARY_EDGE_LIMIT,
+    GRAPH_INITIAL_SUMMARY_NODE_LIMIT,
+    graph_initial_payload,
+    graph_needs_bounded_overview,
+)
 from link_core.wiki import (  # noqa: E402
     build_backlinks,
     build_wiki_cache,
@@ -32,6 +38,7 @@ DEFAULT_MAX_SECONDS = {
     "query": 5.0,
     "graph_summary": 1.0,
     "page_list": 0.5,
+    "graph_initial": 1.0,
     "graph": 3.0,
 }
 
@@ -138,6 +145,22 @@ def check_timing_thresholds(timings: dict[str, float], max_seconds: dict[str, fl
         )
 
 
+def initial_graph_payload_for_smoke(cache: dict[str, object], graph: dict[str, object]) -> dict[str, object]:
+    summary_graph = None
+    if graph_needs_bounded_overview(graph):
+        summary = graph_summary(
+            cache,
+            limit=GRAPH_INITIAL_SUMMARY_NODE_LIMIT,
+            depth=1,
+            max_edges=GRAPH_INITIAL_SUMMARY_EDGE_LIMIT,
+        )
+        summary_graph = {
+            "nodes": summary.get("nodes", []),
+            "edges": summary.get("edges", []),
+        }
+    return graph_initial_payload(graph, summary_graph=summary_graph)
+
+
 def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | None = None) -> dict[str, object]:
     wiki = build_large_wiki(work_dir, page_count)
     timings: dict[str, float] = {}
@@ -167,6 +190,11 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
     timings[label] = elapsed
     label, graph, elapsed = timed("graph", lambda: graph_data(cache))
     timings[label] = elapsed
+    label, initial_graph, elapsed = timed(
+        "graph_initial",
+        lambda: initial_graph_payload_for_smoke(cache, graph),
+    )
+    timings[label] = elapsed
 
     expected_pages = page_count + max(12, min(40, page_count // 20)) + max(16, min(40, page_count // 25)) + 2
     require(len(cache["pages"]) == expected_pages, f"expected {expected_pages} cached pages, got {len(cache['pages'])}")
@@ -181,6 +209,16 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
     require(page_list.get("truncated") is True, "page list did not report truncation for large wiki")
     require(len(graph["nodes"]) == expected_pages, f"expected {expected_pages} graph nodes, got {len(graph['nodes'])}")
     require(len(graph["edges"]) >= page_count * 2, "graph edge count is unexpectedly low")
+    visible_graph_nodes = [
+        node for node in graph.get("nodes", [])
+        if str(node.get("category") or "") != "root"
+    ]
+    if graph_needs_bounded_overview(graph):
+        require(initial_graph.get("graph_mode") == "summary", "large graph did not start with bounded overview")
+        require(initial_graph.get("node_count", 0) <= GRAPH_INITIAL_SUMMARY_NODE_LIMIT, "initial graph payload exceeded node cap")
+    else:
+        require(initial_graph.get("graph_mode") == "full", "small graph should start with full payload")
+    require(initial_graph.get("total_node_count") == len(visible_graph_nodes), "initial graph total node count is incorrect")
     max_seconds = max_seconds or DEFAULT_MAX_SECONDS
     check_timing_thresholds(timings, max_seconds)
 
@@ -200,6 +238,13 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
             "returned_count": page_list.get("returned_count", 0),
             "truncated": page_list.get("truncated", False),
         },
+        "graph_initial": {
+            "mode": initial_graph.get("graph_mode", "unknown"),
+            "nodes": initial_graph.get("node_count", 0),
+            "edges": initial_graph.get("edge_count", 0),
+            "total_nodes": initial_graph.get("total_node_count", 0),
+            "total_edges": initial_graph.get("total_edge_count", 0),
+        },
         "timings": {key: round(value, 4) for key, value in timings.items()},
         "max_seconds": max_seconds,
     }
@@ -218,6 +263,7 @@ def main() -> int:
     parser.add_argument("--max-query-seconds", type=float, default=DEFAULT_MAX_SECONDS["query"])
     parser.add_argument("--max-graph-summary-seconds", type=float, default=DEFAULT_MAX_SECONDS["graph_summary"])
     parser.add_argument("--max-page-list-seconds", type=float, default=DEFAULT_MAX_SECONDS["page_list"])
+    parser.add_argument("--max-graph-initial-seconds", type=float, default=DEFAULT_MAX_SECONDS["graph_initial"])
     parser.add_argument("--max-graph-seconds", type=float, default=DEFAULT_MAX_SECONDS["graph"])
     args = parser.parse_args()
 
@@ -232,6 +278,7 @@ def main() -> int:
         "query": args.max_query_seconds,
         "graph_summary": args.max_graph_summary_seconds,
         "page_list": args.max_page_list_seconds,
+        "graph_initial": args.max_graph_initial_seconds,
         "graph": args.max_graph_seconds,
     }
     try:

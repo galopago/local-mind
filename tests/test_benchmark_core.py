@@ -20,6 +20,7 @@ class BenchmarkCoreTests(unittest.TestCase):
                 "query": 0.03,
                 "graph_summary": 0.01,
                 "page_list": 0.01,
+                "graph_initial": 0.01,
                 "graph": 0.04,
             },
         }
@@ -42,6 +43,7 @@ class BenchmarkCoreTests(unittest.TestCase):
                 "query": 0.03,
                 "graph_summary": 0.01,
                 "page_list": 0.01,
+                "graph_initial": 0.01,
                 "graph": 0.04,
             },
         }
@@ -64,6 +66,7 @@ class BenchmarkCoreTests(unittest.TestCase):
                 "query": 0.03,
                 "graph_summary": 0.01,
                 "page_list": 0.01,
+                "graph_initial": 0.01,
                 "graph": 0.04,
             },
         }

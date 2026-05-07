@@ -10,6 +10,7 @@ BENCHMARK_THRESHOLDS_SECONDS = {
     "query": 3.0,
     "graph_summary": 1.0,
     "page_list": 0.5,
+    "graph_initial": 1.0,
     "graph": 2.0,
 }
 

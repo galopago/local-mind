@@ -44,6 +44,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `link serve` to start the local web viewer without remembering `serve.py` paths.
 - Added `link benchmark` to measure local cache, search, smart query, and graph timings on a user's current wiki.
 - Extended `link benchmark` and large-wiki smoke to prove bounded agent payload timings for graph summaries and page lists.
+- Extended `link benchmark` and large-wiki smoke to prove the graph page's initial browser payload stays bounded on huge wikis.
 - Made the local graph viewer start with a bounded overview for very large wikis, with an explicit full-graph load control.
 - Hardened local write APIs by rejecting browser `Origin`/`Referer` headers that do not point at the local Link viewer.
 - Added in-memory rate limiting for local write APIs so runaway local clients get structured JSON `429` responses with `Retry-After`.
