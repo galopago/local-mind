@@ -199,14 +199,16 @@ def _follow_up_actions(
 ) -> list[dict[str, object]]:
     actions: list[dict[str, object]] = []
     if any(bool(section.get("has_more")) for section in budget_report.values()):
-        args: dict[str, object] = {"query": query, "budget": _next_budget(budget_name)}
-        if project:
-            args["project"] = project
-        actions.append({
-            "when": "packet is relevant but too thin",
-            "tool": "query_link",
-            "arguments": args,
-        })
+        next_budget = _next_budget(budget_name)
+        if next_budget != budget_name:
+            args: dict[str, object] = {"query": query, "budget": next_budget}
+            if project:
+                args["project"] = project
+            actions.append({
+                "when": "packet is relevant but too thin",
+                "tool": "query_link",
+                "arguments": args,
+            })
     if primary:
         actions.append({
             "when": "need the full source-backed topic neighborhood",

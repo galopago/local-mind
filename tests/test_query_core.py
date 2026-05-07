@@ -149,6 +149,44 @@ class QueryCoreTests(unittest.TestCase):
         self.assertEqual(payload["follow_up"][0]["arguments"]["budget"], "medium")
         self.assertIn("budget-limited", payload["agent_guidance"][1])
 
+    def test_large_budget_followup_does_not_repeat_large_budget(self):
+        root = Path(tempfile.mkdtemp(prefix="link-query-core-"))
+        wiki = root / "wiki"
+        wiki.mkdir()
+        write_page(wiki, "index.md", "# Index\n")
+        write_page(wiki, "log.md", "# Log\n")
+        for index in range(12):
+            write_page(
+                wiki,
+                f"concepts/agent-memory-{index}.md",
+                "---\n"
+                "type: concept\n"
+                f"title: Agent memory {index}\n"
+                "tags: [agents, memory]\n"
+                "---\n\n"
+                f"# Agent memory {index}\n\n"
+                "> **TLDR:** Agents use durable memory.\n\n"
+                "## Overview\n\nAgent memory supports source-backed local recall.\n",
+            )
+        (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki)), encoding="utf-8")
+
+        payload = query_link(
+            wiki,
+            "agent memory",
+            build_wiki_cache(wiki),
+            memory_records(wiki),
+            budget="large",
+        )
+
+        self.assertTrue(payload["budget_report"]["wiki_search"]["has_more"])
+        self.assertFalse(
+            any(
+                action["tool"] == "query_link" and action.get("arguments", {}).get("budget") == "large"
+                for action in payload["follow_up"]
+            )
+        )
+        self.assertEqual(payload["follow_up"][0]["tool"], "get_context")
+
 
 if __name__ == "__main__":
     unittest.main()
