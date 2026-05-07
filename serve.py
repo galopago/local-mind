@@ -3251,11 +3251,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
 
-    def _json(self, data, status: int = 200):
+    def _json(self, data, status: int = 200, headers=None):
         encoded = json.dumps(data).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self._security_headers()
+        for key, value in (headers or {}).items():
+            self.send_header(str(key), str(value))
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         if not getattr(self, '_head_only', False):
@@ -3299,6 +3301,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "retry_after_seconds": retry_after,
             },
             status=429,
+            headers={"Retry-After": str(retry_after)},
         )
         return False
 

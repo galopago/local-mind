@@ -46,6 +46,11 @@ def write_page(wiki_dir: Path, rel: str, text: str) -> Path:
 
 
 def run_handler(method: str, path: str, body: bytes = b"", headers: dict[str, str] | None = None):
+    status, payload, _ = run_handler_with_headers(method, path, body, headers)
+    return status, payload
+
+
+def run_handler_with_headers(method: str, path: str, body: bytes = b"", headers: dict[str, str] | None = None):
     handler = object.__new__(serve.Handler)
     handler.command = method
     handler.path = path
@@ -66,10 +71,16 @@ def run_handler(method: str, path: str, body: bytes = b"", headers: dict[str, st
         raise ValueError(method)
     raw = handler.wfile.getvalue()
     header_bytes, _, body_bytes = raw.partition(b"\r\n\r\n")
-    status_line = header_bytes.splitlines()[0].decode("ascii")
+    header_lines = header_bytes.splitlines()
+    status_line = header_lines[0].decode("ascii")
     status = int(status_line.split()[1])
+    response_headers = {}
+    for line in header_lines[1:]:
+        key, _, value = line.decode("ascii").partition(":")
+        if key:
+            response_headers[key.strip()] = value.strip()
     payload = json.loads(body_bytes.decode("utf-8")) if body_bytes else None
-    return status, payload
+    return status, payload, response_headers
 
 
 def post_json(path: str, payload: dict[str, object], local_action: bool = True):
@@ -163,13 +174,19 @@ class ServeTests(unittest.TestCase):
         }
 
         first_status, first_payload = run_handler("POST", "/api/rebuild-backlinks", body=b"{}", headers=headers)
-        second_status, second_payload = run_handler("POST", "/api/rebuild-backlinks", body=b"{}", headers=headers)
+        second_status, second_payload, second_headers = run_handler_with_headers(
+            "POST",
+            "/api/rebuild-backlinks",
+            body=b"{}",
+            headers=headers,
+        )
 
         self.assertEqual(first_status, 200)
         self.assertTrue(first_payload["rebuilt"])
         self.assertEqual(second_status, 429)
         self.assertEqual(second_payload["error"], "local mutation rate limit exceeded")
         self.assertGreaterEqual(second_payload["retry_after_seconds"], 1)
+        self.assertEqual(second_headers["Retry-After"], str(second_payload["retry_after_seconds"]))
 
     def test_server_args_stay_local_only(self):
         self.assertEqual(serve._parse_serve_port(["--port", "3010"], default=3000), 3010)
