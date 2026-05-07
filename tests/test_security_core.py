@@ -1,6 +1,13 @@
 import unittest
+import tempfile
+from pathlib import Path
 
-from mcp_package.link_core.security import clean_text_input, redact_secret_values, secret_value_warnings
+from mcp_package.link_core.security import (
+    clean_text_input,
+    redact_secret_values,
+    secret_file_warnings,
+    secret_value_warnings,
+)
 
 
 class SecurityCoreTests(unittest.TestCase):
@@ -21,6 +28,23 @@ class SecurityCoreTests(unittest.TestCase):
         self.assertEqual(count, 1)
         self.assertNotIn(fake_key, redacted)
         self.assertIn("[redacted-secret]", redacted)
+
+    def test_secret_file_warnings_streams_across_chunks(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-security-core-"))
+        fake_key = "sk-" + "a" * 48
+        path = tmp / "large-ish-source.md"
+        path.write_text("safe text\n" + ("x" * 40) + " " + fake_key + "\n", encoding="utf-8")
+
+        warnings = secret_file_warnings(path, chunk_size=16, tail_size=80)
+
+        self.assertEqual(warnings, ["OpenAI API key"])
+
+    def test_secret_file_warnings_handles_missing_file(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-security-core-"))
+
+        warnings = secret_file_warnings(tmp / "missing.md")
+
+        self.assertEqual(warnings, [])
 
 
 if __name__ == "__main__":

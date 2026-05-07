@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .security import secret_value_warnings
+from .security import secret_file_warnings
 from .wiki import build_backlinks, load_backlinks_index
 
 
@@ -308,10 +308,7 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
             for source_name, source_text in source_texts.items()
             if rel in source_text
         ]
-        try:
-            warnings = secret_value_warnings(raw_path.read_text(encoding="utf-8", errors="replace"))
-        except OSError:
-            warnings = []
+        warnings = secret_file_warnings(raw_path)
         raw_secret_warning_count += len(warnings)
         item = {
             "raw": rel,

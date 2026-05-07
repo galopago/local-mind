@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 
 SECRET_VALUE_PATTERNS = (
@@ -31,6 +32,28 @@ def secret_value_warnings(text: str) -> list[str]:
         if pattern.search(text):
             warnings.append(label)
     return warnings
+
+
+def secret_file_warnings(path: Path, chunk_size: int = 65536, tail_size: int = 512) -> list[str]:
+    """Return secret-looking labels from a file without loading it all at once."""
+    found: set[str] = set()
+    read_size = max(1, chunk_size)
+    tail_len = max(0, tail_size)
+    tail = ""
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            while True:
+                chunk = handle.read(read_size)
+                if not chunk:
+                    break
+                text = tail + chunk
+                found.update(secret_value_warnings(text))
+                if len(found) == len(SECRET_VALUE_PATTERNS):
+                    break
+                tail = text[-tail_len:] if tail_len else ""
+    except OSError:
+        return []
+    return [label for label, _pattern in SECRET_VALUE_PATTERNS if label in found]
 
 
 def redact_secret_values(text: str, replacement: str = "[redacted-secret]") -> tuple[str, list[str], int]:
