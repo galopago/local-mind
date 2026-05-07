@@ -2088,6 +2088,7 @@ def _render_ingest():
     ingest_prompt = agent_prompt or f"ingest {first_raw} into Link"
     memory_prompt = str(plan.get("memory_prompt") or f"propose memories from {first_raw}")
     propose_href = "/propose?source=" + urllib.parse.quote(first_raw) if pending else "/propose"
+    state = str(guidance.get("state") or plan.get("state") or "unknown")
 
     stats = (
         f'<div class="home-stats">'
@@ -2109,6 +2110,35 @@ def _render_ingest():
             f'<code>{html.escape(str(command))}</code></div>'
         )
     actions = f'<div class="memory-actions">{action_rows}</div>' if action_rows else ""
+    if agent_prompt:
+        next_detail = "Copy this into your agent chat. The agent should ingest the raw source, rebuild indexes, and validate before reporting done."
+        next_code = agent_prompt
+        next_extra = (
+            f'<p>If the source contains preferences, decisions, or project facts, '
+            f'<a href="{html.escape(propose_href, quote=True)}">open memory proposals first</a>.</p>'
+        )
+    elif state == "stale_graph":
+        next_detail = "Repair the graph index before relying on search, context, or the graph view."
+        next_code = "link rebuild-backlinks && link validate"
+        next_extra = ""
+    elif state == "empty":
+        next_detail = "Add a note, article, transcript, or project file to raw/, then refresh this page."
+        next_code = "cp notes.md raw/ && link ingest-status"
+        next_extra = ""
+    elif state == "ready":
+        next_detail = "No ingest is pending. Ask Link for context, or add another source when there is new material."
+        next_code = 'link brief "current task"'
+        next_extra = ""
+    else:
+        next_detail = "Initialize or repair the Link folder before ingesting sources."
+        next_code = "link init && link status --validate"
+        next_extra = ""
+    next_html = (
+        f'<div class="memory-next"><strong>Next step</strong>'
+        f'<p>{html.escape(next_detail)}</p>'
+        f'<code>{html.escape(next_code)}</code>'
+        f'{next_extra}</div>'
+    )
     guide_html = (
         f'<section class="ingest-path" aria-label="Ingest path">'
         f'<article class="ingest-step"><span class="step-num">1</span>'
@@ -2179,6 +2209,7 @@ def _render_ingest():
         f'<h1>Ingest</h1>'
         f'<p class="summary">{html.escape(str(guidance.get("summary") or "Check raw source ingest state."))}</p>'
         f'{stats}'
+        f'{next_html}'
         f'{guide_html}'
         f'{actions}'
         f'{plan_html}'
