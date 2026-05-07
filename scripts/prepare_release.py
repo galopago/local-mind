@@ -187,7 +187,8 @@ def release_commands(version: str) -> list[str]:
         'python3 -c "from pathlib import Path; import shutil; shutil.rmtree(\'dist\', ignore_errors=True); [shutil.rmtree(p, ignore_errors=True) for p in Path(\'.\').glob(\'*.egg-info\')]"',
         "python3 -m build",
         "python3 -m twine check dist/*",
-        "TWINE_USERNAME=__token__ python3 -m twine upload dist/*",
+        f"TWINE_USERNAME=__token__ python3 -m twine upload dist/link_mcp-{version}*",
+        "mcp-publisher validate",
         "mcp-publisher publish",
     ]
 

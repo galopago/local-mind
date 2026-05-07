@@ -120,6 +120,8 @@ class PrepareReleaseTests(unittest.TestCase):
 
         self.assertIn('git tag -a v1.0.6 -m "v1.0.6"', commands)
         self.assertTrue(any("glob('*.egg-info')" in command for command in commands))
+        self.assertIn("TWINE_USERNAME=__token__ python3 -m twine upload dist/link_mcp-1.0.6*", commands)
+        self.assertIn("mcp-publisher validate", commands)
         self.assertIn("mcp-publisher publish", commands)
 
 
