@@ -936,6 +936,24 @@ class ServeTests(unittest.TestCase):
         self.assertTrue(payload["truncated"])
         self.assertEqual(payload["follow_up"][0]["tool"], "get_pages")
 
+    def test_page_links_payload_is_bounded_for_api_agents(self):
+        wiki = self.make_wiki()
+        (wiki / "_backlinks.json").write_text(
+            json.dumps({
+                "backlinks": {"hub": ["a", "b", "c", "d"]},
+                "forward": {"hub": ["e", "f", "g"]},
+            }),
+            encoding="utf-8",
+        )
+
+        payload, status = serve._page_links_payload("hub", limit=2)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["inbound_count"], 4)
+        self.assertEqual(payload["returned_inbound"], 2)
+        self.assertTrue(payload["truncated"])
+        self.assertEqual(payload["follow_up"][0]["tool"], "get_backlinks")
+
     def test_graph_tooltip_exists_before_graph_script(self):
         wiki = self.make_wiki()
         write_page(

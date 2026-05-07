@@ -122,7 +122,7 @@ memory. Use `propose_memories` or `capture_session` for proposal-only review.
 | `search_wiki(query, limit?)` | Ranked search — title (20pts), alias (8pts), tag (5pts), fulltext (2pts). Returns scores + snippets. |
 | `get_context(topic)` | **Primary tool.** Best matching page (full content) + inbound/forward graph links in one call. |
 | `get_pages(category?, type?, maturity?, limit?, offset?, include_all?)` | Bounded page metadata list with filters and follow-up pagination actions; set `include_all=true` only for explicit full metadata export. |
-| `get_backlinks(page_name)` | Inbound + forward links for a page. |
+| `get_backlinks(page_name, limit?, offset?, include_all?)` | Bounded inbound + forward links for a page, with total counts and follow-up pagination actions. |
 | `get_graph_summary(topic?, limit?, depth?, max_edges?)` | Bounded graph overview or topic neighborhood for large wikis and agent context budgets. |
 | `get_graph()` | Full graph export with all nodes + edges; prefer `get_graph_summary` first on large wikis. |
 | `rebuild_index()` | Regenerate `wiki/index.md` from current pages so the human-readable catalog stays complete. |

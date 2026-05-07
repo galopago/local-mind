@@ -585,6 +585,7 @@ Common endpoints:
 | `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
 | `GET /api/graph-summary?topic=<topic>&limit=40&depth=1` | Bounded graph overview or topic neighborhood for agents and large wikis. |
 | `GET /api/graph` | Nodes and edges for graph visualization. |
+| `GET /api/page-links?page=<name>&limit=100&offset=0` | Bounded inbound/forward links for one page, with follow-up pagination actions. |
 | `POST /api/rebuild-backlinks` | Header `X-Link-Local-Action: true`; rebuild `_backlinks.json` by scanning wikilinks. |
 | `POST /api/rebuild-index` | Header `X-Link-Local-Action: true`; regenerate `wiki/index.md` from current pages. |
 

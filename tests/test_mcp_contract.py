@@ -245,10 +245,20 @@ class McpContractTests(unittest.TestCase):
         payload = json.loads(self.server.get_backlinks("agent-memory"))
 
         self.assertEqual(payload["page"], "agent-memory")
+        self.assertEqual(payload["inbound_count"], 10)
+        self.assertEqual(payload["forward_count"], 5)
         self.assertEqual(len(payload["inbound"]), 10)
         self.assertEqual(len(payload["forward"]), 5)
         self.assertIn("link", payload["inbound"])
         self.assertIn("agent-memory-session", payload["forward"])
+
+    def test_get_backlinks_is_bounded_for_large_agent_contexts(self):
+        payload = json.loads(self.server.get_backlinks("agent-memory", limit=3))
+
+        self.assertEqual(payload["inbound_count"], 10)
+        self.assertEqual(payload["returned_inbound"], 3)
+        self.assertTrue(payload["truncated"])
+        self.assertEqual(payload["follow_up"][0]["tool"], "get_backlinks")
 
     def test_get_backlinks_rejects_empty_page_name(self):
         payload = json.loads(self.server.get_backlinks(""))

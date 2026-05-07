@@ -168,6 +168,7 @@ from link_core.wiki import (
     graph_summary as _core_graph_summary,
     list_pages as _core_list_pages,
     load_backlinks_index as _core_load_backlinks_index,
+    page_link_summary as _core_page_link_summary,
     rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
     wiki_mtime as _core_wiki_mtime,
@@ -1274,14 +1275,19 @@ def get_pages(
 
 
 @mcp.tool()
-def get_backlinks(page_name: str) -> str:
-    """Get all pages that link to or from a given wiki page.
+def get_backlinks(page_name: str, limit: int = 100, offset: int = 0, include_all: bool = False) -> str:
+    """Get pages that link to or from a given wiki page, bounded by default.
 
     Returns:
     - inbound: pages that link TO this page (who references it)
     - forward: pages this page links TO (what it references)
+    - inbound_count / forward_count: total available link counts
+    - returned_inbound / returned_forward: returned link counts
+    - follow_up: pagination and context actions when truncated
 
     Useful for understanding a page's position in the knowledge graph.
+    Set include_all=true only when the user explicitly asks for a full link
+    export.
     """
     backlinks, error = _core_load_backlinks_index(WIKI_DIR / "_backlinks.json", missing_error="backlinks not built — run rebuild_backlinks first")
     if error:
@@ -1291,12 +1297,16 @@ def get_backlinks(page_name: str) -> str:
     if not page_name:
         return json.dumps({"error": "page_name required", "inbound": [], "forward": []})
 
-    name = page_name.lower().replace(" ", "-")
-    return json.dumps({
-        "page": page_name,
-        "inbound": backlinks.get("backlinks", {}).get(name, []),
-        "forward": backlinks.get("forward", {}).get(name, []),
-    }, ensure_ascii=False)
+    return json.dumps(
+        _core_page_link_summary(
+            backlinks,
+            page_name,
+            limit=limit,
+            offset=offset,
+            include_all=include_all,
+        ),
+        ensure_ascii=False,
+    )
 
 
 @mcp.tool()

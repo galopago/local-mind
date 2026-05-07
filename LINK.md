@@ -589,6 +589,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 | `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call |
 | `GET /api/graph-summary?topic=<topic>&limit=40&depth=1` | Bounded graph overview or topic neighborhood for agents and large wikis |
 | `GET /api/graph` | All nodes + edges for graph visualization/export |
+| `GET /api/page-links?page=<name>&limit=100&offset=0` | Bounded inbound/forward links for one page, with follow-up pagination actions |
 | `GET /api/backlinks` | Reverse link index |
 | `POST /api/rebuild-index` | JSON `{}`; regenerate `wiki/index.md` from current pages |
 | `POST /api/rebuild-backlinks` | JSON `{}`; rebuild `_backlinks.json` by scanning all wikilinks |

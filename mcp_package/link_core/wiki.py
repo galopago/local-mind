@@ -674,6 +674,66 @@ def list_pages(
     }
 
 
+def page_link_summary(
+    backlinks_data: dict[str, dict[str, list[str]]],
+    page_name: str,
+    limit: int = 100,
+    offset: int = 0,
+    include_all: bool = False,
+) -> dict[str, Any]:
+    """Return bounded inbound/forward links for one page."""
+    display_name = str(page_name or "").strip()
+    name = display_name.lower().replace(" ", "-")
+    limit = _bounded_int(limit, 100, 1, 1000)
+    inbound_all = list(backlinks_data.get("backlinks", {}).get(name, []))
+    forward_all = list(backlinks_data.get("forward", {}).get(name, []))
+    max_count = max(len(inbound_all), len(forward_all))
+    offset = _bounded_int(offset, 0, 0, max(max_count, 0))
+
+    if include_all:
+        inbound = inbound_all[offset:]
+        forward = forward_all[offset:]
+        effective_limit: int | None = None
+    else:
+        inbound = inbound_all[offset: offset + limit]
+        forward = forward_all[offset: offset + limit]
+        effective_limit = limit
+
+    next_offset = offset + max(len(inbound), len(forward))
+    truncated = next_offset < max_count
+    follow_up: list[dict[str, Any]] = []
+    if truncated:
+        follow_up.append({
+            "tool": "get_backlinks",
+            "arguments": {
+                "page_name": display_name,
+                "limit": limit,
+                "offset": next_offset,
+            },
+        })
+    follow_up.append({"tool": "get_context", "arguments": {"topic": display_name}})
+    follow_up.append({"tool": "get_graph_summary", "arguments": {"topic": display_name}})
+
+    return {
+        "page": display_name,
+        "key": name,
+        "inbound_count": len(inbound_all),
+        "forward_count": len(forward_all),
+        "returned_inbound": len(inbound),
+        "returned_forward": len(forward),
+        "offset": offset,
+        "limit": effective_limit,
+        "truncated": truncated,
+        "inbound": inbound,
+        "forward": forward,
+        "agent_guidance": [
+            "This page link list may be paginated for context safety.",
+            "Use get_context or query_link when you need source-backed content, not only graph links.",
+        ],
+        "follow_up": follow_up,
+    }
+
+
 def _index_pages(cache: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         page for page in cache["pages"]

@@ -105,6 +105,7 @@ from link_core.wiki import (
     graph_summary as _core_graph_summary,
     list_pages as _core_list_pages,
     load_backlinks_index as _core_load_backlinks_index,
+    page_link_summary as _core_page_link_summary,
     rebuild_index as _core_rebuild_index,
     search_pages as _core_search_pages,
     wiki_mtime as _core_wiki_mtime,
@@ -261,6 +262,26 @@ def _page_list_payload(
 
 def _load_backlinks_index() -> tuple[dict, str | None]:
     return _core_load_backlinks_index(WIKI_DIR / "_backlinks.json")
+
+
+def _page_links_payload(
+    page_name: str,
+    limit: int = 100,
+    offset: int = 0,
+    include_all: bool = False,
+) -> tuple[dict, int]:
+    backlinks, error = _load_backlinks_index()
+    if error:
+        return {"error": error}, 500
+    if not page_name.strip():
+        return {"error": "page parameter required", "inbound": [], "forward": []}, 400
+    return _core_page_link_summary(
+        backlinks,
+        page_name,
+        limit=limit,
+        offset=offset,
+        include_all=include_all,
+    ), 200
 
 
 def _parse_search_limit(raw: str) -> tuple[int | None, str | None]:
@@ -2951,6 +2972,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": error}, status=500)
             else:
                 self._json(data)
+        elif path == "/api/page-links":
+            limit, limit_error = _core_parse_bounded_int(query.get("limit", ["100"])[0], "limit", 100, 1, 1000)
+            offset, offset_error = _core_parse_bounded_int(query.get("offset", ["0"])[0], "offset", 0, 0, 1000000)
+            error = limit_error or offset_error
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                assert limit is not None
+                assert offset is not None
+                payload, status = _page_links_payload(
+                    query.get("page", [""])[0] or query.get("page_name", [""])[0],
+                    limit=limit,
+                    offset=offset,
+                    include_all=query.get("all", ["false"])[0].lower() in {"1", "true", "yes"},
+                )
+                self._json(payload, status=status)
         elif path == "/api/rebuild-backlinks":
             self._json({"error": "use POST with JSON body: {}"}, status=405)
         elif path == "/api/rebuild-index":

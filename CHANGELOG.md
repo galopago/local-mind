@@ -70,6 +70,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added bounded graph summaries through CLI, HTTP, and MCP so agents can inspect large graph structure without loading every node and edge into context.
 - Made graph edge construction cache-backed so large graph rendering/export avoids rereading every Markdown page after cache warmup.
 - Added bounded page-list payloads for MCP and HTTP so agents can inspect page metadata without dumping very large wikis into context.
+- Added bounded backlink/page-link payloads for MCP and HTTP so hub pages do not flood agent context.
 - Added a short local-server cache poll interval so hot navigation reuses the warmed wiki cache instead of rescanning every page for each request.
 - Added duplicate protection for `remember`/`remember_memory`; strong duplicate memories are refused unless explicitly allowed.
 - Added memory merge/update workflow with `update-memory` and MCP `update_memory`, including update counts, audit logs, backlink rebuilds, and review reset.

@@ -20,6 +20,7 @@ from link_core.wiki import (  # noqa: E402
     graph_summary,
     list_pages,
     load_backlinks_index,
+    page_link_summary,
     rebuild_index,
     search_pages,
     wiki_mtime,
@@ -244,6 +245,26 @@ class WikiCoreTests(unittest.TestCase):
         self.assertEqual(body_only["backlinks"], {"b": ["a"]})
         self.assertEqual(body_only["forward"], {"a": ["b"]})
         self.assertIn("frontmatter-only", full_text["backlinks"])
+
+    def test_page_link_summary_is_bounded_and_paginated(self):
+        backlinks = {
+            "backlinks": {"hub": ["a", "b", "c", "d"]},
+            "forward": {"hub": ["e", "f", "g"]},
+        }
+
+        first = page_link_summary(backlinks, "hub", limit=2)
+        second = page_link_summary(backlinks, "hub", limit=2, offset=2)
+        full = page_link_summary(backlinks, "hub", limit=2, include_all=True)
+
+        self.assertEqual(first["inbound_count"], 4)
+        self.assertEqual(first["returned_inbound"], 2)
+        self.assertEqual(first["returned_forward"], 2)
+        self.assertTrue(first["truncated"])
+        self.assertEqual(first["follow_up"][0]["arguments"]["offset"], 2)
+        self.assertEqual(second["inbound"], ["c", "d"])
+        self.assertEqual(second["forward"], ["g"])
+        self.assertEqual(full["returned_inbound"], 4)
+        self.assertFalse(full["truncated"])
 
     def test_wiki_mtime_sees_existing_page_edits(self):
         wiki = self.make_wiki()
