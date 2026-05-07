@@ -45,6 +45,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Optimized ingest status source matching with a reverse raw-path index instead of a raw-file by source-page nested scan.
 - Removed a redundant memory index reread from direct memory resolution paths.
 - Reused cached forward-link data during context retrieval to avoid an extra primary-page disk read.
+- Folded validation backlink comparison into the validation page scan so Markdown pages are read once per validation pass.
 - Added MCP `link_status` and `/api/status` for a compact readiness summary with version, wiki path, page/memory counts, optional validation, and safe next actions.
 - Added search backend reporting to Link status payloads so agents and users can see whether local search is using SQLite FTS or the token fallback.
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.

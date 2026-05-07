@@ -51,10 +51,30 @@ class ValidationCoreTests(unittest.TestCase):
         )
         (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki, body_only=False)), encoding="utf-8")
 
-        payload = validate_wiki(wiki)
+        read_counts: dict[str, int] = {}
+        original_read_text = Path.read_text
+        resolved_wiki = wiki.resolve()
+
+        def counting_read_text(path: Path, *args, **kwargs):
+            if path.suffix == ".md":
+                rel = path.relative_to(resolved_wiki).as_posix()
+                read_counts[rel] = read_counts.get(rel, 0) + 1
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", counting_read_text):
+            payload = validate_wiki(wiki)
 
         self.assertTrue(payload["passed"])
         self.assertEqual(payload["error_count"], 0)
+        self.assertEqual(
+            read_counts,
+            {
+                "concepts/example-concept.md": 1,
+                "index.md": 1,
+                "log.md": 1,
+                "sources/example-source.md": 1,
+            },
+        )
 
     def test_validate_wiki_rejects_malformed_agent_pages(self):
         wiki = self.make_wiki()

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .frontmatter import parse_frontmatter
-from .wiki import WIKILINK_RE, build_backlinks, load_backlinks_index
+from .wiki import WIKILINK_RE, load_backlinks_index
 
 
 TYPE_DIRECTORIES = {
@@ -71,10 +71,6 @@ def _markdown_pages(wiki_dir: Path) -> list[Path]:
     return sorted(path for path in wiki_dir.rglob("*.md") if not path.name.startswith("."))
 
 
-def _page_stems(wiki_dir: Path) -> set[str]:
-    return {path.stem.lower() for path in _markdown_pages(wiki_dir)}
-
-
 def _normalize_links(index: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:
     return {
         "backlinks": {
@@ -86,6 +82,24 @@ def _normalize_links(index: dict[str, dict[str, list[str]]]) -> dict[str, dict[s
             for key, value in index.get("forward", {}).items()
         },
     }
+
+
+def _add_links_to_index(
+    source: str,
+    text: str,
+    backlinks: dict[str, list[str]],
+    forward_links: dict[str, list[str]],
+) -> None:
+    for match in WIKILINK_RE.finditer(text):
+        target = match.group(1).strip().lower()
+        if not target or target == source:
+            continue
+        backlinks.setdefault(target, [])
+        if source not in backlinks[target]:
+            backlinks[target].append(source)
+        forward_links.setdefault(source, [])
+        if target not in forward_links[source]:
+            forward_links[source].append(target)
 
 
 def validate_wiki(wiki_dir: Path, *, strict: bool = False) -> dict[str, Any]:
@@ -104,17 +118,25 @@ def validate_wiki(wiki_dir: Path, *, strict: bool = False) -> dict[str, Any]:
             rel = path.name if path == wiki_dir else path.relative_to(wiki_dir).as_posix()
             findings.append(_finding("error", "missing_required_path", rel, f"Missing required path: {rel}"))
 
-    stems = _page_stems(wiki_dir)
+    pages = _markdown_pages(wiki_dir)
+    stems = {path.stem.lower() for path in pages}
     unreadable_pages: set[str] = set()
-    for page in _markdown_pages(wiki_dir):
+    expected_backlinks: dict[str, dict[str, list[str]]] = {"backlinks": {}, "forward": {}}
+    for page in pages:
         rel = page.relative_to(wiki_dir).as_posix()
-        if rel in {"index.md", "log.md"}:
-            continue
         try:
             text = page.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
             unreadable_pages.add(rel)
             findings.append(_finding("error", "unreadable_page", rel, f"Could not read wiki page: {exc}"))
+            continue
+        _add_links_to_index(
+            page.stem.lower(),
+            text,
+            expected_backlinks["backlinks"],
+            expected_backlinks["forward"],
+        )
+        if rel in {"index.md", "log.md"}:
             continue
         meta, body = parse_frontmatter(text)
         top_dir = rel.split("/", 1)[0]
@@ -161,13 +183,8 @@ def validate_wiki(wiki_dir: Path, *, strict: bool = False) -> dict[str, Any]:
     if backlink_error:
         findings.append(_finding("error", "invalid_backlinks", "_backlinks.json", backlink_error))
     elif not unreadable_pages:
-        try:
-            expected_backlinks = build_backlinks(wiki_dir, body_only=False)
-        except OSError as exc:
-            findings.append(_finding("error", "backlink_rebuild_failed", "_backlinks.json", f"Could not rebuild backlinks: {exc}"))
-        else:
-            if _normalize_links(backlinks) != _normalize_links(expected_backlinks):
-                findings.append(_finding("error", "stale_backlinks", "_backlinks.json", "Backlink index is stale; run rebuild-backlinks."))
+        if _normalize_links(backlinks) != _normalize_links(expected_backlinks):
+            findings.append(_finding("error", "stale_backlinks", "_backlinks.json", "Backlink index is stale; run rebuild-backlinks."))
 
     error_count = sum(1 for finding in findings if finding["severity"] == "error")
     warning_count = sum(1 for finding in findings if finding["severity"] == "warning")
