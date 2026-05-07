@@ -2910,6 +2910,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             headers={"Allow": "GET, HEAD, POST"},
         )
 
+    def do_PUT(self):
+        self._method_not_allowed()
+
+    def do_PATCH(self):
+        self._method_not_allowed()
+
+    def do_DELETE(self):
+        self._method_not_allowed()
+
     def do_POST(self):
         self._head_only = False
         if not self._require_allowed_host():
@@ -3332,6 +3341,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             headers={"Retry-After": str(retry_after)},
         )
         return False
+
+    def _method_not_allowed(self) -> None:
+        self._head_only = False
+        if not self._require_allowed_host():
+            return
+        self._json(
+            {"error": "method not allowed; Link supports GET, HEAD, and POST"},
+            status=405,
+            headers={"Allow": "GET, HEAD, POST"},
+        )
 
     def _read_json_body(self) -> tuple[dict | None, str | None, int]:
         content_type = self.headers.get("Content-Type", "")

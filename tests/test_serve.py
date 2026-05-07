@@ -69,6 +69,12 @@ def run_handler_with_headers(method: str, path: str, body: bytes = b"", headers:
         handler.do_GET()
     elif method == "OPTIONS":
         handler.do_OPTIONS()
+    elif method == "PUT":
+        handler.do_PUT()
+    elif method == "PATCH":
+        handler.do_PATCH()
+    elif method == "DELETE":
+        handler.do_DELETE()
     else:
         raise ValueError(method)
     raw = handler.wfile.getvalue()
@@ -212,6 +218,17 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["error"], "CORS preflight is not supported; Link is localhost-only")
         self.assertEqual(headers["Allow"], "GET, HEAD, POST")
         self.assertNotIn("Access-Control-Allow-Origin", headers)
+
+    def test_unsupported_methods_return_hardened_json_405(self):
+        self.make_wiki()
+
+        for method in ("PUT", "PATCH", "DELETE"):
+            status, payload, headers = run_handler_with_headers(method, "/api/status")
+            self.assertEqual(status, 405)
+            self.assertEqual(payload["error"], "method not allowed; Link supports GET, HEAD, and POST")
+            self.assertEqual(headers["Allow"], "GET, HEAD, POST")
+            self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
+            self.assertIn("Content-Security-Policy", headers)
 
     def test_server_args_stay_local_only(self):
         self.assertEqual(serve._parse_serve_port(["--port", "3010"], default=3000), 3010)
