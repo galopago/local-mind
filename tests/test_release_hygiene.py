@@ -192,6 +192,11 @@ class ReleaseHygieneTests(unittest.TestCase):
             Path("README.md"),
             "https://example.com is allowed in docs.\n",
         )
+        release_hygiene.check_outbound_network_hygiene(
+            findings,
+            Path("scripts/smoke_http_viewer.py"),
+            "import socket\nimport urllib.request\n",
+        )
 
         self.assertIn("outbound network code in mcp_package/link_core/example.py: requests import", findings)
         self.assertIn("outbound network code in integrations/example/install.sh: curl command", findings)

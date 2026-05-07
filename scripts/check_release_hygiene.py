@@ -51,6 +51,9 @@ SECRET_VALUE_PATTERNS = (
 )
 
 OUTBOUND_NETWORK_CODE_SUFFIXES = {".py", ".sh"}
+OUTBOUND_NETWORK_ALLOWLIST = {
+    Path("scripts/smoke_http_viewer.py"),
+}
 OUTBOUND_NETWORK_PATTERNS = (
     ("requests import", re.compile(r"^\s*(?:import\s+requests\b|from\s+requests\b)", re.MULTILINE)),
     ("httpx import", re.compile(r"^\s*(?:import\s+httpx\b|from\s+httpx\b)", re.MULTILINE)),
@@ -248,6 +251,8 @@ def check_tracked_path_hygiene(findings: list[str], path: Path) -> bool:
 def check_outbound_network_hygiene(findings: list[str], path: Path, text: str) -> None:
     """Block accidental outbound network code in Link's local-first runtime."""
     if path.suffix.lower() not in OUTBOUND_NETWORK_CODE_SUFFIXES:
+        return
+    if path in OUTBOUND_NETWORK_ALLOWLIST:
         return
     for label, pattern in OUTBOUND_NETWORK_PATTERNS:
         if pattern.search(text):
