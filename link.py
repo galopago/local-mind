@@ -3152,8 +3152,17 @@ def memory_audit(target: Path, limit: int = 10, project: str | None = None, json
 
 def _check_link_mcp_import(python_cmd: str) -> dict[str, object]:
     code = (
-        "import json, link_mcp; "
-        "print(json.dumps({'installed': True, 'version': getattr(link_mcp, '__version__', 'unknown')}))"
+        "import json\n"
+        "status = {'installed': False, 'version': None, 'mcp_sdk': False, 'error': None}\n"
+        "try:\n"
+        "    import link_mcp\n"
+        "    status['installed'] = True\n"
+        "    status['version'] = getattr(link_mcp, '__version__', 'unknown')\n"
+        "    from mcp.server.fastmcp import FastMCP\n"
+        "    status['mcp_sdk'] = True\n"
+        "except Exception as exc:\n"
+        "    status['error'] = str(exc)\n"
+        "print(json.dumps(status))\n"
     )
     try:
         result = subprocess.run(
@@ -3175,7 +3184,8 @@ def _check_link_mcp_import(python_cmd: str) -> dict[str, object]:
     return {
         "installed": bool(data.get("installed")),
         "version": data.get("version") or "unknown",
-        "error": None,
+        "mcp_sdk": bool(data.get("mcp_sdk")),
+        "error": data.get("error"),
     }
 
 
@@ -3217,8 +3227,9 @@ def verify_mcp(
     wiki_exists = wiki_dir.exists() and wiki_dir.is_dir()
     config = _mcp_config(python_cmd, wiki_dir)
     installed_version = str(import_status.get("version") or "")
+    mcp_sdk_ready = bool(import_status.get("mcp_sdk", import_status.get("installed")))
     version_matches = bool(import_status.get("installed")) and installed_version == LINK_VERSION
-    ready = bool(import_status.get("installed")) and wiki_exists and version_matches
+    ready = bool(import_status.get("installed")) and mcp_sdk_ready and wiki_exists and version_matches
     status = {
         "ready": ready,
         "python": python_cmd,
@@ -3241,6 +3252,11 @@ def verify_mcp(
     print(f"Python: {python_cmd}")
     if import_status.get("installed"):
         print(f"link-mcp: installed ({import_status.get('version')})")
+        if not mcp_sdk_ready:
+            print("MCP SDK: missing")
+            error = import_status.get("error")
+            if error:
+                print(f"Import error: {error}")
         if not version_matches:
             print(f"Expected version: {LINK_VERSION}")
     else:
@@ -3268,6 +3284,9 @@ def verify_mcp(
         print("    python3 -m venv ~/.link-mcp-venv")
         print("    ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp")
         print("    Then rerun with: python3 link.py verify-mcp . --python ~/.link-mcp-venv/bin/python")
+    elif not mcp_sdk_ready:
+        print(f"  Reinstall link-mcp dependencies for Link {LINK_VERSION}:")
+        print(f"    {quoted_python_cmd} -m pip install --upgrade link-mcp=={LINK_VERSION}")
     elif not version_matches:
         print(f"  Upgrade link-mcp to match Link {LINK_VERSION}:")
         print(f"    {quoted_python_cmd} -m pip install --upgrade link-mcp=={LINK_VERSION}")

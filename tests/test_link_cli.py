@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -1559,6 +1560,26 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(data["link_mcp"]["version"], link_cli.LINK_VERSION)
         self.assertEqual(data["config"]["mcpServers"]["link"]["command"], "/tmp/python")
 
+    def test_check_link_mcp_import_requires_mcp_sdk(self):
+        stdout = json.dumps({
+            "installed": True,
+            "version": link_cli.LINK_VERSION,
+            "mcp_sdk": False,
+            "error": "No module named mcp",
+        })
+        with patch.object(
+            link_cli.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess(["/tmp/python"], 0, stdout=stdout, stderr=""),
+        ) as run:
+            payload = link_cli._check_link_mcp_import("/tmp/python")
+
+        self.assertTrue(payload["installed"])
+        self.assertEqual(payload["version"], link_cli.LINK_VERSION)
+        self.assertFalse(payload["mcp_sdk"])
+        self.assertEqual(payload["error"], "No module named mcp")
+        self.assertIn("mcp.server.fastmcp", run.call_args.args[0][2])
+
     def test_verify_mcp_reports_version_mismatch(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
         target = tmp / "demo"
@@ -1577,6 +1598,31 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("link-mcp: installed (0.9.0)", text)
         self.assertIn(f"Expected version: {link_cli.LINK_VERSION}", text)
         self.assertIn(f"'/tmp/Link Python/bin/python' -m pip install --upgrade link-mcp=={link_cli.LINK_VERSION}", text)
+
+    def test_verify_mcp_reports_missing_mcp_sdk_dependency(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                python_cmd="/tmp/python",
+                import_check=lambda _: {
+                    "installed": True,
+                    "version": link_cli.LINK_VERSION,
+                    "mcp_sdk": False,
+                    "error": "No module named mcp",
+                },
+            )
+
+        self.assertEqual(code, 1)
+        text = out.getvalue()
+        self.assertIn(f"link-mcp: installed ({link_cli.LINK_VERSION})", text)
+        self.assertIn("MCP SDK: missing", text)
+        self.assertIn("Import error: No module named mcp", text)
+        self.assertIn(f"/tmp/python -m pip install --upgrade link-mcp=={link_cli.LINK_VERSION}", text)
 
     def test_verify_mcp_reports_missing_package(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
