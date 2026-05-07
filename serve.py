@@ -2325,6 +2325,10 @@ def _render_ingest():
             f'<p>If the source contains preferences, decisions, or project facts, '
             f'<a href="{html.escape(propose_href, quote=True)}">open memory proposals first</a>.</p>'
         )
+    elif state == "blocked_secrets":
+        next_detail = "Redact secret-looking values in the flagged raw source before asking any agent to ingest it."
+        next_code = f"edit {first_raw}"
+        next_extra = ""
     elif state == "stale_graph":
         next_detail = "Repair the graph index before relying on search, context, or the graph view."
         next_code = "link rebuild-backlinks && link validate"
@@ -2341,6 +2345,13 @@ def _render_ingest():
         next_detail = "Initialize or repair the Link folder before ingesting sources."
         next_code = "link init && link status --validate"
         next_extra = ""
+    if state == "blocked_secrets":
+        ingest_prompt = f"redact secret-looking values in {first_raw} before ingest"
+        optional_memory_html = '<code>redact before memory proposals</code>'
+    else:
+        optional_memory_html = (
+            f'<a href="{html.escape(propose_href, quote=True)}"><code>{html.escape(memory_prompt)}</code></a>'
+        )
     next_html = (
         f'<div class="memory-next"><strong>Next step</strong>'
         f'<p>{html.escape(next_detail)}</p>'
@@ -2360,7 +2371,7 @@ def _render_ingest():
         f'<code>link validate</code></article>'
         f'<article class="ingest-step"><span class="step-num">4</span>'
         f'<h3>Optional memory</h3><p>Only save preferences, decisions, or project facts after approval.</p>'
-        f'<a href="{html.escape(propose_href, quote=True)}"><code>{html.escape(memory_prompt)}</code></a></article>'
+        f'{optional_memory_html}</article>'
         f'</section>'
     )
 
@@ -2370,11 +2381,18 @@ def _render_ingest():
         for item in pending[:50]:
             raw_path = str(item.get("raw") or "")
             propose_href = "/propose?source=" + urllib.parse.quote(raw_path)
-            rows += (
-                f'<li><code>{html.escape(raw_path)}</code>'
-                f'<span class="type">{int(item.get("size_bytes") or 0)} bytes · '
-                f'<a href="{html.escape(propose_href, quote=True)}">propose memories</a></span></li>'
-            )
+            secret_warnings = item.get("secret_warnings") if isinstance(item.get("secret_warnings"), list) else []
+            if secret_warnings:
+                meta = (
+                    f'{int(item.get("size_bytes") or 0)} bytes · secret warning: '
+                    f'{", ".join(html.escape(str(label)) for label in secret_warnings)} · redact before ingest'
+                )
+            else:
+                meta = (
+                    f'{int(item.get("size_bytes") or 0)} bytes · '
+                    f'<a href="{html.escape(propose_href, quote=True)}">propose memories</a>'
+                )
+            rows += f'<li><code>{html.escape(raw_path)}</code><span class="type">{meta}</span></li>'
         if len(pending) > 50:
             rows += f'<li>... {len(pending) - 50} more</li>'
         pending_html = f'<div class="section-heading"><h2>Pending Raw Files</h2><a href="/propose">propose memories</a></div><ul class="page-list">{rows}</ul>'

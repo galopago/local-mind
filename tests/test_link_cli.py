@@ -263,6 +263,26 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Post-ingest checks:", out.getvalue())
         self.assertIn("link status --validate", out.getvalue())
 
+    def test_ingest_status_warns_before_secret_raw_ingest(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / "raw/secret-note.md").write_text(
+            "# Secret note\n\nDo not ingest sk-" + ("a" * 25) + "\n",
+            encoding="utf-8",
+        )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.ingest_status(target)
+
+        self.assertEqual(code, 0)
+        self.assertIn("Pending ingest: 1", out.getvalue())
+        self.assertIn("raw/secret-note.md [redact before ingest: OpenAI API key]", out.getvalue())
+        self.assertIn("Guidance: 1 pending raw file contains secret-looking values.", out.getvalue())
+        self.assertIn("Suggested workflow: Redact raw sources before ingest", out.getvalue())
+        self.assertNotIn("Ask your agent: ingest raw/secret-note.md into Link", out.getvalue())
+
     def test_ingest_status_json(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
         target = tmp / "demo"

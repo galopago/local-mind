@@ -1610,7 +1610,12 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
         print("")
         print("Pending raw files:")
         for item in pending_raw[:20]:
-            print(f"- {item['raw']}")
+            warnings = item.get("secret_warnings") if isinstance(item.get("secret_warnings"), list) else []
+            if warnings:
+                labels = ", ".join(str(label) for label in warnings)
+                print(f"- {item['raw']} [redact before ingest: {labels}]")
+            else:
+                print(f"- {item['raw']}")
         if len(pending_raw) > 20:
             print(f"- ... {len(pending_raw) - 20} more")
 

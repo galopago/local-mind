@@ -1067,6 +1067,28 @@ class ServeTests(unittest.TestCase):
         self.assertIn('/propose?source=raw/new-source.md', html)
         self.assertIn("Pending Raw Files", html)
 
+    def test_ingest_page_blocks_secret_looking_raw(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        (raw / "secret-note.md").write_text(
+            "# Secret note\n\nDo not ingest sk-" + ("a" * 25) + "\n",
+            encoding="utf-8",
+        )
+        reset_wiki(wiki)
+
+        api_status, payload = run_handler("GET", "/api/ingest-status")
+        html = serve._render_ingest()
+
+        self.assertEqual(api_status, 200)
+        self.assertEqual(payload["guidance"]["state"], "blocked_secrets")
+        self.assertIsNone(payload["guidance"]["agent_prompt"])
+        self.assertIn("Redact raw sources before ingest", html)
+        self.assertIn("redact secret-looking values in raw/secret-note.md before ingest", html)
+        self.assertIn("secret warning: OpenAI API key", html)
+        self.assertIn("redact before ingest", html)
+        self.assertNotIn('/propose?source=raw/secret-note.md', html)
+
     def test_rebuild_backlinks_requires_json_post(self):
         wiki = self.make_wiki()
         write_page(

@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .security import secret_value_warnings
 from .wiki import build_backlinks, load_backlinks_index
 
 
@@ -78,6 +79,10 @@ def _source_page_suggestion(raw_rel: str) -> str:
     return f"wiki/sources/{slug}.md"
 
 
+def _secret_blocked_items(items: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [item for item in items if item.get("secret_warnings")]
+
+
 def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, object]:
     """Build a short, actionable ingest workflow for agents and humans."""
     guidance = status.get("guidance") if isinstance(status.get("guidance"), dict) else {}
@@ -118,6 +123,33 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "link validate",
                 "link status --validate",
             ],
+        }
+
+    if state == "blocked_secrets":
+        blocked = _secret_blocked_items(pending_raw)
+        first = blocked[0] if blocked else {"raw": "raw/<file>"}
+        return {
+            "state": state,
+            "title": "Redact raw sources before ingest",
+            "summary": f"Start with {first['raw']}; Link will not suggest ingesting secret-looking raw content.",
+            "batch": [
+                {
+                    "raw": str(item.get("raw") or ""),
+                    "size_bytes": int(item.get("size_bytes") or 0),
+                    "secret_warnings": list(item.get("secret_warnings") or []),
+                    "suggested_source_page": _source_page_suggestion(str(item.get("raw") or "")),
+                }
+                for item in blocked[: max(limit, 1)]
+            ],
+            "steps": [
+                "Open each flagged raw file locally.",
+                "Remove or redact the secret-looking values before asking any agent to ingest it.",
+                "Refresh ingest status after redaction.",
+                "Only then ask the agent to create source-backed wiki pages.",
+            ],
+            "agent_prompt": None,
+            "memory_prompt": None,
+            "post_checks": ["link ingest-status", "link status --validate"],
         }
 
     if state == "stale_graph":
@@ -185,6 +217,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
     pending_count = int(status.get("pending_count") or 0)
     raw_count = int(status.get("raw_count") or 0)
     backlinks_status = str(status.get("backlinks_status") or "unknown")
+    secret_items = _secret_blocked_items(pending_items)
 
     if not has_raw_dir or not has_wiki_dir:
         return {
@@ -193,6 +226,23 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "agent_prompt": None,
             "commands": ["link init", "link status --validate"],
             "notes": ["Run the installer or initialize this directory before ingesting sources."],
+        }
+
+    if secret_items:
+        first = str(secret_items[0].get("raw", "raw/<file>"))
+        count = len(secret_items)
+        summary = f"{count} pending raw file contains secret-looking values."
+        if count != 1:
+            summary = f"{count} pending raw files contain secret-looking values."
+        return {
+            "state": "blocked_secrets",
+            "summary": summary + f" Redact {first} before ingest.",
+            "agent_prompt": None,
+            "commands": ["link ingest-status", "link status --validate"],
+            "notes": [
+                "Do not ask an agent to ingest flagged raw files until the secret-looking values are removed or redacted.",
+                "After redaction, refresh ingest status and continue with the normal ingest prompt.",
+            ],
         }
 
     if pending_items:
@@ -250,6 +300,7 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
 
     represented_raw: list[dict[str, object]] = []
     pending_raw: list[dict[str, object]] = []
+    raw_secret_warning_count = 0
     for raw_path in raw_files:
         rel = raw_path.relative_to(target).as_posix()
         matches = [
@@ -257,10 +308,17 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
             for source_name, source_text in source_texts.items()
             if rel in source_text
         ]
+        try:
+            warnings = secret_value_warnings(raw_path.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            warnings = []
+        raw_secret_warning_count += len(warnings)
         item = {
             "raw": rel,
             "size_bytes": raw_path.stat().st_size,
             "source_pages": matches,
+            "secret_warnings": warnings,
+            "secret_warning_count": len(warnings),
         }
         if matches:
             represented_raw.append(item)
@@ -281,6 +339,7 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
         "pending_count": len(pending_raw),
         "represented_raw": represented_raw,
         "pending_raw": pending_raw,
+        "raw_secret_warning_count": raw_secret_warning_count,
         "backlinks_status": backlinks_status,
         "backlinks_message": backlinks_message,
         "has_raw_dir": raw_dir.exists(),
