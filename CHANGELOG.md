@@ -55,6 +55,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added status warnings so cache or memory-read degradation is visible in CLI, HTTP, and MCP readiness payloads.
 - Added shared Markdown renderer coverage under `link_core.markdown` so the local web UI's sanitized Markdown behavior is tested outside the HTTP monolith.
 - Added an HTTP viewer smoke test that starts a generated demo server over localhost and verifies pages, JSON APIs, security headers, and local mutation guards.
+- Added a GitHub Pages-ready product site under `docs/` with local-agent-memory positioning, demo visuals, quick start, MCP links, and security links.
 - Moved bundled demo wiki content into `link_core.demo` so the CLI module no longer carries the full demo payload inline.
 - Moved the local web UI CSS/JavaScript assets into `link_core.web_assets` so `serve.py` stays focused on routing and rendering.
 - Moved memory and raw-capture card rendering into `link_core.web_memory` so memory UI escaping and actions are covered outside the HTTP server.

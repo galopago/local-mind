@@ -21,6 +21,7 @@ compound over time.
 [![PyPI](https://img.shields.io/pypi/v/link-mcp)](https://pypi.org/project/link-mcp/)
 
 Release notes: [CHANGELOG.md](CHANGELOG.md)
+Product site: [gowtham0992.github.io/link](https://gowtham0992.github.io/link/)
 
 <p align="center">
   <img src="docs/assets/link-demo-flow-dark.gif" alt="Link demo flow: wiki, memory dashboard, graph, and memory explanation" width="860">
