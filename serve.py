@@ -117,6 +117,7 @@ from link_core.status import (
 from link_core.capture import (
     capture_inbox as _core_capture_inbox,
     capture_records as _core_capture_records,
+    capture_review_summary as _core_capture_review_summary,
     cli_capture_commands as _core_cli_capture_commands,
 )
 from link_core.wiki import (
@@ -645,17 +646,17 @@ def _capture_inbox(limit: int = 20, project: str | None = None) -> dict[str, obj
 
 def _capture_review_summary(project: str | None = None, limit: int = 3) -> dict[str, object]:
     project_name = _core_normalize_project(project)
-    captures = _capture_records(limit=50, project=project_name)
+    summary = _core_capture_review_summary(
+        WIKI_DIR.parent,
+        limit=limit,
+        project=project_name,
+        commands_for=_core_cli_capture_commands,
+    )
     project_query = f"?project={urllib.parse.quote(project_name, safe='')}" if project_name else ""
     project_arg = f' --project "{project_name}"' if project_name else ""
-    return {
-        "count": len(captures),
-        "warning_count": sum(1 for capture in captures if capture["warning_count"]),
-        "project": project_name,
-        "href": f"/captures{project_query}",
-        "command": f"python3 link.py capture-inbox .{project_arg}",
-        "items": captures[:max(1, min(limit, 10))],
-    }
+    summary["href"] = f"/captures{project_query}"
+    summary["command"] = f"python3 link.py capture-inbox .{project_arg}"
+    return summary
 
 
 def _memory_brief(query: str = "", limit: int = 6, project: str | None = None) -> dict[str, object]:
@@ -1375,6 +1376,7 @@ def _render_captures(project: str | None = None):
         f'<div class="home-stats">'
         f'<div class="stat"><span class="num">{inbox["count"]}</span><span class="label">captures</span></div>'
         f'<div class="stat"><span class="num">{inbox["warning_count"]}</span><span class="label">warnings</span></div>'
+        f'<div class="stat"><span class="num">{inbox.get("read_warning_count", 0)}</span><span class="label">read warnings</span></div>'
         f'</div>'
     )
     warning_html = ""
@@ -1385,6 +1387,19 @@ def _render_captures(project: str | None = None):
             f'{"s contain" if inbox["warning_count"] != 1 else " contains"} secret-looking values.</p>'
             f'<code>python3 link.py redact-capture raw/memory-captures/&lt;capture&gt;.md .</code></div>'
         )
+    read_warning_html = ""
+    read_warnings = inbox.get("read_warnings") if isinstance(inbox.get("read_warnings"), list) else []
+    if read_warnings:
+        rows = "".join(
+            f'<li><code>{html.escape(str(item.get("capture") or ""))}</code> '
+            f'{html.escape(str(item.get("error") or "unreadable"))}</li>'
+            for item in read_warnings[:50]
+        )
+        read_warning_html = (
+            '<div class="memory-next"><strong>Fix capture access</strong>'
+            '<p>Some raw captures could not be read and are not listed for approval.</p>'
+            f'<ul>{rows}</ul></div>'
+        )
     body = (
         f'<div class="breadcrumb"><a href="/">Link</a> / captures</div>'
         f'<h1>Raw Capture Inbox</h1>'
@@ -1393,6 +1408,7 @@ def _render_captures(project: str | None = None):
         f'{"<p><strong>Project:</strong> " + html.escape(str(inbox["project"])) + "</p>" if inbox["project"] else ""}'
         f'{stats}'
         f'{warning_html}'
+        f'{read_warning_html}'
         f'{_render_capture_section(inbox["captures"])}'
         f'</div>'
     )

@@ -1232,6 +1232,45 @@ class LinkCliTests(unittest.TestCase):
         self.assertNotIn("Beta capture", inbox_out.getvalue())
         self.assertNotIn(fake_key, text)
 
+    def test_capture_inbox_reports_unreadable_captures(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        capture_dir = target / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True, exist_ok=True)
+        (capture_dir / "locked.md").write_text(
+            "---\n"
+            "title: Locked capture\n"
+            "---\n\n"
+            "## Notes\n\n"
+            "This capture should surface as unreadable.\n",
+            encoding="utf-8",
+        )
+
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        inbox_out = StringIO()
+        text_out = StringIO()
+        with patch.object(Path, "read_text", flaky_read_text):
+            with redirect_stdout(inbox_out):
+                inbox_code = link_cli.capture_inbox(target, json_output=True)
+            with redirect_stdout(text_out):
+                text_code = link_cli.capture_inbox(target)
+        inbox = json.loads(inbox_out.getvalue())
+        text = text_out.getvalue()
+
+        self.assertEqual(inbox_code, 0)
+        self.assertEqual(text_code, 0)
+        self.assertEqual(inbox["read_warning_count"], 1)
+        self.assertEqual(inbox["read_warnings"][0]["capture"], "raw/memory-captures/locked.md")
+        self.assertIn("Capture read warnings", text)
+        self.assertIn("locked.md", text)
+
     def test_accept_capture_writes_approved_proposal(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))
         target = tmp / "demo"

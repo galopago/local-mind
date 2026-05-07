@@ -115,6 +115,8 @@ def capture_records(
     limit: int = 20,
     project: str | None = None,
     commands_for: CaptureCommands | None = None,
+    *,
+    read_warnings: list[dict[str, str]] | None = None,
 ) -> list[dict[str, object]]:
     root = root.expanduser().resolve()
     capture_dir = root / "raw" / "memory-captures"
@@ -126,16 +128,21 @@ def capture_records(
     for path in sorted(capture_dir.rglob("*.md")):
         if path.name.startswith("."):
             continue
+        rel = path.relative_to(root).as_posix()
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
             stat = path.stat()
-        except OSError:
+        except OSError as exc:
+            if read_warnings is not None:
+                read_warnings.append({
+                    "capture": rel,
+                    "error": str(exc) or exc.__class__.__name__,
+                })
             continue
         meta, notes = capture_notes_from_markdown(text)
         capture_project = normalize_project(str(meta.get("project") or ""))
         if project_name and capture_project and capture_project != project_name:
             continue
-        rel = path.relative_to(root).as_posix()
         warnings = secret_value_warnings(text)
         safe_notes, _, _ = redact_secret_values(notes)
         records.append({
@@ -160,10 +167,43 @@ def capture_inbox(
     commands_for: CaptureCommands | None = None,
 ) -> dict[str, object]:
     project_name = normalize_project(project)
-    captures = capture_records(root, limit=limit, project=project_name, commands_for=commands_for)
+    read_warnings: list[dict[str, str]] = []
+    captures = capture_records(
+        root,
+        limit=limit,
+        project=project_name,
+        commands_for=commands_for,
+        read_warnings=read_warnings,
+    )
     return {
         "count": len(captures),
         "warning_count": sum(1 for capture in captures if capture["warning_count"]),
+        "read_warning_count": len(read_warnings),
+        "read_warnings": read_warnings,
         "project": project_name,
         "captures": captures,
+    }
+
+
+def capture_review_summary(
+    root: Path,
+    limit: int = 3,
+    project: str | None = None,
+    commands_for: CaptureCommands | None = None,
+) -> dict[str, object]:
+    """Return compact capture backlog context for briefs, audits, and dashboards."""
+    payload = capture_inbox(
+        root,
+        limit=50,
+        project=project,
+        commands_for=commands_for,
+    )
+    captures = payload["captures"] if isinstance(payload.get("captures"), list) else []
+    return {
+        "count": len(captures),
+        "warning_count": int(payload.get("warning_count") or 0),
+        "read_warning_count": int(payload.get("read_warning_count") or 0),
+        "read_warnings": payload.get("read_warnings") if isinstance(payload.get("read_warnings"), list) else [],
+        "project": str(payload.get("project") or ""),
+        "items": captures[:max(1, min(limit, 10))],
     }

@@ -1,12 +1,14 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from mcp_package.link_core.capture import (
     capture_filename,
     capture_inbox,
     capture_notes_from_markdown,
     capture_records,
+    capture_review_summary,
     capture_title,
     mcp_capture_commands,
     resolve_capture_file,
@@ -129,6 +131,48 @@ class CaptureCoreTests(unittest.TestCase):
         self.assertEqual(inbox["count"], 1)
         self.assertEqual(inbox["warning_count"], 1)
         self.assertEqual(inbox["project"], "alpha")
+
+    def test_capture_inbox_reports_unreadable_captures(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-core-"))
+        capture_dir = root / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        (capture_dir / "good.md").write_text(
+            "---\n"
+            "title: Good\n"
+            "date_captured: 2026-05-05T00:00:00Z\n"
+            "---\n\n"
+            "## Notes\n\n"
+            "Remember the readable capture.\n",
+            encoding="utf-8",
+        )
+        (capture_dir / "locked.md").write_text(
+            "---\n"
+            "title: Locked\n"
+            "---\n\n"
+            "## Notes\n\n"
+            "This should report a read warning.\n",
+            encoding="utf-8",
+        )
+
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            inbox = capture_inbox(root)
+            summary = capture_review_summary(root)
+
+        self.assertEqual(inbox["count"], 1)
+        self.assertEqual(inbox["read_warning_count"], 1)
+        self.assertEqual(
+            inbox["read_warnings"],
+            [{"capture": "raw/memory-captures/locked.md", "error": "permission denied"}],
+        )
+        self.assertEqual(summary["count"], 1)
+        self.assertEqual(summary["read_warning_count"], 1)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -450,6 +451,30 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("delete_capture", payload["captures"][0]["commands"]["delete"])
         self.assertNotIn(fake_key, raw_payload)
         self.assertNotIn("MCP Beta capture", raw_payload)
+
+    def test_capture_inbox_contract_reports_read_warnings(self):
+        capture_dir = self.target / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True, exist_ok=True)
+        (capture_dir / "locked.md").write_text(
+            "---\n"
+            "title: MCP locked capture\n"
+            "---\n\n"
+            "## Notes\n\n"
+            "This capture should surface as unreadable.\n",
+            encoding="utf-8",
+        )
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            payload = json.loads(self.server.capture_inbox())
+
+        self.assertEqual(payload["read_warning_count"], 1)
+        self.assertEqual(payload["read_warnings"][0]["capture"], "raw/memory-captures/locked.md")
 
     def test_accept_capture_contract(self):
         capture = json.loads(self.server.capture_session(

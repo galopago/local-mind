@@ -646,6 +646,35 @@ class ServeTests(unittest.TestCase):
         self.assertIn("redact-capture", html)
         self.assertNotIn(fake_key, html)
 
+    def test_capture_inbox_page_and_api_report_read_warnings(self):
+        wiki = self.make_wiki()
+        capture_dir = wiki.parent / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        (capture_dir / "locked.md").write_text(
+            "---\n"
+            "title: \"Locked capture\"\n"
+            "---\n\n"
+            "## Notes\n\n"
+            "This capture should surface as unreadable.\n",
+            encoding="utf-8",
+        )
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            status, payload = run_handler("GET", "/api/capture-inbox")
+            html = serve._render_captures()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["read_warning_count"], 1)
+        self.assertEqual(payload["read_warnings"][0]["capture"], "raw/memory-captures/locked.md")
+        self.assertIn("Fix capture access", html)
+        self.assertIn("locked.md", html)
+
     def test_memory_brief_page_and_api_include_capture_status(self):
         wiki = self.make_wiki()
         write_page(

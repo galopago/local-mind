@@ -141,6 +141,7 @@ from link_core.capture import (
     capture_inbox as _core_capture_inbox,
     capture_notes_from_markdown as _core_capture_notes_from_markdown,
     capture_records as _core_capture_records,
+    capture_review_summary as _core_capture_review_summary,
     capture_title as _core_capture_title,
     cli_capture_commands as _core_cli_capture_commands,
     resolve_capture_file as _core_resolve_capture_file,
@@ -2055,6 +2056,8 @@ def capture_inbox(
     project_name = str(payload["project"])
     captures = payload["captures"]
     warning_count = int(payload["warning_count"])
+    read_warning_count = int(payload.get("read_warning_count") or 0)
+    read_warnings = payload.get("read_warnings") if isinstance(payload.get("read_warnings"), list) else []
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
@@ -2062,10 +2065,18 @@ def capture_inbox(
     print("Raw capture inbox")
     if project_name:
         print(f"Project: {project_name}")
-    print(f"{len(captures)} capture{'s' if len(captures) != 1 else ''} · {warning_count} with secret-looking warnings")
+    print(
+        f"{len(captures)} readable capture{'s' if len(captures) != 1 else ''} · "
+        f"{warning_count} with secret-looking warnings · {read_warning_count} read warnings"
+    )
+    if read_warnings:
+        print("")
+        print("Capture read warnings:")
+        for warning in read_warnings[:20]:
+            print(f"   {warning.get('capture')}: {warning.get('error')}")
     if not captures:
         print("")
-        print("No saved raw captures.")
+        print("No readable saved raw captures.")
         return 0
     for index, capture in enumerate(captures, start=1):
         print("")
@@ -2084,15 +2095,13 @@ def capture_inbox(
 
 def _capture_review_summary(target: Path, project: str | None = None, limit: int = 3) -> dict[str, object]:
     root = _resolve_link_root(target)
-    captures = _capture_records(target, limit=50, project=project)
-    warning_count = sum(1 for capture in captures if capture["warning_count"])
-    summary = {
-        "count": len(captures),
-        "warning_count": warning_count,
-        "project": _core_normalize_project(project),
-        "items": captures[:max(1, min(limit, 10))],
-        "next_action": f'python3 link.py capture-inbox "{root}"',
-    }
+    summary = _core_capture_review_summary(
+        root,
+        limit=limit,
+        project=project,
+        commands_for=_core_cli_capture_commands,
+    )
+    summary["next_action"] = f'python3 link.py capture-inbox "{root}"'
     if summary["project"]:
         summary["next_action"] = f'python3 link.py capture-inbox "{root}" --project "{summary["project"]}"'
     return summary

@@ -124,6 +124,7 @@ from link_core.capture import (
     capture_inbox as _core_capture_inbox,
     capture_notes_from_markdown as _core_capture_notes_from_markdown,
     capture_records as _core_capture_records,
+    capture_review_summary as _core_capture_review_summary,
     capture_title as _core_capture_title,
     mcp_capture_commands as _core_mcp_capture_commands,
     resolve_capture_file as _core_resolve_capture_file,
@@ -520,17 +521,17 @@ def _capture_inbox(limit: int = 20, project: str = "") -> dict[str, object]:
 
 def _capture_review_summary(project: str = "", limit: int = 3) -> dict[str, object]:
     project_name = _core_normalize_project(project)
-    captures = _capture_records(limit=50, project=project_name)
+    summary = _core_capture_review_summary(
+        WIKI_DIR.parent,
+        limit=limit,
+        project=project_name,
+        commands_for=_core_mcp_capture_commands,
+    )
     next_action = "capture_inbox()"
     if project_name:
         next_action = f'capture_inbox(project="{project_name}")'
-    return {
-        "count": len(captures),
-        "warning_count": sum(1 for capture in captures if capture["warning_count"]),
-        "project": project_name,
-        "items": captures[:max(1, min(limit, 10))],
-        "next_action": next_action,
-    }
+    summary["next_action"] = next_action
+    return summary
 
 
 def _accept_capture(
