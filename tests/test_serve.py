@@ -895,6 +895,21 @@ class ServeTests(unittest.TestCase):
         self.assertTrue(summary["truncated"])
         self.assertIn("get_graph", {item["tool"] for item in summary["follow_up"]})
 
+    def test_graph_data_uses_served_cache_forward_links_without_rereading_pages(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n[[link]]\n",
+        )
+        write_page(wiki, "entities/link.md", "---\ntype: entity\ntitle: Link\n---\n# Link\n")
+        serve._get_all_pages()
+
+        with patch.object(Path, "read_text", side_effect=AssertionError("serve graph should use cache")):
+            graph = serve._get_graph_data()
+
+        self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
+
     def test_graph_tooltip_exists_before_graph_script(self):
         wiki = self.make_wiki()
         write_page(

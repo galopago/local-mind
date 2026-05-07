@@ -153,15 +153,17 @@ _snippet_index: dict[str, str] = {}  # stem.lower() → pre-extracted first snip
 _token_index: dict[str, set[str]] = {}  # token → set of page stems that contain it
 _page_map: dict[str, dict] = {}  # stem.lower() → page dict (for O(1) lookup in search)
 _meta_token_index: dict[str, set[str]] = {}  # token → stems with that token in title/alias/tag/tldr
+_forward_links_index: dict[str, list[str]] = {}  # page name → canonical outbound wikilinks
 _fts_index = None
 _search_backend = "token-index"
 
 def _invalidate_pages_cache() -> None:
-    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _fts_index, _search_backend
+    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _forward_links_index, _fts_index, _search_backend
     _core_close_wiki_cache({"fts_index": _fts_index})
     _pages_cache = None
     _pages_cache_mtime = 0.0
     _pages_cache_checked_at = 0.0
+    _forward_links_index = {}
     _fts_index = None
     _search_backend = "token-index"
 
@@ -171,7 +173,7 @@ def _wiki_mtime() -> float:
 
 
 def _get_all_pages(force_check: bool = False) -> list:
-    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _page_index, _fulltext_index, _normalized_fulltext_index, _text_words_index, _meta_words_index, _snippet_index, _token_index, _page_map, _meta_token_index, _fts_index, _search_backend
+    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _page_index, _fulltext_index, _normalized_fulltext_index, _text_words_index, _meta_words_index, _snippet_index, _token_index, _page_map, _meta_token_index, _forward_links_index, _fts_index, _search_backend
     now = time.monotonic()
     if (
         _pages_cache is not None
@@ -197,6 +199,7 @@ def _get_all_pages(force_check: bool = False) -> list:
     _token_index = cache["token_index"]
     _meta_token_index = cache["meta_token_index"]
     _page_map = cache["page_map"]
+    _forward_links_index = cache.get("forward_links_index", {})
     _fts_index = cache.get("fts_index")
     _search_backend = str(cache.get("search_backend") or "token-index")
     return _pages_cache
@@ -215,6 +218,7 @@ def _current_wiki_cache() -> dict[str, object]:
         "token_index": _token_index,
         "meta_token_index": _meta_token_index,
         "page_map": _page_map,
+        "forward_links_index": _forward_links_index,
         "fts_index": _fts_index,
         "search_backend": _search_backend,
     }
