@@ -2069,6 +2069,28 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("sensitive-looking file contents", out.getvalue())
 
+    def test_doctor_fails_when_secret_scan_cannot_read_file(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        locked = target / "raw/locked.md"
+        locked.write_text("could contain secrets\n", encoding="utf-8")
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        out = StringIO()
+        with patch.object(Path, "read_text", flaky_read_text):
+            with redirect_stdout(out):
+                code = link_cli.doctor(target)
+
+        self.assertEqual(code, 1)
+        self.assertIn("could not scan file contents for secrets", out.getvalue())
+        self.assertIn("raw/locked.md", out.getvalue())
+
     def test_doctor_fails_on_google_api_key_content(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
         target = tmp / "demo"

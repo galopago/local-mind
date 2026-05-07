@@ -1224,17 +1224,19 @@ def _iter_scannable_files(target: Path) -> list[Path]:
     return sorted(files)
 
 
-def _find_sensitive_values(target: Path) -> list[str]:
+def _find_sensitive_values(target: Path) -> tuple[list[str], list[str]]:
     matches: list[str] = []
+    read_errors: list[str] = []
     for path in _iter_scannable_files(target):
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+        except OSError as exc:
+            read_errors.append(f"{path.relative_to(target)} ({exc})")
             continue
         warnings = _secret_value_warnings(text)
         if warnings:
             matches.append(f"{path.relative_to(target)} ({warnings[0]})")
-    return sorted(matches)
+    return sorted(matches), sorted(read_errors)
 
 
 def _required_paths(target: Path) -> list[Path]:
@@ -1415,11 +1417,13 @@ def doctor(target: Path, fix: bool = False) -> int:
     else:
         print("OK no sensitive-looking filenames")
 
-    sensitive_values = _find_sensitive_values(target)
+    sensitive_values, sensitive_read_errors = _find_sensitive_values(target)
     if sensitive_values:
         errors.append("sensitive-looking file contents present: " + ", ".join(sensitive_values[:8]))
     else:
         print("OK no sensitive-looking file contents")
+    if sensitive_read_errors:
+        errors.append("could not scan file contents for secrets: " + ", ".join(sensitive_read_errors[:8]))
 
     if warnings:
         print("")

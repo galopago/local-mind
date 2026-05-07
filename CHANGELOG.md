@@ -33,6 +33,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Fixed duplicate proposal CLI commands so project-scoped updates preserve the normalized project key.
 - Added top-level project reporting to accepted capture payloads so CLI and MCP agents can keep project-scoped memories straight.
 - Added raw capture read-warning reporting so unreadable saved captures appear in CLI, MCP, local web inbox, brief, and audit diagnostics instead of disappearing silently.
+- Hardened `link.py doctor` secret-content checks so unreadable scannable files fail closed instead of being skipped.
 - Added MCP `link_status` and `/api/status` for a compact readiness summary with version, wiki path, page/memory counts, optional validation, and safe next actions.
 - Added search backend reporting to Link status payloads so agents and users can see whether local search is using SQLite FTS or the token fallback.
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.
