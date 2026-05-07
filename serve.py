@@ -2919,6 +2919,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_DELETE(self):
         self._method_not_allowed()
 
+    def do_TRACE(self):
+        self._method_not_allowed()
+
+    def do_CONNECT(self):
+        self._method_not_allowed()
+
     def do_POST(self):
         self._head_only = False
         if not self._require_allowed_host():

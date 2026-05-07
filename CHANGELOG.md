@@ -50,7 +50,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added in-memory rate limiting for local write APIs so runaway local clients get structured JSON `429` responses with `Retry-After`.
 - Added explicit local JSON `405` responses for browser preflight requests without granting CORS access.
 - Added Content Security Policy headers to the local viewer and a stricter SVG asset policy.
-- Returned hardened JSON `405` responses for unsupported local HTTP methods instead of default server HTML.
+- Returned hardened JSON `405` responses for unsupported local HTTP methods, including `TRACE` and `CONNECT`, instead of default server HTML.
 - Added an interactive-readiness verdict and threshold warnings to `link benchmark` so larger local wikis are easier to evaluate.
 - Added shared benchmark health checks to the large-wiki smoke so user-facing and CI scale verdicts stay aligned.
 - Tightened ownership of generated search caches in CLI query and index rebuild paths so in-memory SQLite indexes are closed when short-lived operations finish.

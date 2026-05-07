@@ -75,6 +75,10 @@ def run_handler_with_headers(method: str, path: str, body: bytes = b"", headers:
         handler.do_PATCH()
     elif method == "DELETE":
         handler.do_DELETE()
+    elif method == "TRACE":
+        handler.do_TRACE()
+    elif method == "CONNECT":
+        handler.do_CONNECT()
     else:
         raise ValueError(method)
     raw = handler.wfile.getvalue()
@@ -222,7 +226,7 @@ class ServeTests(unittest.TestCase):
     def test_unsupported_methods_return_hardened_json_405(self):
         self.make_wiki()
 
-        for method in ("PUT", "PATCH", "DELETE"):
+        for method in ("PUT", "PATCH", "DELETE", "TRACE", "CONNECT"):
             status, payload, headers = run_handler_with_headers(method, "/api/status")
             self.assertEqual(status, 405)
             self.assertEqual(payload["error"], "method not allowed; Link supports GET, HEAD, and POST")
