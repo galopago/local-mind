@@ -110,6 +110,14 @@ def run_smoke(work_dir: Path, python: str = sys.executable) -> None:
     require(bool(query.get("context_packet")), "query returned an empty context packet")
     require(query.get("budget_report", {}).get("context_packet", {}).get("returned", 0) <= 6, "small query budget was not enforced")
 
+    graph_summary = run_json("graph-summary", "agent memory", str(demo_target), "--limit", "10", "--json", python=python)
+    require(graph_summary.get("returned_nodes", 0) >= 1, "graph-summary did not return demo graph context")
+    require(graph_summary.get("returned_nodes", 0) <= 10, "graph-summary did not enforce first-use node limit")
+
+    benchmark = run_json("benchmark", "agent memory", str(demo_target), "--budget", "small", "--json", python=python)
+    require(benchmark.get("health", {}).get("status") == "pass", "benchmark health did not pass on demo wiki")
+    require(benchmark.get("graph_initial", {}).get("mode") in {"full", "summary"}, "benchmark did not report graph initial-load mode")
+
     brief = run_json("brief", "testing Link as local personal memory", str(demo_target), "--json", python=python)
     require(brief.get("profile", {}).get("memory_count", 0) >= 1, "brief did not include memory profile")
     require("agent_guidance" in brief, "brief did not include agent guidance")
