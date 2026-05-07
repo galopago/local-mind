@@ -7,99 +7,137 @@
   <title>Link - Local Agent Memory</title>
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #050505;
-      --panel: #101113;
-      --panel-2: #17191d;
-      --text: #f5f1ea;
-      --muted: #b7b0a7;
-      --line: #303238;
-      --accent: #7fd6b5;
-      --accent-2: #8fb8ff;
-      --code: #0b0c0e;
-      --shadow: rgba(0, 0, 0, 0.45);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color-scheme: light;
+      --paper: #fff4b8;
+      --paper-2: #fffdf1;
+      --ink: #17120c;
+      --muted: #5f5549;
+      --border: #17120c;
+      --green: #54c79d;
+      --blue: #5b8cff;
+      --red: #ff6d5f;
+      --purple: #a87cff;
+      --yellow: #ffd342;
+      --black: #0b0b0b;
+      --shadow: 6px 6px 0 var(--border);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      background: var(--bg);
-      color: var(--text);
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(23, 18, 12, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 18, 12, 0.035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 22px 22px;
       line-height: 1.55;
     }
     a { color: inherit; }
     .site-nav {
-      position: fixed;
+      position: sticky;
       z-index: 10;
       top: 0;
-      left: 0;
-      right: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 24px;
-      padding: 14px clamp(18px, 4vw, 56px);
-      background: rgba(5, 5, 5, 0.78);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-      backdrop-filter: blur(16px);
+      padding: 14px clamp(18px, 4vw, 54px);
+      background: var(--paper-2);
+      border-bottom: 3px solid var(--border);
     }
     .brand {
       display: flex;
       align-items: center;
       gap: 10px;
       font-family: Georgia, serif;
-      font-size: 25px;
-      font-weight: 700;
+      font-size: 28px;
+      font-weight: 800;
       letter-spacing: 0;
       text-decoration: none;
       white-space: nowrap;
     }
-    .brand img { width: 30px; height: 30px; }
+    .brand img {
+      width: 34px;
+      height: 34px;
+      border: 2px solid var(--border);
+      background: var(--black);
+    }
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 18px;
-      color: var(--muted);
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--ink);
       font-size: 14px;
+      font-weight: 800;
     }
-    .nav-links a { text-decoration: none; }
-    .nav-links a:hover { color: var(--text); }
+    .nav-links a {
+      padding: 6px 10px;
+      border: 2px solid transparent;
+      text-decoration: none;
+    }
+    .nav-links a:hover {
+      background: var(--yellow);
+      border-color: var(--border);
+    }
     .hero {
-      min-height: 92vh;
+      min-height: 88vh;
       display: grid;
       align-items: end;
-      padding: 104px clamp(20px, 5vw, 72px) 56px;
+      padding: 74px clamp(20px, 5vw, 72px) 46px;
       background:
-        linear-gradient(180deg, rgba(5, 5, 5, 0.15) 0%, rgba(5, 5, 5, 0.55) 45%, #050505 100%),
+        linear-gradient(90deg, rgba(255, 244, 184, 0.98) 0%, rgba(255, 244, 184, 0.92) 48%, rgba(255, 244, 184, 0.62) 74%, rgba(255, 244, 184, 0.46) 100%),
         url("assets/link-demo-flow-dark.gif") center / cover no-repeat;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 5px solid var(--border);
     }
-    .hero-copy {
-      max-width: 900px;
-      text-shadow: 0 2px 18px var(--shadow);
-    }
+    .hero-copy { max-width: 960px; }
     .eyebrow {
       display: inline-flex;
-      margin: 0 0 18px;
-      color: var(--accent);
-      font-size: 14px;
-      font-weight: 700;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 7px 10px;
+      background: var(--green);
+      border: 2px solid var(--border);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 0.08em;
+      box-shadow: 3px 3px 0 var(--border);
     }
     h1 {
       margin: 0;
-      max-width: 820px;
-      font-size: clamp(52px, 8vw, 104px);
+      max-width: 900px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(46px, 6.2vw, 84px);
       line-height: 0.94;
       letter-spacing: 0;
     }
     .hero p {
-      max-width: 720px;
+      max-width: 760px;
       margin: 24px 0 0;
-      color: #e7e0d7;
+      color: var(--ink);
       font-size: clamp(18px, 2vw, 24px);
+      font-weight: 650;
+    }
+    .hero-notes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 22px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .hero-notes li {
+      padding: 7px 10px;
+      background: var(--paper-2);
+      border: 2px solid var(--border);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      font-weight: 800;
     }
     .actions {
       display: flex;
@@ -111,48 +149,62 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 44px;
+      min-height: 46px;
       padding: 0 18px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      background: rgba(255, 255, 255, 0.1);
-      color: var(--text);
+      border: 3px solid var(--border);
+      background: var(--paper-2);
+      color: var(--ink);
       text-decoration: none;
-      font-weight: 700;
+      font-weight: 900;
+      box-shadow: 4px 4px 0 var(--border);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .button:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 var(--border);
     }
     .button.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #07100c;
+      background: var(--yellow);
+      border-color: var(--border);
+      color: var(--ink);
     }
-    main { background: var(--bg); }
+    main { background: transparent; }
     section {
-      padding: 72px clamp(20px, 5vw, 72px);
-      border-bottom: 1px solid var(--line);
+      scroll-margin-top: 82px;
+      padding: 74px clamp(20px, 5vw, 72px);
+      border-bottom: 4px solid var(--border);
     }
+    section:nth-child(2n) { background: var(--paper-2); }
     .section-inner {
-      max-width: 1120px;
+      max-width: 1160px;
       margin: 0 auto;
     }
     .section-kicker {
-      margin: 0 0 8px;
-      color: var(--accent-2);
-      font-weight: 700;
+      display: inline-flex;
+      margin: 0 0 12px;
+      padding: 5px 9px;
+      background: var(--black);
+      color: var(--paper-2);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      font-size: 13px;
+      font-size: 12px;
     }
     h2 {
       margin: 0 0 18px;
-      max-width: 760px;
-      font-size: clamp(32px, 5vw, 56px);
+      max-width: 820px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(32px, 5vw, 58px);
       line-height: 1.03;
       letter-spacing: 0;
     }
     .lead {
-      max-width: 760px;
+      max-width: 780px;
       margin: 0;
       color: var(--muted);
       font-size: 19px;
+      font-weight: 560;
     }
     .grid {
       display: grid;
@@ -161,24 +213,28 @@
       margin-top: 34px;
     }
     .feature {
-      min-height: 190px;
-      padding: 22px;
-      border: 1px solid var(--line);
-      background: var(--panel);
+      min-height: 198px;
+      padding: 20px;
+      border: 3px solid var(--border);
+      background: var(--paper-2);
+      box-shadow: var(--shadow);
     }
+    .feature:nth-child(3n + 1) { background: #dff8ef; }
+    .feature:nth-child(3n + 2) { background: #e8edff; }
+    .feature:nth-child(3n + 3) { background: #ffe1dc; }
     .feature h3 {
       margin: 0 0 10px;
       font-size: 19px;
     }
     .feature p {
       margin: 0;
-      color: var(--muted);
+      color: var(--ink);
       font-size: 15px;
     }
     .flow {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 28px;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 30px;
       align-items: center;
       margin-top: 34px;
     }
@@ -186,56 +242,97 @@
     .screenshot-row img {
       width: 100%;
       display: block;
-      border: 1px solid var(--line);
-      background: var(--panel);
-      box-shadow: 0 24px 60px var(--shadow);
+      border: 4px solid var(--border);
+      background: var(--black);
+      box-shadow: var(--shadow);
+    }
+    .screenshot-card {
+      margin: 0;
+      padding: 12px;
+      border: 3px solid var(--border);
+      background: var(--paper-2);
+      box-shadow: var(--shadow);
+    }
+    .screenshot-card img {
+      border-width: 3px;
+      box-shadow: none;
+    }
+    figcaption {
+      margin-top: 10px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
     }
     pre {
       overflow-x: auto;
       margin: 0;
       padding: 20px;
-      background: var(--code);
-      border: 1px solid var(--line);
-      color: #e9e1d7;
+      background: var(--black);
+      border: 4px solid var(--border);
+      color: #f7f0d8;
       font-size: 14px;
       line-height: 1.6;
+      box-shadow: var(--shadow);
     }
     code { font-family: "SFMono-Regular", Consolas, monospace; }
     .screenshot-row {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
+      gap: 22px;
       margin-top: 34px;
     }
     .compare {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 1px;
+      gap: 0;
       margin-top: 34px;
-      background: var(--line);
-      border: 1px solid var(--line);
+      border: 3px solid var(--border);
+      background: var(--border);
+      box-shadow: var(--shadow);
     }
     .compare div {
-      background: var(--panel-2);
+      background: var(--paper-2);
       padding: 18px;
+      border-right: 2px solid var(--border);
     }
+    .compare div:last-child { border-right: 0; }
     .compare strong {
       display: block;
       margin-bottom: 8px;
-      color: var(--accent);
+      color: var(--red);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      text-transform: uppercase;
+      font-size: 12px;
     }
     footer {
       padding: 42px clamp(20px, 5vw, 72px);
-      color: var(--muted);
+      color: var(--paper-2);
+      background: var(--black);
     }
     @media (max-width: 820px) {
-      .site-nav { position: static; align-items: flex-start; flex-direction: column; }
-      .nav-links { flex-wrap: wrap; gap: 12px; }
-      .hero { min-height: 82vh; padding-top: 48px; }
+      .site-nav {
+        position: static;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .nav-links { gap: 6px; }
+      .hero {
+        min-height: 78vh;
+        padding-top: 48px;
+        background:
+          linear-gradient(rgba(255, 244, 184, 0.92), rgba(255, 244, 184, 0.86)),
+          url("assets/link-demo-flow-dark.gif") center / cover no-repeat;
+      }
       .grid,
       .flow,
       .screenshot-row,
       .compare { grid-template-columns: 1fr; }
+      .compare div {
+        border-right: 0;
+        border-bottom: 2px solid var(--border);
+      }
+      .compare div:last-child { border-bottom: 0; }
     }
   </style>
 </head>
@@ -256,6 +353,13 @@
       <span class="eyebrow">Local agent memory</span>
       <h1>Link gives every agent the same memory.</h1>
       <p>Source-backed Markdown memory for Codex, Claude, Cursor, Kiro, VS Code, Copilot, and any MCP client. Local files. Inspectable sources. Budgeted context.</p>
+      <ul class="hero-notes" aria-label="Link storage model">
+        <li>raw/</li>
+        <li>wiki/</li>
+        <li>memories/</li>
+        <li>graph</li>
+        <li>MCP</li>
+      </ul>
       <div class="actions">
         <a class="button primary" href="#quick-start">Try the demo</a>
         <a class="button" href="https://github.com/gowtham0992/link">View on GitHub</a>
@@ -306,15 +410,24 @@ python3 link.py benchmark "agent memory" link-demo</code></pre>
         <h2>Memory is inspectable, reviewable, and explainable.</h2>
         <p class="lead">A memory is not a hidden vector. It is a Markdown page with status, scope, source, review state, graph links, and an audit trail.</p>
         <div class="screenshot-row">
-          <img src="assets/link-memory-dashboard-dark.png" alt="Link memory dashboard">
-          <img src="assets/link-explain-memory-dark.png" alt="Link explain memory view">
+          <figure class="screenshot-card">
+            <img src="assets/link-memory-dashboard-dark.png" alt="Link memory dashboard">
+            <figcaption>Memory dashboard: profile, inbox, captures, and review states.</figcaption>
+          </figure>
+          <figure class="screenshot-card">
+            <img src="assets/link-explain-memory-dark.png" alt="Link explain memory view">
+            <figcaption>Explain memory: why Link knows something and whether it is ready to recall.</figcaption>
+          </figure>
         </div>
       </div>
     </section>
 
     <section id="mcp">
       <div class="section-inner flow">
-        <img src="assets/link-graph-dark.png" alt="Link graph view">
+        <figure class="screenshot-card">
+          <img src="assets/link-graph-dark.png" alt="Link graph view">
+          <figcaption>Graph view: bounded by default, expandable when you need the whole neighborhood.</figcaption>
+        </figure>
         <div>
           <p class="section-kicker">Agent contract</p>
           <h2>Agents get a small set of reliable moves.</h2>
