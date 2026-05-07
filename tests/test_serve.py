@@ -1237,6 +1237,38 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(bad_type_status, 415)
         self.assertIn("application/json", bad_type_payload["error"])
 
+    def test_propose_memories_post_bounds_source_and_project(self):
+        self.make_wiki()
+        request_body = json.dumps({
+            "text": "  Remember that bounded proposal inputs matter.  ",
+            "source": "s" * 600,
+            "project": "p" * 100,
+            "limit": 50,
+        }).encode("utf-8")
+
+        with patch.object(
+            serve,
+            "_propose_memories_from_text",
+            return_value={"proposed": True, "count": 0, "proposals": []},
+        ) as propose:
+            status, payload = run_handler(
+                "POST",
+                "/api/propose-memories",
+                body=request_body,
+                headers={
+                    "Content-Type": "application/json",
+                    "Content-Length": str(len(request_body)),
+                },
+            )
+
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["proposed"])
+        args, kwargs = propose.call_args
+        self.assertEqual(args[0], "Remember that bounded proposal inputs matter.")
+        self.assertEqual(kwargs["source"], "s" * 500)
+        self.assertEqual(kwargs["project"], "p" * 80)
+        self.assertEqual(kwargs["limit"], 20)
+
     def test_propose_page_renders_read_only_workflow(self):
         wiki = self.make_wiki()
 

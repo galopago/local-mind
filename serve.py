@@ -2971,20 +2971,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"proposed": False, "error": error, "count": 0, "proposals": []}, status=status)
                 return
             assert payload is not None
-            text = str(payload.get("text") or "")
+            text = _clean_text_input(payload.get("text"), max_len=MAX_POST_BYTES)
             if not text.strip():
                 self._json({"proposed": False, "error": "text required", "count": 0, "proposals": []}, status=400)
                 return
-            source = str(payload.get("source") or "http")[:500]
+            source = _clean_text_input(payload.get("source") or "http", max_len=500) or "http"
             limit, limit_error = _parse_search_limit(str(payload.get("limit", "10")))
             if limit_error:
                 self._json({"proposed": False, "error": limit_error, "count": 0, "proposals": []}, status=400)
                 return
             result = _propose_memories_from_text(
-                text[:MAX_POST_BYTES],
+                text,
                 source=source,
                 limit=min(limit, 20),
-                project=str(payload.get("project") or ""),
+                project=_clean_text_input(payload.get("project"), max_len=80),
             )
             self._json(result)
             return
