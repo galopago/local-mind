@@ -32,6 +32,10 @@ def reset_wiki(wiki_dir: Path) -> None:
     serve._meta_token_index = {}
     serve._fts_index = None
     serve._search_backend = "token-index"
+    serve._mutation_rate_limiter = serve._CoreLocalRateLimiter(
+        max_events=serve.MUTATION_RATE_LIMIT,
+        window_seconds=serve.MUTATION_RATE_WINDOW_SECONDS,
+    )
 
 
 def write_page(wiki_dir: Path, rel: str, text: str) -> Path:
@@ -148,6 +152,24 @@ class ServeTests(unittest.TestCase):
 
         self.assertEqual(status, 403)
         self.assertEqual(payload["error"], "Host header must be localhost or 127.0.0.1")
+
+    def test_local_mutation_rate_limit_returns_json_429(self):
+        self.make_wiki()
+        serve._mutation_rate_limiter = serve._CoreLocalRateLimiter(max_events=1, window_seconds=60)
+        headers = {
+            "Content-Type": "application/json",
+            "Content-Length": "2",
+            "X-Link-Local-Action": "true",
+        }
+
+        first_status, first_payload = run_handler("POST", "/api/rebuild-backlinks", body=b"{}", headers=headers)
+        second_status, second_payload = run_handler("POST", "/api/rebuild-backlinks", body=b"{}", headers=headers)
+
+        self.assertEqual(first_status, 200)
+        self.assertTrue(first_payload["rebuilt"])
+        self.assertEqual(second_status, 429)
+        self.assertEqual(second_payload["error"], "local mutation rate limit exceeded")
+        self.assertGreaterEqual(second_payload["retry_after_seconds"], 1)
 
     def test_server_args_stay_local_only(self):
         self.assertEqual(serve._parse_serve_port(["--port", "3010"], default=3000), 3010)

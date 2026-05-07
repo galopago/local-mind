@@ -11,6 +11,7 @@ from link_core.web_http import (  # noqa: E402
     BROWSER_SOURCE_LOCAL_ONLY,
     HOST_HEADER_LOCAL_ONLY,
     HOST_HEADER_REQUIRED,
+    LocalRateLimiter,
     is_allowed_static_file,
     parse_bounded_int,
     resolve_raw_static_path,
@@ -21,6 +22,20 @@ from link_core.web_http import (  # noqa: E402
 
 
 class WebHttpCoreTests(unittest.TestCase):
+    def test_local_rate_limiter_reports_retry_after_window(self):
+        now = 100.0
+
+        def clock() -> float:
+            return now
+
+        limiter = LocalRateLimiter(max_events=2, window_seconds=10, clock=clock)
+
+        self.assertEqual(limiter.check("127.0.0.1"), (True, 0))
+        self.assertEqual(limiter.check("127.0.0.1"), (True, 0))
+        self.assertEqual(limiter.check("127.0.0.1"), (False, 10))
+        now = 111.0
+        self.assertEqual(limiter.check("127.0.0.1"), (True, 0))
+
     def test_parse_bounded_int_clamps_and_reports_errors(self):
         self.assertEqual(parse_bounded_int("", "limit", 40, 1, 100), (40, None))
         self.assertEqual(parse_bounded_int("250", "limit", 40, 1, 100), (100, None))

@@ -96,6 +96,7 @@ from link_core.web_graph import (
 from link_core.web_http import (
     is_allowed_static_file as _core_is_allowed_static_file,
     is_relative_to as _core_is_relative_to,
+    LocalRateLimiter as _CoreLocalRateLimiter,
     parse_bounded_int as _core_parse_bounded_int,
     resolve_raw_static_path as _core_resolve_raw_static_path,
     safe_resolve as _core_safe_resolve,
@@ -135,6 +136,8 @@ MAX_PROPOSAL_SOURCE_BYTES = 64 * 1024
 MAX_RAW_SOURCE_BYTES = 60 * 1024
 LOCAL_ACTION_HEADER = "X-Link-Local-Action"
 LOCAL_ACTION_VALUES = {"1", "true", "yes"}
+MUTATION_RATE_LIMIT = 180
+MUTATION_RATE_WINDOW_SECONDS = 60
 PROPOSAL_SOURCE_SUFFIXES = {
     ".md",
     ".markdown",
@@ -176,6 +179,10 @@ _meta_token_index: dict[str, set[str]] = {}  # token → stems with that token i
 _forward_links_index: dict[str, list[str]] = {}  # page name → canonical outbound wikilinks
 _fts_index = None
 _search_backend = "token-index"
+_mutation_rate_limiter = _CoreLocalRateLimiter(
+    max_events=MUTATION_RATE_LIMIT,
+    window_seconds=MUTATION_RATE_WINDOW_SECONDS,
+)
 
 def _invalidate_pages_cache() -> None:
     global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _forward_links_index, _fts_index, _search_backend
@@ -2879,6 +2886,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._head_only = False
         if not self._require_allowed_host():
             return
+        if not self._require_mutation_rate_limit():
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         if path == "/api/rebuild-index":
@@ -3277,6 +3286,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._json({
             **payload,
         }, status=403)
+        return False
+
+    def _require_mutation_rate_limit(self) -> bool:
+        client_host = self.client_address[0] if self.client_address else "local"
+        allowed, retry_after = _mutation_rate_limiter.check(client_host)
+        if allowed:
+            return True
+        self._json(
+            {
+                "error": "local mutation rate limit exceeded",
+                "retry_after_seconds": retry_after,
+            },
+            status=429,
+        )
         return False
 
     def _read_json_body(self) -> tuple[dict | None, str | None, int]:

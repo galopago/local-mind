@@ -1,8 +1,9 @@
 """Shared local HTTP guard helpers for Link's web viewer."""
 from __future__ import annotations
 
+import time
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Callable, Iterable, Mapping
 from urllib.parse import unquote, urlsplit
 
 
@@ -29,6 +30,39 @@ def parse_bounded_int(
     if value < min_value:
         return None, f"{label} must be at least {min_value}"
     return min(value, max_value), None
+
+
+class LocalRateLimiter:
+    """Small in-memory sliding-window limiter for local HTTP mutation APIs."""
+
+    def __init__(
+        self,
+        max_events: int,
+        window_seconds: float,
+        clock: Callable[[], float] | None = None,
+    ) -> None:
+        self.max_events = max(1, int(max_events))
+        self.window_seconds = max(0.1, float(window_seconds))
+        self._clock = clock or time.monotonic
+        self._events: dict[str, list[float]] = {}
+
+    def check(self, key: object) -> tuple[bool, int]:
+        """Return (allowed, retry_after_seconds)."""
+        now = self._clock()
+        key_text = str(key or "local")
+        cutoff = now - self.window_seconds
+        events = [
+            timestamp
+            for timestamp in self._events.get(key_text, [])
+            if timestamp > cutoff
+        ]
+        if len(events) >= self.max_events:
+            retry_after = max(1, int(round(events[0] + self.window_seconds - now)))
+            self._events[key_text] = events
+            return False, retry_after
+        events.append(now)
+        self._events[key_text] = events
+        return True, 0
 
 
 def _host_without_port(host: str) -> str | None:

@@ -9,7 +9,9 @@ exposed directly to the public internet.
 
 Local write APIs also require the `X-Link-Local-Action` header. When a browser
 supplies `Origin` or `Referer`, Link accepts local mutations only from
-`localhost` or `127.0.0.1`.
+`localhost` or `127.0.0.1`. Local mutation endpoints are also rate-limited in
+memory so a runaway local client receives JSON `429` responses instead of
+unbounded writes.
 
 The server and MCP package do not call external APIs, send telemetry, or require
 secrets. Raw sources and generated wiki pages are user data and are ignored by
