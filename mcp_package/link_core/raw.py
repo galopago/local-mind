@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .files import atomic_write_text
 from .security import clean_text_input, secret_value_warnings
 
 
@@ -110,7 +111,7 @@ def create_raw_source(
         content = f"# {clean_title}\n\n{source_text}"
     if not content.endswith("\n"):
         content += "\n"
-    path.write_text(content, encoding="utf-8")
+    atomic_write_text(path, content)
 
     rel = path.relative_to(root).as_posix()
     return {

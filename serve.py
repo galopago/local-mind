@@ -120,6 +120,9 @@ from link_core.capture import (
     capture_review_summary as _core_capture_review_summary,
     cli_capture_commands as _core_cli_capture_commands,
 )
+from link_core.files import (
+    atomic_write_json as _core_atomic_write_json,
+)
 from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
@@ -2929,7 +2932,7 @@ def _rebuild_backlinks_payload() -> dict[str, object]:
     except OSError as exc:
         return {"rebuilt": False, "error": f"Could not rebuild backlinks: {exc}"}
     bl_path = WIKI_DIR / "_backlinks.json"
-    bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    _core_atomic_write_json(bl_path, result)
     # Invalidate pages cache so next request picks up the new backlinks mtime.
     _invalidate_pages_cache()
     return {"rebuilt": True, "pages": len(result.get("backlinks", {}))}

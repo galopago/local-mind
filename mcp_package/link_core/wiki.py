@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .files import atomic_write_text
 from .frontmatter import parse_frontmatter
 from .search import (
     build_fts_index,
@@ -863,7 +864,7 @@ def rebuild_index(
             raise OSError(f"could not read {read_warning_count} wiki page(s){detail}")
         markdown = build_index_markdown(wiki_dir, cache=cache, generated_at=generated_at)
         index_path = wiki_dir / "index.md"
-        index_path.write_text(markdown, encoding="utf-8")
+        atomic_write_text(index_path, markdown)
         pages = _index_pages(cache)
         category_counts: dict[str, int] = {}
         for page in pages:

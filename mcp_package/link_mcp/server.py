@@ -130,6 +130,10 @@ from link_core.capture import (
     mcp_capture_commands as _core_mcp_capture_commands,
     resolve_capture_file as _core_resolve_capture_file,
 )
+from link_core.files import (
+    atomic_write_json as _core_atomic_write_json,
+    atomic_write_text as _core_atomic_write_text,
+)
 from link_core.frontmatter import (
     frontmatter_string as _frontmatter_string,
 )
@@ -444,7 +448,8 @@ def _capture_session(
     capture_dir.mkdir(parents=True, exist_ok=True)
     capture_path = _core_capture_filename(timestamp, capture_title, capture_dir)
     project_line = f'project: "{_frontmatter_string(project_name)}"\n' if project_name else ""
-    capture_path.write_text(
+    _core_atomic_write_text(
+        capture_path,
         f"""---
 title: "{_frontmatter_string(capture_title)}"
 source_type: conversation
@@ -463,7 +468,6 @@ Captured locally for Link memory review. This raw note is proposal-only until th
 
 {clean_text}
 """,
-        encoding="utf-8",
     )
     rel_path = capture_path.relative_to(root).as_posix()
     proposals = _propose_memories_from_text(
@@ -620,7 +624,7 @@ def _redact_capture(capture: str, replacement: str = "[redacted-secret]") -> dic
     )
     rel_path = capture_path.relative_to(root).as_posix()
     if replacement_count:
-        capture_path.write_text(redacted, encoding="utf-8")
+        _core_atomic_write_text(capture_path, redacted)
         _append_log(
             _utc_timestamp(),
             "redact-capture",
@@ -1378,7 +1382,7 @@ def rebuild_backlinks() -> str:
     except OSError as exc:
         return json.dumps({"rebuilt": False, "error": f"Could not rebuild backlinks: {exc}"}, ensure_ascii=False)
     bl_path = WIKI_DIR / "_backlinks.json"
-    bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    _core_atomic_write_json(bl_path, result)
 
     _clear_cache()
 

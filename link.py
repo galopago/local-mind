@@ -147,6 +147,10 @@ from link_core.capture import (
     cli_capture_commands as _core_cli_capture_commands,
     resolve_capture_file as _core_resolve_capture_file,
 )
+from link_core.files import (
+    atomic_write_json as _core_atomic_write_json,
+    atomic_write_text as _core_atomic_write_text,
+)
 from link_core.frontmatter import (
     frontmatter_string as _frontmatter_string,
     parse_frontmatter as _parse_frontmatter,
@@ -987,7 +991,7 @@ def _rebuild_memory_backlinks(wiki_dir: Path) -> bool:
     except OSError as exc:
         print(f"Could not rebuild backlinks: {exc}", file=sys.stderr)
         return False
-    (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
+    _core_atomic_write_json(wiki_dir / "_backlinks.json", backlinks)
     return True
 
 
@@ -1295,7 +1299,7 @@ def _apply_doctor_fixes(target: Path) -> list[str]:
         current, load_error = _load_backlinks(backlinks_path)
         expected = _build_backlinks(wiki_dir)
         if load_error or current is None or _normalize_link_index(current) != _normalize_link_index(expected):
-            backlinks_path.write_text(json.dumps(expected, indent=2) + "\n", encoding="utf-8")
+            _core_atomic_write_json(backlinks_path, expected)
             fixes.append("rebuilt wiki/_backlinks.json")
 
         migration = _core_migrate_wiki(wiki_dir)
@@ -1749,7 +1753,7 @@ def rebuild_backlinks(target: Path) -> int:
         print(f"Could not rebuild backlinks: {exc}", file=sys.stderr)
         return 1
     out_path = wiki_dir / "_backlinks.json"
-    out_path.write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
+    _core_atomic_write_json(out_path, backlinks)
     page_count = len(_wiki_pages(wiki_dir))
     edge_count = sum(len(targets) for targets in backlinks["forward"].values())
     print(f"Rebuilt {out_path}")
@@ -1962,7 +1966,8 @@ def capture_session(
     capture_dir.mkdir(parents=True, exist_ok=True)
     capture_path = _core_capture_filename(timestamp, capture_title, capture_dir)
     project_line = f'project: "{_frontmatter_string(project_name)}"\n' if project_name else ""
-    capture_path.write_text(
+    _core_atomic_write_text(
+        capture_path,
         f"""---
 title: "{_frontmatter_string(capture_title)}"
 source_type: conversation
@@ -1981,7 +1986,6 @@ Captured locally for Link memory review. This raw note is proposal-only until th
 
 {text.strip()}
 """,
-        encoding="utf-8",
     )
     rel_path = capture_path.relative_to(root).as_posix()
     result = _propose_memories_from_text(
@@ -2256,7 +2260,7 @@ def redact_capture(
     redacted, labels, replacement_count = _redact_secret_values(original, replacement=replacement)
     rel_path = capture_path.relative_to(root).as_posix()
     if replacement_count:
-        capture_path.write_text(redacted, encoding="utf-8")
+        _core_atomic_write_text(capture_path, redacted)
         _append_log(
             wiki_dir,
             _utc_timestamp(),
@@ -2509,7 +2513,7 @@ def forget_memory(target: Path, identifier: str, confirm: bool = False, json_out
 
     def rebuild_memory_backlinks() -> bool:
         backlinks = _build_backlinks(wiki_dir)
-        (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
+        _core_atomic_write_json(wiki_dir / "_backlinks.json", backlinks)
         return True
 
     result = _core_forget_memory_page(
@@ -3529,7 +3533,7 @@ def create_demo(target: Path, force: bool = False) -> None:
         shutil.rmtree(target)
 
     target.mkdir(parents=True, exist_ok=True)
-    (target / DEMO_MARKER).write_text("Link demo directory\n", encoding="utf-8")
+    _core_atomic_write_text(target / DEMO_MARKER, "Link demo directory\n")
     _copy_runtime_files(target)
 
     for directory in (
@@ -3548,12 +3552,10 @@ def create_demo(target: Path, force: bool = False) -> None:
     for rel, content in DEMO_FILES.items():
         path = target / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content.strip() + "\n", encoding="utf-8")
+        _core_atomic_write_text(path, content.strip() + "\n")
 
     backlinks = _build_backlinks(target / "wiki")
-    (target / "wiki/_backlinks.json").write_text(
-        json.dumps(backlinks, indent=2), encoding="utf-8"
-    )
+    _core_atomic_write_json(target / "wiki/_backlinks.json", backlinks)
     _core_migrate_wiki(target / "wiki")
 
     print(f"Link demo created at {target}")

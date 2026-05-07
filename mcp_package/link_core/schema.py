@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .files import atomic_write_json
 from .log import utc_timestamp
 
 
@@ -111,7 +112,7 @@ def write_schema(wiki_dir: Path, version: int = CURRENT_SCHEMA_VERSION) -> dict[
         "version": int(version),
         "updated_at": utc_timestamp(),
     }
-    schema_path(wiki_dir).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(schema_path(wiki_dir), payload)
     return payload
 
 

@@ -6,6 +6,7 @@ import shlex
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
+from .files import atomic_write_text
 from .frontmatter import (
     csv_values,
     frontmatter_int,
@@ -711,14 +712,14 @@ def unique_page_path(directory: Path, slug: str) -> Path:
 
 
 def write_default_index(index_path: Path) -> None:
-    index_path.write_text(
+    atomic_write_text(
+        index_path,
         "# Link Wiki Index\n\n"
         "> Last updated: not yet ingested | 0 pages | 0 sources\n\n"
         "## Categories\n\n"
         "## Recent\n\n"
         "| Date | Operation | Pages Touched |\n"
         "|------|-----------|---------------|\n",
-        encoding="utf-8",
     )
 
 
@@ -743,7 +744,7 @@ def update_memory_index(
         text = text.replace("\n## Recent", f"\n### memories\n{entry}\n## Recent", 1)
     else:
         text = text.rstrip() + f"\n\n### memories\n{entry}"
-    index_path.write_text(text, encoding="utf-8")
+    atomic_write_text(index_path, text)
 
 
 def remove_memory_from_index(index_path: Path, page_name: str) -> bool:
@@ -754,7 +755,7 @@ def remove_memory_from_index(index_path: Path, page_name: str) -> bool:
     filtered = [line for line in lines if f"[[{page_name}]]" not in line]
     if len(filtered) == len(lines):
         return False
-    index_path.write_text("\n".join(filtered).rstrip() + "\n", encoding="utf-8")
+    atomic_write_text(index_path, "\n".join(filtered).rstrip() + "\n")
     return True
 
 
@@ -816,7 +817,7 @@ def set_memory_status(
     changed = current_status != status
     if changed:
         text = page_path.read_text(encoding="utf-8", errors="replace")
-        page_path.write_text(update_frontmatter_fields(text, updates, remove=remove), encoding="utf-8")
+        atomic_write_text(page_path, update_frontmatter_fields(text, updates, remove=remove))
         if log_writer:
             log_lines = [
                 f"Updated: memories/{page_path.name}",
@@ -914,7 +915,7 @@ def mark_memory_reviewed(
     changed = previous_review_status != "reviewed" or bool(clean_note)
     if changed:
         text = page_path.read_text(encoding="utf-8", errors="replace")
-        page_path.write_text(update_frontmatter_fields(text, updates), encoding="utf-8")
+        atomic_write_text(page_path, update_frontmatter_fields(text, updates))
         if log_writer:
             log_lines = [
                 f"Reviewed: memories/{page_path.name}",
@@ -998,7 +999,7 @@ def update_memory_page(
         "review_status": "pending",
     }
     updated_text = update_frontmatter_fields(original, updates, remove={"reviewed_at", "review_note"})
-    page_path.write_text(replace_markdown_body(updated_text, updated_body), encoding="utf-8")
+    atomic_write_text(page_path, replace_markdown_body(updated_text, updated_body))
     if log_writer:
         log_writer(
             timestamp,
@@ -1146,7 +1147,7 @@ tags: {yaml_list(tag_values)}
 
 {clean_source}
 """
-    page_path.write_text(page, encoding="utf-8")
+    atomic_write_text(page_path, page)
     update_memory_index(wiki_dir / "index.md", page_name, memory_title_value, summary, memory_type, scope)
     if log_writer:
         log_writer(
