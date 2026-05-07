@@ -3201,6 +3201,78 @@ def _mcp_config(python_cmd: str, wiki_dir: Path) -> dict[str, object]:
     }
 
 
+def _mcp_verify_action(tool: str, label: str, command: list[str]) -> dict[str, object]:
+    return {
+        "tool": tool,
+        "label": label,
+        "command": command,
+        "command_text": shlex.join(command),
+    }
+
+
+def _mcp_verify_guidance(
+    *,
+    target: Path,
+    python_cmd: str,
+    import_status: Mapping[str, object],
+    mcp_sdk_ready: bool,
+    version_matches: bool,
+    wiki_exists: bool,
+) -> tuple[list[dict[str, str]], list[dict[str, object]]]:
+    installed = bool(import_status.get("installed"))
+    issues: list[dict[str, str]] = []
+    next_actions: list[dict[str, object]] = []
+
+    if not installed:
+        issues.append({
+            "code": "link_mcp_missing",
+            "message": "link-mcp is not importable from the configured Python.",
+        })
+        next_actions.append(
+            _mcp_verify_action(
+                "install_link_mcp",
+                "Install link-mcp in the configured Python environment",
+                [python_cmd, "-m", "pip", "install", "--upgrade", "link-mcp"],
+            )
+        )
+    else:
+        if not mcp_sdk_ready:
+            issues.append({
+                "code": "mcp_sdk_missing",
+                "message": "link-mcp is installed, but the MCP SDK dependency is missing.",
+            })
+            next_actions.append(
+                _mcp_verify_action(
+                    "reinstall_link_mcp",
+                    f"Reinstall link-mcp dependencies for Link {LINK_VERSION}",
+                    [python_cmd, "-m", "pip", "install", "--upgrade", f"link-mcp=={LINK_VERSION}"],
+                )
+            )
+        if not version_matches:
+            issues.append({"code": "version_mismatch", "message": f"link-mcp must match Link {LINK_VERSION}."})
+            next_actions.append(
+                _mcp_verify_action(
+                    "upgrade_link_mcp",
+                    f"Upgrade link-mcp to Link {LINK_VERSION}",
+                    [python_cmd, "-m", "pip", "install", "--upgrade", f"link-mcp=={LINK_VERSION}"],
+                )
+            )
+    if not wiki_exists:
+        issues.append({
+            "code": "wiki_missing",
+            "message": "The configured Link wiki directory does not exist.",
+        })
+        next_actions.append(
+            _mcp_verify_action(
+                "init_wiki",
+                "Create or repair the local Link wiki",
+                [sys.executable, str(ROOT / "link.py"), "init", str(target)],
+            )
+        )
+
+    return issues, next_actions
+
+
 def _resolve_mcp_python(target: Path, wiki_dir: Path, python_cmd: str | None) -> str:
     if python_cmd:
         return str(Path(python_cmd).expanduser())
@@ -3231,17 +3303,30 @@ def verify_mcp(
     mcp_sdk_ready = bool(import_status.get("mcp_sdk", import_status.get("installed")))
     version_matches = bool(import_status.get("installed")) and installed_version == LINK_VERSION
     ready = bool(import_status.get("installed")) and mcp_sdk_ready and wiki_exists and version_matches
+    normalized_import_status = dict(import_status)
+    normalized_import_status.setdefault("mcp_sdk", mcp_sdk_ready)
+    normalized_import_status.setdefault("error", None)
+    issues, next_actions = _mcp_verify_guidance(
+        target=target,
+        python_cmd=python_cmd,
+        import_status=normalized_import_status,
+        mcp_sdk_ready=mcp_sdk_ready,
+        version_matches=version_matches,
+        wiki_exists=wiki_exists,
+    )
     status = {
         "ready": ready,
         "python": python_cmd,
         "expected_version": LINK_VERSION,
         "version_matches": version_matches,
-        "link_mcp": import_status,
+        "link_mcp": normalized_import_status,
         "wiki": {
             "path": str(wiki_dir),
             "exists": wiki_exists,
         },
         "config": config,
+        "issues": issues,
+        "next_actions": next_actions,
     }
 
     if json_output:

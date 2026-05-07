@@ -1560,8 +1560,79 @@ class LinkCliTests(unittest.TestCase):
         self.assertTrue(data["ready"])
         self.assertEqual(data["expected_version"], link_cli.LINK_VERSION)
         self.assertTrue(data["version_matches"])
+        self.assertEqual(data["issues"], [])
+        self.assertEqual(data["next_actions"], [])
+        self.assertTrue(data["link_mcp"]["mcp_sdk"])
         self.assertEqual(data["link_mcp"]["version"], link_cli.LINK_VERSION)
         self.assertEqual(data["config"]["mcpServers"]["link"]["command"], "/tmp/python")
+
+    def test_verify_mcp_json_reports_repair_actions(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                json_output=True,
+                python_cmd="/tmp/Link Python/bin/python",
+                import_check=lambda _: {
+                    "installed": True,
+                    "version": "0.9.0",
+                    "mcp_sdk": False,
+                    "error": "No module named mcp",
+                },
+            )
+
+        data = json.loads(out.getvalue())
+        self.assertEqual(code, 1)
+        self.assertFalse(data["ready"])
+        self.assertFalse(data["version_matches"])
+        self.assertFalse(data["link_mcp"]["mcp_sdk"])
+        self.assertEqual([issue["code"] for issue in data["issues"]], ["mcp_sdk_missing", "version_mismatch"])
+        self.assertEqual(
+            [action["tool"] for action in data["next_actions"]],
+            ["reinstall_link_mcp", "upgrade_link_mcp"],
+        )
+        self.assertEqual(
+            data["next_actions"][0]["command"],
+            [
+                "/tmp/Link Python/bin/python",
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                f"link-mcp=={link_cli.LINK_VERSION}",
+            ],
+        )
+        self.assertIn("'/tmp/Link Python/bin/python'", data["next_actions"][0]["command_text"])
+
+    def test_verify_mcp_json_reports_missing_wiki_action(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
+        target = tmp / "empty"
+        target.mkdir()
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.verify_mcp(
+                target,
+                json_output=True,
+                python_cmd="/tmp/python",
+                import_check=lambda _: {
+                    "installed": True,
+                    "version": link_cli.LINK_VERSION,
+                    "mcp_sdk": True,
+                    "error": None,
+                },
+            )
+
+        data = json.loads(out.getvalue())
+        self.assertEqual(code, 1)
+        self.assertFalse(data["wiki"]["exists"])
+        self.assertEqual([issue["code"] for issue in data["issues"]], ["wiki_missing"])
+        self.assertEqual(data["next_actions"][0]["tool"], "init_wiki")
+        self.assertEqual(data["next_actions"][0]["command"][-2:], ["init", str(target.resolve())])
 
     def test_check_link_mcp_import_requires_mcp_sdk(self):
         stdout = json.dumps({
