@@ -15,8 +15,9 @@ unbounded writes. Link does not grant browser CORS access; preflight requests
 receive local JSON `405` responses without `Access-Control-Allow-Origin`.
 The local viewer sends a Content Security Policy that limits scripts,
 connections, images, and framing to local-safe sources. It also sends browser
-isolation and permissions-policy headers, and JSON API responses use
-`Cache-Control: no-store` because they can contain personal memory snippets.
+isolation and permissions-policy headers. JSON API responses and served local
+static/raw files use `Cache-Control: no-store` because they can contain personal
+memory snippets or source media.
 
 The server and MCP package do not call external APIs, send telemetry, or require
 secrets. Raw sources and generated wiki pages are user data and are ignored by

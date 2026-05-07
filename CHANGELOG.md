@@ -53,6 +53,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added explicit local JSON `405` responses for browser preflight requests without granting CORS access.
 - Added Content Security Policy headers to the local viewer and a stricter SVG asset policy.
 - Added browser isolation and permissions-policy headers, and marked local JSON API responses `Cache-Control: no-store`.
+- Marked served local static/raw files `Cache-Control: no-store` so private source media is not browser-cached.
 - Returned hardened JSON `405` responses for unsupported local HTTP methods, including `TRACE` and `CONNECT`, instead of default server HTML.
 - Added an interactive-readiness verdict and threshold warnings to `link benchmark` so larger local wikis are easier to evaluate.
 - Added shared benchmark health checks to the large-wiki smoke so user-facing and CI scale verdicts stay aligned.

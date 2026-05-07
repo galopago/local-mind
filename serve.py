@@ -3390,6 +3390,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._security_headers(content_security_policy=SVG_CONTENT_SECURITY_POLICY)
             else:
                 self._security_headers()
+            self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             if not getattr(self, '_head_only', False):

@@ -95,6 +95,38 @@ def run_handler_with_headers(method: str, path: str, body: bytes = b"", headers:
     return status, payload, response_headers
 
 
+def run_handler_raw(method: str, path: str, body: bytes = b"", headers: dict[str, str] | None = None):
+    handler = object.__new__(serve.Handler)
+    handler.command = method
+    handler.path = path
+    handler.request_version = "HTTP/1.1"
+    handler.requestline = f"{method} {path} HTTP/1.1"
+    handler.client_address = ("127.0.0.1", 0)
+    handler.server = None
+    request_headers = {"Host": "127.0.0.1"}
+    request_headers.update(headers or {})
+    handler.headers = request_headers
+    handler.rfile = BytesIO(body)
+    handler.wfile = BytesIO()
+    if method == "GET":
+        handler.do_GET()
+    elif method == "HEAD":
+        handler.do_HEAD()
+    else:
+        raise ValueError(method)
+    raw = handler.wfile.getvalue()
+    header_bytes, _, body_bytes = raw.partition(b"\r\n\r\n")
+    header_lines = header_bytes.splitlines()
+    status_line = header_lines[0].decode("ascii")
+    status = int(status_line.split()[1])
+    response_headers = {}
+    for line in header_lines[1:]:
+        key, _, value = line.decode("ascii").partition(":")
+        if key:
+            response_headers[key.strip()] = value.strip()
+    return status, body_bytes, response_headers
+
+
 def post_json(path: str, payload: dict[str, object], local_action: bool = True):
     body = json.dumps(payload).encode("utf-8")
     headers = {
@@ -312,6 +344,20 @@ class ServeTests(unittest.TestCase):
         self.assertIsNone(encoded_type)
         self.assertIsNone(wiki_path)
         self.assertIsNone(wiki_type)
+
+    def test_raw_static_files_are_not_browser_cached(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        asset = raw / "asset.png"
+        asset.write_bytes(b"private image bytes")
+
+        status, body, headers = run_handler_raw("GET", "/raw/asset.png")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"private image bytes")
+        self.assertEqual(headers["Content-Type"], "image/png")
+        self.assertEqual(headers["Cache-Control"], "no-store")
 
     def test_graph_labels_are_clamped_inside_canvas(self):
         wiki = self.make_wiki()
