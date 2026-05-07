@@ -42,6 +42,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Moved graph payload, category, and legend helpers into `link_core.web_graph` so graph-scale behavior is tested outside the HTTP monolith.
 - Added a managed `~/.local/bin/link` command for global installs so users can run `link status --validate`, `link query`, and `link brief` without remembering wiki paths.
 - Added a shared Link runtime version and `link --version`; CLI and local HTTP status now report the same release version as the package.
+- Switched MCP status version reporting to the shared Link runtime version so source checkouts and installed packages cannot drift.
 - Added `link init` to create or repair a normal Link wiki without loading demo content.
 - Added `link serve` to start the local web viewer without remembering `serve.py` paths.
 - Improved local server startup errors with bounded port validation in both `link serve` and `serve.py`, plus clear next-port guidance when a port is already in use.

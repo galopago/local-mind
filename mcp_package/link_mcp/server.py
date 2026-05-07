@@ -24,8 +24,7 @@ Add to your MCP client config:
   }
 """
 from __future__ import annotations
-import argparse, json, re, sys
-from importlib import metadata
+import argparse, json, sys
 from pathlib import Path
 
 # ── Resolve wiki directory ────────────────────────────────────────────
@@ -153,6 +152,7 @@ from link_core.prompts import (
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
 )
+from link_core.version import LINK_VERSION
 from link_core.status import (
     link_status as _core_link_status,
 )
@@ -317,12 +317,7 @@ def _validate_wiki(strict: bool = False) -> dict[str, object]:
 
 
 def _package_version() -> str:
-    try:
-        return metadata.version("link-mcp")
-    except metadata.PackageNotFoundError:
-        init_path = Path(__file__).with_name("__init__.py")
-        match = re.search(r'^__version__\s*=\s*"([^"]+)"', init_path.read_text(encoding="utf-8"), flags=re.MULTILINE)
-        return match.group(1) if match else "unknown"
+    return LINK_VERSION
 
 
 def _link_status(include_validation: bool = False) -> dict[str, object]:
