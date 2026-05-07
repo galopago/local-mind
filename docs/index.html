@@ -83,16 +83,24 @@
       border-color: var(--border);
     }
     .hero {
+      position: relative;
+      overflow: hidden;
       min-height: 88vh;
       display: grid;
       align-items: end;
       padding: 74px clamp(20px, 5vw, 72px) 46px;
       background:
-        linear-gradient(90deg, rgba(255, 244, 184, 0.98) 0%, rgba(255, 244, 184, 0.92) 48%, rgba(255, 244, 184, 0.62) 74%, rgba(255, 244, 184, 0.46) 100%),
-        url("assets/link-demo-flow-dark.gif") center / cover no-repeat;
+        linear-gradient(rgba(23, 18, 12, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 18, 12, 0.055) 1px, transparent 1px),
+        linear-gradient(135deg, #fff9d1 0%, #fff4b8 58%, #ffd342 100%);
+      background-size: 28px 28px, 28px 28px, auto;
       border-bottom: 5px solid var(--border);
     }
-    .hero-copy { max-width: 960px; }
+    .hero-copy {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+    }
     .eyebrow {
       display: inline-flex;
       align-items: center;
@@ -321,8 +329,10 @@
         min-height: 78vh;
         padding-top: 48px;
         background:
-          linear-gradient(rgba(255, 244, 184, 0.92), rgba(255, 244, 184, 0.86)),
-          url("assets/link-demo-flow-dark.gif") center / cover no-repeat;
+          linear-gradient(rgba(23, 18, 12, 0.055) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(23, 18, 12, 0.055) 1px, transparent 1px),
+          linear-gradient(135deg, #fff9d1 0%, #fff4b8 68%, #ffd342 100%);
+        background-size: 26px 26px, 26px 26px, auto;
       }
       .grid,
       .flow,
