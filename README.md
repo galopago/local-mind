@@ -528,6 +528,8 @@ Common endpoints:
 | `GET /api/proposal-sources` | Local raw text sources that can be loaded into `/propose`; snippets are redacted when secret-looking values are present. |
 | `GET /api/proposal-source?path=raw/file.md` | Load one safe raw text source into the proposal workflow; secret-warning files are refused until redacted. |
 | `POST /api/propose-memories` | Returns memory proposals from pasted or loaded notes without writing pages; used by `/propose`. |
+| `POST /api/remember-memory` | Header `X-Link-Local-Action: true`; saves an explicitly approved memory through duplicate/conflict-safe core writes. |
+| `POST /api/update-memory` | Header `X-Link-Local-Action: true`; merges an approved proposal into an existing memory and resets review. |
 | `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; marks a memory reviewed. |
 | `POST /api/archive-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "reason": "optional" }`; hides a memory from default recall. |
 | `POST /api/restore-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name" }`; restores an archived memory to active recall. |

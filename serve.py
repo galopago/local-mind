@@ -27,6 +27,8 @@ from link_core.memory import (
     normalize_project as _core_normalize_project,
     propose_memories_from_text as _core_propose_memories_from_text,
     set_memory_status as _core_set_memory_status,
+    update_memory_page as _core_update_memory_page,
+    write_memory_page as _core_write_memory_page,
 )
 from link_core.frontmatter import (
     parse_frontmatter as _parse_frontmatter,
@@ -323,6 +325,47 @@ def _set_memory_status(identifier: str, status: str, reason: str = "") -> dict[s
         log_writer=_append_log,
     )
     if result["updated"]:
+        _invalidate_pages_cache()
+    return result
+
+
+def _remember_memory_from_web(payload: dict[str, object]) -> dict[str, object]:
+    result = _core_write_memory_page(
+        WIKI_DIR,
+        _clean_text_input(payload.get("memory") or payload.get("text"), max_len=MAX_POST_BYTES),
+        _clean_text_input(payload.get("title"), max_len=160) or None,
+        _clean_text_input(payload.get("memory_type") or payload.get("type") or "note", max_len=30),
+        _clean_text_input(payload.get("scope") or "user", max_len=30),
+        _clean_text_input(payload.get("tags"), max_len=500) or None,
+        _clean_text_input(payload.get("source") or "web approval", max_len=500),
+        _utc_timestamp(),
+        project=_clean_text_input(payload.get("project"), max_len=80) or None,
+        records=_memory_records(),
+        allow_duplicate=bool(payload.get("allow_duplicate")),
+        allow_conflict=bool(payload.get("allow_conflict")),
+        log_writer=_append_log,
+        rebuild_backlinks=lambda: bool(_rebuild_backlinks_payload().get("rebuilt")),
+    )
+    if result.get("created"):
+        _invalidate_pages_cache()
+    return result
+
+
+def _update_memory_from_web(payload: dict[str, object]) -> dict[str, object]:
+    result = _core_update_memory_page(
+        WIKI_DIR,
+        _clean_text_input(payload.get("memory") or payload.get("identifier"), max_len=300),
+        _clean_text_input(payload.get("text"), max_len=MAX_POST_BYTES),
+        _clean_text_input(payload.get("source") or "web approval", max_len=500),
+        _utc_timestamp(),
+        records=_memory_records(),
+        review_command="review-memory",
+        allow_conflict=bool(payload.get("allow_conflict")),
+        project=_clean_text_input(payload.get("project"), max_len=80) or None,
+        log_writer=_append_log,
+        rebuild_backlinks=lambda: bool(_rebuild_backlinks_payload().get("rebuilt")),
+    )
+    if result.get("updated"):
         _invalidate_pages_cache()
     return result
 
@@ -1398,6 +1441,74 @@ PROPOSAL_UI_JS = """
     parent.appendChild(button);
   }
 
+  function firstCandidateName(items) {
+    if (!items || !items.length) return '';
+    return items[0].name || items[0].title || '';
+  }
+
+  function approvalEndpoint(proposal) {
+    var action = proposal.primary_action || {};
+    if (action.kind === 'remember' && !(proposal.conflict_candidates && proposal.conflict_candidates.length)) {
+      return '/api/remember-memory';
+    }
+    if (action.kind === 'update' && firstCandidateName(proposal.duplicate_candidates)) {
+      return '/api/update-memory';
+    }
+    return '';
+  }
+
+  function approvalPayload(proposal) {
+    var endpoint = approvalEndpoint(proposal);
+    if (endpoint === '/api/update-memory') {
+      return {
+        memory: firstCandidateName(proposal.duplicate_candidates),
+        text: proposal.memory || '',
+        source: proposal.source || 'web approval',
+        project: proposal.project || ''
+      };
+    }
+    return {
+      memory: proposal.memory || '',
+      title: proposal.title || '',
+      memory_type: proposal.memory_type || 'note',
+      scope: proposal.scope || 'user',
+      source: proposal.source || 'web approval',
+      project: proposal.project || ''
+    };
+  }
+
+  function addApproveButton(parent, proposal) {
+    var endpoint = approvalEndpoint(proposal);
+    if (!endpoint) return;
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = endpoint === '/api/update-memory' ? 'Approve update' : 'Approve and save';
+    button.addEventListener('click', async function() {
+      var message = endpoint === '/api/update-memory'
+        ? 'Update the existing memory with this proposal?'
+        : 'Save this proposal as durable local memory?';
+      if (!window.confirm(message)) return;
+      button.disabled = true;
+      button.textContent = 'Saving...';
+      try {
+        var response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Link-Local-Action': 'true'},
+          body: JSON.stringify(approvalPayload(proposal))
+        });
+        var data = await response.json();
+        if (!response.ok) throw new Error(data.error || data.message || 'memory save failed');
+        button.textContent = 'Saved';
+        setStatus('Saved ' + (data.title || data.name || 'memory') + '. Review it in the memory inbox.');
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = endpoint === '/api/update-memory' ? 'Approve update' : 'Approve and save';
+        setStatus(error.message || 'memory save failed');
+      }
+    });
+    parent.appendChild(button);
+  }
+
   function renderProposals(data) {
     if (!resultsEl) return;
     resultsEl.textContent = '';
@@ -1437,6 +1548,7 @@ PROPOSAL_UI_JS = """
       }
       var actions = document.createElement('div');
       actions.className = 'proposal-actions';
+      addApproveButton(actions, proposal);
       addCopyButton(actions, 'Copy approval prompt', promptText);
       addCopyButton(actions, 'Copy CLI command', action.command || '');
       card.appendChild(actions);
@@ -3271,6 +3383,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 project=str(payload.get("project") or ""),
             )
             self._json(result)
+            return
+        if path in {"/api/remember-memory", "/api/update-memory"}:
+            if not self._require_local_action_header({"saved": False}):
+                return
+            payload, error, status = self._read_json_body()
+            if error:
+                self._json({"saved": False, "error": error}, status=status)
+                return
+            assert payload is not None
+            try:
+                if path == "/api/remember-memory":
+                    result = _remember_memory_from_web(payload)
+                    http_status = 200 if result.get("created") else 409
+                    self._json({"saved": bool(result.get("created")), **result}, status=http_status)
+                else:
+                    result = _update_memory_from_web(payload)
+                    http_status = 200 if result.get("updated") else 409
+                    self._json({"saved": bool(result.get("updated")), **result}, status=http_status)
+            except ValueError as exc:
+                self._json({"saved": False, "error": str(exc)}, status=400)
             return
         if path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:
             if not self._require_local_action_header():

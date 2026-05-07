@@ -913,9 +913,50 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Approve explicitly", html)
         self.assertIn("This step never writes durable memory", html)
         self.assertIn("Proposal-only: no durable memory has been written yet.", html)
+        self.assertIn("Approve and save", html)
+        self.assertIn("/api/remember-memory", html)
+        self.assertIn("/api/update-memory", html)
         self.assertIn("Copy approval prompt", html)
         self.assertIn("navigator.clipboard.writeText", html)
         self.assertIn("var initialSource = form.getAttribute('data-initial-source')", html)
+
+    def test_memory_approval_api_requires_header_and_writes_memory(self):
+        wiki = self.make_wiki()
+        payload = {
+            "memory": "User wants Link memory approvals to stay explicit.",
+            "title": "Explicit approvals",
+            "memory_type": "preference",
+            "scope": "user",
+            "source": "web proposal",
+        }
+
+        denied_status, denied_payload = post_json("/api/remember-memory", payload, local_action=False)
+        create_status, created = post_json("/api/remember-memory", payload)
+        duplicate_status, duplicate = post_json("/api/remember-memory", payload)
+        update_status, updated = post_json(
+            "/api/update-memory",
+            {
+                "memory": created["name"],
+                "text": "User also wants the web proposal flow to preserve review.",
+                "source": "web proposal",
+            },
+        )
+        page_text = (wiki / "memories" / f"{created['name']}.md").read_text(encoding="utf-8")
+
+        self.assertEqual(denied_status, 403)
+        self.assertIn("X-Link-Local-Action", denied_payload["error"])
+        self.assertEqual(create_status, 200)
+        self.assertTrue(created["saved"])
+        self.assertTrue(created["created"])
+        self.assertEqual(created["path"], f"wiki/memories/{created['name']}.md")
+        self.assertEqual(duplicate_status, 409)
+        self.assertFalse(duplicate["saved"])
+        self.assertTrue(duplicate["duplicate"])
+        self.assertEqual(update_status, 200)
+        self.assertTrue(updated["saved"])
+        self.assertTrue(updated["updated"])
+        self.assertEqual(updated["review_status"], "pending")
+        self.assertIn("User also wants the web proposal flow", page_text)
 
     def test_proposal_sources_api_lists_safe_raw_files(self):
         wiki = self.make_wiki()
