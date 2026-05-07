@@ -58,6 +58,7 @@ OUTBOUND_NETWORK_PATTERNS = (
     ("http.client import", re.compile(r"^\s*(?:import\s+http\.client\b|from\s+http\.client\b)", re.MULTILINE)),
     ("urllib.request import", re.compile(r"^\s*(?:import\s+urllib\.request\b|from\s+urllib\.request\b)", re.MULTILINE)),
     ("urllib request import", re.compile(r"^\s*from\s+urllib\s+import\s+request\b", re.MULTILINE)),
+    ("socket import", re.compile(r"^\s*(?:import\s+socket\b|from\s+socket\b)", re.MULTILINE)),
     ("urlopen call", re.compile(r"\burlopen\s*\(")),
     ("http.client connection", re.compile(r"\b(?:http\.client\.)?HTTPS?Connection\s*\(")),
     ("requests call", re.compile(r"\brequests\.(?:get|post|put|patch|delete|request)\s*\(")),

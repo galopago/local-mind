@@ -184,6 +184,11 @@ class ReleaseHygieneTests(unittest.TestCase):
         )
         release_hygiene.check_outbound_network_hygiene(
             findings,
+            Path("mcp_package/link_core/socket_client.py"),
+            "import socket\n",
+        )
+        release_hygiene.check_outbound_network_hygiene(
+            findings,
             Path("README.md"),
             "https://example.com is allowed in docs.\n",
         )
@@ -192,7 +197,8 @@ class ReleaseHygieneTests(unittest.TestCase):
         self.assertIn("outbound network code in integrations/example/install.sh: curl command", findings)
         self.assertIn("outbound network code in mcp_package/link_core/stdlib.py: http.client import", findings)
         self.assertIn("outbound network code in mcp_package/link_core/urllib_alias.py: urllib request import", findings)
-        self.assertEqual(len(findings), 4)
+        self.assertIn("outbound network code in mcp_package/link_core/socket_client.py: socket import", findings)
+        self.assertEqual(len(findings), 5)
 
 
 if __name__ == "__main__":

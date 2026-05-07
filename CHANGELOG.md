@@ -170,6 +170,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Hardened release hygiene so `server.json` cannot silently lose the `link-mcp` package version entry.
 - Added release hygiene checks that block accidental outbound HTTP client code in tracked Python and shell runtimes.
 - Expanded outbound-network release hygiene to catch stdlib `http.client` and `urllib` request aliases.
+- Expanded outbound-network release hygiene to catch direct stdlib `socket` client imports while allowing the local `socketserver` viewer.
 - Updated agent contract checks and installed instructions to include `link_status` for setup/readiness checks.
 - Changed CI to run on pull requests and manual dispatch only, preserving GitHub minutes for the develop-branch workflow.
 - Added CLI validation to the CI demo health smoke path so PRs catch broken generated wiki templates.
