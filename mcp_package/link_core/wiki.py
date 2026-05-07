@@ -284,16 +284,29 @@ def context_for_topic(
 
     forward: list[str] = []
     forward_seen: set[str] = set()
-    path = cache["page_index"].get(primary_name)
-    if path and path.exists():
-        text = path.read_text(encoding="utf-8", errors="replace")
-        _, body = parse_frontmatter(text)
-        page_set = {page["name"].lower() for page in cache["pages"]}
-        for match in WIKILINK_RE.finditer(body):
-            target = match.group(1).strip().lower()
+    page_set = {page["name"].lower() for page in cache["pages"]}
+    forward_links_index = cache.get("forward_links_index")
+    if isinstance(forward_links_index, dict):
+        cached_forward = (
+            forward_links_index.get(str(primary.get("name") or ""))
+            or forward_links_index.get(primary_name)
+            or []
+        )
+        for target_name in cached_forward:
+            target = str(target_name).lower()
             if target in page_set and target != primary_name and target not in forward_seen:
                 forward_seen.add(target)
                 forward.append(target)
+    else:
+        path = cache["page_index"].get(primary_name)
+        if path and path.exists():
+            text = path.read_text(encoding="utf-8", errors="replace")
+            _, body = parse_frontmatter(text)
+            for match in WIKILINK_RE.finditer(body):
+                target = match.group(1).strip().lower()
+                if target in page_set and target != primary_name and target not in forward_seen:
+                    forward_seen.add(target)
+                    forward.append(target)
 
     seen = {primary_name}
     context_names = [primary_name]

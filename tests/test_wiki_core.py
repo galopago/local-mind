@@ -78,7 +78,16 @@ class WikiCoreTests(unittest.TestCase):
 
         cache = build_wiki_cache(wiki)
         search = search_pages("durable", cache)
-        context = context_for_topic(wiki, "agent memory", cache)
+        context_read_counts: dict[str, int] = {}
+        original_read_text = Path.read_text
+
+        def counting_read_text(path: Path, *args, **kwargs):
+            if path.suffix == ".md":
+                context_read_counts[path.stem] = context_read_counts.get(path.stem, 0) + 1
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", counting_read_text):
+            context = context_for_topic(wiki, "agent memory", cache)
         graph = graph_data(cache)
 
         self.assertEqual(search[0]["name"], "agent-memory")
@@ -92,6 +101,7 @@ class WikiCoreTests(unittest.TestCase):
         self.assertEqual(context["inbound_count"], 1)
         self.assertEqual(context["forward_count"], 2)
         self.assertEqual([page["name"] for page in context["pages"]], ["agent-memory", "link", "retrieval"])
+        self.assertEqual(context_read_counts, {"agent-memory": 1, "link": 1, "retrieval": 1})
         self.assertEqual(cache["forward_links_index"]["agent-memory"], ["link", "retrieval"])
         self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
         self.assertIn({"source": "agent-memory", "target": "retrieval"}, graph["edges"])
