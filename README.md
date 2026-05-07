@@ -100,13 +100,15 @@ Open:
 Then check the demo:
 
 ```bash
+python3 link.py query "why does Link help agents?" link-demo --budget small
+python3 link.py brief "working on agent memory" link-demo
 python3 link.py memory-audit link-demo
-python3 link.py doctor link-demo
-python3 link.py ingest-status link-demo
+python3 link.py status --validate link-demo
 ```
 
-The demo includes source pages, concept pages, a memory page, backlinks, search,
-a graph view, memory audit, and MCP-ready retrieval.
+The first query should return a compact packet with a relevant memory, the best
+wiki page, nearby graph context, and agent guidance. The demo also writes
+`link-demo/START_HERE.md` with the exact prompts and checks to try.
 
 ## What You Get
 
