@@ -1,7 +1,9 @@
 """Shared local HTTP guard helpers for Link's web viewer."""
 from __future__ import annotations
 
-from typing import Iterable
+from pathlib import Path
+from typing import Iterable, Mapping
+from urllib.parse import unquote
 
 
 ALLOWED_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost"})
@@ -66,3 +68,63 @@ def validate_local_host_header(
     if host_name in set(allowed_hosts):
         return True, None
     return False, HOST_HEADER_LOCAL_ONLY
+
+
+def safe_resolve(path: Path) -> Path | None:
+    """Resolve a path, returning None for malformed filesystem inputs."""
+    try:
+        return path.resolve()
+    except (OSError, ValueError):
+        return None
+
+
+def is_relative_to(path: Path, root: Path) -> bool:
+    """Return whether path stays under root after both paths are resolved."""
+    resolved_path = safe_resolve(path)
+    resolved_root = safe_resolve(root)
+    if not resolved_path or not resolved_root:
+        return False
+    try:
+        resolved_path.relative_to(resolved_root)
+        return True
+    except ValueError:
+        return False
+
+
+def is_allowed_static_file(
+    path: Path,
+    raw_dir: Path,
+    root_files: Iterable[Path],
+    raw_static_types: Mapping[str, str],
+) -> bool:
+    """Check whether a static file is an allowed root asset or raw media file."""
+    resolved_path = safe_resolve(path)
+    resolved_raw_dir = safe_resolve(raw_dir)
+    if not resolved_path or not resolved_raw_dir:
+        return False
+    allowed_root_files = {
+        resolved
+        for root_file in root_files
+        if (resolved := safe_resolve(root_file)) is not None
+    }
+    return resolved_path in allowed_root_files or (
+        is_relative_to(resolved_path, resolved_raw_dir)
+        and resolved_path.suffix.lower() in raw_static_types
+    )
+
+
+def resolve_raw_static_path(
+    raw_dir: Path,
+    url_fragment: object,
+    raw_static_types: Mapping[str, str],
+) -> tuple[Path | None, str | None]:
+    """Resolve a /raw/ URL fragment to an allowed local file and MIME type."""
+    decoded = unquote(str(url_fragment or "")).lstrip("/")
+    resolved_raw_dir = safe_resolve(raw_dir)
+    resolved = safe_resolve(raw_dir / decoded)
+    if not resolved_raw_dir or not resolved or not is_relative_to(resolved, resolved_raw_dir):
+        return None, None
+    content_type = raw_static_types.get(resolved.suffix.lower())
+    if not content_type:
+        return None, None
+    return resolved, content_type

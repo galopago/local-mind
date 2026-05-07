@@ -85,7 +85,11 @@ from link_core.web_layout import (
     render_layout as _core_render_layout,
 )
 from link_core.web_http import (
+    is_allowed_static_file as _core_is_allowed_static_file,
+    is_relative_to as _core_is_relative_to,
     parse_bounded_int as _core_parse_bounded_int,
+    resolve_raw_static_path as _core_resolve_raw_static_path,
+    safe_resolve as _core_safe_resolve,
     validate_local_host_header as _core_validate_local_host_header,
 )
 from link_core.status import (
@@ -754,42 +758,25 @@ def _json_for_script(data) -> str:
 
 
 def _safe_resolve(path: Path) -> Path | None:
-    try:
-        return path.resolve()
-    except (OSError, ValueError):
-        return None
+    return _core_safe_resolve(path)
 
 
 def _is_relative_to(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-        return True
-    except ValueError:
-        return False
+    return _core_is_relative_to(path, root)
 
 
 def _is_allowed_static_file(path: Path) -> bool:
     root = Path(__file__).parent.resolve()
-    raw_root = RAW_DIR.resolve()
-    allowed_root_files = {
-        (root / "logo.svg").resolve(),
-        (root / "logo.png").resolve(),
-    }
-    return path in allowed_root_files or (
-        _is_relative_to(path, raw_root)
-        and path.suffix.lower() in RAW_STATIC_TYPES
+    return _core_is_allowed_static_file(
+        path,
+        RAW_DIR,
+        (root / "logo.svg", root / "logo.png"),
+        RAW_STATIC_TYPES,
     )
 
 
 def _resolve_raw_static_path(url_fragment: str) -> tuple[Path | None, str | None]:
-    decoded = urllib.parse.unquote(url_fragment).lstrip("/")
-    resolved = _safe_resolve(RAW_DIR / decoded)
-    if not resolved or not _is_relative_to(resolved, RAW_DIR.resolve()):
-        return None, None
-    content_type = RAW_STATIC_TYPES.get(resolved.suffix.lower())
-    if not content_type:
-        return None, None
-    return resolved, content_type
+    return _core_resolve_raw_static_path(RAW_DIR, url_fragment, RAW_STATIC_TYPES)
 
 
 def _proposal_source_title(text: str, fallback: str) -> str:
