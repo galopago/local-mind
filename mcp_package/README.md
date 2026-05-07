@@ -81,10 +81,11 @@ Replace `/Users/YOU` with your absolute home path. The default wiki is
 Most agents should call:
 
 1. `link_status(include_validation=true)` when connecting or troubleshooting.
-2. `memory_brief(query="<current task>")` before personalized or project work.
-3. `query_link(query="<question>", budget="small")` for compact answer-ready context.
-4. `ingest_status()` when the user drops files into `raw/`.
-5. `validate_wiki(strict=true)` after ingest or large edits.
+2. `starter_prompts()` when the user asks what to try after install.
+3. `memory_brief(query="<current task>")` before personalized or project work.
+4. `query_link(query="<question>", budget="small")` for compact answer-ready context.
+5. `ingest_status()` when the user drops files into `raw/`.
+6. `validate_wiki(strict=true)` after ingest or large edits.
 
 Use `remember_memory` only when the user explicitly approves saving durable
 memory. Use `propose_memories` or `capture_session` for proposal-only review.
@@ -94,6 +95,7 @@ memory. Use `propose_memories` or `capture_session` for proposal-only review.
 | Tool | Description |
 |------|-------------|
 | `link_status(include_validation?)` | Readiness summary with package version, wiki path, page/memory counts, optional validation summary, and safe next actions. |
+| `starter_prompts(project?)` | First-run natural agent prompts plus local readiness/check commands. |
 | `migrate_wiki()` | Apply safe, idempotent wiki schema migrations when `link_status` reports a missing or old schema marker. |
 | `ingest_status()` | Raw source ingest state with pending files, graph health, the next agent prompt, guided plan, and follow-up checks. |
 | `query_link(query, budget?, project?)` | Build a compact answer-ready packet from local memory, ranked wiki search, graph-neighborhood context, provenance, budget reports with estimated packet size, and follow-up actions. |

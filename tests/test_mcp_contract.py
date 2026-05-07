@@ -140,6 +140,14 @@ class McpContractTests(unittest.TestCase):
         self.assertTrue(payload["validation"]["passed"])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
 
+    def test_starter_prompts_contract(self):
+        payload = json.loads(self.server.starter_prompts(project="link"))
+
+        self.assertEqual(payload["project"], "link")
+        self.assertEqual(payload["prompts"][0]["prompt"], "is Link ready?")
+        self.assertIn("this project uses Link", payload["prompts"][2]["prompt"])
+        self.assertIn("link status --validate", payload["commands"])
+
     def test_migrate_wiki_contract(self):
         (self.target / "wiki/_link_schema.json").unlink()
 

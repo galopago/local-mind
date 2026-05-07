@@ -75,6 +75,7 @@ EXPECTED_MCP_TOOLS = {
     "restore_memory",
     "review_memory",
     "search_wiki",
+    "starter_prompts",
     "update_memory",
     "validate_wiki",
 }

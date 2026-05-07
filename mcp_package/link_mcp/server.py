@@ -55,6 +55,7 @@ mcp = FastMCP(
         "Link is local personal memory for agents. Use link_status when "
         "connecting to Link or troubleshooting setup/readiness. Start with "
         "migrate_wiki if link_status reports a missing or old schema marker. "
+        "Use starter_prompts when the user asks what to try after install. "
         "Use ingest_status to check pending raw files, the guided ingest plan, and the next ingest prompt. "
         "query_link when the user asks a substantive question that may need "
         "both memory and wiki context. Use memory_brief at "
@@ -143,6 +144,9 @@ from link_core.security import (
 )
 from link_core.query import (
     query_link as _core_query_link,
+)
+from link_core.prompts import (
+    starter_prompt_payload as _core_starter_prompt_payload,
 )
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
@@ -324,6 +328,10 @@ def _link_status(include_validation: bool = False) -> dict[str, object]:
         records=_memory_records(),
         include_validation=include_validation,
     )
+
+
+def _starter_prompts(project: str = "") -> dict[str, object]:
+    return _core_starter_prompt_payload(WIKI_DIR.parent, project=project or None)
 
 
 def _migrate_wiki() -> dict[str, object]:
@@ -800,6 +808,17 @@ def link_status(include_validation: bool = False) -> str:
     optional validation summary, and safe next actions.
     """
     return json.dumps(_link_status(include_validation=include_validation), ensure_ascii=False)
+
+
+@mcp.tool()
+def starter_prompts(project: str = "") -> str:
+    """Return first-run Link prompts and local checks.
+
+    Use this when a user asks what to try after installing Link, or when an
+    agent needs concise natural-language prompts for readiness, brief, remember,
+    query, ingest, and proposal workflows.
+    """
+    return json.dumps(_starter_prompts(project=project), ensure_ascii=False)
 
 
 @mcp.tool()

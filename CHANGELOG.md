@@ -45,6 +45,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added first-run agent prompts to installer output so new users can immediately try brief, remember, and query workflows.
 - Added `link prompts` to print the first-run natural agent prompts and local readiness checks on demand.
 - Added `/prompts` and `/api/prompts` so browser-first users get the same starter prompt guidance as the CLI.
+- Added MCP `starter_prompts` so MCP-only agents can retrieve the same first-run prompt guidance.
 - Added guided `link ingest-status` output with structured JSON guidance, exact agent prompts, and follow-up validation commands.
 - Added visible post-ingest checks to the CLI and local ingest UI so users see the rebuild/validate/status loop before relying on generated pages.
 - Added `/ingest` and `/api/ingest-status` so the local UI shows pending raw files, graph health, and the next agent prompt.
