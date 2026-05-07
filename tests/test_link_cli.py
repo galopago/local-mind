@@ -1568,7 +1568,7 @@ class LinkCliTests(unittest.TestCase):
         with redirect_stdout(out):
             code = link_cli.verify_mcp(
                 target,
-                python_cmd="/tmp/python",
+                python_cmd="/tmp/Link Python/bin/python",
                 import_check=lambda _: {"installed": True, "version": "0.9.0", "error": None},
             )
 
@@ -1576,7 +1576,7 @@ class LinkCliTests(unittest.TestCase):
         text = out.getvalue()
         self.assertIn("link-mcp: installed (0.9.0)", text)
         self.assertIn(f"Expected version: {link_cli.LINK_VERSION}", text)
-        self.assertIn(f"/tmp/python -m pip install --upgrade link-mcp=={link_cli.LINK_VERSION}", text)
+        self.assertIn(f"'/tmp/Link Python/bin/python' -m pip install --upgrade link-mcp=={link_cli.LINK_VERSION}", text)
 
     def test_verify_mcp_reports_missing_package(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))
@@ -1593,7 +1593,7 @@ class LinkCliTests(unittest.TestCase):
 
         self.assertEqual(code, 1)
         self.assertIn("link-mcp: missing", out.getvalue())
-        self.assertIn("python3 -m pip install --upgrade link-mcp", out.getvalue())
+        self.assertIn("/tmp/python -m pip install --upgrade link-mcp", out.getvalue())
 
     def test_verify_mcp_reports_missing_wiki(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-verify-test-"))

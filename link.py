@@ -3261,15 +3261,16 @@ def verify_mcp(
 
     print("")
     print("Next:")
+    quoted_python_cmd = shlex.quote(python_cmd)
     if not import_status.get("installed"):
-        print("  Install: python3 -m pip install --upgrade link-mcp")
+        print(f"  Install: {quoted_python_cmd} -m pip install --upgrade link-mcp")
         print("  macOS/Homebrew fallback:")
         print("    python3 -m venv ~/.link-mcp-venv")
         print("    ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp")
         print("    Then rerun with: python3 link.py verify-mcp . --python ~/.link-mcp-venv/bin/python")
     elif not version_matches:
         print(f"  Upgrade link-mcp to match Link {LINK_VERSION}:")
-        print(f"    {python_cmd} -m pip install --upgrade link-mcp=={LINK_VERSION}")
+        print(f"    {quoted_python_cmd} -m pip install --upgrade link-mcp=={LINK_VERSION}")
     if not wiki_exists:
         print("  Create a wiki with an installer, or try: python3 link.py init")
     print("")
