@@ -2742,6 +2742,8 @@ def benchmark(
     health = payload["health"]
     if isinstance(health, Mapping):
         print(f"Verdict: {health.get('label', 'unknown')}")
+        if health.get("summary"):
+            print(f"Health: {health.get('summary')}")
     print("")
     print("Timings")
     for key in ("cache", "search", "query", "graph"):
@@ -2751,6 +2753,12 @@ def benchmark(
         print("Warnings")
         for warning in health["warnings"]:
             print(f"- {warning}")
+        recommendations = health.get("recommendations")
+        if isinstance(recommendations, list) and recommendations:
+            print("")
+            print("Recommendations")
+            for recommendation in recommendations:
+                print(f"- {recommendation}")
     if isinstance(budget_report, dict):
         packet_report = budget_report.get("context_packet")
         if isinstance(packet_report, dict):

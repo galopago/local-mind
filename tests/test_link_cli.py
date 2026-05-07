@@ -848,6 +848,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertGreater(payload["budget_report"]["context_packet"]["estimated_chars"], 0)
         self.assertEqual(payload["health"]["status"], "pass")
         self.assertEqual(payload["health"]["label"], "interactive")
+        self.assertIn("interactive local agent memory", payload["health"]["summary"])
         self.assertIn("search", payload["health"]["thresholds_seconds"])
 
         text_out = StringIO()
@@ -856,6 +857,7 @@ class LinkCliTests(unittest.TestCase):
 
         self.assertEqual(text_code, 0)
         self.assertIn("Verdict: interactive", text_out.getvalue())
+        self.assertIn("Health: Ready for interactive local agent memory.", text_out.getvalue())
 
     def test_brief_surfaces_saved_captures_without_secret_values(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-memory-test-"))

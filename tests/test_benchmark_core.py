@@ -21,7 +21,9 @@ class BenchmarkCoreTests(unittest.TestCase):
 
         self.assertEqual(health["status"], "pass")
         self.assertEqual(health["label"], "interactive")
+        self.assertEqual(health["summary"], "Ready for interactive local agent memory.")
         self.assertEqual(health["warnings"], [])
+        self.assertEqual(health["recommendations"], [])
 
     def test_benchmark_health_warns_on_slow_paths(self):
         payload = {
@@ -35,6 +37,8 @@ class BenchmarkCoreTests(unittest.TestCase):
         self.assertEqual(health["status"], "warn")
         self.assertEqual(health["label"], "review")
         self.assertIn("search took 1.5000s", health["warnings"][0])
+        self.assertIn("Review recommended", health["summary"])
+        self.assertIn("Run link doctor --fix", health["recommendations"][1])
 
     def test_benchmark_health_warns_on_large_token_fallback(self):
         payload = {
@@ -47,6 +51,7 @@ class BenchmarkCoreTests(unittest.TestCase):
 
         self.assertEqual(health["status"], "warn")
         self.assertIn("SQLite FTS", health["warnings"][0])
+        self.assertIn("SQLite FTS", health["recommendations"][0])
 
 
 if __name__ == "__main__":
