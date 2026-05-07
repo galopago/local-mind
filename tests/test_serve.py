@@ -114,6 +114,16 @@ class ServeTests(unittest.TestCase):
         self.assertIn(".memory-grid { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
         self.assertIn(".memory-actions code, .memory-next code { word-break: break-word; }", serve.CSS)
 
+    def test_security_headers_include_api_version(self):
+        handler = object.__new__(serve.Handler)
+        headers = []
+        handler.send_header = lambda key, value: headers.append((key, value))
+
+        handler._security_headers()
+
+        self.assertIn(("X-Link-API-Version", serve.API_VERSION), headers)
+        self.assertIn(("X-Content-Type-Options", "nosniff"), headers)
+
     def test_server_args_stay_local_only(self):
         self.assertEqual(serve._parse_serve_port(["--port", "3010"], default=3000), 3010)
         self.assertEqual(serve._parse_serve_port(["--port=3011"], default=3000), 3011)
@@ -520,6 +530,7 @@ class ServeTests(unittest.TestCase):
         status, payload = run_handler("GET", "/api/status?validate=true")
 
         self.assertEqual(status, 200)
+        self.assertEqual(payload["api_version"], serve.API_VERSION)
         self.assertTrue(payload["ready"])
         self.assertEqual(payload["memory_count"], 1)
         self.assertTrue(payload["validation"]["passed"])

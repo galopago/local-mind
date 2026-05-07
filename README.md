@@ -507,7 +507,7 @@ from other explicit projects out of recall and duplicate/conflict checks.
 
 Local use only: `serve.py` binds to `127.0.0.1`, rejects host/bind flags, and
 has no authentication. Do not expose it to the internet without adding auth. HTTP write actions require
-`X-Link-Local-Action: true`; proposal analysis does not write pages.
+`X-Link-Local-Action: true`; responses include `X-Link-API-Version`; proposal analysis does not write pages.
 
 Common endpoints:
 

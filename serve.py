@@ -74,6 +74,7 @@ del _BUNDLED_CORE
 WIKI_DIR = ROOT / "wiki"
 RAW_DIR = ROOT / "raw"
 PORT = 3000
+API_VERSION = "1"
 MAX_POST_BYTES = 64 * 1024
 MAX_PROPOSAL_SOURCE_BYTES = 64 * 1024
 LOCAL_ACTION_HEADER = "X-Link-Local-Action"
@@ -3318,12 +3319,14 @@ def _validate_wiki_payload(strict: bool = False) -> dict[str, object]:
 
 
 def _link_status_payload(include_validation: bool = False) -> dict[str, object]:
-    return _core_link_status(
+    payload = _core_link_status(
         WIKI_DIR,
         cache=_current_wiki_cache(),
         records=_memory_records(),
         include_validation=include_validation,
     )
+    payload["api_version"] = API_VERSION
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -3680,6 +3683,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return payload, None, 200
 
     def _security_headers(self):
+        self.send_header("X-Link-API-Version", API_VERSION)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
