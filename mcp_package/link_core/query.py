@@ -71,6 +71,23 @@ def _memory_reason(memory: Mapping[str, object]) -> str:
     return "; ".join(parts)
 
 
+def _drop_empty(data: dict[str, object]) -> dict[str, object]:
+    return {key: value for key, value in data.items() if value not in ("", [], {})}
+
+
+def _memory_provenance(memory: Mapping[str, object]) -> dict[str, object]:
+    return _drop_empty({
+        "path": memory.get("path", ""),
+        "source": memory.get("source", ""),
+        "date_captured": memory.get("date_captured", ""),
+        "updated_at": memory.get("updated_at", ""),
+        "last_update_source": memory.get("last_update_source", ""),
+        "review_status": memory.get("review_status", ""),
+        "reviewed_at": memory.get("reviewed_at", ""),
+        "status": memory.get("status", ""),
+    })
+
+
 def _page_reason(page: Mapping[str, object]) -> str:
     relationship = str(page.get("relationship") or "")
     if relationship == "primary":
@@ -80,6 +97,18 @@ def _page_reason(page: Mapping[str, object]) -> str:
     if relationship == "forward":
         return "linked from the primary page"
     return "related wiki page"
+
+
+def _page_provenance(page: Mapping[str, object]) -> dict[str, object]:
+    return _drop_empty({
+        "path": page.get("path", ""),
+        "relationship": page.get("relationship", ""),
+        "type": page.get("type", ""),
+        "category": page.get("category", ""),
+        "source_count": page.get("source_count", ""),
+        "date_updated": page.get("date_updated", ""),
+        "date_published": page.get("date_published", ""),
+    })
 
 
 def _compact_memory(memory: Mapping[str, object]) -> dict[str, object]:
@@ -98,9 +127,10 @@ def _compact_memory(memory: Mapping[str, object]) -> dict[str, object]:
         "recall": memory.get("recall", {}),
         "review_issue_count": memory.get("review_issue_count", 0),
         "highest_review_severity": memory.get("highest_review_severity", "none"),
+        "provenance": _memory_provenance(memory),
         "why_selected": _memory_reason(memory),
     }
-    return {key: value for key, value in item.items() if value not in ("", [], {})}
+    return _drop_empty(item)
 
 
 def _compact_page(page: Mapping[str, object], primary_chars: int, neighbor_chars: int) -> dict[str, object]:
@@ -114,6 +144,7 @@ def _compact_page(page: Mapping[str, object], primary_chars: int, neighbor_chars
         "relationship": relationship,
         "is_primary": bool(page.get("is_primary")),
         "content": _trim_text(page.get("content", ""), max_chars),
+        "provenance": _page_provenance(page),
         "why_selected": _page_reason(page),
     }
 
@@ -126,6 +157,7 @@ def _compact_search_result(page: Mapping[str, object]) -> dict[str, object]:
         "category": page.get("category", ""),
         "score": page.get("score", 0),
         "snippet": page.get("snippet", ""),
+        "provenance": _page_provenance(page),
     }
 
 
@@ -295,6 +327,7 @@ def query_link(
     guidance = [
         "Use this packet before answering; do not read the whole wiki unless this packet is insufficient.",
         "Prefer recall-ready reviewed memories for personalization and source-backed wiki pages for factual claims.",
+        "Use provenance.path/source/date fields to explain why Link knows something.",
         "If important context appears missing, rerun query_link with a larger budget or call get_context on the primary page.",
         "Do not create or update memory from this packet unless the user explicitly asks.",
     ]

@@ -106,6 +106,7 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
 
         page = {
             "name": md.stem,
+            "path": f"wiki/{rel.as_posix()}",
             "title": title,
             "category": category,
             "type": meta.get("type", ""),
@@ -341,6 +342,7 @@ def context_for_topic(
         page_path = cache["page_index"].get(name)
         if not page_path or not page_path.exists():
             continue
+        cached_page = cache.get("page_map", {}).get(name, {})
         text = page_path.read_text(encoding="utf-8", errors="replace")
         meta, body = parse_frontmatter(text)
         is_primary = name == primary_name
@@ -355,8 +357,14 @@ def context_for_topic(
             content = "\n".join(summary_lines)
         context_pages.append({
             "name": name,
+            "path": cached_page.get("path") or f"wiki/{page_path.relative_to(wiki_dir).as_posix()}",
             "title": meta.get("title", name),
+            "category": cached_page.get("category", ""),
             "type": meta.get("type", ""),
+            "source_count": cached_page.get("source_count", ""),
+            "tldr": cached_page.get("tldr", ""),
+            "date_updated": cached_page.get("date_updated", ""),
+            "date_published": cached_page.get("date_published", ""),
             "is_primary": is_primary,
             "relationship": "primary" if is_primary else ("inbound" if name in inbound else "forward"),
             "content": content,

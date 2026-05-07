@@ -33,6 +33,8 @@ class QueryCoreTests(unittest.TestCase):
             "type: concept\n"
             "title: Agent memory\n"
             "tags: [agents, memory]\n"
+            "source_count: 2\n"
+            "date_updated: \"2026-05-06\"\n"
             "---\n\n"
             "# Agent memory\n\n"
             "> **TLDR:** Agents use durable memory to preserve context.\n\n"
@@ -82,11 +84,21 @@ class QueryCoreTests(unittest.TestCase):
         self.assertEqual(payload["strategy"]["mode"], "memory+wiki")
         self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-memory")
         self.assertEqual(payload["memory"]["items"][0]["recall"]["state"], "ready")
+        self.assertEqual(payload["memory"]["items"][0]["provenance"]["path"], "wiki/memories/prefer-local-memory.md")
+        self.assertEqual(payload["memory"]["items"][0]["provenance"]["source"], "unit-test")
+        self.assertEqual(payload["memory"]["items"][0]["provenance"]["date_captured"], "2026-05-05T00:00:00Z")
+        self.assertEqual(payload["memory"]["items"][0]["provenance"]["review_status"], "reviewed")
         self.assertEqual(payload["memory"]["review"]["items"], [])
         self.assertEqual(payload["wiki"]["primary"], "agent-memory")
+        self.assertEqual(payload["wiki"]["pages"][0]["provenance"]["path"], "wiki/concepts/agent-memory.md")
+        self.assertEqual(payload["wiki"]["pages"][0]["provenance"]["source_count"], "2")
+        self.assertEqual(payload["wiki"]["pages"][0]["provenance"]["date_updated"], "2026-05-06")
+        self.assertEqual(payload["wiki"]["search_results"][0]["provenance"]["path"], "wiki/concepts/agent-memory.md")
         self.assertLessEqual(len(payload["context_packet"]), 4)
         self.assertIn("why_selected", payload["context_packet"][0])
+        self.assertIn("provenance", payload["context_packet"][0])
         self.assertIn("do not read the whole wiki", payload["agent_guidance"][0])
+        self.assertIn("provenance.path/source/date", payload["agent_guidance"][2])
         self.assertIn("budget_report", payload)
         self.assertGreater(payload["budget_report"]["context_packet"]["estimated_chars"], 0)
         self.assertGreater(payload["budget_report"]["context_packet"]["estimated_tokens"], 0)
