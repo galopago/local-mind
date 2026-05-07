@@ -1601,6 +1601,9 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
     print(f"Represented in wiki/sources: {status['represented_count']}")
     print(f"Pending ingest: {status['pending_count']}")
     print(f"Backlinks: {status['backlinks_status']} ({status['backlinks_message']})")
+    safety = status.get("safety") if isinstance(status.get("safety"), dict) else {}
+    if safety:
+        print(f"Safety: {safety.get('status')} ({safety.get('summary')})")
     guidance = status["guidance"]
     if isinstance(guidance, dict):
         print(f"Guidance: {guidance['summary']}")

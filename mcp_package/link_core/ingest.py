@@ -83,6 +83,42 @@ def _secret_blocked_items(items: list[dict[str, object]]) -> list[dict[str, obje
     return [item for item in items if item.get("secret_warnings")]
 
 
+def build_ingest_safety(
+    pending_raw: list[dict[str, object]],
+    represented_raw: list[dict[str, object]],
+) -> dict[str, object]:
+    """Summarize raw-source secret warning state for agents and UI."""
+    blocked = _secret_blocked_items(pending_raw)
+    represented_warnings = _secret_blocked_items(represented_raw)
+    warning_items = blocked + represented_warnings
+    label_set: set[str] = set()
+    for item in warning_items:
+        labels_for_item = item.get("secret_warnings")
+        if isinstance(labels_for_item, list):
+            label_set.update(str(label) for label in labels_for_item)
+    labels = sorted(label_set)
+    warning_count = sum(int(item.get("secret_warning_count") or 0) for item in warning_items)
+    if blocked:
+        status = "blocked"
+        summary = f"{len(blocked)} pending raw file needs redaction before ingest."
+        if len(blocked) != 1:
+            summary = f"{len(blocked)} pending raw files need redaction before ingest."
+    elif represented_warnings:
+        status = "warning"
+        summary = "Raw source warnings exist in already represented files."
+    else:
+        status = "clear"
+        summary = "No secret-looking values detected in raw sources."
+    return {
+        "status": status,
+        "summary": summary,
+        "blocked_count": len(blocked),
+        "warning_count": warning_count,
+        "labels": labels,
+        "blocked_raw": [str(item.get("raw") or "") for item in blocked],
+    }
+
+
 def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, object]:
     """Build a short, actionable ingest workflow for agents and humans."""
     guidance = status.get("guidance") if isinstance(status.get("guidance"), dict) else {}
@@ -342,6 +378,7 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
         "has_raw_dir": raw_dir.exists(),
         "has_wiki_dir": wiki_dir.exists(),
     }
+    payload["safety"] = build_ingest_safety(pending_raw, represented_raw)
     payload["guidance"] = build_ingest_guidance(payload)
     payload["plan"] = build_ingest_plan(payload)
     return payload

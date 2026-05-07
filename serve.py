@@ -2292,6 +2292,7 @@ def _render_ingest():
     plan = status.get("plan") if isinstance(status.get("plan"), dict) else {}
     pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
     represented = status.get("represented_raw") if isinstance(status.get("represented_raw"), list) else []
+    safety = status.get("safety") if isinstance(status.get("safety"), dict) else {}
     first_raw = str(pending[0].get("raw") or "raw/<file>") if pending else "raw/<file>"
     ingest_prompt = agent_prompt or f"ingest {first_raw} into Link"
     memory_prompt = str(plan.get("memory_prompt") or f"propose memories from {first_raw}")
@@ -2304,8 +2305,18 @@ def _render_ingest():
         f'<div class="stat"><span class="num">{int(status.get("represented_count") or 0)}</span><span class="label">represented</span></div>'
         f'<div class="stat"><span class="num">{int(status.get("pending_count") or 0)}</span><span class="label">pending</span></div>'
         f'<div class="stat"><span class="num">{html.escape(str(status.get("backlinks_status") or "unknown"))}</span><span class="label">graph</span></div>'
+        f'<div class="stat"><span class="num">{html.escape(str(safety.get("status") or "unknown"))}</span><span class="label">safety</span></div>'
         f'</div>'
     )
+    safety_html = ""
+    if safety:
+        labels = safety.get("labels") if isinstance(safety.get("labels"), list) else []
+        labels_text = ", ".join(html.escape(str(label)) for label in labels)
+        labels_html = f"<p>Warnings: {labels_text}</p>" if labels_text else ""
+        safety_html = (
+            f'<div class="memory-next"><strong>Raw safety: {html.escape(str(safety.get("status") or "unknown"))}</strong>'
+            f'<p>{html.escape(str(safety.get("summary") or ""))}</p>{labels_html}</div>'
+        )
     action_rows = ""
     if agent_prompt:
         action_rows += (
@@ -2444,6 +2455,7 @@ def _render_ingest():
         f'<h1>Ingest</h1>'
         f'<p class="summary">{html.escape(str(guidance.get("summary") or "Check raw source ingest state."))}</p>'
         f'{stats}'
+        f'{safety_html}'
         f'{next_html}'
         f'{guide_html}'
         f'{actions}'

@@ -253,6 +253,7 @@ class LinkCliTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("Pending ingest: 1", out.getvalue())
+        self.assertIn("Safety: clear (No secret-looking values detected in raw sources.)", out.getvalue())
         self.assertIn("raw/new-source.md", out.getvalue())
         self.assertIn("Guidance: 1 raw file needs ingest.", out.getvalue())
         self.assertIn("Ask your agent: ingest raw/new-source.md into Link", out.getvalue())
@@ -278,6 +279,7 @@ class LinkCliTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("Pending ingest: 1", out.getvalue())
+        self.assertIn("Safety: blocked (1 pending raw file needs redaction before ingest.)", out.getvalue())
         self.assertIn("raw/secret-note.md [redact before ingest: OpenAI API key]", out.getvalue())
         self.assertIn("Guidance: 1 pending raw file contains secret-looking values.", out.getvalue())
         self.assertIn("Suggested workflow: Redact raw sources before ingest", out.getvalue())

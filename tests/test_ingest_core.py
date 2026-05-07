@@ -44,6 +44,7 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["pending_count"], 1)
         self.assertEqual(payload["pending_raw"][0]["raw"], "raw/new-note.md")
         self.assertEqual(payload["guidance"]["state"], "pending_raw")
+        self.assertEqual(payload["safety"]["status"], "clear")
         self.assertEqual(payload["guidance"]["agent_prompt"], "ingest raw/new-note.md into Link")
         self.assertEqual(payload["plan"]["title"], "Ingest pending raw sources")
         self.assertEqual(payload["plan"]["batch"][0]["suggested_source_page"], "wiki/sources/new-note.md")
@@ -68,6 +69,10 @@ class IngestCoreTests(unittest.TestCase):
 
         self.assertEqual(payload["pending_count"], 1)
         self.assertEqual(payload["raw_secret_warning_count"], 1)
+        self.assertEqual(payload["safety"]["status"], "blocked")
+        self.assertEqual(payload["safety"]["blocked_count"], 1)
+        self.assertEqual(payload["safety"]["labels"], ["OpenAI API key"])
+        self.assertEqual(payload["safety"]["blocked_raw"], ["raw/secret-note.md"])
         self.assertEqual(payload["pending_raw"][0]["secret_warnings"], ["OpenAI API key"])
         self.assertEqual(payload["guidance"]["state"], "blocked_secrets")
         self.assertIsNone(payload["guidance"]["agent_prompt"])
@@ -96,8 +101,38 @@ class IngestCoreTests(unittest.TestCase):
 
         self.assertEqual(payload["pending_count"], 0)
         self.assertEqual(payload["represented_count"], 1)
+        self.assertEqual(payload["safety"]["status"], "clear")
         self.assertEqual(payload["guidance"]["state"], "ready")
         self.assertEqual(payload["plan"]["title"], "Ready for new sources")
+
+    def test_collect_ingest_status_warns_on_represented_secret_raw(self):
+        root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))
+        raw = root / "raw"
+        wiki = root / "wiki"
+        raw.mkdir()
+        (raw / "source.md").write_text(
+            "# Source\n\nHistorical token sk-" + ("a" * 25) + "\n",
+            encoding="utf-8",
+        )
+        write_page(wiki, "index.md", "# Index\n")
+        write_page(wiki, "log.md", "# Log\n")
+        write_page(
+            wiki,
+            "sources/source.md",
+            "---\ntype: source\ntitle: Source\n---\n\n"
+            "# Source\n\n"
+            "## Raw Source\n\n`raw/source.md`\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki)), encoding="utf-8")
+
+        payload = collect_ingest_status(root)
+
+        self.assertEqual(payload["pending_count"], 0)
+        self.assertEqual(payload["represented_count"], 1)
+        self.assertEqual(payload["safety"]["status"], "warning")
+        self.assertEqual(payload["safety"]["blocked_count"], 0)
+        self.assertEqual(payload["safety"]["labels"], ["OpenAI API key"])
+        self.assertEqual(payload["guidance"]["state"], "ready")
 
 
 if __name__ == "__main__":
