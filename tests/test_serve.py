@@ -882,6 +882,9 @@ class ServeTests(unittest.TestCase):
         self.assertIn('value="link"', html)
         self.assertIn("without writing anything", html)
         self.assertIn("Save only preferences", html)
+        self.assertIn("Proposal-only: no durable memory has been written yet.", html)
+        self.assertIn("Copy approval prompt", html)
+        self.assertIn("navigator.clipboard.writeText", html)
         self.assertIn("var initialSource = form.getAttribute('data-initial-source')", html)
 
     def test_proposal_sources_api_lists_safe_raw_files(self):

@@ -1053,6 +1053,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .proposal-warning { color: #8a6d3b; font-family: sans-serif; font-size: 13px; line-height: 1.45; }
 .proposal-command { display: block; margin-top: 10px; padding: 8px; background: var(--surface-code);
                     border-radius: 4px; white-space: normal; overflow-wrap: anywhere; }
+.proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-family: sans-serif; }
+.proposal-actions button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
+                           border-radius: 4px; padding: 5px 8px; cursor: pointer; font: inherit; }
+.proposal-actions button:hover { background: var(--button-hover); }
 .memory-issues { margin-top: 6px; }
 .memory-issues li { border: none; padding: 0; color: var(--muted); font-size: 13px; }
 .memory-issues .severity { font-family: sans-serif; font-size: 11px; text-transform: uppercase; color: #8a6d3b; }
@@ -1376,6 +1380,24 @@ PROPOSAL_UI_JS = """
     return 'Approve by asking: remember that ' + memory;
   }
 
+  function addCopyButton(parent, label, text) {
+    if (!text) return;
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.addEventListener('click', async function() {
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = 'Copied';
+        window.setTimeout(function() { button.textContent = label; }, 1200);
+      } catch (error) {
+        button.textContent = 'Select text above';
+        window.setTimeout(function() { button.textContent = label; }, 1600);
+      }
+    });
+    parent.appendChild(button);
+  }
+
   function renderProposals(data) {
     if (!resultsEl) return;
     resultsEl.textContent = '';
@@ -1405,12 +1427,19 @@ PROPOSAL_UI_JS = """
       if (conflicts) addText(card, 'p', 'proposal-warning', 'Possible conflict: ' + conflicts);
       var action = proposal.primary_action || {};
       if (action.label) addText(card, 'p', 'summary', action.label + ': ' + (action.description || ''));
-      var prompt = addText(card, 'code', 'proposal-command', approvalPrompt(proposal));
+      addText(card, 'p', 'proposal-warning', 'Proposal-only: no durable memory has been written yet.');
+      var promptText = approvalPrompt(proposal);
+      var prompt = addText(card, 'code', 'proposal-command', promptText);
       prompt.setAttribute('title', 'Copy this into your agent chat if you approve the memory.');
       if (action.command) {
         var command = addText(card, 'code', 'proposal-command', action.command);
         command.setAttribute('title', 'Equivalent local command.');
       }
+      var actions = document.createElement('div');
+      actions.className = 'proposal-actions';
+      addCopyButton(actions, 'Copy approval prompt', promptText);
+      addCopyButton(actions, 'Copy CLI command', action.command || '');
+      card.appendChild(actions);
       resultsEl.appendChild(card);
     });
   }
