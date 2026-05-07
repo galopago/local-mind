@@ -1146,6 +1146,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .memory-actions button:hover { background: var(--button-hover); }
 .memory-actions button:disabled { color: var(--button-disabled); cursor: default; }
 .memory-action-result { color: var(--muted); min-height: 1em; }
+.copy-button { border: 1px solid var(--border); background: var(--button-bg); color: var(--button-text);
+               border-radius: 4px; padding: 4px 8px; cursor: pointer; font: 12px -apple-system, BlinkMacSystemFont, sans-serif;
+               margin-left: 8px; vertical-align: middle; }
+.copy-button:hover { background: var(--button-hover); }
+.copy-button:disabled { color: var(--button-disabled); cursor: default; }
 .ingest-path { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 14px 0 18px; }
 .ingest-step { border: 1px solid var(--border-soft); border-radius: 4px; background: var(--surface); padding: 12px; font-family: sans-serif; min-width: 0; }
 .ingest-step .step-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
@@ -1361,6 +1366,49 @@ MEMORY_ACTION_JS = """
         if (result) result.textContent = err.message || 'memory action failed';
         button.disabled = false;
       }
+    });
+  });
+})();
+"""
+
+
+COPY_BUTTON_JS = """
+(function() {
+  var buttons = Array.from(document.querySelectorAll('[data-copy-text]'));
+  if (!buttons.length) return;
+
+  async function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    var textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', 'true');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
+
+  buttons.forEach(function(button) {
+    button.addEventListener('click', async function() {
+      var label = button.textContent || 'Copy';
+      var text = button.getAttribute('data-copy-text') || '';
+      if (!text) return;
+      button.disabled = true;
+      try {
+        await copyText(text);
+        button.textContent = 'Copied';
+      } catch (err) {
+        button.textContent = 'Copy failed';
+      }
+      window.setTimeout(function() {
+        button.textContent = label;
+        button.disabled = false;
+      }, 1200);
     });
   });
 })();
@@ -1737,6 +1785,7 @@ document.addEventListener('keydown', function(e) {{
 </script>
 <script>{THEME_CONTROL_JS}</script>
 <script>{MEMORY_ACTION_JS}</script>
+<script>{COPY_BUTTON_JS}</script>
 <script>{PROPOSAL_UI_JS}</script>
 </body>
 </html>"""
@@ -2283,6 +2332,16 @@ def _render_propose(project: str | None = None, source: str | None = None):
     return _layout("Propose Memories", body)
 
 
+def _copy_button(text: object, label: str = "Copy") -> str:
+    value = str(text or "")
+    if not value:
+        return ""
+    return (
+        f'<button type="button" class="copy-button" '
+        f'data-copy-text="{html.escape(value, quote=True)}">{html.escape(label)}</button>'
+    )
+
+
 def _render_ingest():
     status = _ingest_status()
     guidance = status.get("guidance") if isinstance(status.get("guidance"), dict) else {}
@@ -2321,12 +2380,12 @@ def _render_ingest():
     if agent_prompt:
         action_rows += (
             f'<div class="memory-action-row"><span class="memory-action-head"><strong>Ask your agent</strong></span>'
-            f'<code>{html.escape(agent_prompt)}</code></div>'
+            f'{_copy_button(agent_prompt, "Copy prompt")}<code>{html.escape(agent_prompt)}</code></div>'
         )
     for command in commands:
         action_rows += (
             f'<div class="memory-action-row"><span class="memory-action-head"><strong>Run</strong></span>'
-            f'<code>{html.escape(str(command))}</code></div>'
+            f'{_copy_button(command, "Copy command")}<code>{html.escape(str(command))}</code></div>'
         )
     actions = f'<div class="memory-actions">{action_rows}</div>' if action_rows else ""
     if agent_prompt:
@@ -2367,6 +2426,7 @@ def _render_ingest():
         f'<div class="memory-next"><strong>Next step</strong>'
         f'<p>{html.escape(next_detail)}</p>'
         f'<code>{html.escape(next_code)}</code>'
+        f'{_copy_button(next_code, "Copy next step")}'
         f'{next_extra}</div>'
     )
     guide_html = (
@@ -2440,7 +2500,7 @@ def _render_ingest():
         if post_checks:
             rows = "".join(
                 f'<li><code>{html.escape(str(check))}</code>'
-                f'<span class="type">run before reporting done</span></li>'
+                f'<span class="type">run before reporting done {_copy_button(check)}</span></li>'
                 for check in post_checks[:6]
             )
             checks_html = f'<h3>Post-ingest checks</h3><ul class="page-list">{rows}</ul>'

@@ -113,6 +113,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Blocked normal ingest guidance for raw files with secret-looking values so users redact them before any agent reads them into wiki memory.
 - Switched raw-source secret detection to streaming file scans so large source folders do not get loaded into memory during ingest status checks.
 - Added an explicit ingest `safety` summary across CLI, HTTP, and MCP payloads so agents do not need to infer whether raw sources are clear, warning-only, or blocked.
+- Added copy buttons for guided ingest prompts and post-ingest checks in the local web UI.
 - Added a first-use smoke test for init, demo, status, query, brief, remember, capture, ingest-status, and validation workflows.
 - Added `link prompts` coverage to the first-use smoke so CI validates the first-run agent prompt path.
 - Added large-wiki smoke coverage for smart query budgets and graph generation across hundreds of pages.
