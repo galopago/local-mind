@@ -55,8 +55,11 @@ OUTBOUND_NETWORK_CODE_SUFFIXES = {".py", ".sh"}
 OUTBOUND_NETWORK_PATTERNS = (
     ("requests import", re.compile(r"^\s*(?:import\s+requests\b|from\s+requests\b)", re.MULTILINE)),
     ("httpx import", re.compile(r"^\s*(?:import\s+httpx\b|from\s+httpx\b)", re.MULTILINE)),
+    ("http.client import", re.compile(r"^\s*(?:import\s+http\.client\b|from\s+http\.client\b)", re.MULTILINE)),
     ("urllib.request import", re.compile(r"^\s*(?:import\s+urllib\.request\b|from\s+urllib\.request\b)", re.MULTILINE)),
+    ("urllib request import", re.compile(r"^\s*from\s+urllib\s+import\s+request\b", re.MULTILINE)),
     ("urlopen call", re.compile(r"\burlopen\s*\(")),
+    ("http.client connection", re.compile(r"\b(?:http\.client\.)?HTTPS?Connection\s*\(")),
     ("requests call", re.compile(r"\brequests\.(?:get|post|put|patch|delete|request)\s*\(")),
     ("httpx call", re.compile(r"\bhttpx\.(?:get|post|put|patch|delete|request)\s*\(")),
     ("curl command", re.compile(r"(^|[;&|]\s*)curl\s+(?:-[^\s]+\s+)*https?://", re.MULTILINE)),
