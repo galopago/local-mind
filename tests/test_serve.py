@@ -820,6 +820,29 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["warnings"], [])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
 
+    def test_status_api_reports_cache_warnings(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/locked-page.md",
+            "---\ntype: concept\ntitle: Locked\n---\n# Locked\n",
+        )
+        reset_wiki(wiki)
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked-page.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            status, payload = run_handler("GET", "/api/status")
+
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["page_count"], 0)
+        self.assertEqual(payload["warnings"][0]["code"], "cache_unavailable")
+
     def test_memory_inbox_and_explain_render_action_commands(self):
         wiki = self.make_wiki()
         write_page(

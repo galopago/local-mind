@@ -144,6 +144,23 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["warnings"], [])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
 
+    def test_link_status_contract_reports_cache_warnings(self):
+        locked = self.target / "wiki/concepts/locked-page.md"
+        locked.write_text("---\ntype: concept\ntitle: Locked\n---\n\n# Locked\n", encoding="utf-8")
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked-page.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            payload = json.loads(self.server.link_status())
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["page_count"], 0)
+        self.assertEqual(payload["warnings"][0]["code"], "cache_unavailable")
+
     def test_starter_prompts_contract(self):
         payload = json.loads(self.server.starter_prompts(project="Client Launch"))
 

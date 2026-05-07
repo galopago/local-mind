@@ -326,8 +326,6 @@ def _link_status(include_validation: bool = False) -> dict[str, object]:
     return _core_link_status(
         WIKI_DIR,
         version=_package_version(),
-        cache=_build_cache(),
-        records=_memory_records(),
         include_validation=include_validation,
     )
 

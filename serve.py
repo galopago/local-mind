@@ -2947,8 +2947,6 @@ def _link_status_payload(include_validation: bool = False) -> dict[str, object]:
     payload = _core_link_status(
         WIKI_DIR,
         version=LINK_VERSION,
-        cache=_current_wiki_cache(),
-        records=_memory_records(),
         include_validation=include_validation,
     )
     payload["api_version"] = API_VERSION
