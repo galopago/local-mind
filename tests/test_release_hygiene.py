@@ -51,12 +51,23 @@ class ReleaseHygieneTests(unittest.TestCase):
 
         self.assertEqual(findings, [])
 
-    def test_agent_contract_requires_starter_status_query_validate_and_brief_terms(self):
+    def test_agent_contract_requires_core_public_workflow_terms(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-agent-contract-test-"))
         good = tmp / "good.md"
         bad = tmp / "bad.md"
+        required_terms = (
+            "link_status",
+            "starter_prompts",
+            "ingest_status",
+            "query_link",
+            "memory_brief",
+            "get_graph_summary",
+            "backup_wiki",
+            "validate_wiki",
+        )
         good.write_text(
-            "Use link_status, starter_prompts, query_link, validate_wiki, and memory_brief.\n",
+            "Use link_status, starter_prompts, ingest_status, query_link, "
+            "memory_brief, get_graph_summary, backup_wiki, and validate_wiki.\n",
             encoding="utf-8",
         )
         bad.write_text("Use query_link only.\n", encoding="utf-8")
@@ -65,14 +76,17 @@ class ReleaseHygieneTests(unittest.TestCase):
         release_hygiene.check_agent_contract(
             findings,
             {
-                good: ("link_status", "starter_prompts", "query_link", "validate_wiki", "memory_brief"),
-                bad: ("link_status", "starter_prompts", "query_link", "validate_wiki", "memory_brief"),
+                good: required_terms,
+                bad: required_terms,
                 tmp / "missing.md": ("query_link",),
             },
         )
 
         self.assertIn(f"agent contract missing 'link_status' in {bad}", findings)
         self.assertIn(f"agent contract missing 'starter_prompts' in {bad}", findings)
+        self.assertIn(f"agent contract missing 'ingest_status' in {bad}", findings)
+        self.assertIn(f"agent contract missing 'get_graph_summary' in {bad}", findings)
+        self.assertIn(f"agent contract missing 'backup_wiki' in {bad}", findings)
         self.assertIn(f"agent contract missing 'validate_wiki' in {bad}", findings)
         self.assertIn(f"agent contract missing 'memory_brief' in {bad}", findings)
         self.assertIn(f"agent contract file missing: {tmp / 'missing.md'}", findings)
