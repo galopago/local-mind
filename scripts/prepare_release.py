@@ -24,6 +24,7 @@ CHANGELOG_HEADING_RE = re.compile(r"^## \[([^\]]+)\](?: - \d{4}-\d{2}-\d{2})?\s*
 class ReleaseFiles:
     pyproject: Path
     init: Path
+    core_version: Path
     server_json: Path
     changelog: Path
 
@@ -32,6 +33,7 @@ def release_files(root: Path = ROOT) -> ReleaseFiles:
     return ReleaseFiles(
         pyproject=root / "mcp_package/pyproject.toml",
         init=root / "mcp_package/link_mcp/__init__.py",
+        core_version=root / "mcp_package/link_core/version.py",
         server_json=root / "mcp_package/server.json",
         changelog=root / "CHANGELOG.md",
     )
@@ -69,6 +71,13 @@ def read_init_version(path: Path) -> str:
     return match.group(1)
 
 
+def read_core_version(path: Path) -> str:
+    match = re.search(r'^LINK_VERSION\s*=\s*"([^"]+)"', path.read_text(encoding="utf-8"), flags=re.MULTILINE)
+    if not match:
+        raise ValueError(f"could not read LINK_VERSION from {path}")
+    return match.group(1)
+
+
 def read_server_versions(path: Path) -> set[str]:
     data = json.loads(path.read_text(encoding="utf-8"))
     versions = {str(data.get("version", ""))}
@@ -84,6 +93,7 @@ def read_current_versions(files: ReleaseFiles) -> set[str]:
     versions = {
         read_pyproject_version(files.pyproject),
         read_init_version(files.init),
+        read_core_version(files.core_version),
     }
     versions.update(read_server_versions(files.server_json))
     return versions
@@ -109,6 +119,10 @@ def update_pyproject(text: str, version: str) -> str:
 
 def update_init(text: str, version: str) -> str:
     return replace_one(r'^__version__\s*=\s*"[^"]+"', f'__version__ = "{version}"', text, "__version__")
+
+
+def update_core_version(text: str, version: str) -> str:
+    return replace_one(r'^LINK_VERSION\s*=\s*"[^"]+"', f'LINK_VERSION = "{version}"', text, "LINK_VERSION")
 
 
 def update_server_json(text: str, version: str) -> str:
@@ -165,6 +179,7 @@ def prepare_release(root: Path, version: str, release_date: str, dry_run: bool =
     updates = {
         files.pyproject: update_pyproject(files.pyproject.read_text(encoding="utf-8"), version),
         files.init: update_init(files.init.read_text(encoding="utf-8"), version),
+        files.core_version: update_core_version(files.core_version.read_text(encoding="utf-8"), version),
         files.server_json: update_server_json(files.server_json.read_text(encoding="utf-8"), version),
         files.changelog: update_changelog(files.changelog.read_text(encoding="utf-8"), version, release_date),
     }

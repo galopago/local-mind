@@ -181,6 +181,9 @@ from link_core.web_graph import (
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
 )
+from link_core.version import (
+    LINK_VERSION,
+)
 from link_core.status import (
     link_status as _core_link_status,
 )
@@ -1495,13 +1498,14 @@ def migrate(target: Path, json_output: bool = False) -> int:
 def status(target: Path, include_validation: bool = False, json_output: bool = False) -> int:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
-    payload = _core_link_status(wiki_dir, include_validation=include_validation)
+    payload = _core_link_status(wiki_dir, version=LINK_VERSION, include_validation=include_validation)
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0 if payload["ready"] else 1
 
     print(f"Link status: {wiki_dir}")
     print("")
+    print(f"Version: {payload.get('version') or LINK_VERSION}")
     print(f"Ready: {'yes' if payload['ready'] else 'no'}")
     print(f"Pages: {payload['page_count']}")
     print(
@@ -3398,6 +3402,7 @@ def create_demo(target: Path, force: bool = False) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="link.py", description="Link command runner")
+    parser.add_argument("--version", action="version", version=f"Link {LINK_VERSION}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     init_cmd = sub.add_parser("init", help="create or repair a normal Link wiki")

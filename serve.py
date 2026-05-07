@@ -61,6 +61,9 @@ from link_core.prompts import (
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
 )
+from link_core.version import (
+    LINK_VERSION,
+)
 from link_core.web_assets import (
     COPY_BUTTON_JS,
     CSS,
@@ -2870,6 +2873,7 @@ def _validate_wiki_payload(strict: bool = False) -> dict[str, object]:
 def _link_status_payload(include_validation: bool = False) -> dict[str, object]:
     payload = _core_link_status(
         WIKI_DIR,
+        version=LINK_VERSION,
         cache=_current_wiki_cache(),
         records=_memory_records(),
         include_validation=include_validation,

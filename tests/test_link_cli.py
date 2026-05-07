@@ -348,11 +348,27 @@ class LinkCliTests(unittest.TestCase):
             code = link_cli.status(target, include_validation=True)
 
         self.assertEqual(code, 0)
+        self.assertIn(f"Version: {link_cli.LINK_VERSION}", out.getvalue())
         self.assertIn("Ready: yes", out.getvalue())
         self.assertIn("Schema: current", out.getvalue())
         self.assertIn("Search backend:", out.getvalue())
         self.assertIn("Validation: passed", out.getvalue())
         self.assertIn("query_link", out.getvalue())
+
+        json_out = StringIO()
+        with redirect_stdout(json_out):
+            json_code = link_cli.status(target, include_validation=True, json_output=True)
+        self.assertEqual(json_code, 0)
+        self.assertEqual(json.loads(json_out.getvalue())["version"], link_cli.LINK_VERSION)
+
+    def test_main_prints_version(self):
+        out = StringIO()
+
+        with redirect_stdout(out), self.assertRaises(SystemExit) as cm:
+            link_cli.main(["--version"])
+
+        self.assertEqual(cm.exception.code, 0)
+        self.assertIn(f"Link {link_cli.LINK_VERSION}", out.getvalue())
 
     def test_backup_creates_local_archive_without_raw_by_default(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-backup-test-"))

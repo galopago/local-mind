@@ -731,6 +731,7 @@ class ServeTests(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(payload["api_version"], serve.API_VERSION)
+        self.assertEqual(payload["version"], serve.LINK_VERSION)
         self.assertTrue(payload["ready"])
         self.assertEqual(payload["memory_count"], 1)
         self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})

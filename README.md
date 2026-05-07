@@ -598,6 +598,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 
 | Command | What it does |
 |---------|-------------|
+| `link --version` | Print the Link release version used by the local CLI/runtime files. |
 | `link init [dir]` | Create or repair a normal Link wiki without demo content. |
 | `link serve [dir] [--port 3000]` | Start the local web viewer for a Link wiki. |
 | `link prompts [dir] [--project slug]` | Print first-run natural agent prompts plus the local readiness/check commands. |

@@ -109,9 +109,15 @@ def read_init_version(path: Path) -> str | None:
     return match.group(1) if match else None
 
 
+def read_core_version(path: Path) -> str | None:
+    match = re.search(r'^LINK_VERSION\s*=\s*"([^"]+)"', path.read_text(encoding="utf-8"), flags=re.MULTILINE)
+    return match.group(1) if match else None
+
+
 def check_version_consistency(findings: list[str]) -> str | None:
     pyproject_version = read_pyproject_version(Path("mcp_package/pyproject.toml"))
     init_version = read_init_version(Path("mcp_package/link_mcp/__init__.py"))
+    core_version = read_core_version(Path("mcp_package/link_core/version.py"))
     server = json.loads(Path("mcp_package/server.json").read_text(encoding="utf-8"))
     server_version = server.get("version")
     package_versions = {
@@ -122,6 +128,7 @@ def check_version_consistency(findings: list[str]) -> str | None:
     versions = {
         "mcp_package/pyproject.toml": pyproject_version,
         "mcp_package/link_mcp/__init__.py": init_version,
+        "mcp_package/link_core/version.py": core_version,
         "mcp_package/server.json": server_version,
     }
     if len(set(versions.values()) | package_versions) != 1:
