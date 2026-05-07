@@ -22,6 +22,10 @@ The server and MCP package do not call external APIs, send telemetry, or require
 secrets. Raw sources and generated wiki pages are user data and are ignored by
 git by default.
 
+Release hygiene fails if tracked Python or shell runtime code adds common
+outbound HTTP clients or direct `curl`/`wget` calls. This keeps Link's
+local-first promise testable instead of only documented.
+
 `link ingest-status` and MCP `ingest_status` scan raw source files locally for
 secret-looking values. If a pending raw file is flagged, Link withholds the
 normal ingest prompt until the file is redacted.

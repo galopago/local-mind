@@ -96,6 +96,29 @@ class ReleaseHygieneTests(unittest.TestCase):
         )
         self.assertIn("sensitive-looking tracked filename: .pypirc", findings)
 
+    def test_outbound_network_hygiene_blocks_runtime_http_clients(self):
+        findings: list[str] = []
+
+        release_hygiene.check_outbound_network_hygiene(
+            findings,
+            Path("mcp_package/link_core/example.py"),
+            "import requests\nrequests.get('https://example.com')\n",
+        )
+        release_hygiene.check_outbound_network_hygiene(
+            findings,
+            Path("integrations/example/install.sh"),
+            "curl https://example.com/install.sh\n",
+        )
+        release_hygiene.check_outbound_network_hygiene(
+            findings,
+            Path("README.md"),
+            "https://example.com is allowed in docs.\n",
+        )
+
+        self.assertIn("outbound network code in mcp_package/link_core/example.py: requests import", findings)
+        self.assertIn("outbound network code in integrations/example/install.sh: curl command", findings)
+        self.assertEqual(len(findings), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

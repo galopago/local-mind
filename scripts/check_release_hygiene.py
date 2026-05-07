@@ -51,6 +51,18 @@ SECRET_VALUE_PATTERNS = (
     ("Private key block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
 )
 
+OUTBOUND_NETWORK_CODE_SUFFIXES = {".py", ".sh"}
+OUTBOUND_NETWORK_PATTERNS = (
+    ("requests import", re.compile(r"^\s*(?:import\s+requests\b|from\s+requests\b)", re.MULTILINE)),
+    ("httpx import", re.compile(r"^\s*(?:import\s+httpx\b|from\s+httpx\b)", re.MULTILINE)),
+    ("urllib.request import", re.compile(r"^\s*(?:import\s+urllib\.request\b|from\s+urllib\.request\b)", re.MULTILINE)),
+    ("urlopen call", re.compile(r"\burlopen\s*\(")),
+    ("requests call", re.compile(r"\brequests\.(?:get|post|put|patch|delete|request)\s*\(")),
+    ("httpx call", re.compile(r"\bhttpx\.(?:get|post|put|patch|delete|request)\s*\(")),
+    ("curl command", re.compile(r"(^|[;&|]\s*)curl\s+(?:-[^\s]+\s+)*https?://", re.MULTILINE)),
+    ("wget command", re.compile(r"(^|[;&|]\s*)wget\s+(?:-[^\s]+\s+)*https?://", re.MULTILINE)),
+)
+
 BINARY_SUFFIXES = {
     ".gif",
     ".gz",
@@ -168,6 +180,16 @@ def check_tracked_path_hygiene(findings: list[str], path: Path) -> bool:
     return False
 
 
+def check_outbound_network_hygiene(findings: list[str], path: Path, text: str) -> None:
+    """Block accidental outbound network code in Link's local-first runtime."""
+    if path.suffix.lower() not in OUTBOUND_NETWORK_CODE_SUFFIXES:
+        return
+    for label, pattern in OUTBOUND_NETWORK_PATTERNS:
+        if pattern.search(text):
+            findings.append(f"outbound network code in {path}: {label}")
+            return
+
+
 def main() -> int:
     findings: list[str] = []
     current_version = check_version_consistency(findings)
@@ -191,6 +213,7 @@ def main() -> int:
             if pattern.search(text):
                 findings.append(f"sensitive-looking content in {path}: {label}")
                 break
+        check_outbound_network_hygiene(findings, path, text)
 
     if findings:
         print("Release hygiene check failed:")
