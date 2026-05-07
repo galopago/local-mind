@@ -54,6 +54,22 @@ class RuntimeDuplicationTests(unittest.TestCase):
 
         self.assertTrue(any("exact duplicate" in finding for finding in findings))
 
+    def test_report_tracks_thin_duplicate_private_helpers_without_failing(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-runtime-dup-test-"))
+        a = tmp / "a.py"
+        b = tmp / "b.py"
+        a.write_text("def _adapter():\n    return 1\n", encoding="utf-8")
+        b.write_text("def _adapter():\n    return 2\n", encoding="utf-8")
+
+        functions = runtime_duplication.runtime_functions((a, b))
+
+        report = runtime_duplication.format_private_name_report(functions)
+        findings = runtime_duplication.check_large_duplicate_private_names(functions)
+
+        self.assertIn("_adapter", report)
+        self.assertIn("thin", report)
+        self.assertEqual(findings, [])
+
 
 if __name__ == "__main__":
     unittest.main()
