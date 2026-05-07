@@ -102,11 +102,11 @@ class LinkCliTests(unittest.TestCase):
 
         out = StringIO()
         with redirect_stdout(out):
-            code = link_cli.starter_prompts(target, project="link", json_output=True)
+            code = link_cli.starter_prompts(target, project="Client Launch", json_output=True)
         payload = json.loads(out.getvalue())
 
         self.assertEqual(code, 0)
-        self.assertEqual(payload["project"], "link")
+        self.assertEqual(payload["project"], "client-launch")
         self.assertIn("this project uses Link", payload["prompts"][2]["prompt"])
         self.assertIn("what this project remembers", payload["prompts"][3]["prompt"])
 

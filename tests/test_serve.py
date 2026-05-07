@@ -156,17 +156,17 @@ class ServeTests(unittest.TestCase):
     def test_prompts_page_and_api_share_starter_prompts(self):
         self.make_wiki()
 
-        html = serve._render_prompts(project="link")
-        status, payload = run_handler("GET", "/api/prompts?project=link")
+        html = serve._render_prompts(project="Client Launch")
+        status, payload = run_handler("GET", "/api/prompts?project=Client%20Launch")
 
         self.assertEqual(status, 200)
-        self.assertEqual(payload["project"], "link")
+        self.assertEqual(payload["project"], "client-launch")
         self.assertEqual(payload["prompts"][0]["prompt"], "is Link ready?")
         self.assertIn("this project uses Link", payload["prompts"][2]["prompt"])
         self.assertIn("Starter Prompts", html)
         self.assertIn("Ask Your Agent", html)
         self.assertIn("Local Checks", html)
-        self.assertIn("Project examples are scoped", html)
+        self.assertIn("Project examples are scoped to <code>client-launch</code>", html)
         self.assertIn("link status --validate", html)
 
     def test_css_has_explicit_black_dark_theme(self):

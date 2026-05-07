@@ -141,9 +141,9 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")
 
     def test_starter_prompts_contract(self):
-        payload = json.loads(self.server.starter_prompts(project="link"))
+        payload = json.loads(self.server.starter_prompts(project="Client Launch"))
 
-        self.assertEqual(payload["project"], "link")
+        self.assertEqual(payload["project"], "client-launch")
         self.assertEqual(payload["prompts"][0]["prompt"], "is Link ready?")
         self.assertIn("this project uses Link", payload["prompts"][2]["prompt"])
         self.assertIn("link status --validate", payload["commands"])
