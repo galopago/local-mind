@@ -110,6 +110,7 @@ class LargeWikiSmokeTests(unittest.TestCase):
         self.assertTrue(packet["found"])
         self.assertLessEqual(len(packet["context_packet"]), 6)
         self.assertTrue(packet["budget_report"]["wiki_search"]["has_more"])
+        self.assertLess(packet["budget_report"]["context_packet"]["estimated_tokens"], 3000)
         self.assertLessEqual(packet["memory"]["count"], 3)
         self.assertEqual(packet["follow_up"][0]["tool"], "query_link")
         self.assertEqual(len(graph["nodes"]), page_count + 30)

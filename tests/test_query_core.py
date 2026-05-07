@@ -88,6 +88,8 @@ class QueryCoreTests(unittest.TestCase):
         self.assertIn("why_selected", payload["context_packet"][0])
         self.assertIn("do not read the whole wiki", payload["agent_guidance"][0])
         self.assertIn("budget_report", payload)
+        self.assertGreater(payload["budget_report"]["context_packet"]["estimated_chars"], 0)
+        self.assertGreater(payload["budget_report"]["context_packet"]["estimated_tokens"], 0)
         self.assertEqual(payload["follow_up"][0]["tool"], "get_context")
 
     def test_query_link_reports_budget_overflow_and_followups(self):
@@ -142,6 +144,7 @@ class QueryCoreTests(unittest.TestCase):
         self.assertTrue(payload["budget_report"]["memories"]["has_more"])
         self.assertTrue(payload["budget_report"]["wiki_search"]["has_more"])
         self.assertLessEqual(payload["budget_report"]["memories"]["selected"], 3)
+        self.assertLess(payload["budget_report"]["context_packet"]["estimated_tokens"], 2000)
         self.assertEqual(payload["follow_up"][0]["tool"], "query_link")
         self.assertEqual(payload["follow_up"][0]["arguments"]["budget"], "medium")
         self.assertIn("budget-limited", payload["agent_guidance"][1])

@@ -6,6 +6,7 @@ agent can read before answering.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -172,6 +173,23 @@ def _budget_item(selected: int, limit: int, has_more: bool) -> dict[str, object]
     }
 
 
+def _estimated_json_chars(value: object) -> int:
+    return len(json.dumps(value, ensure_ascii=False, sort_keys=True))
+
+
+def _estimated_tokens(chars: int) -> int:
+    # Practical rough count for agent budgeting; exact tokenizers vary by model.
+    return max(1, (chars + 3) // 4) if chars else 0
+
+
+def _context_packet_budget_item(packet: list[dict[str, object]], limit: int) -> dict[str, object]:
+    chars = _estimated_json_chars(packet)
+    item = _budget_item(len(packet), limit, False)
+    item["estimated_chars"] = chars
+    item["estimated_tokens"] = _estimated_tokens(chars)
+    return item
+
+
 def _follow_up_actions(
     query: str,
     budget_name: str,
@@ -285,7 +303,7 @@ def query_link(
         "memories": _budget_item(len(memories), limits["memories"], memory_has_more),
         "wiki_search": _budget_item(len(search_results), limits["search_results"], search_has_more),
         "graph_context": _budget_item(len(pages), limits["context_pages"], context_has_more),
-        "context_packet": _budget_item(len(packet), limits["memories"] + limits["context_pages"], False),
+        "context_packet": _context_packet_budget_item(packet, limits["memories"] + limits["context_pages"]),
     }
     if any(bool(section.get("has_more")) for section in budget_report.values()):
         guidance.insert(1, "This packet is budget-limited; use follow_up instead of scanning files manually.")

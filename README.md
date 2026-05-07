@@ -466,7 +466,7 @@ Most agents should start with:
 | `link_status` | You are connecting to Link or troubleshooting setup and need version, readiness, counts, validation summary, and safe next actions. |
 | `migrate_wiki` | `link_status` reports a missing or old schema marker and you need a safe, idempotent local migration. |
 | `ingest_status` | The user dropped files into `raw/` or asks to ingest, and you need pending raw files plus the next prompt/checks and guided ingest plan. |
-| `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, graph context, budget limits, and follow-up actions without reading the whole wiki. |
+| `query_link` | You need one compact, answer-ready packet that combines relevant memory, ranked wiki results, graph context, budget limits, estimated packet size, and follow-up actions without reading the whole wiki. |
 | `validate_wiki` | You just ingested sources or substantially edited pages and need to verify page shape, links, and backlink freshness before reporting done. |
 | `backup_wiki` | You are about to run broad repair work or risky local wiki edits and want a local `.link-backups/` archive first. |
 | `memory_brief` | You are starting a session or task and need Link to prime the agent with relevant memory, review warnings, and saved capture status. |
@@ -523,7 +523,7 @@ Common endpoints:
 | `GET /api/memory-inbox?project=<slug>` | Memories that need review or metadata cleanup. |
 | `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, secret-warning labels, and review commands. |
 | `GET /api/explain-memory?memory=<name>` | Provenance, lifecycle, graph links, review state, and recall readiness. |
-| `GET /api/query-link?q=<query>&budget=small\|medium\|large` | Compact context packet with relevant memory, ranked wiki results, graph context, budget reports, follow-up actions, and selection reasons. |
+| `GET /api/query-link?q=<query>&budget=small\|medium\|large` | Compact context packet with relevant memory, ranked wiki results, graph context, budget reports with estimated size, follow-up actions, and selection reasons. |
 | `GET /api/validate?strict=true` | Validate generated wiki pages; failed gates return HTTP 422 with structured findings. |
 | `GET /api/proposal-sources` | Local raw text sources that can be loaded into `/propose`; snippets are redacted when secret-looking values are present. |
 | `GET /api/proposal-source?path=raw/file.md` | Load one safe raw text source into the proposal workflow; secret-warning files are refused until redacted. |
@@ -556,7 +556,7 @@ repo-local or source checkout, use `python3 link.py <command>` in that directory
 | `link accept-capture <capture> [--index N]` | Accept one proposal from a saved raw capture using duplicate/conflict-safe memory writes. |
 | `link redact-capture <capture>` | Replace secret-looking values in a saved raw capture and log labels/counts only. |
 | `link delete-capture <capture> --confirm` | Delete a saved raw capture after explicit confirmation. |
-| `link query "task" [--budget small\|medium\|large] [--project slug]` | Build a compact answer-ready packet from memory, wiki search, and graph context. |
+| `link query "task" [--budget small\|medium\|large] [--project slug]` | Build a compact answer-ready packet from memory, wiki search, graph context, and estimated packet size. |
 | `link brief "task" [--project slug]` | Prime an agent with profile counts, relevant memories, review warnings, saved capture status, and safe memory rules. |
 | `link memory-audit [--project slug]` | Read-only health report for memory review backlog, raw captures, risk factors, and next actions. |
 | `link recall "query" [--project slug]` | Search local agent memories with recall readiness. |
