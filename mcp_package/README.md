@@ -89,6 +89,9 @@ Most agents should call:
 
 Use `remember_memory` only when the user explicitly approves saving durable
 memory. Use `propose_memories` or `capture_session` for proposal-only review.
+For local CLI setup checks, `link verify-mcp --json` returns structured
+`issues` and `next_actions` that agents and scripts can consume without parsing
+terminal text.
 
 ## Privacy and Scale
 

@@ -34,6 +34,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.
 - Added `link.py status --validate` to installer next-step output so new users have one readiness command after setup.
 - Added `content_page_count` to Link status and first-run guidance for structurally ready but empty wikis.
+- Added status warnings so cache or memory-read degradation is visible in CLI, HTTP, and MCP readiness payloads.
 - Added shared Markdown renderer coverage under `link_core.markdown` so the local web UI's sanitized Markdown behavior is tested outside the HTTP monolith.
 - Moved the local web UI CSS/JavaScript assets into `link_core.web_assets` so `serve.py` stays focused on routing and rendering.
 - Moved memory and raw-capture card rendering into `link_core.web_memory` so memory UI escaping and actions are covered outside the HTTP server.
@@ -49,6 +50,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Made `link verify-mcp` require the installed `link-mcp` version to match the local Link runtime before reporting ready.
 - Made `link verify-mcp` print shell-quoted install and upgrade commands using the exact Python executable being verified.
 - Made `link verify-mcp` import-check the MCP SDK dependency so broken partial installs no longer report ready.
+- Made `link verify-mcp --json` return structured issue codes and repair actions for agent/tooling consumers.
 - Improved local server startup errors with bounded port validation in both `link serve` and `serve.py`, plus clear next-port guidance when a port is already in use.
 - Added `link benchmark` to measure local cache, search, smart query, and graph timings on a user's current wiki.
 - Extended `link benchmark` and large-wiki smoke to prove bounded agent payload timings for graph summaries and page lists.
