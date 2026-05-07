@@ -268,7 +268,9 @@ and the follow-up checks to run after ingest. If Link reports secret-looking
 values in a raw file, redact that local file first; Link will not suggest the
 normal ingest prompt for flagged raw content. If Link cannot read and safety-scan
 a raw file, fix the local file access first; unreadable raw files are blocked
-from normal ingest guidance too.
+from normal ingest guidance too. If a source page cannot be read, Link blocks
+normal ingest guidance until that page is repaired because pending/represented
+counts may be incomplete.
 
 ### 3. Save One Direct Memory
 

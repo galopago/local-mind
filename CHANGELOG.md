@@ -154,6 +154,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Normalized explicit starter prompt project names so CLI, HTTP, and MCP return consistent project slugs.
 - Blocked normal ingest guidance for raw files with secret-looking values so users redact them before any agent reads them into wiki memory.
 - Blocked normal ingest guidance for raw files Link cannot read and safety-scan, with explicit CLI, HTTP, and MCP payload diagnostics.
+- Blocked normal ingest guidance when source pages cannot be read, because represented/pending raw counts may be incomplete.
 - Switched raw-source secret detection to streaming file scans so large source folders do not get loaded into memory during ingest status checks.
 - Added an explicit ingest `safety` summary across CLI, HTTP, and MCP payloads so agents do not need to infer whether raw sources are clear, warning-only, or blocked.
 - Added copy buttons for guided ingest prompts and post-ingest checks in the local web UI.

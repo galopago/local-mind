@@ -1613,6 +1613,38 @@ class ServeTests(unittest.TestCase):
         self.assertIn("fix access before ingest", html)
         self.assertNotIn('/propose?source=raw/locked-note.md', html)
 
+    def test_ingest_page_blocks_unreadable_source_pages(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        (raw / "broken-source.md").write_text("# Broken source\n", encoding="utf-8")
+        write_page(
+            wiki,
+            "sources/broken.md",
+            "---\ntype: source\ntitle: Broken\n---\n\n`raw/broken-source.md`\n",
+        )
+        reset_wiki(wiki)
+        original_read_text = Path.read_text
+
+        def read_text(path: Path, *args: object, **kwargs: object) -> str:
+            if path.name == "broken.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", read_text):
+            api_status, payload = run_handler("GET", "/api/ingest-status")
+            html = serve._render_ingest()
+
+        self.assertEqual(api_status, 200)
+        self.assertEqual(payload["guidance"]["state"], "blocked_source_access")
+        self.assertIsNone(payload["guidance"]["agent_prompt"])
+        self.assertEqual(payload["source_read_warning_count"], 1)
+        self.assertIn("Source Page Warnings", html)
+        self.assertIn("wiki/sources/broken.md", html)
+        self.assertIn("could not inspect: permission denied", html)
+        self.assertIn("Inspect source page access", html)
+        self.assertIn("fix source page access before ingest", html)
+
     def test_rebuild_backlinks_requires_json_post(self):
         wiki = self.make_wiki()
         write_page(

@@ -112,6 +112,39 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["plan"]["batch"][0]["scan_error"], "permission denied")
         self.assertIn("cannot read and scan", payload["guidance"]["notes"][0])
 
+    def test_collect_ingest_status_blocks_unreadable_source_pages(self):
+        root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))
+        raw = root / "raw"
+        wiki = root / "wiki"
+        raw.mkdir()
+        (raw / "broken-source.md").write_text("# Broken source\n", encoding="utf-8")
+        write_page(wiki, "index.md", "# Index\n")
+        write_page(wiki, "log.md", "# Log\n")
+        write_page(
+            wiki,
+            "sources/broken.md",
+            "---\ntype: source\ntitle: Broken\n---\n\n`raw/broken-source.md`\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki)), encoding="utf-8")
+
+        original_read_text = Path.read_text
+
+        def read_text(path: Path, *args: object, **kwargs: object) -> str:
+            if path.name == "broken.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", read_text):
+            payload = collect_ingest_status(root)
+
+        self.assertEqual(payload["source_read_warning_count"], 1)
+        self.assertEqual(payload["source_read_warnings"], [{"page": "wiki/sources/broken.md", "error": "permission denied"}])
+        self.assertEqual(payload["guidance"]["state"], "blocked_source_access")
+        self.assertIsNone(payload["guidance"]["agent_prompt"])
+        self.assertEqual(payload["plan"]["title"], "Inspect source page access")
+        self.assertEqual(payload["plan"]["batch"][0]["page"], "wiki/sources/broken.md")
+        self.assertIn("Represented and pending raw counts may be incomplete", payload["guidance"]["notes"][0])
+
     def test_collect_ingest_status_reports_represented_raw(self):
         root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))
         raw = root / "raw"

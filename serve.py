@@ -1515,6 +1515,10 @@ def _render_ingest():
         next_detail = "Fix raw file access before asking any agent to ingest it. Link could not inspect the source for safety."
         next_code = f"inspect {first_raw}"
         next_extra = ""
+    elif state == "blocked_source_access":
+        next_detail = "Fix source page access before relying on ingest state. Link could not inspect represented source pages."
+        next_code = "link ingest-status"
+        next_extra = ""
     elif state == "stale_graph":
         next_detail = "Repair the graph index before relying on search, context, or the graph view."
         next_code = "link rebuild-backlinks && link validate"
@@ -1537,6 +1541,9 @@ def _render_ingest():
     elif state == "blocked_raw_access":
         ingest_prompt = f"fix raw source access for {first_raw} before ingest"
         optional_memory_html = '<code>fix access before memory proposals</code>'
+    elif state == "blocked_source_access":
+        ingest_prompt = "fix source page access before ingest"
+        optional_memory_html = '<code>fix source access first</code>'
     else:
         optional_memory_html = (
             f'<a href="{html.escape(propose_href, quote=True)}"><code>{html.escape(memory_prompt)}</code></a>'
@@ -1597,6 +1604,19 @@ def _render_ingest():
     notes_html = ""
     if notes:
         notes_html = "<ul>" + "".join(f"<li>{html.escape(str(note))}</li>" for note in notes) + "</ul>"
+
+    source_warning_html = ""
+    source_warnings = status.get("source_read_warnings") if isinstance(status.get("source_read_warnings"), list) else []
+    if source_warnings:
+        rows = ""
+        for item in source_warnings[:50]:
+            if not isinstance(item, dict):
+                continue
+            rows += (
+                f'<li><code>{html.escape(str(item.get("page") or ""))}</code>'
+                f'<span class="type">could not inspect: {html.escape(str(item.get("error") or ""))}</span></li>'
+            )
+        source_warning_html = f'<h2>Source Page Warnings</h2><ul class="page-list">{rows}</ul>'
 
     plan_html = ""
     if plan:
@@ -1712,6 +1732,7 @@ def _render_ingest():
         f'{raw_form}'
         f'{stats}'
         f'{safety_html}'
+        f'{source_warning_html}'
         f'{next_html}'
         f'{guide_html}'
         f'{actions}'

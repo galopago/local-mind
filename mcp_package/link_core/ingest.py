@@ -49,7 +49,10 @@ def _heading_title(body: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-def source_page_index(wiki_dir: Path) -> dict[str, dict[str, object]]:
+def source_page_index(
+    wiki_dir: Path,
+    read_warnings: list[dict[str, str]] | None = None,
+) -> dict[str, dict[str, object]]:
     sources_dir = wiki_dir / "sources"
     if not sources_dir.exists():
         return {}
@@ -57,7 +60,15 @@ def source_page_index(wiki_dir: Path) -> dict[str, dict[str, object]]:
     for page in sorted(sources_dir.rglob("*.md")):
         if page.name.startswith("."):
             continue
-        text = page.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = page.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            if read_warnings is not None:
+                read_warnings.append({
+                    "page": f"wiki/{page.relative_to(wiki_dir).as_posix()}",
+                    "error": str(exc),
+                })
+            continue
         meta, body = parse_frontmatter(text)
         name = page.stem.lower()
         records[name] = {
@@ -85,7 +96,10 @@ def backlinks_health(wiki_dir: Path) -> tuple[str, str]:
     )
     if load_error:
         return "missing" if "missing" in load_error else "invalid", load_error
-    expected = build_backlinks(wiki_dir)
+    try:
+        expected = build_backlinks(wiki_dir)
+    except OSError as exc:
+        return "invalid", f"could not inspect wiki pages for backlinks: {exc}"
     if current is not None and normalize_link_index(current) == normalize_link_index(expected):
         return "current", "wiki/_backlinks.json is current"
     return "stale", "wiki/_backlinks.json is stale"
@@ -245,6 +259,32 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
             "post_checks": ["link ingest-status", "link status --validate"],
         }
 
+    if state == "blocked_source_access":
+        warnings = status.get("source_read_warnings") if isinstance(status.get("source_read_warnings"), list) else []
+        first = warnings[0] if warnings and isinstance(warnings[0], dict) else {"page": "wiki/sources/<page>.md"}
+        return {
+            "state": state,
+            "title": "Inspect source page access",
+            "summary": f"Start with {first['page']}; Link could not read one or more source pages.",
+            "batch": [
+                {
+                    "page": str(item.get("page") or ""),
+                    "error": str(item.get("error") or ""),
+                }
+                for item in warnings[: max(limit, 1)]
+                if isinstance(item, dict)
+            ],
+            "steps": [
+                "Check that the source page still exists and is readable by the local user.",
+                "Fix permissions or repair the page before relying on represented/pending raw counts.",
+                "Refresh ingest status after the page is readable.",
+                "Run validation before reporting ingest complete.",
+            ],
+            "agent_prompt": None,
+            "memory_prompt": None,
+            "post_checks": ["link ingest-status", "link validate", "link status --validate"],
+        }
+
     if state == "stale_graph":
         return {
             "state": state,
@@ -361,6 +401,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
     pending_count = int(status.get("pending_count") or 0)
     raw_count = int(status.get("raw_count") or 0)
     backlinks_status = str(status.get("backlinks_status") or "unknown")
+    source_read_warning_count = int(status.get("source_read_warning_count") or 0)
     secret_items = _secret_blocked_items(pending_items)
     access_items = _access_blocked_items(pending_items)
 
@@ -371,6 +412,18 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "agent_prompt": None,
             "commands": ["link init", "link status --validate"],
             "notes": ["Run the installer or initialize this directory before ingesting sources."],
+        }
+
+    if source_read_warning_count:
+        return {
+            "state": "blocked_source_access",
+            "summary": f"{source_read_warning_count} source page could not be inspected. Fix source page access before ingest.",
+            "agent_prompt": None,
+            "commands": ["link ingest-status", "link validate", "link status --validate"],
+            "notes": [
+                "Represented and pending raw counts may be incomplete while source pages cannot be read.",
+                "Fix permissions or repair the page, then refresh ingest status.",
+            ],
         }
 
     if access_items:
@@ -458,7 +511,8 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     raw_dir = target / "raw"
     wiki_dir = target / "wiki"
     raw_files = raw_source_files(raw_dir, skip_dirs=skip_dirs)
-    source_records = source_page_index(wiki_dir)
+    source_read_warnings: list[dict[str, str]] = []
+    source_records = source_page_index(wiki_dir, read_warnings=source_read_warnings)
 
     represented_raw: list[dict[str, object]] = []
     pending_raw: list[dict[str, object]] = []
@@ -510,6 +564,8 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
         "target": str(target),
         "raw_count": len(raw_files),
         "source_page_count": len(source_records),
+        "source_read_warning_count": len(source_read_warnings),
+        "source_read_warnings": source_read_warnings,
         "represented_count": len(represented_raw),
         "pending_count": len(pending_raw),
         "represented_raw": represented_raw,

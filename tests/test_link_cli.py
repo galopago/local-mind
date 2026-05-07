@@ -342,6 +342,33 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Suggested workflow: Inspect raw source access", text)
         self.assertNotIn("Ask your agent: ingest raw/locked-note.md into Link", text)
 
+    def test_ingest_status_blocks_unreadable_source_pages(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / "wiki/sources/broken.md").write_text(
+            "---\ntype: source\ntitle: Broken\n---\n\n`raw/agent-memory-session.md`\n",
+            encoding="utf-8",
+        )
+        original_read_text = Path.read_text
+
+        def read_text(path: Path, *args: object, **kwargs: object) -> str:
+            if path.name == "broken.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        out = StringIO()
+        with patch.object(Path, "read_text", read_text), redirect_stdout(out):
+            code = link_cli.ingest_status(target)
+
+        text = out.getvalue()
+        self.assertEqual(code, 0)
+        self.assertIn("Source page read warnings: 1", text)
+        self.assertIn("wiki/sources/broken.md [fix access: permission denied]", text)
+        self.assertIn("Guidance: 1 source page could not be inspected.", text)
+        self.assertIn("Suggested workflow: Inspect source page access", text)
+        self.assertNotIn("Ask your agent:", text)
+
     def test_ingest_status_json(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
         target = tmp / "demo"
