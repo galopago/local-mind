@@ -42,6 +42,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Hardened MCP and local web status calls so cache issues produce readiness warnings instead of crashing.
 - Made the shared wiki cache skip unreadable pages with `cache_read_warnings` so search/query/graph can continue over readable pages.
 - Added shared atomic write helpers and migrated Link state writes for schema markers, memory pages, indexes, backlinks, captures, raw source creation, logs, and demo files.
+- Optimized ingest status source matching with a reverse raw-path index instead of a raw-file by source-page nested scan.
 - Added MCP `link_status` and `/api/status` for a compact readiness summary with version, wiki path, page/memory counts, optional validation, and safe next actions.
 - Added search backend reporting to Link status payloads so agents and users can see whether local search is using SQLite FTS or the token fallback.
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.

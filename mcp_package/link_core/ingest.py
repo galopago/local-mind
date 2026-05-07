@@ -22,6 +22,8 @@ DEFAULT_SKIP_DIRS = {
     "node_modules",
 }
 
+SOURCE_RAW_MATCH_CHUNK_SIZE = 256
+
 
 def raw_source_files(raw_dir: Path, skip_dirs: set[str] | None = None) -> list[Path]:
     if not raw_dir.exists():
@@ -78,6 +80,38 @@ def source_page_index(
             "text": text,
         }
     return records
+
+
+def source_matches_by_raw(
+    source_records: dict[str, dict[str, object]],
+    raw_rels: list[str],
+    *,
+    chunk_size: int = SOURCE_RAW_MATCH_CHUNK_SIZE,
+) -> dict[str, list[str]]:
+    """Build raw path -> source page matches without an O(raw * source) scan."""
+    matches: dict[str, list[str]] = {raw_rel: [] for raw_rel in raw_rels}
+    if not source_records or not raw_rels:
+        return matches
+
+    unique_raw_rels = sorted(set(raw_rels), key=lambda value: (-len(value), value))
+    safe_chunk_size = max(1, chunk_size)
+    patterns = [
+        re.compile("|".join(re.escape(raw_rel) for raw_rel in unique_raw_rels[index : index + safe_chunk_size]))
+        for index in range(0, len(unique_raw_rels), safe_chunk_size)
+    ]
+    for source_name, source_record in source_records.items():
+        text = str(source_record.get("text") or "")
+        if not text:
+            continue
+        seen_in_source: set[str] = set()
+        for pattern in patterns:
+            for match in pattern.finditer(text):
+                raw_rel = match.group(0)
+                if raw_rel in seen_in_source:
+                    continue
+                seen_in_source.add(raw_rel)
+                matches.setdefault(raw_rel, []).append(source_name)
+    return matches
 
 
 def normalize_link_index(data: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:
@@ -513,18 +547,15 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     raw_files = raw_source_files(raw_dir, skip_dirs=skip_dirs)
     source_read_warnings: list[dict[str, str]] = []
     source_records = source_page_index(wiki_dir, read_warnings=source_read_warnings)
+    raw_rels = [raw_path.relative_to(target).as_posix() for raw_path in raw_files]
+    source_matches = source_matches_by_raw(source_records, raw_rels)
 
     represented_raw: list[dict[str, object]] = []
     pending_raw: list[dict[str, object]] = []
     raw_secret_warning_count = 0
     raw_scan_warnings: list[dict[str, str]] = []
-    for raw_path in raw_files:
-        rel = raw_path.relative_to(target).as_posix()
-        matches = [
-            source_name
-            for source_name, source_record in source_records.items()
-            if rel in str(source_record.get("text") or "")
-        ]
+    for raw_path, rel in zip(raw_files, raw_rels):
+        matches = source_matches.get(rel, [])
         match_records = [source_records[source_name] for source_name in matches]
         scan = secret_file_scan(raw_path)
         warnings = list(scan.get("labels") or [])

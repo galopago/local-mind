@@ -9,7 +9,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.ingest import collect_ingest_status  # noqa: E402
+from link_core.ingest import collect_ingest_status, source_matches_by_raw  # noqa: E402
 from link_core.wiki import build_backlinks  # noqa: E402
 
 
@@ -178,6 +178,25 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["completion"]["items"][0]["source_pages"][0]["path"], "wiki/sources/source.md")
         self.assertEqual(payload["completion"]["items"][0]["memory_prompt"], "propose memories from raw/source.md")
         self.assertEqual(payload["completion"]["next_prompt"], "brief me from Link before we continue")
+
+    def test_source_matches_by_raw_handles_special_characters_and_prefixes(self):
+        source_records = {
+            "alpha": {
+                "text": "`raw/source (v1)+.md`\n`raw/source (v1)+.md`\n`raw/source.md.backup`\n",
+            },
+            "beta": {
+                "text": "No raw references here.",
+            },
+        }
+
+        matches = source_matches_by_raw(
+            source_records,
+            ["raw/source (v1)+.md", "raw/source.md", "raw/source.md.backup"],
+        )
+
+        self.assertEqual(matches["raw/source (v1)+.md"], ["alpha"])
+        self.assertEqual(matches["raw/source.md"], [])
+        self.assertEqual(matches["raw/source.md.backup"], ["alpha"])
 
     def test_collect_ingest_status_warns_on_represented_secret_raw(self):
         root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))
