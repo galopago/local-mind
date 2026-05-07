@@ -5,355 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Link is local, source-backed memory for LLM agents, stored as inspectable Markdown on your machine.">
   <title>Link - Local Agent Memory</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --paper: #fff4b8;
-      --paper-2: #fffdf1;
-      --ink: #17120c;
-      --muted: #5f5549;
-      --border: #17120c;
-      --green: #54c79d;
-      --blue: #5b8cff;
-      --red: #ff6d5f;
-      --purple: #a87cff;
-      --yellow: #ffd342;
-      --black: #0b0b0b;
-      --shadow: 6px 6px 0 var(--border);
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      color: var(--ink);
-      background:
-        linear-gradient(rgba(23, 18, 12, 0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(23, 18, 12, 0.035) 1px, transparent 1px),
-        var(--paper);
-      background-size: 22px 22px;
-      line-height: 1.55;
-    }
-    a { color: inherit; }
-    .site-nav {
-      position: sticky;
-      z-index: 10;
-      top: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      padding: 14px clamp(18px, 4vw, 54px);
-      background: var(--paper-2);
-      border-bottom: 3px solid var(--border);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-family: Georgia, serif;
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: 0;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .brand img {
-      width: 34px;
-      height: 34px;
-      border: 2px solid var(--border);
-      background: var(--black);
-    }
-    .nav-links {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
-      color: var(--ink);
-      font-size: 14px;
-      font-weight: 800;
-    }
-    .nav-links a {
-      padding: 6px 10px;
-      border: 2px solid transparent;
-      text-decoration: none;
-    }
-    .nav-links a:hover {
-      background: var(--yellow);
-      border-color: var(--border);
-    }
-    .hero {
-      position: relative;
-      overflow: hidden;
-      min-height: 88vh;
-      display: grid;
-      align-items: end;
-      padding: 74px clamp(20px, 5vw, 72px) 46px;
-      background:
-        linear-gradient(rgba(23, 18, 12, 0.055) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(23, 18, 12, 0.055) 1px, transparent 1px),
-        linear-gradient(135deg, #fff9d1 0%, #fff4b8 58%, #ffd342 100%);
-      background-size: 28px 28px, 28px 28px, auto;
-      border-bottom: 5px solid var(--border);
-    }
-    .hero-copy {
-      position: relative;
-      z-index: 1;
-      max-width: 960px;
-    }
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin: 0 0 16px;
-      padding: 7px 10px;
-      background: var(--green);
-      border: 2px solid var(--border);
-      color: var(--ink);
-      font-size: 13px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      box-shadow: 3px 3px 0 var(--border);
-    }
-    h1 {
-      margin: 0;
-      max-width: 900px;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(46px, 6.2vw, 84px);
-      line-height: 0.94;
-      letter-spacing: 0;
-    }
-    .hero p {
-      max-width: 760px;
-      margin: 24px 0 0;
-      color: var(--ink);
-      font-size: clamp(18px, 2vw, 24px);
-      font-weight: 650;
-    }
-    .hero-notes {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 22px 0 0;
-      padding: 0;
-      list-style: none;
-    }
-    .hero-notes li {
-      padding: 7px 10px;
-      background: var(--paper-2);
-      border: 2px solid var(--border);
-      font-family: "SFMono-Regular", Consolas, monospace;
-      font-size: 13px;
-      font-weight: 800;
-    }
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 28px;
-    }
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 46px;
-      padding: 0 18px;
-      border: 3px solid var(--border);
-      background: var(--paper-2);
-      color: var(--ink);
-      text-decoration: none;
-      font-weight: 900;
-      box-shadow: 4px 4px 0 var(--border);
-      transition: transform 120ms ease, box-shadow 120ms ease;
-    }
-    .button:hover {
-      transform: translate(2px, 2px);
-      box-shadow: 2px 2px 0 var(--border);
-    }
-    .button.primary {
-      background: var(--yellow);
-      border-color: var(--border);
-      color: var(--ink);
-    }
-    main { background: transparent; }
-    section {
-      scroll-margin-top: 82px;
-      padding: 74px clamp(20px, 5vw, 72px);
-      border-bottom: 4px solid var(--border);
-    }
-    section:nth-child(2n) { background: var(--paper-2); }
-    .section-inner {
-      max-width: 1160px;
-      margin: 0 auto;
-    }
-    .section-kicker {
-      display: inline-flex;
-      margin: 0 0 12px;
-      padding: 5px 9px;
-      background: var(--black);
-      color: var(--paper-2);
-      font-family: "SFMono-Regular", Consolas, monospace;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-size: 12px;
-    }
-    h2 {
-      margin: 0 0 18px;
-      max-width: 820px;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(32px, 5vw, 58px);
-      line-height: 1.03;
-      letter-spacing: 0;
-    }
-    .lead {
-      max-width: 780px;
-      margin: 0;
-      color: var(--muted);
-      font-size: 19px;
-      font-weight: 560;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 16px;
-      margin-top: 34px;
-    }
-    .feature {
-      min-height: 198px;
-      padding: 20px;
-      border: 3px solid var(--border);
-      background: var(--paper-2);
-      box-shadow: var(--shadow);
-    }
-    .feature:nth-child(3n + 1) { background: #dff8ef; }
-    .feature:nth-child(3n + 2) { background: #e8edff; }
-    .feature:nth-child(3n + 3) { background: #ffe1dc; }
-    .feature h3 {
-      margin: 0 0 10px;
-      font-size: 19px;
-    }
-    .feature p {
-      margin: 0;
-      color: var(--ink);
-      font-size: 15px;
-    }
-    .flow {
-      display: grid;
-      grid-template-columns: 0.9fr 1.1fr;
-      gap: 30px;
-      align-items: center;
-      margin-top: 34px;
-    }
-    .flow img,
-    .screenshot-row img {
-      width: 100%;
-      display: block;
-      border: 4px solid var(--border);
-      background: var(--black);
-      box-shadow: var(--shadow);
-    }
-    .screenshot-card {
-      margin: 0;
-      padding: 12px;
-      border: 3px solid var(--border);
-      background: var(--paper-2);
-      box-shadow: var(--shadow);
-    }
-    .screenshot-card img {
-      border-width: 3px;
-      box-shadow: none;
-    }
-    figcaption {
-      margin-top: 10px;
-      font-family: "SFMono-Regular", Consolas, monospace;
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--muted);
-    }
-    pre {
-      overflow-x: auto;
-      margin: 0;
-      padding: 20px;
-      background: var(--black);
-      border: 4px solid var(--border);
-      color: #f7f0d8;
-      font-size: 14px;
-      line-height: 1.6;
-      box-shadow: var(--shadow);
-    }
-    code { font-family: "SFMono-Regular", Consolas, monospace; }
-    .screenshot-row {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 22px;
-      margin-top: 34px;
-    }
-    .compare {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0;
-      margin-top: 34px;
-      border: 3px solid var(--border);
-      background: var(--border);
-      box-shadow: var(--shadow);
-    }
-    .compare div {
-      background: var(--paper-2);
-      padding: 18px;
-      border-right: 2px solid var(--border);
-    }
-    .compare div:last-child { border-right: 0; }
-    .compare strong {
-      display: block;
-      margin-bottom: 8px;
-      color: var(--red);
-      font-family: "SFMono-Regular", Consolas, monospace;
-      text-transform: uppercase;
-      font-size: 12px;
-    }
-    footer {
-      padding: 42px clamp(20px, 5vw, 72px);
-      color: var(--paper-2);
-      background: var(--black);
-    }
-    @media (max-width: 820px) {
-      .site-nav {
-        position: static;
-        align-items: flex-start;
-        flex-direction: column;
-      }
-      .nav-links { gap: 6px; }
-      .hero {
-        min-height: 78vh;
-        padding-top: 48px;
-        background:
-          linear-gradient(rgba(23, 18, 12, 0.055) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(23, 18, 12, 0.055) 1px, transparent 1px),
-          linear-gradient(135deg, #fff9d1 0%, #fff4b8 68%, #ffd342 100%);
-        background-size: 26px 26px, 26px 26px, auto;
-      }
-      .grid,
-      .flow,
-      .screenshot-row,
-      .compare { grid-template-columns: 1fr; }
-      .compare div {
-        border-right: 0;
-        border-bottom: 2px solid var(--border);
-      }
-      .compare div:last-child { border-bottom: 0; }
-    }
-  </style>
+  <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
   <nav class="site-nav" aria-label="Main">
-    <a class="brand" href="#top"><img src="assets/logo.svg" alt="">Link</a>
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
     <div class="nav-links">
-      <a href="#why">Why</a>
-      <a href="#quick-start">Quick Start</a>
-      <a href="#memory">Memory</a>
-      <a href="#mcp">MCP</a>
+      <a href="getting-started.html">Start</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="mcp.html">MCP</a>
+      <a href="cli.html">CLI</a>
+      <a href="api.html">API</a>
+      <a href="security.html">Security</a>
+      <a href="contributing.html">Contribute</a>
       <a href="https://github.com/gowtham0992/link">GitHub</a>
     </div>
   </nav>
@@ -371,7 +35,7 @@
         <li>MCP</li>
       </ul>
       <div class="actions">
-        <a class="button primary" href="#quick-start">Try the demo</a>
+        <a class="button primary" href="getting-started.html">Try Link</a>
         <a class="button" href="https://github.com/gowtham0992/link">View on GitHub</a>
         <a class="button" href="https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink">MCP Registry</a>
       </div>
@@ -385,7 +49,7 @@
         <h2>Not another notes app. A local memory layer agents can actually use.</h2>
         <p class="lead">Link turns raw notes, transcripts, project context, and explicit memories into a source-backed wiki. Agents query a compact packet instead of reading your entire folder.</p>
         <div class="grid">
-          <article class="feature"><h3>Personal memory</h3><p>Preferences, decisions, project facts, and user context stay durable across agent sessions.</p></article>
+          <article class="feature"><h3>Personal memory</h3><p>Preferences, decisions, facts, and project context stay durable across agent sessions.</p></article>
           <article class="feature"><h3>Source-backed wiki</h3><p>Raw sources compile into Markdown pages with citations, backlinks, and reviewable provenance.</p></article>
           <article class="feature"><h3>MCP-native recall</h3><p>One local memory works across MCP-capable tools through the same query, brief, graph, and memory lifecycle tools.</p></article>
           <article class="feature"><h3>Budgeted context</h3><p>Smart query packets return the right memory, pages, graph neighborhood, and follow-up actions without flooding tokens.</p></article>
@@ -401,6 +65,10 @@
           <p class="section-kicker">First 2 minutes</p>
           <h2>Run a finished memory wiki locally.</h2>
           <p class="lead">The demo includes raw sources, wiki pages, one starter memory, backlinks, graph context, and a compact query packet.</p>
+          <div class="actions">
+            <a class="button primary" href="getting-started.html">First 10 minutes</a>
+            <a class="button" href="troubleshooting.html">Troubleshooting</a>
+          </div>
         </div>
         <pre><code>git clone https://github.com/gowtham0992/link.git
 cd link
@@ -454,20 +122,25 @@ python3 link.py benchmark "agent memory" link-demo</code></pre>
 
     <section>
       <div class="section-inner">
-        <p class="section-kicker">Local-first</p>
-        <h2>Your memory should belong to you.</h2>
-        <p class="lead">Link keeps the raw source, wiki, memories, backups, graph indexes, and performance cache on your machine. Open it in a text editor, Obsidian, Git, or the local web viewer.</p>
-        <div class="actions">
-          <a class="button primary" href="https://github.com/gowtham0992/link#quick-start">Read the docs</a>
-          <a class="button" href="https://pypi.org/project/link-mcp/">PyPI package</a>
-          <a class="button" href="https://github.com/gowtham0992/link/blob/main/SECURITY.md">Security model</a>
+        <p class="section-kicker">Read next</p>
+        <h2>Start small, then make it your agent memory.</h2>
+        <p class="lead">The docs are arranged by user path: try the demo, understand the model, wire MCP, then use the CLI and maintenance tools when you need them.</p>
+        <div class="grid">
+          <article class="feature"><h3><a href="getting-started.html">First 10 minutes</a></h3><p>Run the demo, add one source, save one direct memory, and verify the loop.</p></article>
+          <article class="feature"><h3><a href="concepts.html">Concepts</a></h3><p>Understand raw sources, wiki pages, memories, graph indexes, and budgeted query packets.</p></article>
+          <article class="feature"><h3><a href="mcp.html">MCP setup</a></h3><p>Install the MCP server and teach local agents how to use Link reliably.</p></article>
+          <article class="feature"><h3><a href="cli.html">CLI reference</a></h3><p>Every local command, grouped by daily workflow and maintenance jobs.</p></article>
+          <article class="feature"><h3><a href="api.html">HTTP API</a></h3><p>Local endpoints for status, query, memory, graph, validation, and web UI actions.</p></article>
+          <article class="feature"><h3><a href="security.html">Security model</a></h3><p>Local-first constraints, secret scanning, backup behavior, and HTTP safety boundaries.</p></article>
+          <article class="feature"><h3><a href="contributing.html">Contributing</a></h3><p>PR expectations, test gates, branch policy, and what not to include in public changes.</p></article>
+          <article class="feature"><h3><a href="troubleshooting.html">Troubleshooting</a></h3><p>Fix MCP setup, blocked ingest, stale graph indexes, slow wikis, and Python packaging issues.</p></article>
         </div>
       </div>
     </section>
   </main>
 
   <footer>
-    <div class="section-inner">MIT licensed. Built for local-first agent memory.</div>
+    <div class="section-inner">MIT licensed. Built for local-first agent memory. <a href="https://github.com/gowtham0992/link">GitHub</a></div>
   </footer>
 </body>
 </html>

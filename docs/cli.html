@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Link CLI reference for local agent memory, wiki maintenance, validation, backup, and MCP verification.">
+  <title>Link - CLI Reference</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
+    <div class="nav-links">
+      <a href="getting-started.html">Start</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="mcp.html">MCP</a>
+      <a href="cli.html" aria-current="page">CLI</a>
+      <a href="api.html">API</a>
+      <a href="security.html">Security</a>
+      <a href="contributing.html">Contribute</a>
+      <a href="https://github.com/gowtham0992/link">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="page-hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Command reference</span>
+      <h1>Local commands for daily memory work.</h1>
+      <p>After a global installer run, use <code>link &lt;command&gt;</code>. From a source checkout, use <code>python3 link.py &lt;command&gt;</code>.</p>
+    </div>
+  </header>
+
+  <main class="doc-section">
+    <div class="section-inner doc-grid">
+      <aside class="toc">
+        <strong>On this page</strong>
+        <a href="#daily">Daily loop</a>
+        <a href="#memory">Memory commands</a>
+        <a href="#captures">Capture workflow</a>
+        <a href="#maintenance">Maintenance</a>
+        <a href="#all">All commands</a>
+      </aside>
+      <article class="doc-content">
+        <h2 id="daily">Daily Loop</h2>
+        <pre><code>link serve
+link ingest-status
+link remember "User prefers feature branches for Link work." --type preference --scope project --project link
+link brief "working on Link release" --project link
+link query "what should I know before changing the MCP tools?" --budget small --project link
+link validate</code></pre>
+
+        <h2 id="memory">Memory Commands</h2>
+        <div class="grid">
+          <article class="panel"><h3><code>link remember</code></h3><p>Save a local agent memory. Strong duplicates and likely conflicts are refused unless explicitly allowed.</p></article>
+          <article class="panel"><h3><code>link recall</code></h3><p>Search local memories with recall readiness and project-aware filtering.</p></article>
+          <article class="panel"><h3><code>link explain-memory</code></h3><p>Show provenance, lifecycle, graph links, review issues, and recall readiness.</p></article>
+          <article class="panel"><h3><code>link update-memory</code></h3><p>Merge new text into an existing memory and reset review state.</p></article>
+          <article class="panel"><h3><code>link archive-memory</code></h3><p>Reversibly hide a stale or wrong memory from default recall.</p></article>
+          <article class="panel"><h3><code>link forget-memory</code></h3><p>Permanently delete a memory after explicit confirmation.</p></article>
+        </div>
+
+        <h2 id="captures">Capture Workflow</h2>
+        <p>Use captures for longer chat notes or session summaries that should be reviewed before becoming durable memory.</p>
+        <pre><code>link capture-session session-notes.md --project link
+link capture-inbox --project link
+link accept-capture raw/memory-captures/&lt;capture&gt;.md --index 1
+link redact-capture raw/memory-captures/&lt;capture&gt;.md
+link delete-capture raw/memory-captures/&lt;capture&gt;.md --confirm</code></pre>
+
+        <h2 id="maintenance">Maintenance</h2>
+        <pre><code>link backup
+link doctor --fix
+link status --validate
+link memory-audit
+link benchmark "agent memory"
+link rebuild-index
+link rebuild-backlinks
+link validate
+link verify-mcp</code></pre>
+        <p>Use <code>link backup</code> before broad repair work. Use <code>link benchmark</code> when a wiki starts to feel slow.</p>
+
+        <h2 id="all">All Commands</h2>
+        <pre><code>link --version
+link init [dir]
+link serve [dir] [--port 3000]
+link prompts [dir] [--project slug]
+link status [--validate]
+link backup [--label name] [--include-raw]
+link ingest-status
+link remember "text" [--project slug]
+link propose-memories &lt;file-or-text&gt; [--project slug]
+link capture-session &lt;file-or-text&gt; [--project slug]
+link capture-inbox [--project slug]
+link accept-capture &lt;capture&gt; [--index N]
+link redact-capture &lt;capture&gt;
+link delete-capture &lt;capture&gt; --confirm
+link query "task" [--budget small|medium|large] [--project slug]
+link graph-summary ["topic"] [--limit 40] [--depth 1]
+link benchmark ["query"] [--budget small|medium|large] [--project slug]
+link brief "task" [--project slug]
+link memory-audit [--project slug]
+link recall "query" [--project slug]
+link profile [--project slug]
+link memory-inbox [--project slug]
+link review-memory &lt;name&gt;
+link explain-memory &lt;name&gt;
+link update-memory &lt;name&gt; "text" [--project slug]
+link archive-memory &lt;name&gt;
+link restore-memory &lt;name&gt;
+link forget-memory &lt;name&gt; --confirm
+link doctor
+link doctor --fix
+link migrate
+link validate [--strict]
+link rebuild-index
+link rebuild-backlinks
+link verify-mcp [--json]
+python3 link.py demo
+python3 link.py query-link "task" [dir]</code></pre>
+        <p><code>query-link</code> is kept as an internal/backward-compatible alias. Prefer <code>link query</code> in user-facing docs.</p>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <div class="section-inner"><a href="getting-started.html">First 10 minutes</a> · <a href="mcp.html">MCP setup</a> · <a href="security.html">Security</a></div>
+  </footer>
+</body>
+</html>

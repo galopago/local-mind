@@ -30,11 +30,13 @@ class ToolContractTests(unittest.TestCase):
             shutil.copy2(ROOT / "link.py", tmp / "link.py")
             shutil.copy2(ROOT / "mcp_package/link_mcp/server.py", tmp / "mcp_package/link_mcp/server.py")
 
-            cli_reference = "\n".join(f"`link {command}`" for command in sorted(contract.README_CLI_COMMANDS))
+            (tmp / "docs").mkdir()
+            cli_reference = "\n".join(f"`link {command}`" for command in sorted(contract.DOCS_CLI_COMMANDS))
             mcp_reference = "\n".join(
                 tool for tool in sorted(contract.EXPECTED_MCP_TOOLS) if tool != "query_link"
             )
-            (tmp / "README.md").write_text(cli_reference + "\n" + mcp_reference, encoding="utf-8")
+            (tmp / "docs/cli.html").write_text(cli_reference, encoding="utf-8")
+            (tmp / "docs/mcp.html").write_text(mcp_reference, encoding="utf-8")
             (tmp / "mcp_package/README.md").write_text(mcp_reference, encoding="utf-8")
 
             findings = contract.check_tool_contract(tmp)

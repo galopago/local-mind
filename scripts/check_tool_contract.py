@@ -82,9 +82,10 @@ EXPECTED_MCP_TOOLS = {
     "validate_wiki",
 }
 
-README_CLI_COMMANDS = EXPECTED_CLI_COMMANDS - {"query-link"}
-README_MCP_DOC_PATHS = (
-    Path("README.md"),
+DOCS_CLI_COMMANDS = EXPECTED_CLI_COMMANDS - {"query-link"}
+CLI_DOC_PATH = Path("docs/cli.html")
+MCP_DOC_PATHS = (
+    Path("docs/mcp.html"),
     Path("mcp_package/README.md"),
 )
 
@@ -153,11 +154,16 @@ def _missing_terms(path: Path, terms: set[str]) -> list[str]:
     return sorted(term for term in terms if term not in text)
 
 
-def _missing_cli_reference(path: Path = ROOT / "README.md") -> list[str]:
+def _missing_cli_reference(path: Path = ROOT / CLI_DOC_PATH) -> list[str]:
     text = path.read_text(encoding="utf-8", errors="replace")
     missing: list[str] = []
-    for command in sorted(README_CLI_COMMANDS):
-        command_tokens = (f"`link {command}", f"`python3 link.py {command}")
+    for command in sorted(DOCS_CLI_COMMANDS):
+        command_tokens = (
+            f"`link {command}",
+            f"`python3 link.py {command}",
+            f"link {command}",
+            f"python3 link.py {command}",
+        )
         if not any(token in text for token in command_tokens):
             missing.append(command)
     return missing
@@ -182,11 +188,11 @@ def check_tool_contract(root: Path = ROOT) -> list[str]:
     if extra_mcp:
         findings.append(f"link_mcp.server has undocumented MCP tools: {', '.join(extra_mcp)}")
 
-    missing_cli_docs = _missing_cli_reference(root / "README.md")
+    missing_cli_docs = _missing_cli_reference(root / CLI_DOC_PATH)
     if missing_cli_docs:
-        findings.append(f"README.md command reference is missing: {', '.join(missing_cli_docs)}")
+        findings.append(f"{CLI_DOC_PATH} command reference is missing: {', '.join(missing_cli_docs)}")
 
-    for relative_path in README_MCP_DOC_PATHS:
+    for relative_path in MCP_DOC_PATHS:
         path = root / relative_path
         missing = _missing_terms(path, EXPECTED_MCP_TOOLS)
         if missing:

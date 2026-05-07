@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How to contribute to Link: branches, pull requests, tests, screenshots, and release safety.">
+  <title>Link - Contributing</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
+    <div class="nav-links">
+      <a href="getting-started.html">Start</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="mcp.html">MCP</a>
+      <a href="cli.html">CLI</a>
+      <a href="api.html">API</a>
+      <a href="security.html">Security</a>
+      <a href="contributing.html" aria-current="page">Contribute</a>
+      <a href="https://github.com/gowtham0992/link">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="page-hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Contributing</span>
+      <h1>Keep Link local, inspectable, and reliable.</h1>
+      <p>Contributions should make agent memory easier to trust: clearer onboarding, safer writes, faster retrieval, better validation, and tighter docs.</p>
+    </div>
+  </header>
+
+  <main class="doc-section">
+    <div class="section-inner doc-grid">
+      <aside class="toc">
+        <strong>On this page</strong>
+        <a href="#branches">Branches</a>
+        <a href="#before-pr">Before a PR</a>
+        <a href="#description">PR description</a>
+        <a href="#structure">Project structure</a>
+        <a href="#principles">Design principles</a>
+      </aside>
+      <article class="doc-content">
+        <h2 id="branches">Branches</h2>
+        <p>Contributions should come through pull requests. Please target <code>main</code> unless the maintainer asks for a different branch. The <code>develop</code> branch is a maintainer integration branch for staging larger release work before it is proposed to <code>main</code>.</p>
+
+        <h2 id="before-pr">Before Opening A PR</h2>
+        <pre><code>python3 -m pip install "ruff&gt;=0.8,&lt;1"
+python3 -m ruff check .
+python3 -m unittest discover -s tests
+python3 -m py_compile link.py serve.py scripts/check_release_hygiene.py scripts/check_runtime_duplication.py scripts/check_tool_contract.py scripts/prepare_release.py scripts/smoke_first_use.py scripts/smoke_http_viewer.py scripts/smoke_large_wiki.py scripts/smoke_mcp_stdio.py mcp_package/link_core/*.py mcp_package/link_mcp/server.py mcp_package/link_mcp/__main__.py mcp_package/link_mcp/__init__.py
+python3 scripts/smoke_first_use.py
+python3 scripts/smoke_http_viewer.py
+python3 scripts/smoke_large_wiki.py --pages 1000
+python3 scripts/check_release_hygiene.py
+python3 scripts/check_runtime_duplication.py
+python3 scripts/check_tool_contract.py
+bash -n integrations/*/install.sh integrations/*/uninstall.sh integrations/_shared/*.sh
+python3 link.py demo /tmp/link-mcp-smoke --force
+PYTHONPATH=mcp_package python3 scripts/smoke_mcp_stdio.py /tmp/link-mcp-smoke/wiki
+git diff --check</code></pre>
+
+        <h2 id="description">PR Description</h2>
+        <ul>
+          <li>What changed.</li>
+          <li>How you tested it.</li>
+          <li>Whether it touches memory writes, installers, MCP behavior, HTTP endpoints, or automation.</li>
+          <li>Screenshots or GIFs for UI changes.</li>
+        </ul>
+        <p>Do not include personal wiki data, raw sources, registry tokens, <code>.env</code> files, or local MCP credentials in a PR.</p>
+
+        <h2 id="structure">Project Structure</h2>
+        <pre><code>link/
+|-- LINK.md              # schema and instructions for agents
+|-- raw/                 # source documents, ignored by git
+|-- .link-cache/         # local derived cache, ignored by git
+|-- wiki/                # compiled knowledge, ignored by git except scaffolding
+|-- docs/                # GitHub Pages product and docs site
+|-- integrations/        # one-step setup per AI tool
+|-- mcp_package/         # PyPI package for link-mcp and shared link_core
+|-- scripts/             # release and hygiene tooling
+|-- serve.py             # local web viewer and HTTP API
+`-- link.py              # local utility CLI</code></pre>
+
+        <h2 id="principles">Design Principles</h2>
+        <ul>
+          <li>Every claim links to a source.</li>
+          <li>Confidence tags make uncertainty visible.</li>
+          <li><code>log.md</code> records wiki operations.</li>
+          <li>Pages mature from seed to established.</li>
+          <li>Agents should use <code>query_link</code> first, then follow up with graph/context tools only when the compact packet is insufficient.</li>
+          <li>The local web viewer has no runtime dependencies beyond Python stdlib.</li>
+          <li>The wiki is plain Markdown, so it works with git, Obsidian, and normal editors.</li>
+        </ul>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <div class="section-inner"><a href="index.html">Link home</a> · <a href="security.html">Security</a> · <a href="troubleshooting.html">Troubleshooting</a></div>
+  </footer>
+</body>
+</html>

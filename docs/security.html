@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Link security model: local-first storage, secret scanning, backups, HTTP safety boundaries, and release hygiene.">
+  <title>Link - Security</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
+    <div class="nav-links">
+      <a href="getting-started.html">Start</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="mcp.html">MCP</a>
+      <a href="cli.html">CLI</a>
+      <a href="api.html">API</a>
+      <a href="security.html" aria-current="page">Security</a>
+      <a href="contributing.html">Contribute</a>
+      <a href="https://github.com/gowtham0992/link">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="page-hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Local-first</span>
+      <h1>Your agent memory should belong to you.</h1>
+      <p>Link has no hosted backend, no telemetry, no external API calls, and no cloud account requirement. The safety model is local files, explicit writes, and inspectable provenance.</p>
+    </div>
+  </header>
+
+  <main class="doc-section">
+    <div class="section-inner doc-grid">
+      <aside class="toc">
+        <strong>On this page</strong>
+        <a href="#privacy">Privacy model</a>
+        <a href="#secrets">Secret handling</a>
+        <a href="#http">HTTP boundary</a>
+        <a href="#backups">Backups</a>
+        <a href="#share">Before sharing</a>
+      </aside>
+      <article class="doc-content">
+        <h2 id="privacy">Privacy Model</h2>
+        <ul>
+          <li>No telemetry.</li>
+          <li>No hosted backend.</li>
+          <li>No external API calls from <code>serve.py</code> or <code>link-mcp</code>.</li>
+          <li>Raw sources and generated wiki pages are ignored by git by default.</li>
+          <li>SQLite search, when available, is an in-memory derived index. Markdown remains the source of truth.</li>
+        </ul>
+
+        <h2 id="secrets">Secret Handling</h2>
+        <p>Link scans raw sources, captures, release files, and public artifacts for secret-looking values. It detects common API keys and token formats, warns without logging secret values, and refuses normal ingest guidance when raw safety cannot be established.</p>
+        <pre><code>link ingest-status
+link capture-inbox
+link redact-capture raw/memory-captures/&lt;capture&gt;.md
+python3 scripts/check_release_hygiene.py</code></pre>
+        <div class="callout">
+          <strong>Rule</strong>
+          Redact or remove secret-looking values locally before asking an agent to ingest a file. Link is not a secret manager.
+        </div>
+
+        <h2 id="http">HTTP Boundary</h2>
+        <p>The local viewer binds to <code>127.0.0.1</code>, rejects unexpected host/bind flags and unexpected <code>Host</code> headers, and has no authentication. Do not expose it to the internet without adding an auth layer.</p>
+        <p>HTTP write actions require <code>X-Link-Local-Action: true</code>. Responses include <code>X-Link-API-Version</code>. Proposal analysis does not write pages.</p>
+
+        <h2 id="backups">Backups</h2>
+        <p><code>link backup</code> and MCP <code>backup_wiki</code> write local <code>.link-backups/</code> archives. Raw sources are excluded unless explicitly requested.</p>
+        <pre><code>link backup
+link backup --include-raw
+link doctor --fix</code></pre>
+        <p>Run a backup before broad repair work or large generated changes.</p>
+
+        <h2 id="share">Before Sharing A Repo Or Wiki</h2>
+        <pre><code>python3 link.py doctor
+python3 link.py validate
+python3 scripts/check_release_hygiene.py
+git diff --check</code></pre>
+        <p>Use <code>git push</code>, <code>git archive</code>, or clean build artifacts for public sharing. Do not zip a whole working directory; ignored local files, <code>.git/</code>, caches, raw sources, and build outputs can be included by accident.</p>
+        <p>See <a href="https://github.com/gowtham0992/link/blob/main/SECURITY.md">SECURITY.md</a> for vulnerability reporting.</p>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <div class="section-inner"><a href="getting-started.html">First 10 minutes</a> · <a href="mcp.html">MCP setup</a> · <a href="troubleshooting.html">Troubleshooting</a></div>
+  </footer>
+</body>
+</html>

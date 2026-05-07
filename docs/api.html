@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Link local HTTP API reference for status, ingest, query, memory, graph, validation, and maintenance endpoints.">
+  <title>Link - HTTP API</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
+    <div class="nav-links">
+      <a href="getting-started.html">Start</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="mcp.html">MCP</a>
+      <a href="cli.html">CLI</a>
+      <a href="api.html" aria-current="page">API</a>
+      <a href="security.html">Security</a>
+      <a href="contributing.html">Contribute</a>
+      <a href="https://github.com/gowtham0992/link">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="page-hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Local HTTP</span>
+      <h1>HTTP endpoints for the local viewer.</h1>
+      <p><code>serve.py</code> exposes Link locally while the web viewer is running. It is a localhost API for personal tooling, not a hosted service.</p>
+    </div>
+  </header>
+
+  <main class="doc-section">
+    <div class="section-inner doc-grid">
+      <aside class="toc">
+        <strong>On this page</strong>
+        <a href="#boundary">Boundary</a>
+        <a href="#read">Read endpoints</a>
+        <a href="#write">Write endpoints</a>
+        <a href="#large">Large wiki endpoints</a>
+      </aside>
+      <article class="doc-content">
+        <h2 id="boundary">Boundary</h2>
+        <p><code>serve.py</code> binds to <code>127.0.0.1</code>, rejects unsafe host/bind flags and unexpected <code>Host</code> headers, and has no authentication. Do not expose it to the internet without adding auth.</p>
+        <p>Write actions require <code>X-Link-Local-Action: true</code>. Responses include <code>X-Link-API-Version</code>.</p>
+
+        <h2 id="read">Read Endpoints</h2>
+        <pre><code>GET /api/status?validate=true
+GET /api/prompts?project=slug
+GET /api/ingest-status
+GET /api/page-list?limit=100&amp;offset=0
+GET /api/pages
+GET /api/memory-dashboard?project=slug
+GET /api/memory-brief?q=task&amp;project=slug
+GET /api/memory-audit?project=slug
+GET /api/memory-profile?project=slug
+GET /api/memory-inbox?project=slug
+GET /api/capture-inbox?project=slug
+GET /api/explain-memory?memory=name
+GET /api/query-link?q=query&amp;budget=small|medium|large
+GET /api/validate?strict=true
+GET /api/proposal-sources
+GET /api/proposal-source?path=raw/file.md
+GET /api/search?q=query
+GET /api/context?topic=topic
+GET /api/graph-summary?topic=topic&amp;limit=40&amp;depth=1
+GET /api/graph
+GET /api/page-links?page=name&amp;limit=100&amp;offset=0</code></pre>
+
+        <h2 id="write">Write Endpoints</h2>
+        <pre><code>POST /api/raw-source
+POST /api/propose-memories
+POST /api/remember-memory
+POST /api/update-memory
+POST /api/review-memory
+POST /api/archive-memory
+POST /api/restore-memory
+POST /api/rebuild-backlinks
+POST /api/rebuild-index</code></pre>
+        <p>Web memory approval APIs intentionally do not honor duplicate/conflict override flags. If Link reports a duplicate or conflict, review the existing memory and use the CLI or MCP tool explicitly after deciding what should coexist.</p>
+
+        <h2 id="large">Large Wiki Endpoints</h2>
+        <p>Agents and integrations should prefer bounded endpoints over full dumps:</p>
+        <ul>
+          <li><code>/api/query-link</code> for answer-ready context.</li>
+          <li><code>/api/page-list</code> instead of <code>/api/pages</code> when paging matters.</li>
+          <li><code>/api/graph-summary</code> instead of <code>/api/graph</code> for agent context.</li>
+          <li><code>/api/page-links</code> for paginated inbound and forward links.</li>
+        </ul>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <div class="section-inner"><a href="security.html">Security</a> · <a href="cli.html">CLI reference</a> · <a href="mcp.html">MCP setup</a></div>
+  </footer>
+</body>
+</html>
