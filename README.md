@@ -191,7 +191,7 @@ Link is designed so agents do useful work without silently absorbing bad context
 | Gate | What it protects |
 |------|------------------|
 | `link ingest-status` | Shows pending raw files, graph state, next prompt/checks, and a `clear`/`warning`/`blocked` raw safety summary. |
-| `/propose` | Lists raw text sources with explicit `load`, `redact`, or `split` actions before memory proposals are generated. |
+| `/propose` | Lists raw text sources with explicit `load`, `redact`, `split`, or `fix access` actions before memory proposals are generated. |
 | Memory writes | Refuse strong duplicates and likely conflicts unless the user explicitly overrides them. |
 | `link validate` | Checks frontmatter, directory/type alignment, required sections, dead wikilinks, and stale backlinks after ingest. |
 | `link benchmark` | Reports cache/search/query/graph timings, search backend, packet size, and readiness recommendations. |

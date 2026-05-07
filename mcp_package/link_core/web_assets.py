@@ -667,6 +667,9 @@ PROPOSAL_UI_JS = """
       if (source.secret_warnings && source.secret_warnings.length) {
         addText(card, 'p', 'proposal-warning', 'Secret-looking values: ' + source.secret_warnings.join(', '));
       }
+      if (source.error) {
+        addText(card, 'p', 'proposal-warning', 'Cannot load source: ' + source.error);
+      }
       if (source.truncated) {
         addText(card, 'p', 'proposal-warning', 'Large source: split or summarize it before loading into the proposal form.');
       }

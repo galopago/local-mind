@@ -50,7 +50,7 @@ from link_core.raw import (
 from link_core.security import (
     clean_text_input as _clean_text_input,
     redact_secret_values as _redact_secret_values,
-    secret_file_warnings as _secret_file_warnings,
+    secret_file_scan as _secret_file_scan,
 )
 from link_core.query import (
     query_link as _core_query_link,
@@ -831,12 +831,12 @@ def _proposal_source_snippet(text: str) -> str:
     return " ".join(lines[:3])[:260]
 
 
-def _proposal_source_preview(path: Path) -> str:
+def _proposal_source_preview(path: Path) -> tuple[str, str]:
     try:
         with path.open("r", encoding="utf-8", errors="replace") as handle:
-            return handle.read(MAX_PROPOSAL_SOURCE_BYTES + 1)
-    except OSError:
-        return ""
+            return handle.read(MAX_PROPOSAL_SOURCE_BYTES + 1), ""
+    except OSError as exc:
+        return "", str(exc)
 
 
 def _resolve_proposal_source_path(source_path: str) -> Path | None:
@@ -879,11 +879,17 @@ def _proposal_source_record(path: Path, include_text: bool = False) -> dict[str,
             "action_label": "Unavailable",
             "error": str(exc),
         }
-    text = _proposal_source_preview(path)
-    labels = _secret_file_warnings(path)
+    text, read_error = _proposal_source_preview(path)
+    scan = _secret_file_scan(path)
+    labels = list(scan.get("labels") or [])
+    scan_error = str(scan.get("error") or "")
+    read_error = read_error or scan_error
     redacted, _, _ = _redact_secret_values(text) if labels else (text, [], 0)
     truncated = size > MAX_PROPOSAL_SOURCE_BYTES
-    if labels:
+    if read_error:
+        action = "unavailable"
+        action_label = "Fix access"
+    elif labels:
         action = "redact"
         action_label = "Redact first"
     elif truncated:
@@ -905,6 +911,8 @@ def _proposal_source_record(path: Path, include_text: bool = False) -> dict[str,
         "action": action,
         "action_label": action_label,
     }
+    if read_error:
+        record["error"] = read_error
     if include_text and record["loadable"]:
         record["text"] = text[:MAX_PROPOSAL_SOURCE_BYTES]
     return record
@@ -946,6 +954,9 @@ def _proposal_source_payload(source_path: str) -> tuple[dict[str, object], int]:
         return record, 409
     if not record.get("loadable"):
         record["found"] = True
+        if record.get("action") == "unavailable":
+            record["error"] = record.get("error") or "source could not be read"
+            return record, 423
         record["error"] = "source is too large to load into the proposal form"
         return record, 413
     record["found"] = True

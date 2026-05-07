@@ -1417,6 +1417,36 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(long_status, 404)
         self.assertFalse(long_payload["found"])
 
+    def test_proposal_sources_api_blocks_unreadable_raw_files(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        (raw / "locked-note.md").write_text("# Locked note\n", encoding="utf-8")
+        reset_wiki(wiki)
+        original_open = Path.open
+
+        def open_path(path: Path, *args: object, **kwargs: object):
+            if path.name == "locked-note.md":
+                raise OSError("permission denied")
+            return original_open(path, *args, **kwargs)
+
+        with patch.object(Path, "open", open_path):
+            list_status, list_payload = run_handler("GET", "/api/proposal-sources")
+            load_status, load_payload = run_handler("GET", "/api/proposal-source?path=raw/locked-note.md")
+
+        self.assertEqual(list_status, 200)
+        self.assertEqual(list_payload["count"], 1)
+        source = list_payload["sources"][0]
+        self.assertEqual(source["path"], "raw/locked-note.md")
+        self.assertFalse(source["loadable"])
+        self.assertEqual(source["action"], "unavailable")
+        self.assertEqual(source["action_label"], "Fix access")
+        self.assertEqual(source["error"], "permission denied")
+        self.assertEqual(load_status, 423)
+        self.assertEqual(load_payload["action"], "unavailable")
+        self.assertIn("permission denied", load_payload["error"])
+        self.assertNotIn("text", load_payload)
+
     def test_raw_source_api_creates_local_source_for_ingest(self):
         wiki = self.make_wiki()
 

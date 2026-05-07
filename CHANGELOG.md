@@ -159,6 +159,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added an explicit ingest `safety` summary across CLI, HTTP, and MCP payloads so agents do not need to infer whether raw sources are clear, warning-only, or blocked.
 - Added copy buttons for guided ingest prompts and post-ingest checks in the local web UI.
 - Made proposal source discovery stream secret scans, read only bounded previews, and return explicit source actions for load, redact, or split.
+- Made proposal source discovery return explicit fix-access actions for raw files that cannot be read.
 - Hardened direct proposal-source loading to reject oversized path inputs and hidden raw files, matching the source picker.
 - Added benchmark health summaries and recommendations so `link benchmark` produces clearer proof-of-readiness output.
 - Improved benchmark recommendations so slow search, cache, page-list, and graph paths get targeted repair guidance.
