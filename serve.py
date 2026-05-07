@@ -2419,6 +2419,7 @@ def _render_graph():
   var inspectorMeta = document.getElementById('graph-inspector-meta');
   var inspectorLinks = document.getElementById('graph-inspector-links');
   var inspectorOpen = document.getElementById('graph-open');
+  var inspectorFocus = document.getElementById('graph-focus');
   var W, H;
 
   // Compact neural-map sizing: concepts lead, sources recede.
@@ -2585,12 +2586,13 @@ def _render_graph():
   }}
 
   function updateInspector() {{
-    if (!inspector || !inspectorTitle || !inspectorMeta || !inspectorLinks || !inspectorOpen) return;
+    if (!inspector || !inspectorTitle || !inspectorMeta || !inspectorLinks || !inspectorOpen || !inspectorFocus) return;
     inspectorLinks.textContent = '';
     if (!selectedNode) {{
       inspectorTitle.textContent = 'Select a node';
       inspectorMeta.textContent = 'Click a node to inspect it. Drag a node to place it. Double-click a node, or use Open page, to navigate.';
       inspectorOpen.disabled = true;
+      inspectorFocus.disabled = true;
       return;
     }}
     var neighbors = (adj[selectedNode.id] || []).slice().sort(function(a, b) {{
@@ -2599,6 +2601,7 @@ def _render_graph():
     inspectorTitle.textContent = selectedNode.title;
     inspectorMeta.textContent = selectedNode.category + ' · ' + neighbors.length + ' linked page' + (neighbors.length === 1 ? '' : 's');
     inspectorOpen.disabled = false;
+    inspectorFocus.disabled = false;
     neighbors.slice(0, 10).forEach(function(id) {{
       var target = nodeById[id];
       var link = document.createElement('a');
@@ -3009,6 +3012,16 @@ def _render_graph():
     setFullscreen(!frameEl.classList.contains('is-fullscreen'));
   }});
   if (inspectorOpen) inspectorOpen.addEventListener('click', function() {{ openNode(selectedNode); }});
+  if (inspectorFocus) inspectorFocus.addEventListener('click', function() {{
+    if (!selectedNode) return;
+    depthValue = '1';
+    if (depthFilter) depthFilter.value = '1';
+    invalidateFilters();
+    setMotionPaused(motionPaused);
+    autoFit();
+    updateStatus();
+    drawSoon();
+  }});
   if (searchInput) {{
     searchInput.addEventListener('input', function() {{
       searchTerm = searchInput.value.trim().toLowerCase();
@@ -3084,6 +3097,7 @@ def _render_graph():
         f'<p id="graph-inspector-meta">Click a node to inspect it. Drag a node to place it. '
         f'Double-click a node, or use Open page, to navigate.</p>'
         f'<div id="graph-inspector-links" class="graph-inspector-links"></div>'
+        f'<button id="graph-focus" type="button" disabled>Focus neighborhood</button>'
         f'<button id="graph-open" type="button" disabled>Open page</button>'
         f'</aside>'
         f'</div>'
