@@ -266,7 +266,9 @@ link ingest-status
 `link ingest-status` prints the exact agent prompt to use for the next raw file
 and the follow-up checks to run after ingest. If Link reports secret-looking
 values in a raw file, redact that local file first; Link will not suggest the
-normal ingest prompt for flagged raw content.
+normal ingest prompt for flagged raw content. If Link cannot read and safety-scan
+a raw file, fix the local file access first; unreadable raw files are blocked
+from normal ingest guidance too.
 
 ### 3. Save One Direct Memory
 
@@ -567,7 +569,7 @@ Common endpoints:
 |----------|-------------|
 | `GET /api/status?validate=true` | Readiness summary with content/page/memory counts, optional validation summary, warnings, and safe next actions. |
 | `GET /api/prompts?project=slug` | First-run natural agent prompts plus local readiness/check commands; same payload as `link prompts --json`. |
-| `GET /api/ingest-status` | Raw ingest state with pending files, represented-source completion cards, safety summary, graph health, exact agent prompt, guided plan, and follow-up commands. |
+| `GET /api/ingest-status` | Raw ingest state with pending files, represented-source completion cards, safety/access summary, graph health, exact agent prompt, guided plan, and follow-up commands. |
 | `GET /api/page-list?limit=100&offset=0` | Bounded page metadata list for agents and large wikis, with follow-up pagination actions. |
 | `GET /api/pages` | Full page metadata list for local UI/export use. Prefer `/api/page-list` for agents. |
 | `GET /api/memory-dashboard?project=<slug>` | Read-only memory dashboard data, including saved raw captures and secret-warning counts. |

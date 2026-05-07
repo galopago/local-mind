@@ -317,6 +317,31 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Suggested workflow: Redact raw sources before ingest", out.getvalue())
         self.assertNotIn("Ask your agent: ingest raw/secret-note.md into Link", out.getvalue())
 
+    def test_ingest_status_blocks_unreadable_raw_ingest(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        (target / "raw/locked-note.md").write_text("# Locked note\n", encoding="utf-8")
+
+        out = StringIO()
+        with (
+            patch(
+                "link_core.ingest.secret_file_scan",
+                return_value={"labels": [], "readable": False, "error": "permission denied"},
+            ),
+            redirect_stdout(out),
+        ):
+            code = link_cli.ingest_status(target)
+
+        text = out.getvalue()
+        self.assertEqual(code, 0)
+        self.assertIn("Pending ingest: 1", text)
+        self.assertIn("Safety: blocked (1 pending raw file could not be inspected before ingest.)", text)
+        self.assertIn("raw/locked-note.md [fix access before ingest: permission denied]", text)
+        self.assertIn("Guidance: 1 pending raw file could not be inspected.", text)
+        self.assertIn("Suggested workflow: Inspect raw source access", text)
+        self.assertNotIn("Ask your agent: ingest raw/locked-note.md into Link", text)
+
     def test_ingest_status_json(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
         target = tmp / "demo"

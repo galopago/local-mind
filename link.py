@@ -1635,7 +1635,10 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
         print("Pending raw files:")
         for item in pending_raw[:20]:
             warnings = item.get("secret_warnings") if isinstance(item.get("secret_warnings"), list) else []
-            if warnings:
+            scan_error = str(item.get("scan_error") or "")
+            if scan_error:
+                print(f"- {item['raw']} [fix access before ingest: {scan_error}]")
+            elif warnings:
                 labels = ", ".join(str(label) for label in warnings)
                 print(f"- {item['raw']} [redact before ingest: {labels}]")
             else:

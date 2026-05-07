@@ -180,6 +180,7 @@ class McpContractTests(unittest.TestCase):
 
         self.assertEqual(payload["guidance"]["state"], "ready")
         self.assertEqual(payload["pending_count"], 0)
+        self.assertEqual(payload["raw_scan_warning_count"], 0)
         self.assertEqual(payload["backlinks_status"], "current")
         self.assertEqual(payload["plan"]["title"], "Ready for new sources")
 

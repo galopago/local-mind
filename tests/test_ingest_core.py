@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +72,7 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["raw_secret_warning_count"], 1)
         self.assertEqual(payload["safety"]["status"], "blocked")
         self.assertEqual(payload["safety"]["blocked_count"], 1)
+        self.assertEqual(payload["safety"]["access_blocked_count"], 0)
         self.assertEqual(payload["safety"]["labels"], ["OpenAI API key"])
         self.assertEqual(payload["safety"]["blocked_raw"], ["raw/secret-note.md"])
         self.assertEqual(payload["pending_raw"][0]["secret_warnings"], ["OpenAI API key"])
@@ -79,6 +81,36 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["plan"]["title"], "Redact raw sources before ingest")
         self.assertEqual(payload["plan"]["batch"][0]["secret_warnings"], ["OpenAI API key"])
         self.assertIn("Do not ask an agent to ingest", payload["guidance"]["notes"][0])
+
+    def test_collect_ingest_status_blocks_unreadable_raw(self):
+        root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))
+        raw = root / "raw"
+        wiki = root / "wiki"
+        raw.mkdir()
+        (raw / "locked-note.md").write_text("# Locked note\n", encoding="utf-8")
+        write_page(wiki, "index.md", "# Index\n")
+        write_page(wiki, "log.md", "# Log\n")
+        (wiki / "sources").mkdir(parents=True, exist_ok=True)
+        (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki)), encoding="utf-8")
+
+        with patch(
+            "link_core.ingest.secret_file_scan",
+            return_value={"labels": [], "readable": False, "error": "permission denied"},
+        ):
+            payload = collect_ingest_status(root)
+
+        self.assertEqual(payload["pending_count"], 1)
+        self.assertEqual(payload["raw_scan_warning_count"], 1)
+        self.assertEqual(payload["raw_scan_warnings"], [{"raw": "raw/locked-note.md", "error": "permission denied"}])
+        self.assertEqual(payload["pending_raw"][0]["scan_error"], "permission denied")
+        self.assertEqual(payload["safety"]["status"], "blocked")
+        self.assertEqual(payload["safety"]["blocked_count"], 1)
+        self.assertEqual(payload["safety"]["access_blocked_count"], 1)
+        self.assertEqual(payload["guidance"]["state"], "blocked_raw_access")
+        self.assertIsNone(payload["guidance"]["agent_prompt"])
+        self.assertEqual(payload["plan"]["title"], "Inspect raw source access")
+        self.assertEqual(payload["plan"]["batch"][0]["scan_error"], "permission denied")
+        self.assertIn("cannot read and scan", payload["guidance"]["notes"][0])
 
     def test_collect_ingest_status_reports_represented_raw(self):
         root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))

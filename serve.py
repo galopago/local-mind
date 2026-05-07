@@ -1511,6 +1511,10 @@ def _render_ingest():
         next_detail = "Redact secret-looking values in the flagged raw source before asking any agent to ingest it."
         next_code = f"edit {first_raw}"
         next_extra = ""
+    elif state == "blocked_raw_access":
+        next_detail = "Fix raw file access before asking any agent to ingest it. Link could not inspect the source for safety."
+        next_code = f"inspect {first_raw}"
+        next_extra = ""
     elif state == "stale_graph":
         next_detail = "Repair the graph index before relying on search, context, or the graph view."
         next_code = "link rebuild-backlinks && link validate"
@@ -1530,6 +1534,9 @@ def _render_ingest():
     if state == "blocked_secrets":
         ingest_prompt = f"redact secret-looking values in {first_raw} before ingest"
         optional_memory_html = '<code>redact before memory proposals</code>'
+    elif state == "blocked_raw_access":
+        ingest_prompt = f"fix raw source access for {first_raw} before ingest"
+        optional_memory_html = '<code>fix access before memory proposals</code>'
     else:
         optional_memory_html = (
             f'<a href="{html.escape(propose_href, quote=True)}"><code>{html.escape(memory_prompt)}</code></a>'
@@ -1569,6 +1576,11 @@ def _render_ingest():
                 meta = (
                     f'{int(item.get("size_bytes") or 0)} bytes · secret warning: '
                     f'{", ".join(html.escape(str(label)) for label in secret_warnings)} · redact before ingest'
+                )
+            elif item.get("scan_error"):
+                meta = (
+                    f'{int(item.get("size_bytes") or 0)} bytes · '
+                    f'could not inspect: {html.escape(str(item.get("scan_error") or ""))} · fix access before ingest'
                 )
             else:
                 meta = (

@@ -36,6 +36,11 @@ def secret_value_warnings(text: str) -> list[str]:
 
 def secret_file_warnings(path: Path, chunk_size: int = 65536, tail_size: int = 512) -> list[str]:
     """Return secret-looking labels from a file without loading it all at once."""
+    return list(secret_file_scan(path, chunk_size=chunk_size, tail_size=tail_size)["labels"])
+
+
+def secret_file_scan(path: Path, chunk_size: int = 65536, tail_size: int = 512) -> dict[str, object]:
+    """Scan a file for secret-looking values and report read failures explicitly."""
     found: set[str] = set()
     read_size = max(1, chunk_size)
     tail_len = max(0, tail_size)
@@ -51,9 +56,17 @@ def secret_file_warnings(path: Path, chunk_size: int = 65536, tail_size: int = 5
                 if len(found) == len(SECRET_VALUE_PATTERNS):
                     break
                 tail = text[-tail_len:] if tail_len else ""
-    except OSError:
-        return []
-    return [label for label, _pattern in SECRET_VALUE_PATTERNS if label in found]
+    except OSError as exc:
+        return {
+            "labels": [],
+            "readable": False,
+            "error": str(exc),
+        }
+    return {
+        "labels": [label for label, _pattern in SECRET_VALUE_PATTERNS if label in found],
+        "readable": True,
+        "error": "",
+    }
 
 
 def redact_secret_values(text: str, replacement: str = "[redacted-secret]") -> tuple[str, list[str], int]:

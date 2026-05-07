@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from .frontmatter import parse_frontmatter
-from .security import secret_file_warnings
+from .security import secret_file_scan
 from .wiki import build_backlinks, load_backlinks_index
 
 
@@ -101,12 +101,18 @@ def _secret_blocked_items(items: list[dict[str, object]]) -> list[dict[str, obje
     return [item for item in items if item.get("secret_warnings")]
 
 
+def _access_blocked_items(items: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [item for item in items if item.get("scan_error")]
+
+
 def build_ingest_safety(
     pending_raw: list[dict[str, object]],
     represented_raw: list[dict[str, object]],
 ) -> dict[str, object]:
     """Summarize raw-source secret warning state for agents and UI."""
-    blocked = _secret_blocked_items(pending_raw)
+    secret_blocked = _secret_blocked_items(pending_raw)
+    access_blocked = _access_blocked_items(pending_raw)
+    blocked = secret_blocked + [item for item in access_blocked if item not in secret_blocked]
     represented_warnings = _secret_blocked_items(represented_raw)
     warning_items = blocked + represented_warnings
     label_set: set[str] = set()
@@ -116,11 +122,16 @@ def build_ingest_safety(
             label_set.update(str(label) for label in labels_for_item)
     labels = sorted(label_set)
     warning_count = sum(int(item.get("secret_warning_count") or 0) for item in warning_items)
-    if blocked:
+    if access_blocked:
         status = "blocked"
-        summary = f"{len(blocked)} pending raw file needs redaction before ingest."
-        if len(blocked) != 1:
-            summary = f"{len(blocked)} pending raw files need redaction before ingest."
+        summary = f"{len(access_blocked)} pending raw file could not be inspected before ingest."
+        if len(access_blocked) != 1:
+            summary = f"{len(access_blocked)} pending raw files could not be inspected before ingest."
+    elif secret_blocked:
+        status = "blocked"
+        summary = f"{len(secret_blocked)} pending raw file needs redaction before ingest."
+        if len(secret_blocked) != 1:
+            summary = f"{len(secret_blocked)} pending raw files need redaction before ingest."
     elif represented_warnings:
         status = "warning"
         summary = "Raw source warnings exist in already represented files."
@@ -131,6 +142,7 @@ def build_ingest_safety(
         "status": status,
         "summary": summary,
         "blocked_count": len(blocked),
+        "access_blocked_count": len(access_blocked),
         "warning_count": warning_count,
         "labels": labels,
         "blocked_raw": [str(item.get("raw") or "") for item in blocked],
@@ -200,6 +212,33 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "Remove or redact the secret-looking values before asking any agent to ingest it.",
                 "Refresh ingest status after redaction.",
                 "Only then ask the agent to create source-backed wiki pages.",
+            ],
+            "agent_prompt": None,
+            "memory_prompt": None,
+            "post_checks": ["link ingest-status", "link status --validate"],
+        }
+
+    if state == "blocked_raw_access":
+        blocked = _access_blocked_items(pending_raw)
+        first = blocked[0] if blocked else {"raw": "raw/<file>"}
+        return {
+            "state": state,
+            "title": "Inspect raw source access",
+            "summary": f"Start with {first['raw']}; Link could not read it to run safety checks.",
+            "batch": [
+                {
+                    "raw": str(item.get("raw") or ""),
+                    "size_bytes": int(item.get("size_bytes") or 0),
+                    "scan_error": str(item.get("scan_error") or ""),
+                    "suggested_source_page": _source_page_suggestion(str(item.get("raw") or "")),
+                }
+                for item in blocked[: max(limit, 1)]
+            ],
+            "steps": [
+                "Check the file still exists and is readable by the local user.",
+                "Fix permissions or move the source to a readable raw/ file.",
+                "Refresh ingest status before asking an agent to ingest it.",
+                "Only ingest after Link can inspect the raw source for secret-looking values.",
             ],
             "agent_prompt": None,
             "memory_prompt": None,
@@ -289,6 +328,7 @@ def build_ingest_completion(status: dict[str, object], limit: int = 8) -> dict[s
             "memory_prompt": f"propose memories from {raw_rel}" if raw_rel else "",
             "query_prompt": f"query Link for {Path(raw_rel).stem.replace('-', ' ')}" if raw_rel else "",
             "secret_warnings": list(item.get("secret_warnings") or []),
+            "scan_error": str(item.get("scan_error") or ""),
         })
 
     if represented_count and pending_count:
@@ -322,6 +362,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
     raw_count = int(status.get("raw_count") or 0)
     backlinks_status = str(status.get("backlinks_status") or "unknown")
     secret_items = _secret_blocked_items(pending_items)
+    access_items = _access_blocked_items(pending_items)
 
     if not has_raw_dir or not has_wiki_dir:
         return {
@@ -330,6 +371,23 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "agent_prompt": None,
             "commands": ["link init", "link status --validate"],
             "notes": ["Run the installer or initialize this directory before ingesting sources."],
+        }
+
+    if access_items:
+        first = str(access_items[0].get("raw", "raw/<file>"))
+        count = len(access_items)
+        summary = f"{count} pending raw file could not be inspected."
+        if count != 1:
+            summary = f"{count} pending raw files could not be inspected."
+        return {
+            "state": "blocked_raw_access",
+            "summary": summary + f" Fix access for {first} before ingest.",
+            "agent_prompt": None,
+            "commands": ["link ingest-status", "link status --validate"],
+            "notes": [
+                "Do not ask an agent to ingest raw files that Link cannot read and scan for secret-looking values.",
+                "Fix permissions or replace the file, then refresh ingest status.",
+            ],
         }
 
     if secret_items:
@@ -405,6 +463,7 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     represented_raw: list[dict[str, object]] = []
     pending_raw: list[dict[str, object]] = []
     raw_secret_warning_count = 0
+    raw_scan_warnings: list[dict[str, str]] = []
     for raw_path in raw_files:
         rel = raw_path.relative_to(target).as_posix()
         matches = [
@@ -413,16 +472,28 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
             if rel in str(source_record.get("text") or "")
         ]
         match_records = [source_records[source_name] for source_name in matches]
-        warnings = secret_file_warnings(raw_path)
+        scan = secret_file_scan(raw_path)
+        warnings = list(scan.get("labels") or [])
+        scan_error = str(scan.get("error") or "")
         raw_secret_warning_count += len(warnings)
+        try:
+            size_bytes = raw_path.stat().st_size
+        except OSError as exc:
+            size_bytes = 0
+            if not scan_error:
+                scan_error = str(exc)
+        if scan_error:
+            raw_scan_warnings.append({"raw": rel, "error": scan_error})
         item = {
             "raw": rel,
-            "size_bytes": raw_path.stat().st_size,
+            "size_bytes": size_bytes,
             "source_pages": matches,
             "source_page_paths": [str(record.get("path") or "") for record in match_records],
             "source_page_titles": [str(record.get("title") or record.get("name") or "") for record in match_records],
             "secret_warnings": warnings,
             "secret_warning_count": len(warnings),
+            "readable": not bool(scan_error),
+            "scan_error": scan_error,
         }
         if matches:
             represented_raw.append(item)
@@ -444,6 +515,8 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
         "represented_raw": represented_raw,
         "pending_raw": pending_raw,
         "raw_secret_warning_count": raw_secret_warning_count,
+        "raw_scan_warning_count": len(raw_scan_warnings),
+        "raw_scan_warnings": raw_scan_warnings,
         "backlinks_status": backlinks_status,
         "backlinks_message": backlinks_message,
         "has_raw_dir": raw_dir.exists(),

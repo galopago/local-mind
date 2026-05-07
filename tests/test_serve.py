@@ -1586,6 +1586,33 @@ class ServeTests(unittest.TestCase):
         self.assertIn('/propose?source=raw/a-safe-note.md', html)
         self.assertNotIn('/propose?source=raw/secret-note.md', html)
 
+    def test_ingest_page_blocks_unreadable_raw(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        (raw / "locked-note.md").write_text("# Locked note\n", encoding="utf-8")
+        reset_wiki(wiki)
+
+        with patch(
+            "link_core.ingest.secret_file_scan",
+            return_value={"labels": [], "readable": False, "error": "permission denied"},
+        ):
+            api_status, payload = run_handler("GET", "/api/ingest-status")
+            html = serve._render_ingest()
+
+        self.assertEqual(api_status, 200)
+        self.assertEqual(payload["guidance"]["state"], "blocked_raw_access")
+        self.assertIsNone(payload["guidance"]["agent_prompt"])
+        self.assertEqual(payload["safety"]["status"], "blocked")
+        self.assertEqual(payload["raw_scan_warning_count"], 1)
+        self.assertIn("Raw safety: blocked", html)
+        self.assertIn('data-copy-text="inspect raw/locked-note.md"', html)
+        self.assertIn("Inspect raw source access", html)
+        self.assertIn("fix raw source access for raw/locked-note.md before ingest", html)
+        self.assertIn("could not inspect: permission denied", html)
+        self.assertIn("fix access before ingest", html)
+        self.assertNotIn('/propose?source=raw/locked-note.md', html)
+
     def test_rebuild_backlinks_requires_json_post(self):
         wiki = self.make_wiki()
         write_page(
