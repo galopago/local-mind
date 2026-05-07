@@ -114,6 +114,14 @@ class ServeTests(unittest.TestCase):
         self.assertIn(".memory-grid { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
         self.assertIn(".memory-actions code, .memory-next code { word-break: break-word; }", serve.CSS)
 
+    def test_server_args_stay_local_only(self):
+        self.assertEqual(serve._parse_serve_port(["--port", "3010"], default=3000), 3010)
+        self.assertEqual(serve._parse_serve_port(["--port=3011"], default=3000), 3011)
+        with self.assertRaises(SystemExit):
+            serve._parse_serve_port(["--host", "0.0.0.0"], default=3000)
+        with self.assertRaises(SystemExit):
+            serve._parse_serve_port(["--bind=0.0.0.0"], default=3000)
+
     def test_home_page_shows_first_agent_prompts(self):
         self.make_wiki()
 

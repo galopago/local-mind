@@ -3,8 +3,8 @@
 ## Local-first threat model
 
 Link is designed for local personal knowledge management. `serve.py` binds to
-`127.0.0.1` and has no authentication, so it should not be exposed directly to
-the public internet.
+`127.0.0.1`, rejects host/bind flags, and has no authentication, so it should
+not be exposed directly to the public internet.
 
 The server and MCP package do not call external APIs, send telemetry, or require
 secrets. Raw sources and generated wiki pages are user data and are ignored by

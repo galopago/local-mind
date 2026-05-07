@@ -126,6 +126,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Fixed missing HTTP context topics to return a controlled 400 JSON error.
 - Hardened backlink rebuild over HTTP so local web rebuilds require JSON POST instead of a mutating GET.
 - Hardened HTTP rebuild actions so local web index/backlink mutations require the explicit local-action header.
+- Hardened local web startup so unsupported host/bind flags fail instead of implying public serving is supported.
 - Hardened `/raw/` static serving so the local web viewer only serves supported media/PDF source assets.
 - Tightened raw asset path resolution so `/raw/` URLs cannot route through non-raw static allowlists, including encoded parent-directory paths.
 - Hardened HTTP memory mutation endpoints with an explicit `X-Link-Local-Action: true` header required by non-UI clients.

@@ -3574,13 +3574,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
 
+def _parse_serve_port(argv: list[str], default: int = PORT) -> int:
+    port = default
+    for index, arg in enumerate(argv):
+        if arg in {"--host", "--bind"} or arg.startswith("--host=") or arg.startswith("--bind="):
+            raise SystemExit("Link serve is local-only; host/bind options are not supported.")
+        if arg == "--port":
+            if index + 1 >= len(argv):
+                raise SystemExit("--port requires a value")
+            try:
+                port = int(argv[index + 1])
+            except ValueError as exc:
+                raise SystemExit("--port must be an integer") from exc
+        elif arg.startswith("--port="):
+            try:
+                port = int(arg.split("=", 1)[1])
+            except ValueError as exc:
+                raise SystemExit("--port must be an integer") from exc
+    return port
+
+
 def main():
     global PORT
-    for i, a in enumerate(sys.argv[1:]):
-        if a == "--port" and i + 1 < len(sys.argv) - 1: PORT = int(sys.argv[i+2])
+    PORT = _parse_serve_port(sys.argv[1:], default=PORT)
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as s:
         print(f"  Link → http://localhost:{PORT}")
+        print("  Local-only: bound to 127.0.0.1; no public host mode.")
         try: s.serve_forever()
         except KeyboardInterrupt: print("\n  stopped.")
 
