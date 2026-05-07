@@ -69,7 +69,15 @@ def run_smoke(work_dir: Path, python: str = sys.executable) -> None:
     require(init_status.get("ready") is True, "initialized wiki did not report ready")
     require(init_status.get("schema", {}).get("status") == "current", "initialized wiki schema is not current")
 
-    run_link("demo", str(demo_target), "--force", python=python)
+    demo_result = run_link("demo", str(demo_target), "--force", python=python)
+    require("Try the value loop:" in demo_result.stdout, "demo output did not show the value loop")
+    require("query \"why does Link help agents?\"" in demo_result.stdout, "demo output did not show the query proof command")
+    require("START_HERE.md" in demo_result.stdout, "demo output did not point to START_HERE.md")
+    require((demo_target / "START_HERE.md").exists(), "demo did not create START_HERE.md")
+    start_here = (demo_target / "START_HERE.md").read_text(encoding="utf-8")
+    require("query Link for why Link helps agents" in start_here, "START_HERE.md did not include agent prompt")
+    require("python3 link.py query" in start_here, "START_HERE.md did not include CLI proof command")
+
     demo_status = run_json("status", str(demo_target), "--validate", "--json", python=python)
     require(demo_status.get("ready") is True, "demo wiki did not report ready")
     require(demo_status.get("validation", {}).get("passed") is True, "demo validation did not pass")
