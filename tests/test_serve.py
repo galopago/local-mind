@@ -67,6 +67,8 @@ def run_handler_with_headers(method: str, path: str, body: bytes = b"", headers:
         handler.do_POST()
     elif method == "GET":
         handler.do_GET()
+    elif method == "OPTIONS":
+        handler.do_OPTIONS()
     else:
         raise ValueError(method)
     raw = handler.wfile.getvalue()
@@ -187,6 +189,16 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(second_payload["error"], "local mutation rate limit exceeded")
         self.assertGreaterEqual(second_payload["retry_after_seconds"], 1)
         self.assertEqual(second_headers["Retry-After"], str(second_payload["retry_after_seconds"]))
+
+    def test_options_preflight_returns_local_json_405(self):
+        self.make_wiki()
+
+        status, payload, headers = run_handler_with_headers("OPTIONS", "/api/rebuild-backlinks")
+
+        self.assertEqual(status, 405)
+        self.assertEqual(payload["error"], "CORS preflight is not supported; Link is localhost-only")
+        self.assertEqual(headers["Allow"], "GET, HEAD, POST")
+        self.assertNotIn("Access-Control-Allow-Origin", headers)
 
     def test_server_args_stay_local_only(self):
         self.assertEqual(serve._parse_serve_port(["--port", "3010"], default=3000), 3010)

@@ -2882,6 +2882,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.do_GET()
         self._head_only = False
 
+    def do_OPTIONS(self):
+        self._head_only = False
+        if not self._require_allowed_host():
+            return
+        self._json(
+            {"error": "CORS preflight is not supported; Link is localhost-only"},
+            status=405,
+            headers={"Allow": "GET, HEAD, POST"},
+        )
+
     def do_POST(self):
         self._head_only = False
         if not self._require_allowed_host():
