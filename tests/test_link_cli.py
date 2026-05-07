@@ -378,6 +378,32 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(status_payload["version"], link_cli.LINK_VERSION)
         self.assertGreater(status_payload["content_page_count"], 0)
 
+    def test_status_guides_empty_initialized_wiki_to_ingest(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))
+        target = tmp / "my-link"
+        with redirect_stdout(StringIO()):
+            self.assertEqual(link_cli.init_wiki(target), 0)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.status(target)
+
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("Ready: yes", text)
+        self.assertIn("Content pages: 0", text)
+        self.assertIn("ingest_status", text)
+        self.assertIn("starter_prompts", text)
+
+        json_out = StringIO()
+        with redirect_stdout(json_out):
+            json_code = link_cli.status(target, json_output=True)
+        payload = json.loads(json_out.getvalue())
+        self.assertEqual(json_code, 0)
+        self.assertEqual(payload["content_page_count"], 0)
+        self.assertEqual(payload["next_actions"][0]["tool"], "ingest_status")
+        self.assertEqual(payload["next_actions"][1]["tool"], "starter_prompts")
+
     def test_main_prints_version(self):
         out = StringIO()
 
