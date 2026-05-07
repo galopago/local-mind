@@ -312,7 +312,7 @@ Rules:
 
 When the human adds a new source to `raw/` and asks you to process it:
 
-0. Run `python3 link.py ingest-status .` when `link.py` is available to see pending raw files, current graph state, and the suggested ingest workflow
+0. Run `python3 link.py ingest-status .` when `link.py` is available to see pending raw files, current graph state, and the suggested ingest workflow. If it reports `blocked_secrets` or secret warnings, stop and ask the human to redact the flagged raw file before reading or ingesting it.
 1. Read the source completely
 2. Discuss key takeaways with the human (brief, 3-5 bullet points)
 3. Create a source page in `wiki/sources/` following the template
@@ -352,7 +352,7 @@ When the human asks a question:
 1. If you are connecting to Link for the first time or troubleshooting setup, call MCP `link_status`, run `python3 link.py status . --validate`, or call `GET /api/status?validate=true`.
 2. If the human asks what to try after installing Link, call MCP `starter_prompts`, run `python3 link.py prompts .`, or call `GET /api/prompts`.
 3. If status reports a missing or old schema marker, run MCP `migrate_wiki` when available or `python3 link.py migrate .` before other writes.
-4. If the user asks to ingest or says they dropped files into `raw/`, use MCP `ingest_status`, `python3 link.py ingest-status .`, or `GET /api/ingest-status` to get pending files, the guided ingest plan, and the next prompt/checks.
+4. If the user asks to ingest or says they dropped files into `raw/`, use MCP `ingest_status`, `python3 link.py ingest-status .`, or `GET /api/ingest-status` to get pending files, the guided ingest plan, and the next prompt/checks. If the state is `blocked_secrets`, do not read or ingest flagged raw files until the human redacts them.
 5. Start with the smart query path when available: MCP `query_link`, `python3 link.py query "<question>" .`, or `GET /api/query-link?q=<question>`. This returns a compact context packet with relevant memory, ranked wiki results, graph context, provenance, selection reasons, budget reports, and follow-up tool actions. Use provenance fields to explain why Link knows something. Do not read the whole wiki unless the packet is insufficient; if it is budget-limited, use the returned `follow_up` action first.
 6. If the question only needs session priming or personal/project preferences, use `python3 link.py brief "<question>" .` or MCP `memory_brief`. Use `profile`/`memory_profile` and `recall`/`recall_memory` afterward only when you need deeper detail.
 7. **If you need full source-backed context for one topic:** call `GET /api/context?topic=<question>` or MCP `get_context` — returns the best matching page plus related pages via graph traversal.

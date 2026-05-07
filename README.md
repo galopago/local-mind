@@ -235,7 +235,9 @@ link ingest-status
 ```
 
 `link ingest-status` prints the exact agent prompt to use for the next raw file
-and the follow-up checks to run after ingest.
+and the follow-up checks to run after ingest. If Link reports secret-looking
+values in a raw file, redact that local file first; Link will not suggest the
+normal ingest prompt for flagged raw content.
 
 ### 3. Save One Direct Memory
 

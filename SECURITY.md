@@ -10,6 +10,10 @@ The server and MCP package do not call external APIs, send telemetry, or require
 secrets. Raw sources and generated wiki pages are user data and are ignored by
 git by default.
 
+`link ingest-status` and MCP `ingest_status` scan raw source files locally for
+secret-looking values. If a pending raw file is flagged, Link withholds the
+normal ingest prompt until the file is redacted.
+
 ## Sensitive files
 
 Do not commit:

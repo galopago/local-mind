@@ -8,7 +8,7 @@ If the user asks what to try after installing Link, use MCP `starter_prompts` wh
 
 If status reports a missing or old schema marker, use MCP `migrate_wiki` when available, or run `link migrate`, before other writes.
 
-When the user asks to ingest or drops files into `raw/`, use MCP `ingest_status` when available, or run `link ingest-status`, then follow its guided plan before deciding what to process.
+When the user asks to ingest or drops files into `raw/`, use MCP `ingest_status` when available, or run `link ingest-status`, then follow its guided plan before deciding what to process. If it reports `blocked_secrets` or secret warnings, do not read or ingest flagged raw files until the user redacts them.
 
 When answering a substantive question that may need local memory or wiki context, start with MCP `query_link` when available, or run `link query "<task or question>"`.
 
