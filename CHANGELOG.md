@@ -6,6 +6,15 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ## [Unreleased]
 
+### Highlights
+
+- Reframes Link as local personal memory for agents, with the Markdown wiki as the inspectable storage layer.
+- Adds the first-use path around `link init`, `link serve`, the managed `link` command, demo proof prompts, and readiness checks.
+- Adds the memory lifecycle: remember, recall, propose, capture, approve, review, archive, restore, forget, explain, profile, and audit.
+- Adds smart query packets so MCP agents can retrieve budgeted memory, ranked wiki context, graph neighborhoods, and follow-up actions without scanning the whole wiki.
+- Adds guided ingest/proposal UI, Memory Dashboard, larger graph controls, dark/light/system themes, and clearer local web navigation.
+- Adds schema migration, validation gates, release hygiene, MCP contract checks, runtime duplication guardrails, and broader first-use/large-wiki smoke tests.
+
 ### Added
 
 - Added Memory Mode foundation with `wiki/memories/`, `link.py remember`, `link.py recall`, and MCP `remember_memory`/`recall_memory` tools.
