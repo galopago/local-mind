@@ -16,6 +16,7 @@ from link_core.web_http import (  # noqa: E402
     PERMISSIONS_POLICY,
     SVG_CONTENT_SECURITY_POLICY,
     is_allowed_static_file,
+    local_no_store_headers,
     local_security_headers,
     parse_bounded_int,
     resolve_raw_static_path,
@@ -44,6 +45,13 @@ class WebHttpCoreTests(unittest.TestCase):
         self.assertEqual(headers["X-Link-API-Version"], "2")
         self.assertEqual(headers["Content-Security-Policy"], SVG_CONTENT_SECURITY_POLICY)
         self.assertIn("script-src 'none'", SVG_CONTENT_SECURITY_POLICY)
+
+    def test_local_no_store_headers_include_legacy_cache_guards(self):
+        headers = dict(local_no_store_headers())
+
+        self.assertEqual(headers["Cache-Control"], "no-store")
+        self.assertEqual(headers["Pragma"], "no-cache")
+        self.assertEqual(headers["Expires"], "0")
 
     def test_local_rate_limiter_reports_retry_after_window(self):
         now = 100.0

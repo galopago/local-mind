@@ -101,6 +101,7 @@ from link_core.web_http import (
     is_allowed_static_file as _core_is_allowed_static_file,
     is_relative_to as _core_is_relative_to,
     LocalRateLimiter as _CoreLocalRateLimiter,
+    local_no_store_headers as _core_local_no_store_headers,
     local_security_headers as _core_local_security_headers,
     parse_bounded_int as _core_parse_bounded_int,
     PERMISSIONS_POLICY as _core_permissions_policy,
@@ -3273,7 +3274,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self._security_headers()
         self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Cache-Control", "no-store")
+        self._no_store_headers()
         self.end_headers()
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
@@ -3284,7 +3285,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self._security_headers()
         self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Cache-Control", "no-store")
+        self._no_store_headers()
         self.end_headers()
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
@@ -3294,7 +3295,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self._security_headers()
-        self.send_header("Cache-Control", "no-store")
+        self._no_store_headers()
         for key, value in (headers or {}).items():
             self.send_header(str(key), str(value))
         self.send_header("Content-Length", str(len(encoded)))
@@ -3383,6 +3384,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         for key, value in _core_local_security_headers(API_VERSION, content_security_policy):
             self.send_header(key, value)
 
+    def _no_store_headers(self):
+        for key, value in _core_local_no_store_headers():
+            self.send_header(key, value)
+
     def _file(self, fpath, content_type):
         fpath = _safe_resolve(fpath)
         if not fpath or not _is_allowed_static_file(fpath):
@@ -3396,7 +3401,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._security_headers(content_security_policy=SVG_CONTENT_SECURITY_POLICY)
             else:
                 self._security_headers()
-            self.send_header("Cache-Control", "no-store")
+            self._no_store_headers()
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             if not getattr(self, '_head_only', False):

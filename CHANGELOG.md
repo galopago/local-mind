@@ -56,6 +56,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added Content Security Policy headers to the local viewer and a stricter SVG asset policy.
 - Added browser isolation and permissions-policy headers, and marked local JSON API responses `Cache-Control: no-store`.
 - Marked local HTML pages and served static/raw files `Cache-Control: no-store` so private memory pages and source media are not browser-cached.
+- Added shared legacy `Pragma`/`Expires` no-cache headers for local personal-memory responses.
 - Returned hardened JSON `405` responses for unsupported local HTTP methods, including `TRACE` and `CONNECT`, instead of default server HTML.
 - Hardened `HEAD` handling so local health/static checks return headers without bodies and always reset response state.
 - Added an interactive-readiness verdict and threshold warnings to `link benchmark` so larger local wikis are easier to evaluate.

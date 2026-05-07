@@ -215,6 +215,8 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["api_version"], serve.API_VERSION)
         self.assertEqual(headers["Cache-Control"], "no-store")
+        self.assertEqual(headers["Pragma"], "no-cache")
+        self.assertEqual(headers["Expires"], "0")
 
     def test_html_responses_are_not_browser_cached(self):
         self.make_wiki()
@@ -225,6 +227,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn(b"Link", body)
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
         self.assertEqual(headers["Cache-Control"], "no-store")
+        self.assertEqual(headers["Pragma"], "no-cache")
+        self.assertEqual(headers["Expires"], "0")
 
     def test_head_status_sends_headers_without_body(self):
         self.make_wiki()
@@ -235,6 +239,8 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(body, b"")
         self.assertEqual(headers["Content-Type"], "application/json")
         self.assertEqual(headers["Cache-Control"], "no-store")
+        self.assertEqual(headers["Pragma"], "no-cache")
+        self.assertEqual(headers["Expires"], "0")
 
     def test_svg_security_headers_use_strict_policy(self):
         handler = object.__new__(serve.Handler)
@@ -390,6 +396,8 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(body, b"private image bytes")
         self.assertEqual(headers["Content-Type"], "image/png")
         self.assertEqual(headers["Cache-Control"], "no-store")
+        self.assertEqual(headers["Pragma"], "no-cache")
+        self.assertEqual(headers["Expires"], "0")
 
     def test_head_raw_static_sends_headers_without_body(self):
         wiki = self.make_wiki()
@@ -404,6 +412,8 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(body, b"")
         self.assertEqual(headers["Content-Type"], "image/png")
         self.assertEqual(headers["Cache-Control"], "no-store")
+        self.assertEqual(headers["Pragma"], "no-cache")
+        self.assertEqual(headers["Expires"], "0")
 
     def test_graph_labels_are_clamped_inside_canvas(self):
         wiki = self.make_wiki()

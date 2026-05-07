@@ -103,6 +103,15 @@ def local_security_headers(
     )
 
 
+def local_no_store_headers() -> tuple[tuple[str, str], ...]:
+    """Return cache-prevention headers for personal local memory responses."""
+    return (
+        ("Cache-Control", "no-store"),
+        ("Pragma", "no-cache"),
+        ("Expires", "0"),
+    )
+
+
 def _host_without_port(host: str) -> str | None:
     if any(char.isspace() for char in host):
         return None
