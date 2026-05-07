@@ -69,6 +69,17 @@ def run_smoke(work_dir: Path, python: str = sys.executable) -> None:
     require(init_status.get("ready") is True, "initialized wiki did not report ready")
     require(init_status.get("schema", {}).get("status") == "current", "initialized wiki schema is not current")
 
+    init_prompts = run_json("prompts", str(init_target), "--json", python=python)
+    require(len(init_prompts.get("prompts", [])) >= 6, "prompts did not return the first-run prompt set")
+    require(
+        init_prompts.get("prompts", [{}])[0].get("prompt") == "is Link ready?",
+        "prompts did not start with readiness guidance",
+    )
+    require(
+        "link status --validate" in init_prompts.get("commands", []),
+        "prompts did not include readiness command",
+    )
+
     demo_result = run_link("demo", str(demo_target), "--force", python=python)
     require("Try the value loop:" in demo_result.stdout, "demo output did not show the value loop")
     require("query \"why does Link help agents?\"" in demo_result.stdout, "demo output did not show the query proof command")
@@ -82,6 +93,12 @@ def run_smoke(work_dir: Path, python: str = sys.executable) -> None:
     require(demo_status.get("ready") is True, "demo wiki did not report ready")
     require(demo_status.get("validation", {}).get("passed") is True, "demo validation did not pass")
     require(int(demo_status.get("memory_count") or 0) >= 1, "demo did not include a starter memory")
+
+    project_prompts = run_json("prompts", str(demo_target), "--project", "demo", "--json", python=python)
+    require(
+        "this project uses Link" in project_prompts.get("prompts", [{}, {}, {}])[2].get("prompt", ""),
+        "project prompts did not include project memory guidance",
+    )
 
     backup = run_json("backup", str(demo_target), "--label", "first-use-smoke", "--json", python=python)
     require(backup.get("created") is True, "backup did not create an archive")
