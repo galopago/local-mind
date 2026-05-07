@@ -932,7 +932,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("restore-memory", log_text)
 
     def test_memory_action_post_requires_memory_identifier(self):
-        wiki = self.make_wiki()
+        self.make_wiki()
         status, payload = post_json("/api/review-memory", {})
 
         self.assertEqual(status, 400)
@@ -940,7 +940,7 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["error"], "memory required")
 
     def test_memory_action_post_requires_local_action_header(self):
-        wiki = self.make_wiki()
+        self.make_wiki()
         status, payload = post_json(
             "/api/review-memory",
             {"memory": "prefer-web-review"},
@@ -1332,7 +1332,7 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(kwargs["limit"], 20)
 
     def test_propose_page_renders_read_only_workflow(self):
-        wiki = self.make_wiki()
+        self.make_wiki()
 
         html = serve._render_propose(project="link", source="raw/first-memory.md")
 
@@ -1362,7 +1362,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("var initialSource = form.getAttribute('data-initial-source')", html)
 
     def test_propose_page_bounds_query_seed_values(self):
-        wiki = self.make_wiki()
+        self.make_wiki()
 
         html = serve._render_propose(project="p" * 100, source="s" * 600)
 
@@ -1891,7 +1891,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Could not rebuild backlinks", payload["error"])
 
     def test_rebuild_backlinks_rejects_bad_json_after_local_header(self):
-        wiki = self.make_wiki()
+        self.make_wiki()
 
         bad_post_status, bad_post_payload = run_handler(
             "POST",
@@ -1976,7 +1976,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Could not rebuild index", payload["error"])
 
     def test_rebuild_index_rejects_bad_json_after_local_header(self):
-        wiki = self.make_wiki()
+        self.make_wiki()
 
         bad_post_status, bad_post_payload = run_handler(
             "POST",
@@ -2078,7 +2078,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("searchInput.addEventListener('input'", html)
 
     def test_graph_empty_state_when_no_visible_pages(self):
-        wiki = self.make_wiki()
+        self.make_wiki()
 
         html = serve._render_graph()
 

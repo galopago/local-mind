@@ -42,6 +42,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Hardened MCP and local web status calls so cache issues produce readiness warnings instead of crashing.
 - Made the shared wiki cache skip unreadable pages with `cache_read_warnings` so search/query/graph can continue over readable pages.
 - Added shared atomic write helpers and migrated Link state writes for schema markers, memory pages, indexes, backlinks, captures, raw source creation, logs, and demo files.
+- Added a root `pyproject.toml` with conservative Ruff correctness checks and a CI lint job for pull requests.
 - Optimized ingest status source matching with a reverse raw-path index instead of a raw-file by source-page nested scan.
 - Removed a redundant memory index reread from direct memory resolution paths.
 - Reused cached forward-link data during context retrieval to avoid an extra primary-page disk read.

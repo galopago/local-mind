@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
 """Link — local wiki viewer. python serve.py → http://localhost:3000"""
 from __future__ import annotations
-import errno, html, http.server, json, re, socketserver, sys, time, urllib.parse
+
+import errno
+import html
+import http.server
+import json
+import re
+import socketserver
+import sys
+import time
+import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -64,15 +73,7 @@ from link_core.validation import (
 from link_core.version import (
     LINK_VERSION,
 )
-from link_core.web_assets import (
-    COPY_BUTTON_JS,
-    CSS,
-    MEMORY_ACTION_JS,
-    PROPOSAL_UI_JS,
-    RAW_SOURCE_JS,
-    THEME_CONTROL_JS,
-    THEME_INIT_JS,
-)
+from link_core.web_assets import CSS  # noqa: F401 - kept as serve.CSS for tests and compatibility
 from link_core.web_memory import (
     render_capture_card as _core_render_capture_card,
     render_capture_section as _core_render_capture_section,
