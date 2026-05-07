@@ -838,6 +838,22 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("agent-memory", rebuilt["forward"])
         self.assertIn("link", rebuilt["backlinks"]["agent-memory"])
 
+    def test_rebuild_backlinks_contract_reports_read_errors(self):
+        locked = self.target / "wiki/concepts/locked-page.md"
+        locked.write_text("---\ntype: concept\ntitle: Locked\n---\n\n[[link]]\n", encoding="utf-8")
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked-page.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            payload = json.loads(self.server.rebuild_backlinks())
+
+        self.assertFalse(payload["rebuilt"])
+        self.assertIn("Could not rebuild backlinks", payload["error"])
+
     def test_rebuild_index_contract(self):
         index_path = self.target / "wiki/index.md"
         index_path.write_text("# Broken Index\n", encoding="utf-8")

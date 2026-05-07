@@ -2919,7 +2919,10 @@ def _get_graph_summary(topic: str = "", limit: int = 40, depth: int = 1, max_edg
 
 
 def _rebuild_backlinks_payload() -> dict[str, object]:
-    result = _build_backlinks()
+    try:
+        result = _build_backlinks()
+    except OSError as exc:
+        return {"rebuilt": False, "error": f"Could not rebuild backlinks: {exc}"}
     bl_path = WIKI_DIR / "_backlinks.json"
     bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     # Invalidate pages cache so next request picks up the new backlinks mtime.

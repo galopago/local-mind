@@ -1995,6 +1995,27 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Rebuilt", out.getvalue())
         self.assertIn("agent-memory", rebuilt["backlinks"])
 
+    def test_rebuild_backlinks_reports_unreadable_pages(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        locked = target / "wiki/concepts/locked-page.md"
+        locked.write_text("---\ntype: concept\ntitle: Locked\n---\n\n[[link]]\n", encoding="utf-8")
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked-page.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        err = StringIO()
+        with patch.object(Path, "read_text", flaky_read_text):
+            with redirect_stderr(err):
+                code = link_cli.rebuild_backlinks(target)
+
+        self.assertEqual(code, 1)
+        self.assertIn("Could not rebuild backlinks", err.getvalue())
+
     def test_rebuild_index_repairs_missing_catalog_entries(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-index-test-"))
         target = tmp / "demo"

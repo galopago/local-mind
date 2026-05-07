@@ -1372,7 +1372,10 @@ def rebuild_backlinks() -> str:
     the graph index is up to date. Updates wiki/_backlinks.json with
     both reverse links (backlinks) and forward links.
     """
-    result = _core_build_backlinks(WIKI_DIR)
+    try:
+        result = _core_build_backlinks(WIKI_DIR)
+    except OSError as exc:
+        return json.dumps({"rebuilt": False, "error": f"Could not rebuild backlinks: {exc}"}, ensure_ascii=False)
     bl_path = WIKI_DIR / "_backlinks.json"
     bl_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
 

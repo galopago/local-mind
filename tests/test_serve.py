@@ -1836,6 +1836,36 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(rebuilt["backlinks"], {"b": ["a"]})
         self.assertEqual(rebuilt["forward"], {"a": ["b"]})
 
+    def test_rebuild_backlinks_reports_read_errors(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/locked-page.md",
+            "---\ntype: concept\ntitle: Locked\n---\n# Locked\n\n[[link]]\n",
+        )
+        original_read_text = Path.read_text
+
+        def flaky_read_text(path: Path, *args, **kwargs):
+            if path.name == "locked-page.md":
+                raise OSError("permission denied")
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", flaky_read_text):
+            status, payload = run_handler(
+                "POST",
+                "/api/rebuild-backlinks",
+                body=b"{}",
+                headers={
+                    "Content-Type": "application/json",
+                    "Content-Length": "2",
+                    "X-Link-Local-Action": "true",
+                },
+            )
+
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["rebuilt"])
+        self.assertIn("Could not rebuild backlinks", payload["error"])
+
     def test_rebuild_backlinks_rejects_bad_json_after_local_header(self):
         wiki = self.make_wiki()
 

@@ -982,7 +982,11 @@ def _log_writer_for(wiki_dir: Path) -> Callable[[str, str, str, list[str]], None
 
 
 def _rebuild_memory_backlinks(wiki_dir: Path) -> bool:
-    backlinks = _build_backlinks(wiki_dir)
+    try:
+        backlinks = _build_backlinks(wiki_dir)
+    except OSError as exc:
+        print(f"Could not rebuild backlinks: {exc}", file=sys.stderr)
+        return False
     (wiki_dir / "_backlinks.json").write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
     return True
 
@@ -1739,7 +1743,11 @@ def rebuild_backlinks(target: Path) -> int:
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
-    backlinks = _build_backlinks(wiki_dir)
+    try:
+        backlinks = _build_backlinks(wiki_dir)
+    except OSError as exc:
+        print(f"Could not rebuild backlinks: {exc}", file=sys.stderr)
+        return 1
     out_path = wiki_dir / "_backlinks.json"
     out_path.write_text(json.dumps(backlinks, indent=2) + "\n", encoding="utf-8")
     page_count = len(_wiki_pages(wiki_dir))
