@@ -561,6 +561,34 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("backup failed", payload["error"])
         self.assertEqual(list((target / ".link-backups").glob("*.tar.gz")), [])
 
+    def test_backup_list_reports_unreadable_archive_warning(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-backup-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        with redirect_stdout(StringIO()):
+            link_cli.backup(target, label="warning source")
+        archive = next((target / ".link-backups").glob("*.tar.gz"))
+        original_stat = Path.stat
+
+        def flaky_stat(path: Path, *args, **kwargs):
+            if path.name == archive.name:
+                raise OSError("permission denied")
+            return original_stat(path, *args, **kwargs)
+
+        json_out = StringIO()
+        text_out = StringIO()
+        with patch.object(Path, "stat", flaky_stat):
+            with redirect_stdout(json_out):
+                json_code = link_cli.backup(target, list_only=True, json_output=True)
+            with redirect_stdout(text_out):
+                text_code = link_cli.backup(target, list_only=True)
+        payload = json.loads(json_out.getvalue())
+
+        self.assertEqual(json_code, 0)
+        self.assertEqual(text_code, 0)
+        self.assertEqual(payload["warning_count"], 1)
+        self.assertIn("could not read backup", text_out.getvalue())
+
     def test_migrate_repairs_schema_marker(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-migrate-test-"))
         target = tmp / "demo"

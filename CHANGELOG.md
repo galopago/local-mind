@@ -35,6 +35,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added raw capture read-warning reporting so unreadable saved captures appear in CLI, MCP, local web inbox, brief, and audit diagnostics instead of disappearing silently.
 - Hardened `link.py doctor` secret-content checks so unreadable scannable files fail closed instead of being skipped.
 - Hardened local backups so archive failures remove partial `.tar.gz` files and return controlled CLI/MCP errors.
+- Added backup-list warnings for unreadable local backup archives instead of failing the whole list operation.
 - Added MCP `link_status` and `/api/status` for a compact readiness summary with version, wiki path, page/memory counts, optional validation, and safe next actions.
 - Added search backend reporting to Link status payloads so agents and users can see whether local search is using SQLite FTS or the token fallback.
 - Added `link.py status` so the same readiness summary is available before MCP or the local web server is connected.

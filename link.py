@@ -1574,6 +1574,9 @@ def backup(
         print("")
         if not payload["backups"]:
             print("No backups found.")
+        for warning in payload.get("warnings") or []:
+            print(f"Warning: could not read backup {warning.get('backup')}: {warning.get('error')}")
+        if not payload["backups"]:
             return 0
         for item in payload["backups"]:
             print(f"- {item['name']} ({item['bytes']} bytes)")

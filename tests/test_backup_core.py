@@ -51,6 +51,24 @@ class BackupCoreTests(unittest.TestCase):
         self.assertEqual(listing["count"], 1)
         self.assertEqual(listing["backups"][0]["name"], result["name"])
 
+    def test_list_backups_reports_unreadable_archive_metadata(self):
+        root = self.make_root()
+        result = create_backup(root, label="unit test")
+        archive = Path(result["path"])
+        original_stat = Path.stat
+
+        def flaky_stat(path: Path, *args, **kwargs):
+            if path.name == archive.name:
+                raise OSError("permission denied")
+            return original_stat(path, *args, **kwargs)
+
+        with patch.object(Path, "stat", flaky_stat):
+            listing = list_backups(root)
+
+        self.assertEqual(listing["count"], 0)
+        self.assertEqual(listing["warning_count"], 1)
+        self.assertEqual(listing["warnings"][0]["backup"], archive.name)
+
     def test_backup_requires_wiki(self):
         root = Path(tempfile.mkdtemp(prefix="link-backup-core-"))
 

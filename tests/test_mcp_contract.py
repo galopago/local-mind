@@ -191,6 +191,22 @@ class McpContractTests(unittest.TestCase):
         self.assertIn("backup failed", payload["error"])
         self.assertEqual(list((self.target / ".link-backups").glob("*.tar.gz")), [])
 
+    def test_backup_wiki_contract_reports_list_warnings(self):
+        created = json.loads(self.server.backup_wiki(label="warning source"))
+        archive = Path(created["path"])
+        original_stat = Path.stat
+
+        def flaky_stat(path: Path, *args, **kwargs):
+            if path.name == archive.name:
+                raise OSError("permission denied")
+            return original_stat(path, *args, **kwargs)
+
+        with patch.object(Path, "stat", flaky_stat):
+            payload = json.loads(self.server.backup_wiki(list_only=True))
+
+        self.assertEqual(payload["warning_count"], 1)
+        self.assertEqual(payload["warnings"][0]["backup"], archive.name)
+
     def test_ingest_status_contract(self):
         payload = json.loads(self.server.ingest_status())
 

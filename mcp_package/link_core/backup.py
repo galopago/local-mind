@@ -134,14 +134,21 @@ def list_backups(link_root: Path, *, limit: int = 20) -> dict[str, Any]:
     root = link_root.expanduser().resolve()
     backup_dir = root / BACKUP_DIR_NAME
     backups: list[dict[str, Any]] = []
+    warnings: list[dict[str, str]] = []
     if backup_dir.exists():
-        for path in sorted(
-            backup_dir.glob("*.tar.gz"),
-            key=lambda item: (item.stat().st_mtime, item.name),
+        archive_stats: list[tuple[Path, Any]] = []
+        for path in backup_dir.glob("*.tar.gz"):
+            try:
+                archive_stats.append((path, path.stat()))
+            except OSError as exc:
+                warnings.append({"backup": path.name, "error": str(exc) or exc.__class__.__name__})
+        for path, stat in sorted(
+            archive_stats,
+            key=lambda item: (item[1].st_mtime, item[0].name),
             reverse=True,
         )[: max(int(limit), 0)]:
             created_at = (
-                datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+                datetime.fromtimestamp(stat.st_mtime, timezone.utc)
                 .replace(microsecond=0)
                 .isoformat()
                 .replace("+00:00", "Z")
@@ -149,11 +156,13 @@ def list_backups(link_root: Path, *, limit: int = 20) -> dict[str, Any]:
             backups.append({
                 "name": path.name,
                 "path": str(path),
-                "bytes": path.stat().st_size,
+                "bytes": stat.st_size,
                 "created_at": created_at,
             })
     return {
         "backup_dir": str(backup_dir),
         "count": len(backups),
+        "warning_count": len(warnings),
+        "warnings": warnings,
         "backups": backups,
     }
