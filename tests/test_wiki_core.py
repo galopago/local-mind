@@ -90,8 +90,24 @@ class WikiCoreTests(unittest.TestCase):
         self.assertEqual(context["inbound_count"], 1)
         self.assertEqual(context["forward_count"], 2)
         self.assertEqual([page["name"] for page in context["pages"]], ["agent-memory", "link", "retrieval"])
+        self.assertEqual(cache["forward_links_index"]["agent-memory"], ["link", "retrieval"])
         self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
         self.assertIn({"source": "agent-memory", "target": "retrieval"}, graph["edges"])
+
+    def test_graph_data_uses_cached_forward_links_without_rereading_pages(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n[[link]]\n",
+        )
+        write_page(wiki, "entities/link.md", "---\ntype: entity\ntitle: Link\n---\n# Link\n")
+        cache = build_wiki_cache(wiki)
+
+        with patch.object(Path, "read_text", side_effect=AssertionError("graph_data should use cache")):
+            graph = graph_data(cache)
+
+        self.assertIn({"source": "agent-memory", "target": "link"}, graph["edges"])
 
     def test_graph_summary_caps_overview_for_agent_context(self):
         wiki = self.make_wiki()

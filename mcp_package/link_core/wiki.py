@@ -90,6 +90,7 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
     snippet_index: dict[str, str] = {}
     token_index: dict[str, set[str]] = {}
     meta_token_index: dict[str, set[str]] = {}
+    raw_forward_links: dict[str, list[str]] = {}
 
     for md in sorted(wiki_dir.rglob("*.md")):
         if md.name.startswith("."):
@@ -122,6 +123,11 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
         }
         pages.append(page)
         page_index[stem] = md
+        raw_forward_links[stem] = [
+            match.group(1).strip().lower()
+            for match in WIKILINK_RE.finditer(body)
+            if match.group(1).strip()
+        ]
         for alias in aliases:
             if alias not in page_index:
                 page_index[alias] = md
@@ -163,6 +169,20 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
             " ".join(str(tag) for tag in tags_raw),
         ]))
 
+    page_ids = {page["name"].lower(): page["name"] for page in pages}
+    forward_links_index: dict[str, list[str]] = {}
+    for source, raw_targets in raw_forward_links.items():
+        source_name = page_ids.get(source, source)
+        seen_targets: set[str] = set()
+        for target_key in raw_targets:
+            target = page_ids.get(target_key)
+            if not target or target_key == source:
+                continue
+            if target in seen_targets:
+                continue
+            seen_targets.add(target)
+            forward_links_index.setdefault(source_name, []).append(target)
+
     fts_index = build_fts_index(pages, fulltext)
     return {
         "mtime": wiki_mtime(wiki_dir),
@@ -176,6 +196,7 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
         "token_index": token_index,
         "meta_token_index": meta_token_index,
         "page_map": {page["name"].lower(): page for page in pages},
+        "forward_links_index": forward_links_index,
         "fts_index": fts_index,
         "search_backend": "sqlite-fts" if fts_index is not None else "token-index",
     }
@@ -316,12 +337,33 @@ def context_for_topic(
 def graph_data(cache: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     pages = cache["pages"]
     page_ids = {page["name"].lower(): page["name"] for page in pages}
+    valid_ids = set(page_ids.values())
     nodes = [
         {"id": page["name"], "title": page["title"], "category": page["category"], "type": page["type"]}
         for page in pages
     ]
     edges: list[dict[str, str]] = []
     seen_edges: set[tuple[str, str]] = set()
+    forward_links = cache.get("forward_links_index")
+    if isinstance(forward_links, dict):
+        for source, targets in forward_links.items():
+            source_id = page_ids.get(str(source).lower(), str(source))
+            if source_id not in valid_ids:
+                continue
+            if not isinstance(targets, list):
+                continue
+            for target_raw in targets:
+                target_key = str(target_raw).lower()
+                target = page_ids.get(target_key, str(target_raw))
+                if target not in valid_ids or target == source_id:
+                    continue
+                edge_key = (source_id, target)
+                if edge_key in seen_edges:
+                    continue
+                seen_edges.add(edge_key)
+                edges.append({"source": source_id, "target": target})
+        return {"nodes": nodes, "edges": edges}
+
     for page in pages:
         source = page["name"]
         path = cache["page_index"].get(source.lower())

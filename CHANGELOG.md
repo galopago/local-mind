@@ -67,6 +67,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added large-graph controls for node search, type filtering, and selected-node neighborhood depth.
 - Added a capped default graph overview for huge wikis so the canvas draws the most connected nodes first while search and selected neighborhoods still pull relevant nodes into view.
 - Added bounded graph summaries through CLI, HTTP, and MCP so agents can inspect large graph structure without loading every node and edge into context.
+- Made graph edge construction cache-backed so large graph rendering/export avoids rereading every Markdown page after cache warmup.
 - Added a short local-server cache poll interval so hot navigation reuses the warmed wiki cache instead of rescanning every page for each request.
 - Added duplicate protection for `remember`/`remember_memory`; strong duplicate memories are refused unless explicitly allowed.
 - Added memory merge/update workflow with `update-memory` and MCP `update_memory`, including update counts, audit logs, backlink rebuilds, and review reset.
