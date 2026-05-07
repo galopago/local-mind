@@ -21,19 +21,30 @@ def benchmark_health(payload: Mapping[str, object]) -> dict[str, object]:
     if not isinstance(timings, Mapping):
         timings = {}
     warnings: list[str] = []
+    slow_paths: list[str] = []
     for label, ceiling in BENCHMARK_THRESHOLDS_SECONDS.items():
         elapsed = timings.get(label)
         if isinstance(elapsed, (int, float)) and elapsed > ceiling:
             warnings.append(f"{label} took {elapsed:.4f}s, above the {ceiling:.1f}s interactive target")
-    if int(payload.get("pages") or 0) >= 1000 and payload.get("search_backend") != "sqlite-fts":
+            slow_paths.append(label)
+    large_token_fallback = int(payload.get("pages") or 0) >= 1000 and payload.get("search_backend") != "sqlite-fts"
+    if large_token_fallback:
         warnings.append("large wiki is using token-index fallback; SQLite FTS would improve search headroom")
     if warnings:
         summary = "Review recommended before relying on this wiki for interactive agent work."
         recommendations = [
-            "Use SQLite FTS for large wikis when available.",
             "Run link doctor --fix and link benchmark again after repairing wiki/index state.",
-            "If one timing path stays slow, inspect unusually large pages or raw-source references.",
         ]
+        if large_token_fallback or "search" in slow_paths or "query" in slow_paths:
+            recommendations.append("Use a Python build with sqlite3/FTS5 enabled for large local wikis.")
+        if "cache" in slow_paths:
+            recommendations.append("Inspect unusually large pages or raw-source references; cache time is dominated by local file reads.")
+        if "graph_initial" in slow_paths or "graph" in slow_paths:
+            recommendations.append("Use graph-summary, search, and focused neighborhoods instead of loading the full graph first.")
+        if "page_list" in slow_paths:
+            recommendations.append("Use bounded page-list pagination instead of asking an agent to enumerate every page.")
+        if not any(path in slow_paths for path in ("cache", "search", "query", "graph_summary", "page_list", "graph_initial", "graph")):
+            recommendations.append("Inspect unusually large pages or raw-source references if interaction still feels slow.")
     else:
         summary = "Ready for interactive local agent memory."
         recommendations = []

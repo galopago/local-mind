@@ -54,7 +54,8 @@ class BenchmarkCoreTests(unittest.TestCase):
         self.assertEqual(health["label"], "review")
         self.assertIn("search took 1.5000s", health["warnings"][0])
         self.assertIn("Review recommended", health["summary"])
-        self.assertIn("Run link doctor --fix", health["recommendations"][1])
+        self.assertIn("Run link doctor --fix", health["recommendations"][0])
+        self.assertIn("sqlite3/FTS5", health["recommendations"][1])
 
     def test_benchmark_health_warns_on_large_token_fallback(self):
         payload = {
@@ -75,7 +76,29 @@ class BenchmarkCoreTests(unittest.TestCase):
 
         self.assertEqual(health["status"], "warn")
         self.assertIn("SQLite FTS", health["warnings"][0])
-        self.assertIn("SQLite FTS", health["recommendations"][0])
+        self.assertIn("sqlite3/FTS5", health["recommendations"][1])
+
+    def test_benchmark_health_gives_graph_specific_recommendations(self):
+        payload = {
+            "pages": 2000,
+            "search_backend": "sqlite-fts",
+            "timings": {
+                "cache": 0.2,
+                "search": 0.01,
+                "query": 0.03,
+                "graph_summary": 0.01,
+                "page_list": 0.01,
+                "graph_initial": 1.4,
+                "graph": 2.4,
+            },
+        }
+
+        health = benchmark_health(payload)
+
+        self.assertEqual(health["status"], "warn")
+        self.assertTrue(any("graph_initial took" in warning for warning in health["warnings"]))
+        self.assertTrue(any("graph took" in warning for warning in health["warnings"]))
+        self.assertIn("focused neighborhoods", " ".join(health["recommendations"]))
 
 
 if __name__ == "__main__":

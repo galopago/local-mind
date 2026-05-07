@@ -142,6 +142,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added copy buttons for guided ingest prompts and post-ingest checks in the local web UI.
 - Made proposal source discovery stream secret scans, read only bounded previews, and return explicit source actions for load, redact, or split.
 - Added benchmark health summaries and recommendations so `link benchmark` produces clearer proof-of-readiness output.
+- Improved benchmark recommendations so slow search, cache, page-list, and graph paths get targeted repair guidance.
 - Added README trust-gate guidance for ingest safety, proposal review, validation, benchmark readiness, duplicate/conflict checks, and first-run benchmarking.
 - Added a first-use smoke test for init, demo, status, query, brief, remember, capture, ingest-status, and validation workflows.
 - Added `link prompts` coverage to the first-use smoke so CI validates the first-run agent prompt path.
