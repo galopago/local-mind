@@ -870,6 +870,34 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["memory"]["items"][0]["name"], "prefer-local-personal-memory")
         self.assertIn("context_packet", payload)
 
+    def test_agent_facing_cli_queries_are_bounded(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-query-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        long_query = "agent memory " + ("memory " * 200)
+
+        query_out = StringIO()
+        with redirect_stdout(query_out):
+            query_code = link_cli.query(target, long_query, budget="small", json_output=True)
+        graph_out = StringIO()
+        with redirect_stdout(graph_out):
+            graph_code = link_cli.graph_summary(target, long_query, json_output=True)
+        brief_out = StringIO()
+        with redirect_stdout(brief_out):
+            brief_code = link_cli.brief(target, long_query, json_output=True)
+        benchmark_out = StringIO()
+        with redirect_stdout(benchmark_out):
+            benchmark_code = link_cli.benchmark(target, long_query, json_output=True)
+
+        self.assertEqual(query_code, 0)
+        self.assertEqual(graph_code, 0)
+        self.assertEqual(brief_code, 0)
+        self.assertEqual(benchmark_code, 0)
+        self.assertLessEqual(len(json.loads(query_out.getvalue())["query"]), 500)
+        self.assertLessEqual(len(json.loads(graph_out.getvalue())["topic"]), 500)
+        self.assertLessEqual(len(json.loads(brief_out.getvalue())["query"]), 500)
+        self.assertLessEqual(len(json.loads(benchmark_out.getvalue())["query"]), 500)
+
     def test_graph_summary_reports_bounded_context(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-graph-summary-test-"))
         target = tmp / "demo"

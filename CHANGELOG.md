@@ -94,6 +94,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added smart Link query packets with `link.py query`, MCP `query_link`, and `/api/query-link` so agents can retrieve budgeted memory, ranked wiki results, and graph context without reading the whole wiki.
 - Added smart query budget reports and follow-up tool actions so agents know when context was truncated and how to continue without scanning the whole wiki.
 - Added estimated character/token counts to smart query budget reports so agents can reason about context cost.
+- Bounded agent-facing CLI query strings for `query`, `brief`, `graph-summary`, and `benchmark` to match the MCP server's safer input posture.
 - Added provenance metadata to smart query memory and wiki packets so agents can explain why Link knows something without loading full pages.
 - Added precomputed search word indexes so repeated wiki search and smart query calls avoid rebuilding per-page word sets on larger wikis.
 - Added optional in-memory SQLite FTS search acceleration with token-index fallback so large local wikis stay fast without adding a server dependency.

@@ -163,6 +163,7 @@ from link_core.schema import (
     schema_status as _core_schema_status,
 )
 from link_core.security import (
+    clean_text_input as _clean_text_input,
     redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
@@ -2660,6 +2661,7 @@ def query(
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
+    query_text = _clean_text_input(query_text, max_len=500)
     project_name = project or _default_project(target)
     payload = _query_link(wiki_dir, query_text, budget=budget, project=project_name)
     if json_output:
@@ -2722,6 +2724,7 @@ def graph_summary(
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
+    topic = _clean_text_input(topic, max_len=500)
     cache = _core_build_wiki_cache(wiki_dir)
     payload = _core_graph_summary(
         cache,
@@ -2803,6 +2806,7 @@ def benchmark(
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
+    query_text = _clean_text_input(query_text, max_len=500)
     project_name = project or _default_project(target)
     timings: dict[str, float] = {}
 
@@ -2954,6 +2958,7 @@ def brief(
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
+    query = _clean_text_input(query, max_len=500)
     project_name = project or _default_project(target)
     payload = _memory_brief(wiki_dir, query=query, limit=limit, project=project_name)
     payload = _core_add_capture_review_to_brief(
