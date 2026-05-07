@@ -216,6 +216,16 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["api_version"], serve.API_VERSION)
         self.assertEqual(headers["Cache-Control"], "no-store")
 
+    def test_html_responses_are_not_browser_cached(self):
+        self.make_wiki()
+
+        status, body, headers = run_handler_raw("GET", "/")
+
+        self.assertEqual(status, 200)
+        self.assertIn(b"Link", body)
+        self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        self.assertEqual(headers["Cache-Control"], "no-store")
+
     def test_svg_security_headers_use_strict_policy(self):
         handler = object.__new__(serve.Handler)
         headers = []

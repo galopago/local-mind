@@ -3271,7 +3271,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self._security_headers()
         self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
@@ -3282,7 +3282,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self._security_headers()
         self.send_header("Content-Length", str(len(encoded)))
-        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         if not getattr(self, '_head_only', False):
             self.wfile.write(encoded)
