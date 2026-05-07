@@ -37,6 +37,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Moved the local web UI CSS/JavaScript assets into `link_core.web_assets` so `serve.py` stays focused on routing and rendering.
 - Moved memory and raw-capture card rendering into `link_core.web_memory` so memory UI escaping and actions are covered outside the HTTP server.
 - Moved the shared local web layout shell into `link_core.web_layout` so header/nav/theme/search behavior is tested outside the HTTP server.
+- Moved local HTTP guard parsing and Host validation into `link_core.web_http` with isolated tests.
 - Added a managed `~/.local/bin/link` command for global installs so users can run `link status --validate`, `link query`, and `link brief` without remembering wiki paths.
 - Added `link init` to create or repair a normal Link wiki without loading demo content.
 - Added `link serve` to start the local web viewer without remembering `serve.py` paths.
