@@ -159,6 +159,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Changed CI to run on pull requests and manual dispatch only, preserving GitHub minutes for the develop-branch workflow.
 - Added CLI validation to the CI demo health smoke path so PRs catch broken generated wiki templates.
 - Updated the PyPI package README with the current MCP tool contract, validation workflow, capture inbox, and permanent-forget guidance.
+- Added PyPI package README trust notes for local-first privacy, bounded agent context, SQLite FTS, and graph-summary-first usage.
 - Updated package classifiers and PR CI coverage for modern Python, including Python 3.14.
 - Added Memory Dashboard next actions so the web UI and API surface the most important memory maintenance step.
 - Extracted shared memory proposal logic into `link_core` so CLI, HTTP, and MCP proposal behavior stays aligned.

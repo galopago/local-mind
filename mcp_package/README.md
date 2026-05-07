@@ -90,6 +90,18 @@ Most agents should call:
 Use `remember_memory` only when the user explicitly approves saving durable
 memory. Use `propose_memories` or `capture_session` for proposal-only review.
 
+## Privacy and Scale
+
+- Local-first: `link-mcp` reads the wiki path you configure and does not call
+  external APIs, send telemetry, or require API keys.
+- Bounded by default: `query_link`, `get_pages`, `get_backlinks`, and
+  `get_graph_summary` are designed for agent context budgets so large wikis do
+  not have to be dumped into a chat.
+- Large-wiki search uses in-memory SQLite FTS when Python provides it, with a
+  token-index fallback when FTS is unavailable.
+- Use `get_graph_summary` before `get_graph` unless the user explicitly needs a
+  full graph export.
+
 ## Tools
 
 | Tool | Description |
