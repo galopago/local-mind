@@ -38,6 +38,10 @@ def normalized_search_text(value: object) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _search_words(value: object) -> set[str]:
+    return {word for word in re.split(r"\W+", normalized_search_text(value)) if len(word) >= 3}
+
+
 def wiki_mtime(wiki_dir: Path) -> float:
     """Return an mtime signal for files that affect wiki indexes."""
     try:
@@ -85,6 +89,8 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
     page_index: dict[str, Path] = {}
     fulltext: dict[str, str] = {}
     normalized_fulltext: dict[str, str] = {}
+    text_words_index: dict[str, set[str]] = {}
+    meta_words_index: dict[str, set[str]] = {}
     snippet_index: dict[str, str] = {}
     token_index: dict[str, set[str]] = {}
     meta_token_index: dict[str, set[str]] = {}
@@ -126,7 +132,9 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
 
         text_lower = text.lower()
         fulltext[stem] = text_lower
-        normalized_fulltext[stem] = normalized_search_text(text_lower)
+        text_normalized = normalized_search_text(text_lower)
+        normalized_fulltext[stem] = text_normalized
+        text_words_index[stem] = _search_words(text_normalized)
         snippet_index[stem] = _body_snippet(body)
 
         for token in re.split(r"\W+", text_lower):
@@ -151,6 +159,13 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
                     meta_tokens.add(word)
         for token in meta_tokens:
             meta_token_index.setdefault(token, set()).add(stem)
+        meta_words_index[stem] = _search_words(" ".join([
+            title,
+            stem,
+            tldr,
+            " ".join(str(alias) for alias in aliases),
+            " ".join(str(tag) for tag in tags_raw),
+        ]))
 
     return {
         "mtime": wiki_mtime(wiki_dir),
@@ -158,6 +173,8 @@ def build_wiki_cache(wiki_dir: Path) -> dict[str, Any]:
         "page_index": page_index,
         "fulltext": fulltext,
         "normalized_fulltext": normalized_fulltext,
+        "text_words_index": text_words_index,
+        "meta_words_index": meta_words_index,
         "snippet_index": snippet_index,
         "token_index": token_index,
         "meta_token_index": meta_token_index,
@@ -224,6 +241,8 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
     meta_token_index = cache["meta_token_index"]
     fulltext = cache["fulltext"]
     normalized_fulltext = cache.get("normalized_fulltext", {})
+    text_words_index = cache.get("text_words_index", {})
+    meta_words_index = cache.get("meta_words_index", {})
     snippet_index = cache["snippet_index"]
 
     is_single_token = bool(re.match(r"^\w+$", q_lower))
@@ -255,16 +274,15 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
         tags = page.get("tags", [])
         tldr = page.get("tldr", "")
         text_lower = fulltext.get(stem, "")
-        meta_words = set(re.split(
-            r"\W+",
-            normalized_search_text(" ".join([
+        meta_words = meta_words_index.get(stem)
+        if meta_words is None:
+            meta_words = _search_words(" ".join([
                 str(page["title"]),
                 stem,
                 str(tldr),
                 " ".join(str(alias) for alias in aliases),
                 " ".join(str(tag) for tag in tags),
-            ])),
-        ))
+            ]))
 
         if q_lower in str(page["title"]).lower() or (q_normalized and q_normalized in title_normalized):
             score += 10
@@ -284,7 +302,9 @@ def search_pages(query: str, cache: dict[str, Any], limit: int = 20) -> list[dic
         elif query_tokens and any(token in meta_words for token in query_tokens):
             score += 1
         if query_tokens and text_normalized:
-            text_words = set(re.split(r"\W+", text_normalized))
+            text_words = text_words_index.get(stem)
+            if text_words is None:
+                text_words = _search_words(text_normalized)
             if all(token in text_words for token in query_tokens):
                 score += 2
         if score > 0:

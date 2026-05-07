@@ -79,6 +79,8 @@ class WikiCoreTests(unittest.TestCase):
 
         self.assertEqual(search[0]["name"], "agent-memory")
         self.assertIn("date_published", search[0])
+        self.assertIn("durable", cache["meta_words_index"]["agent-memory"])
+        self.assertIn("references", cache["text_words_index"]["link"])
         self.assertEqual(context["primary"], "agent-memory")
         self.assertEqual(context["inbound_count"], 1)
         self.assertEqual(context["forward_count"], 2)

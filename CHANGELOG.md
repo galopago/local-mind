@@ -53,6 +53,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added smart query budget reports and follow-up tool actions so agents know when context was truncated and how to continue without scanning the whole wiki.
 - Added estimated character/token counts to smart query budget reports so agents can reason about context cost.
 - Added provenance metadata to smart query memory and wiki packets so agents can explain why Link knows something without loading full pages.
+- Added precomputed search word indexes so repeated wiki search and smart query calls avoid rebuilding per-page word sets on larger wikis.
 - Improved smart query follow-ups so a truncated large-budget packet does not ask the agent to rerun the same large budget again.
 - Added `link.py validate` as an ingest gate for agent-generated wiki pages, covering required frontmatter, type/directory alignment, required sections, dead links, and stale backlinks.
 - Added MCP `validate_wiki` and `/api/validate` so agents can run the same ingest gate without shell access.
