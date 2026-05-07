@@ -13,6 +13,8 @@ supplies `Origin` or `Referer`, Link accepts local mutations only from
 memory so a runaway local client receives JSON `429` responses instead of
 unbounded writes. Link does not grant browser CORS access; preflight requests
 receive local JSON `405` responses without `Access-Control-Allow-Origin`.
+The local viewer sends a Content Security Policy that limits scripts,
+connections, images, and framing to local-safe sources.
 
 The server and MCP package do not call external APIs, send telemetry, or require
 secrets. Raw sources and generated wiki pages are user data and are ignored by

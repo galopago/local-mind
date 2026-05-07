@@ -138,6 +138,24 @@ LOCAL_ACTION_HEADER = "X-Link-Local-Action"
 LOCAL_ACTION_VALUES = {"1", "true", "yes"}
 MUTATION_RATE_LIMIT = 180
 MUTATION_RATE_WINDOW_SECONDS = 60
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "img-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'none'; "
+    "frame-ancestors 'none'"
+)
+SVG_CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; "
+    "img-src 'self' data:; "
+    "style-src 'unsafe-inline'; "
+    "script-src 'none'; "
+    "object-src 'none'; "
+    "sandbox"
+)
 PROPOSAL_SOURCE_SUFFIXES = {
     ".md",
     ".markdown",
@@ -3340,11 +3358,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return None, "JSON body must be an object", 400
         return payload, None, 200
 
-    def _security_headers(self):
+    def _security_headers(self, content_security_policy: str = CONTENT_SECURITY_POLICY):
         self.send_header("X-Link-API-Version", API_VERSION)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        self.send_header("Content-Security-Policy", content_security_policy)
 
     def _file(self, fpath, content_type):
         fpath = _safe_resolve(fpath)
@@ -3355,9 +3374,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             data = fpath.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", content_type)
-            self._security_headers()
             if content_type == "image/svg+xml":
-                self.send_header("Content-Security-Policy", "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; sandbox")
+                self._security_headers(content_security_policy=SVG_CONTENT_SECURITY_POLICY)
+            else:
+                self._security_headers()
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             if not getattr(self, '_head_only', False):

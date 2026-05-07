@@ -157,6 +157,19 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn(("X-Link-API-Version", serve.API_VERSION), headers)
         self.assertIn(("X-Content-Type-Options", "nosniff"), headers)
+        self.assertIn(("Content-Security-Policy", serve.CONTENT_SECURITY_POLICY), headers)
+        self.assertIn("connect-src 'self'", serve.CONTENT_SECURITY_POLICY)
+        self.assertIn("frame-ancestors 'none'", serve.CONTENT_SECURITY_POLICY)
+
+    def test_svg_security_headers_use_strict_policy(self):
+        handler = object.__new__(serve.Handler)
+        headers = []
+        handler.send_header = lambda key, value: headers.append((key, value))
+
+        handler._security_headers(content_security_policy=serve.SVG_CONTENT_SECURITY_POLICY)
+
+        self.assertIn(("Content-Security-Policy", serve.SVG_CONTENT_SECURITY_POLICY), headers)
+        self.assertIn("script-src 'none'", serve.SVG_CONTENT_SECURITY_POLICY)
 
     def test_rejects_unexpected_host_header(self):
         self.make_wiki()
