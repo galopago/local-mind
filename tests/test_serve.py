@@ -1364,6 +1364,10 @@ class ServeTests(unittest.TestCase):
             "# Big Note\n\n" + ("large source text\n" * 5000),
             encoding="utf-8",
         )
+        (raw / ".hidden-note.md").write_text(
+            "# Hidden Note\n\nThis should not be listed or loaded directly.",
+            encoding="utf-8",
+        )
         (raw / "image.png").write_bytes(b"not listed")
         reset_wiki(wiki)
 
@@ -1372,6 +1376,8 @@ class ServeTests(unittest.TestCase):
         secret_status, secret_payload = run_handler("GET", "/api/proposal-source?path=raw/secret-note.md")
         big_status, big_payload = run_handler("GET", "/api/proposal-source?path=raw/big-note.md")
         traversal_status, traversal_payload = run_handler("GET", "/api/proposal-source?path=../serve.py")
+        hidden_status, hidden_payload = run_handler("GET", "/api/proposal-source?path=raw/.hidden-note.md")
+        long_status, long_payload = run_handler("GET", f"/api/proposal-source?path={'x' * 1001}.md")
 
         self.assertEqual(list_status, 200)
         self.assertEqual(list_payload["count"], 3)
@@ -1388,6 +1394,7 @@ class ServeTests(unittest.TestCase):
         self.assertTrue(sources["raw/big-note.md"]["truncated"])
         self.assertEqual(sources["raw/big-note.md"]["action"], "split")
         self.assertEqual(sources["raw/big-note.md"]["action_label"], "Split file")
+        self.assertNotIn("raw/.hidden-note.md", sources)
         self.assertEqual(load_status, 200)
         self.assertIn("local-first agent memory", load_payload["text"])
         self.assertEqual(load_payload["source"], "raw/first-memory.md")
@@ -1399,6 +1406,10 @@ class ServeTests(unittest.TestCase):
         self.assertNotIn("text", big_payload)
         self.assertEqual(traversal_status, 404)
         self.assertFalse(traversal_payload["found"])
+        self.assertEqual(hidden_status, 404)
+        self.assertFalse(hidden_payload["found"])
+        self.assertEqual(long_status, 404)
+        self.assertFalse(long_payload["found"])
 
     def test_raw_source_api_creates_local_source_for_ingest(self):
         wiki = self.make_wiki()

@@ -840,7 +840,10 @@ def _proposal_source_preview(path: Path) -> str:
 
 
 def _resolve_proposal_source_path(source_path: str) -> Path | None:
-    decoded = urllib.parse.unquote(str(source_path or "")).strip().lstrip("/")
+    raw_text = str(source_path or "").strip()
+    if len(raw_text) > 1000:
+        return None
+    decoded = urllib.parse.unquote(raw_text).strip().lstrip("/")
     if decoded.startswith("raw/"):
         decoded = decoded[4:]
     if not decoded:
@@ -848,6 +851,8 @@ def _resolve_proposal_source_path(source_path: str) -> Path | None:
     resolved = _safe_resolve(RAW_DIR / decoded)
     raw_root = RAW_DIR.resolve()
     if not resolved or not _is_relative_to(resolved, raw_root):
+        return None
+    if any(part.startswith(".") for part in resolved.relative_to(raw_root).parts):
         return None
     if not resolved.is_file() or resolved.suffix.lower() not in PROPOSAL_SOURCE_SUFFIXES:
         return None
