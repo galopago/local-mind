@@ -5,6 +5,7 @@ import time
 import unittest
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 
 import serve
 from link_core.schema import write_schema
@@ -18,6 +19,8 @@ def reset_wiki(wiki_dir: Path) -> None:
     serve.RAW_DIR = wiki_dir.parent / "raw"
     serve._pages_cache = None
     serve._pages_cache_mtime = 0.0
+    serve._pages_cache_checked_at = 0.0
+    serve.CACHE_MTIME_CHECK_INTERVAL_SECONDS = 0.0
     serve._page_index = {}
     serve._fulltext_index = {}
     serve._normalized_fulltext_index = {}
@@ -808,6 +811,24 @@ class ServeTests(unittest.TestCase):
 
         self.assertEqual(next(p["title"] for p in before if p["name"] == "a"), "A")
         self.assertEqual(next(p["title"] for p in after if p["name"] == "a"), "A2")
+
+    def test_cache_mtime_check_is_throttled_for_hot_navigation(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n",
+        )
+        serve.CACHE_MTIME_CHECK_INTERVAL_SECONDS = 60.0
+
+        with patch("serve._wiki_mtime", wraps=serve._wiki_mtime) as mtime:
+            first = serve._get_all_pages()
+            second = serve._get_all_pages()
+            forced = serve._get_all_pages(force_check=True)
+
+        self.assertIs(first, second)
+        self.assertIs(first, forced)
+        self.assertEqual(mtime.call_count, 2)
 
     def test_backlinks_loader_returns_documented_shape(self):
         wiki = self.make_wiki()

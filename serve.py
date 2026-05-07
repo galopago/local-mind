@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Link — local wiki viewer. python serve.py → http://localhost:3000"""
 from __future__ import annotations
-import html, http.server, json, re, socketserver, sys, urllib.parse
+import html, http.server, json, re, socketserver, sys, time, urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -116,8 +116,10 @@ RAW_STATIC_TYPES = {
 # ---------------------------------------------------------------------------
 # In-memory caches — invalidated on each request by mtime check
 # ---------------------------------------------------------------------------
+CACHE_MTIME_CHECK_INTERVAL_SECONDS = 0.5
 _pages_cache: list | None = None
 _pages_cache_mtime: float = 0.0
+_pages_cache_checked_at: float = 0.0
 _page_index: dict[str, Path] = {}  # stem.lower() → path
 _fulltext_index: dict[str, str] = {}  # stem.lower() → full text (for search)
 _normalized_fulltext_index: dict[str, str] = {}  # punctuation-normalized full text
@@ -131,10 +133,11 @@ _fts_index = None
 _search_backend = "token-index"
 
 def _invalidate_pages_cache() -> None:
-    global _pages_cache, _pages_cache_mtime, _fts_index, _search_backend
+    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _fts_index, _search_backend
     _core_close_wiki_cache({"fts_index": _fts_index})
     _pages_cache = None
     _pages_cache_mtime = 0.0
+    _pages_cache_checked_at = 0.0
     _fts_index = None
     _search_backend = "token-index"
 
@@ -143,9 +146,18 @@ def _wiki_mtime() -> float:
     return _core_wiki_mtime(WIKI_DIR)
 
 
-def _get_all_pages() -> list:
-    global _pages_cache, _pages_cache_mtime, _page_index, _fulltext_index, _normalized_fulltext_index, _text_words_index, _meta_words_index, _snippet_index, _token_index, _page_map, _meta_token_index, _fts_index, _search_backend
+def _get_all_pages(force_check: bool = False) -> list:
+    global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _page_index, _fulltext_index, _normalized_fulltext_index, _text_words_index, _meta_words_index, _snippet_index, _token_index, _page_map, _meta_token_index, _fts_index, _search_backend
+    now = time.monotonic()
+    if (
+        _pages_cache is not None
+        and not force_check
+        and CACHE_MTIME_CHECK_INTERVAL_SECONDS > 0
+        and now - _pages_cache_checked_at < CACHE_MTIME_CHECK_INTERVAL_SECONDS
+    ):
+        return _pages_cache
     mtime = _wiki_mtime()
+    _pages_cache_checked_at = now
     if _pages_cache is not None and mtime == _pages_cache_mtime:
         return _pages_cache
     _core_close_wiki_cache({"fts_index": _fts_index})
