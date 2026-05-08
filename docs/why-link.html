@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Why Link exists, when to use it, and how it differs from notes apps, hosted memory APIs, stateful-agent platforms, and graph memory systems.">
+  <title>Link - Why Link?</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
+    <div class="nav-links">
+      <a href="getting-started.html">Start</a>
+      <a href="why-link.html" aria-current="page">Why</a>
+      <a href="ui.html">UI</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="mcp.html">MCP</a>
+      <a href="cli.html">CLI</a>
+      <a href="api.html">API</a>
+      <a href="security.html">Security</a>
+      <a href="contributing.html">Contribute</a>
+      <a href="https://github.com/gowtham0992/link">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="page-hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Positioning</span>
+      <h1>Link is not a notes app. It is local memory for agents.</h1>
+      <p>The wiki is the inspectable storage layer. The product is shared, source-backed memory that local agents can query without starting every session from zero.</p>
+    </div>
+  </header>
+
+  <main class="doc-section">
+    <div class="section-inner doc-grid">
+      <aside class="toc">
+        <strong>On this page</strong>
+        <a href="#fit">Best fit</a>
+        <a href="#compare">How to choose</a>
+        <a href="#trust">Trust model</a>
+        <a href="#boundaries">Boundaries</a>
+      </aside>
+      <article class="doc-content">
+        <h2 id="fit">Best Fit</h2>
+        <p>Use Link when you want one local memory layer that multiple agents can share. It is strongest for developer and power-user workflows where privacy, provenance, and inspectable files matter.</p>
+        <div class="grid two-up">
+          <article class="panel"><h3>Personal agent memory</h3><p>Preferences, decisions, project conventions, and active context that should survive between Codex, Kiro, Claude, Cursor, and other MCP clients.</p></article>
+          <article class="panel"><h3>Source-backed knowledge</h3><p>Raw notes, transcripts, release notes, articles, and project files that should become cited Markdown pages instead of hidden context.</p></article>
+          <article class="panel"><h3>Inspectable retrieval</h3><p>Smart query packets with reasons, sources, graph links, budgets, and follow-up actions instead of full-folder dumps.</p></article>
+          <article class="panel"><h3>Local ownership</h3><p>Plain Markdown and JSON indexes on your machine. No hosted backend, telemetry, or required cloud account.</p></article>
+        </div>
+
+        <h2 id="compare">How To Choose</h2>
+        <div class="choice-table">
+          <div><strong>If you need...</strong><strong>Use Link when...</strong><strong>Use another category when...</strong></div>
+          <div><span>Human-first notes</span><span>You want agents to query and maintain the notes as memory.</span><span>You mainly want a polished human writing app, mobile sync, plugins, and manual note-taking.</span></div>
+          <div><span>Hosted app memory</span><span>You want local files, no cloud account, and MCP access from many desktop agents.</span><span>You are building a hosted product and need managed APIs, user accounts, dashboards, and cloud-scale operations.</span></div>
+          <div><span>Stateful agent runtime</span><span>You already use agents and need shared memory outside any one runtime.</span><span>You want an entire agent platform with its own execution loop, hosted state, and deployment model.</span></div>
+          <div><span>Temporal business graph</span><span>You need personal/project memory with explicit review and source-backed Markdown.</span><span>You need automatic entity extraction, temporal fact invalidation, multi-user business data, and enterprise integrations.</span></div>
+          <div><span>Plain file search</span><span>You want search plus memory lifecycle, graph context, MCP tools, validation, and provenance.</span><span>You only need grep, ripgrep, or a folder of notes with no agent-memory workflow.</span></div>
+        </div>
+
+        <h2 id="trust">Trust Model</h2>
+        <p>Link deliberately avoids hidden memory. A durable memory is a Markdown page with scope, status, review state, source/provenance, graph links, and a local audit trail. Agents can recall it, but humans can inspect, edit, archive, restore, or forget it.</p>
+        <pre><code>raw/file.md -> wiki/sources/file.md -> linked concepts
+remember "preference" -> wiki/memories/preference.md
+query_link -> compact context + why_selected + follow_up actions</code></pre>
+
+        <h2 id="boundaries">Boundaries</h2>
+        <ul>
+          <li>Link is local-first personal software, not a hosted SaaS backend.</li>
+          <li>The local web viewer has no authentication and must stay on loopback unless you add your own auth layer.</li>
+          <li>Ingest quality depends on the agent that reads and writes pages; Link provides schema, validation, safety gates, and review workflows.</li>
+          <li>Generated memory is not automatically trusted. Use proposal, review, explain, archive, and forget workflows.</li>
+        </ul>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <div class="section-inner"><a href="getting-started.html">First 10 minutes</a> · <a href="concepts.html">Concepts</a> · <a href="mcp.html">MCP setup</a> · If Link helps your agents remember better, <a href="https://github.com/gowtham0992/link">star it on GitHub</a>.</div>
+  </footer>
+</body>
+</html>

@@ -384,7 +384,8 @@ pre {
 code { font-family: "SFMono-Regular", Consolas, monospace; }
 
 .compare,
-.doc-table {
+.doc-table,
+.choice-table {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
@@ -395,7 +396,8 @@ code { font-family: "SFMono-Regular", Consolas, monospace; }
 }
 
 .compare div,
-.doc-table div {
+.doc-table div,
+.choice-table div {
   background: var(--paper-2);
   padding: 18px;
   border-right: 2px solid var(--border);
@@ -405,13 +407,47 @@ code { font-family: "SFMono-Regular", Consolas, monospace; }
 .doc-table div:last-child { border-right: 0; }
 
 .compare strong,
-.doc-table strong {
+.doc-table strong,
+.choice-table strong {
   display: block;
   margin-bottom: 8px;
   color: var(--red);
   font-family: "SFMono-Regular", Consolas, monospace;
   text-transform: uppercase;
   font-size: 12px;
+}
+
+.choice-table {
+  grid-template-columns: 1fr;
+}
+
+.choice-table div {
+  display: grid;
+  grid-template-columns: 0.75fr 1fr 1fr;
+  gap: 0;
+  padding: 0;
+  border-right: 0;
+  border-bottom: 2px solid var(--border);
+}
+
+.choice-table div:last-child {
+  border-bottom: 0;
+}
+
+.choice-table span,
+.choice-table strong {
+  margin: 0;
+  padding: 16px;
+  border-right: 2px solid var(--border);
+}
+
+.choice-table span:last-child,
+.choice-table strong:last-child {
+  border-right: 0;
+}
+
+.choice-table span:first-child {
+  font-weight: 900;
 }
 
 .doc-grid {
@@ -492,7 +528,9 @@ footer a {
   .screenshot-row,
   .media-grid,
   .compare,
-  .doc-table {
+  .doc-table,
+  .choice-table,
+  .choice-table div {
     grid-template-columns: 1fr;
   }
 
@@ -508,6 +546,17 @@ footer a {
 
   .compare div:last-child,
   .doc-table div:last-child {
+    border-bottom: 0;
+  }
+
+  .choice-table span,
+  .choice-table strong {
+    border-right: 0;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .choice-table span:last-child,
+  .choice-table strong:last-child {
     border-bottom: 0;
   }
 }

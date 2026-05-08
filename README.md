@@ -23,6 +23,7 @@ compound over time.
 
 [Product site](https://gowtham0992.github.io/link/) ·
 [First 10 minutes](https://gowtham0992.github.io/link/getting-started.html) ·
+[Why Link?](https://gowtham0992.github.io/link/why-link.html) ·
 [Web UI](https://gowtham0992.github.io/link/ui.html) ·
 [MCP setup](https://gowtham0992.github.io/link/mcp.html) ·
 [CLI](https://gowtham0992.github.io/link/cli.html) ·
@@ -60,6 +61,10 @@ Open:
 http://127.0.0.1:3000
 http://127.0.0.1:3000/graph
 ```
+
+The web viewer is for local use only. It binds to `127.0.0.1`, has no user
+accounts or authentication, and should not be exposed to the internet unless you
+add your own auth layer.
 
 Try the value loop:
 
@@ -237,6 +242,7 @@ More detail: [Security guide](https://gowtham0992.github.io/link/security.html).
 | Need | Go here |
 |------|---------|
 | Run Link for the first time | [First 10 minutes](https://gowtham0992.github.io/link/getting-started.html) |
+| Decide whether Link fits | [Why Link?](https://gowtham0992.github.io/link/why-link.html) |
 | Use the local viewer | [Web UI](https://gowtham0992.github.io/link/ui.html) |
 | Understand raw/wiki/memory | [Concepts](https://gowtham0992.github.io/link/concepts.html) |
 | Configure MCP | [MCP setup](https://gowtham0992.github.io/link/mcp.html) |

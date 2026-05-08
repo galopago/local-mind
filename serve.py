@@ -3662,6 +3662,7 @@ def main():
         with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as s:
             print(f"  Link → http://127.0.0.1:{PORT}")
             print("  Local-only: bound to 127.0.0.1; no public host mode.")
+            print("  No auth: do not expose this server without your own authentication layer.")
             try: s.serve_forever()
             except KeyboardInterrupt: print("\n  stopped.")
     except OSError as exc:
