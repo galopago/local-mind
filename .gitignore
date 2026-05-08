@@ -19,6 +19,7 @@ wiki/explorations/*
 
 # Keep index and log templates but ignore personal content
 # (we ship empty versions in the repo)
+wiki/_link_schema.json
 
 # OS junk
 .DS_Store
