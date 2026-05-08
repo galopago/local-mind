@@ -554,10 +554,28 @@ def _find_unindexed_pages(wiki_dir: Path) -> list[str]:
     return sorted(stem for stem in _page_stems(wiki_dir) if stem not in indexed and stem not in roots)
 
 
-def _find_uningested_raw(target: Path) -> list[str]:
+def _raw_ingest_findings(target: Path) -> dict[str, list[str]]:
     target = target.expanduser().resolve()
     status = _collect_ingest_status(target)
-    return [item["raw"].removeprefix("raw/") for item in status["pending_raw"]]
+    pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
+    findings = {
+        "new": [],
+        "stale": [],
+        "blocked": [],
+    }
+    for item in pending:
+        if not isinstance(item, dict):
+            continue
+        raw_rel = str(item.get("raw") or "")
+        if not raw_rel:
+            continue
+        if item.get("scan_error") or item.get("secret_warnings"):
+            findings["blocked"].append(raw_rel)
+        elif item.get("stale"):
+            findings["stale"].append(raw_rel)
+        else:
+            findings["new"].append(raw_rel)
+    return {key: sorted(values) for key, values in findings.items()}
 
 
 def _collect_ingest_status(target: Path) -> dict[str, object]:
@@ -968,10 +986,14 @@ def doctor(target: Path, fix: bool = False) -> int:
         if capture_warning_count:
             warnings.append(f"raw memory captures with secret warnings: {capture_warning_count}")
 
-    uningested = _find_uningested_raw(target)
-    if uningested:
-        warnings.append("raw files not referenced by wiki pages: " + ", ".join(uningested[:8]))
-    elif raw_dir.exists():
+    raw_ingest_findings = _raw_ingest_findings(target)
+    if raw_ingest_findings["blocked"]:
+        warnings.append("raw files blocked before ingest: " + ", ".join(raw_ingest_findings["blocked"][:8]))
+    if raw_ingest_findings["stale"]:
+        warnings.append("raw files need source refresh: " + ", ".join(raw_ingest_findings["stale"][:8]))
+    if raw_ingest_findings["new"]:
+        warnings.append("raw files not referenced by wiki source pages: " + ", ".join(raw_ingest_findings["new"][:8]))
+    if not any(raw_ingest_findings.values()) and raw_dir.exists():
         print("OK raw files are represented in wiki sources")
 
     sensitive_names = _find_sensitive_filenames(target)

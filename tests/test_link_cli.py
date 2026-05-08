@@ -2227,6 +2227,24 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("## Raw Source", repaired_text)
         self.assertIn("`raw/agent-memory-session.md`", repaired_text)
 
+    def test_doctor_labels_stale_raw_as_source_refresh(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        raw_page = target / "raw/agent-memory-session.md"
+        time.sleep(0.02)
+        raw_page.write_text("# Agent memory session\n\nUpdated after ingest.\n", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.doctor(target)
+
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("raw files need source refresh: raw/agent-memory-session.md", text)
+        self.assertNotIn("raw files not referenced by wiki pages", text)
+        self.assertNotIn("raw files not referenced by wiki source pages", text)
+
     def test_doctor_warns_on_missing_summary(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
         target = tmp / "demo"
