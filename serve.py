@@ -1150,15 +1150,52 @@ def _render_page(page_path):
     return _layout(title, crumb + meta_line + body_html)
 
 
-def _render_all():
+def _render_all(query: dict[str, list[str]] | None = None):
+    query = query or {}
     pages = _get_all_pages()
+    total = len(pages)
+    limit_raw = query.get("limit", ["250"])[0]
+    offset_raw = query.get("offset", ["0"])[0]
+    limit, limit_error = _core_parse_bounded_int(limit_raw, "limit", 250, 1, 500)
+    offset, offset_error = _core_parse_bounded_int(offset_raw, "offset", 0, 0, 1000000)
+    error = limit_error or offset_error
+    if error:
+        limit = 250
+        offset = 0
+    assert limit is not None
+    assert offset is not None
+    sorted_pages = sorted(pages, key=lambda x: x["title"])
+    window = sorted_pages[offset:offset + limit]
     items = "".join(
         f'<li><a href="{_page_href(p["name"])}">{html.escape(p["title"])}</a>'
         f'<span class="type">{p["type"] or p["category"]}</span></li>'
-        for p in sorted(pages, key=lambda x: x["title"])
+        for p in window
     )
+    next_offset = offset + limit
+    prev_offset = max(0, offset - limit)
+    controls = ""
+    if total > limit or offset:
+        start = 0 if total == 0 else offset + 1
+        end = min(offset + limit, total)
+        prev_href = html.escape(f"/all?limit={limit}&offset={prev_offset}", quote=True)
+        next_href = html.escape(f"/all?limit={limit}&offset={next_offset}", quote=True)
+        prev_link = (
+            f'<a class="button-link" href="{prev_href}">Previous</a>'
+            if offset > 0
+            else '<span class="button-link disabled">Previous</span>'
+        )
+        next_link = (
+            f'<a class="button-link" href="{next_href}">Next</a>'
+            if next_offset < total
+            else '<span class="button-link disabled">Next</span>'
+        )
+        controls = (
+            f'<div class="pager"><span>Showing {start}-{end} of {total}</span>'
+            f'{prev_link}{next_link}</div>'
+        )
+    warning = f'<p class="error">{html.escape(error)}</p>' if error else ""
     return _layout("All Pages", f'<div class="breadcrumb"><a href="/">Link</a> / all pages</div>'
-                   f"<h1>All Pages ({len(pages)})</h1><ul class='page-list'>{items}</ul>")
+                   f"<h1>All Pages ({total})</h1>{warning}{controls}<ul class='page-list'>{items}</ul>{controls}")
 
 
 def _render_memory_card(record: dict[str, object], include_issues: bool = False) -> str:
@@ -1986,10 +2023,12 @@ def _render_graph():
   var FAST_RENDER_NODE_LIMIT = 450;
   var FAST_RENDER_EDGE_LIMIT = 1200;
   var OVERVIEW_NODE_LIMIT = 650;
+  var SEARCH_LABEL_LIMIT = 60;
   var initialGraphMode = {_json_for_script(graph_mode)};
   var totalNodeCount = {total_node_count};
   var totalEdgeCount = {total_edge_count};
   var fullGraphLoaded = initialGraphMode === 'full';
+  var fullGraphLoading = false;
   var nodeById = {{}};
 
   function stableNoise(id, salt) {{
@@ -2051,6 +2090,8 @@ def _render_graph():
   var motionPaused = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || nodes.length > LARGE_GRAPH_LIMIT;
   var SETTLE = 200; // frames of physics
   var searchTerm = '';
+  var cachedSearchTerm = '';
+  var cachedSearchMatches = 0;
   var categoryValue = 'all';
   var depthValue = 'all';
   var visibleCache = null;
@@ -2066,6 +2107,7 @@ def _render_graph():
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
   function pageHref(id) {{ return '/page/' + encodeURIComponent(id); }}
   function invalidateFilters() {{ visibleCache = null; }}
+  function invalidateSearchCache() {{ cachedSearchTerm = ''; cachedSearchMatches = 0; }}
   function escapeHtml(value) {{
     return String(value).replace(/[&<>"']/g, function(ch) {{
       return {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[ch];
@@ -2089,6 +2131,13 @@ def _render_graph():
   }}
   function searchMatches(n) {{
     return searchTerm && nodeSearchText(n).indexOf(searchTerm) !== -1;
+  }}
+  function totalSearchMatches() {{
+    if (!searchTerm) return 0;
+    if (cachedSearchTerm === searchTerm) return cachedSearchMatches;
+    cachedSearchTerm = searchTerm;
+    cachedSearchMatches = nodes.filter(searchMatches).length;
+    return cachedSearchMatches;
   }}
   function depthMap() {{
     if (!selectedNode || depthValue === 'all') return null;
@@ -2201,10 +2250,12 @@ def _render_graph():
     if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');
     if (graphNeedsFastRender(currentNodes, currentEdges)) parts.push('fast render');
     if (nodes.length > OVERVIEW_NODE_LIMIT && currentNodes.length < nodes.length) parts.push('overview capped');
+    if (fullGraphLoading) parts.push('loading graph data');
     if (showAllLabels) parts.push('labels all');
     if (searchTerm) {{
-      var matches = currentNodes.filter(searchMatches).length;
+      var matches = totalSearchMatches();
       parts.push(matches + ' match' + (matches === 1 ? '' : 'es'));
+      if (matches > SEARCH_LABEL_LIMIT) parts.push('match labels capped');
     }}
     var locked = pinnedCount();
     if (locked) parts.push(locked + ' placed');
@@ -2448,7 +2499,8 @@ def _render_graph():
       // Labels stay sparse until a node is hovered.
       var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
       var defaultSparseLabel = !largeLabelSet && n.category !== 'sources' && degree[n.id] >= 2;
-      var showLabel = showAllLabels || selected || matched || (hoverNode ? activeNode : defaultSparseLabel);
+      var showMatchLabel = matched && totalSearchMatches() <= SEARCH_LABEL_LIMIT;
+      var showLabel = showAllLabels || selected || showMatchLabel || (hoverNode ? activeNode : defaultSparseLabel);
       if (showLabel) {{
         ctx.font = LABEL_FONT;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -2521,6 +2573,7 @@ def _render_graph():
     selectedNode = null;
     hoverNode = null;
     searchTerm = '';
+    invalidateSearchCache();
     categoryValue = 'all';
     depthValue = 'all';
     if (searchInput) searchInput.value = '';
@@ -2568,6 +2621,7 @@ def _render_graph():
     totalNodeCount = nodes.length;
     totalEdgeCount = edges.length;
     fullGraphLoaded = true;
+    fullGraphLoading = false;
     pinned = {{}};
     selectedNode = null;
     hoverNode = null;
@@ -2576,6 +2630,7 @@ def _render_graph():
     rebuildGraphIndexes();
     seedMissingPositions();
     syncCategoryOptions();
+    invalidateSearchCache();
     invalidateFilters();
     frame = SETTLE;
     autoFit();
@@ -2583,14 +2638,18 @@ def _render_graph():
     setMotionPaused(true);
     if (loadFullButton) {{
       loadFullButton.disabled = true;
-      loadFullButton.textContent = 'Full graph loaded';
+      loadFullButton.textContent = 'Graph data loaded';
     }}
   }}
 
   function loadFullGraph() {{
-    if (!loadFullButton || fullGraphLoaded) return;
-    loadFullButton.disabled = true;
-    loadFullButton.textContent = 'Loading full graph...';
+    if (fullGraphLoaded || fullGraphLoading) return;
+    fullGraphLoading = true;
+    if (loadFullButton) {{
+      loadFullButton.disabled = true;
+      loadFullButton.textContent = 'Loading graph data...';
+    }}
+    updateStatus();
     fetch('/api/graph')
       .then(function(response) {{
         if (!response.ok) throw new Error('graph load failed');
@@ -2602,8 +2661,11 @@ def _render_graph():
         drawSoon();
       }})
       .catch(function() {{
-        loadFullButton.disabled = false;
-        loadFullButton.textContent = 'Retry full graph';
+        fullGraphLoading = false;
+        if (loadFullButton) {{
+          loadFullButton.disabled = false;
+          loadFullButton.textContent = 'Retry graph data';
+        }}
         if (status) status.textContent = 'Full graph load failed; local API did not return graph data.';
       }});
   }}
@@ -2753,6 +2815,10 @@ def _render_graph():
   if (searchInput) {{
     searchInput.addEventListener('input', function() {{
       searchTerm = searchInput.value.trim().toLowerCase();
+      invalidateSearchCache();
+      invalidateFilters();
+      if (searchTerm && !fullGraphLoaded) loadFullGraph();
+      autoFit();
       updateStatus();
       drawSoon();
     }});
@@ -2798,7 +2864,7 @@ def _render_graph():
     if graph_mode != "full":
         load_full_button = (
             f'<button id="graph-load-full" type="button">'
-            f'Load full graph ({total_node_count} nodes)</button>'
+            f'Load graph data ({total_node_count} nodes)</button>'
         )
 
     body = (
@@ -3171,7 +3237,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/profile":
             self._ok(_render_profile(project=_query_text(query, "project", max_len=80)))
         elif path == "/all":
-            self._ok(_render_all())
+            self._ok(_render_all(query))
         elif path == "/graph":
             self._ok(_render_graph())
         elif path == "/search":

@@ -191,6 +191,25 @@ class ServeTests(unittest.TestCase):
         self.assertIn(".memory-grid { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
         self.assertIn(".memory-actions code, .memory-next code { word-break: break-word; }", serve.CSS)
 
+    def test_all_pages_is_paginated_for_large_wikis(self):
+        wiki = self.make_wiki()
+        for index in range(300):
+            write_page(
+                wiki,
+                f"concepts/topic-{index:03}.md",
+                f"---\ntype: concept\ntitle: Topic {index:03}\n---\n# Topic\n",
+            )
+        reset_wiki(wiki)
+
+        html = serve._render_all({"limit": ["25"], "offset": ["25"]})
+
+        self.assertIn("All Pages (302)", html)
+        self.assertIn("Showing 26-50 of 302", html)
+        self.assertIn("/all?limit=25&amp;offset=0", html)
+        self.assertIn("/all?limit=25&amp;offset=50", html)
+        self.assertIn("Topic 023", html)
+        self.assertNotIn("Topic 299", html)
+
     def test_security_headers_include_api_version(self):
         handler = object.__new__(serve.Handler)
         headers = []
@@ -2193,6 +2212,9 @@ class ServeTests(unittest.TestCase):
         self.assertIn("function capEligibleNodes(eligible)", html)
         self.assertIn(".slice(0, OVERVIEW_NODE_LIMIT)", html)
         self.assertIn("if (searchMatches(n)) keep[n.id] = true;", html)
+        self.assertIn("invalidateFilters();\n      if (searchTerm && !fullGraphLoaded) loadFullGraph();", html)
+        self.assertIn("cachedSearchMatches = nodes.filter(searchMatches).length;", html)
+        self.assertIn("matches > SEARCH_LABEL_LIMIT", html)
         self.assertIn("parts.push('overview capped');", html)
 
     def test_graph_uses_bounded_initial_payload_for_large_wikis(self):
@@ -2212,11 +2234,11 @@ class ServeTests(unittest.TestCase):
         self.assertIn("var totalNodeCount = 920;", html)
         self.assertIn("250/920 nodes", html)
         self.assertIn("fast overview", html)
-        self.assertIn("Load full graph (920 nodes)", html)
+        self.assertIn("Load graph data (920 nodes)", html)
         self.assertIn("var loadFullButton = document.getElementById('graph-load-full');", html)
         self.assertIn("function loadFullGraph()", html)
         self.assertIn("fetch('/api/graph')", html)
-        self.assertIn("Full graph loaded", html)
+        self.assertIn("Graph data loaded", html)
 
     def test_graph_labels_are_sparse_for_large_visible_sets(self):
         wiki = self.make_wiki()

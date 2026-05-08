@@ -166,6 +166,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .page-list li { padding: 6px 0; border-bottom: 1px solid var(--border-soft); }
 .page-list li:last-child { border-bottom: none; }
 .page-list .type { font-size: 11px; color: var(--subtle); font-family: sans-serif; margin-left: 6px; }
+.pager { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0; font-family: sans-serif; color: var(--muted); font-size: 13px; }
+.pager .button-link { border: 1px solid var(--border); border-radius: 4px; padding: 4px 9px; color: var(--button-text); background: var(--button-bg); text-decoration: none; }
+.pager .button-link:hover { background: var(--button-hover); }
+.pager .button-link.disabled { color: var(--button-disabled); background: transparent; cursor: default; }
 .section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
                    margin-top: 28px; border-bottom: 1px solid var(--border-soft); }
 .section-heading h2 { margin: 0; border: 0; padding-bottom: 4px; }

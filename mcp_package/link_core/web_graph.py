@@ -68,7 +68,7 @@ def graph_initial_payload(
         graph_mode = "summary"
         graph_note = (
             f" Showing a fast overview of {len(visible_nodes)} high-signal nodes first; "
-            f"load the full graph only when you need every page."
+            f"load graph data when you need to search or filter across every page."
         )
 
     return {
