@@ -32,6 +32,10 @@ compound over time.
   <img src="docs/assets/link-product-tour-dark.gif" alt="Link demo flow across home, ingest, brief, memory, graph, and explanation views" width="860">
 </p>
 
+<p align="center">
+  <sub>If Link helps your agents remember better, <a href="https://github.com/gowtham0992/link">star it on GitHub</a> so more people can find it.</sub>
+</p>
+
 ## Why It Exists
 
 Most agent sessions start from zero. You re-explain preferences, repo decisions,
