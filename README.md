@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.svg" alt="Link" width="120">
+  <img src="logo.svg" alt="Link" width="112">
 </p>
 
 # Link
@@ -7,9 +7,9 @@
 **Local, source-backed memory for LLM agents.**
 
 Link gives Codex, Claude, Cursor, Kiro, VS Code, Copilot, and other MCP clients
-the same durable memory about you and your work. The memory stays on your
-machine as plain Markdown, with sources, backlinks, graph context, review state,
-and an audit trail you can inspect.
+the same durable memory about you and your work. It stays on your machine as
+plain Markdown, with sources, backlinks, graph context, review state, and an
+audit trail you can inspect.
 
 It follows Andrej Karpathy's
 [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f):
@@ -24,35 +24,31 @@ compound over time.
 [Product site](https://gowtham0992.github.io/link/) ·
 [First 10 minutes](https://gowtham0992.github.io/link/getting-started.html) ·
 [MCP setup](https://gowtham0992.github.io/link/mcp.html) ·
-[CLI reference](https://gowtham0992.github.io/link/cli.html) ·
+[CLI](https://gowtham0992.github.io/link/cli.html) ·
 [Security](SECURITY.md) ·
 [Changelog](CHANGELOG.md)
 
 <p align="center">
-  <img src="docs/assets/link-demo-flow-dark.gif" alt="Link demo flow: wiki, memory dashboard, graph, and memory explanation" width="860">
+  <img src="docs/assets/link-demo-flow-dark.gif" alt="Link demo flow across home, ingest, brief, memory, graph, and explanation views" width="860">
 </p>
 
-## Why Link
+## Why It Exists
 
 Most agent sessions start from zero. You re-explain preferences, repo decisions,
 project constraints, and why something matters. Link turns that repeated context
 into local memory agents can query.
 
-- **Personal memory:** preferences, decisions, facts, and project context carry
-  across sessions.
-- **Source-backed wiki:** raw notes become readable Markdown pages with citations
-  and backlinks.
-- **MCP-native recall:** every local agent can use the same memory layer.
-- **Budgeted context:** smart query packets return useful context without
-  flooding the model.
-- **Private by default:** no hosted backend, no telemetry, no cloud lock-in.
-- **Inspectable:** Markdown files, backlinks, logs, backups, and review states
-  stay on your machine.
+| Pain | Link's answer |
+|------|---------------|
+| Agents forget you between sessions. | Save reviewed preferences, decisions, facts, and project context. |
+| Notes are private or messy. | Keep raw sources local, then turn them into source-backed Markdown. |
+| Context windows are expensive. | Return compact query packets with provenance and follow-up actions. |
+| Memory needs trust. | Every page and memory can be inspected, reviewed, archived, or forgotten. |
 
 ## Quick Start
 
-Run the finished demo first. It already has raw sources, wiki pages, one starter
-memory, backlinks, graph data, and query packets ready to inspect.
+Run the demo first. It creates a complete local wiki with raw sources, wiki
+pages, one starter memory, graph data, and query packets ready to inspect.
 
 ```bash
 git clone https://github.com/gowtham0992/link.git
@@ -63,15 +59,12 @@ python3 link.py serve link-demo
 
 Open:
 
-- `http://127.0.0.1:3000`
-- `http://127.0.0.1:3000/brief`
-- `http://127.0.0.1:3000/memory`
-- `http://127.0.0.1:3000/audit`
-- `http://127.0.0.1:3000/captures`
-- `http://127.0.0.1:3000/propose`
-- `http://127.0.0.1:3000/graph`
+```text
+http://127.0.0.1:3000
+http://127.0.0.1:3000/graph
+```
 
-Then try:
+Try the value loop:
 
 ```bash
 python3 link.py query "why does Link help agents?" link-demo --budget small
@@ -80,35 +73,14 @@ python3 link.py benchmark "agent memory" link-demo
 python3 link.py status --validate link-demo
 ```
 
-The first query should return a compact packet with relevant memory, the best
-wiki page, graph context, provenance, and follow-up actions. The demo also
-writes `link-demo/START_HERE.md` with prompts and checks to try.
-
 The generated demo is the public proof wiki. The repo's root `wiki/` directory
-is only a scaffold for local development and personal testing; generated content
+is only a scaffold for local development and personal testing. Generated content
 inside `wiki/`, `raw/`, and `link-demo/` is ignored by git so personal memory is
 not published by accident.
 
-The demo includes one pending memory on purpose so you can see the review inbox,
-explain-memory view, and audit trail. Mark it reviewed when you want a clean
-memory-audit state.
+## Install For Your Agent
 
-## Install Paths
-
-### I Want To Try Link
-
-Use the demo:
-
-```bash
-python3 link.py demo
-python3 link.py serve link-demo
-```
-
-Then follow the [First 10 minutes guide](https://gowtham0992.github.io/link/getting-started.html).
-
-### I Want My Agent To Use Link
-
-Run the installer for your agent from the cloned checkout:
+Run one installer from the cloned checkout:
 
 ```bash
 bash integrations/codex/install.sh
@@ -122,9 +94,21 @@ bash integrations/antigravity/install.sh
 
 Installers create or update `~/link`, install or upgrade `link-mcp`, write
 lightweight agent instructions, and preserve existing wiki data on reinstall.
-Use `--project` for repo-local memory.
+Use `--project` when a repo needs separate project memory.
 
-### I Want MCP Only
+Then ask your agent:
+
+```text
+is Link ready?
+brief me from Link before we continue
+ingest raw/notes.md into Link
+remember that I prefer short release notes
+query Link for the release process
+what does Link remember about local personal memory?
+```
+
+<details>
+<summary>MCP-only install</summary>
 
 ```bash
 python3 -m pip install --upgrade link-mcp
@@ -150,8 +134,9 @@ python3 -m venv ~/.link-mcp-venv
 ```
 
 Full setup: [MCP guide](https://gowtham0992.github.io/link/mcp.html).
+</details>
 
-## What Users Actually Do
+## How Link Works
 
 Link has one simple rule:
 
@@ -161,27 +146,13 @@ Explicit "remember" becomes agent memory.
 Queries use both.
 ```
 
-Use these moves with your agent:
+The storage model is plain and inspectable:
 
-```text
-is Link ready?
-brief me from Link before we continue
-ingest raw/notes.md into Link
-remember that I prefer short release notes
-query Link for the release process
-what does Link remember about local personal memory?
-```
-
-Or use the local command:
-
-```bash
-link prompts
-link ingest-status
-link remember "I prefer short release notes." --type preference --scope user
-link brief "working on a release"
-link query "what should I know before changing the MCP tools?" --budget small
-link validate
-```
+| Layer | What lives there |
+|-------|------------------|
+| `raw/` | Original notes, transcripts, articles, PDFs, screenshots, and project files. |
+| `wiki/` | Source-backed pages, concepts, entities, explorations, comparisons, and memories. |
+| MCP tools | Compact packets agents can use without dumping the whole wiki into context. |
 
 If a raw file was already ingested and later edited, `link ingest-status` marks it
 as stale and tells your agent to refresh the existing source page instead of
@@ -189,60 +160,53 @@ creating a duplicate.
 
 ## What You Get
 
-### Wiki Home
-
-Browse pages by type, search locally, and open the same Markdown pages your
-agents use.
-
-<p align="center">
-  <img src="docs/assets/link-home-dark.png" alt="Link wiki home in dark mode" width="860">
-</p>
-
-### Memory Dashboard
-
-See what agents can remember, what needs review, and what changed recently.
-
-<p align="center">
-  <img src="docs/assets/link-memory-dashboard-dark.png" alt="Link Memory Dashboard in dark mode" width="860">
-</p>
-
-### Knowledge Graph
-
-Inspect relationships between sources, concepts, entities, explorations, and
-memories. Large graphs open as bounded overviews first, with filters, search,
-neighborhood depth, and explicit full-graph loading when needed.
-
-<p align="center">
-  <img src="docs/assets/link-graph-dark.png" alt="Link Knowledge Graph in dark mode" width="860">
-</p>
-
-### Explain Memory
-
-Every memory can explain why it exists, whether it is review-ready, and what
-source or log evidence supports it.
-
-<p align="center">
-  <img src="docs/assets/link-explain-memory-dark.png" alt="Link Explain Memory view in dark mode" width="860">
-</p>
+<table>
+  <tr>
+    <td width="50%">
+      <strong>First-run prompts</strong><br>
+      <img src="docs/assets/link-home-dark.png" alt="Link home with starter prompts" width="420">
+    </td>
+    <td width="50%">
+      <strong>Guided ingest</strong><br>
+      <img src="docs/assets/link-ingest-dark.png" alt="Link ingest workflow" width="420">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <strong>Memory dashboard</strong><br>
+      <img src="docs/assets/link-memory-dashboard-dark.png" alt="Link memory dashboard" width="420">
+    </td>
+    <td width="50%">
+      <strong>Memory brief</strong><br>
+      <img src="docs/assets/link-brief-dark.png" alt="Link memory brief" width="420">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <strong>Knowledge graph</strong><br>
+      <img src="docs/assets/link-graph-dark.png" alt="Link knowledge graph" width="420">
+    </td>
+    <td width="50%">
+      <strong>Explain memory</strong><br>
+      <img src="docs/assets/link-explain-memory-dark.png" alt="Link explain memory view" width="420">
+    </td>
+  </tr>
+</table>
 
 ## Agent Contract
 
-Link's agent workflow is intentionally small and predictable. Agents should start
-with readiness, then use compact query and memory packets before reaching for
-larger graph/context tools:
+Agents should use Link in this order:
 
-| Tool | Use it when |
-|------|-------------|
-| `link_status` | Check setup, content counts, search backend, warnings, and safe next actions. |
-| `starter_prompts` | Show the user exactly what to ask after install. |
-| `ingest_status` | Inspect pending raw files and the safest next ingest prompt. |
-| `query_link` | Build one compact answer-ready packet from memory, wiki search, graph context, and provenance. |
-| `memory_brief` | Prime an agent before longer work. |
-| `get_graph_summary` | Fetch bounded graph context without dumping every node and edge. |
-| `backup_wiki` | Create a local archive before broad repair work. |
-| `validate_wiki` | Verify page shape, links, and backlink freshness after ingest or large edits. |
+1. `link_status` to check readiness and safe next actions.
+2. `starter_prompts` when the user asks what to try first.
+3. `ingest_status` before touching raw sources.
+4. `query_link` for compact answer-ready context.
+5. `memory_brief` before longer work.
+6. `get_graph_summary` when graph context is useful but the full graph would be noisy.
+7. `backup_wiki` before broad repair or migration work.
+8. `validate_wiki` after ingest or broad wiki edits.
 
-Full MCP tool list: [MCP guide](https://gowtham0992.github.io/link/mcp.html).
+Full MCP tool list: [MCP setup](https://gowtham0992.github.io/link/mcp.html).
 
 ## Privacy And Safety
 
@@ -268,7 +232,7 @@ python3 scripts/check_release_hygiene.py
 
 More detail: [Security guide](https://gowtham0992.github.io/link/security.html).
 
-## Docs
+## Documentation
 
 | Need | Go here |
 |------|---------|
@@ -278,17 +242,15 @@ More detail: [Security guide](https://gowtham0992.github.io/link/security.html).
 | Find a command | [CLI reference](https://gowtham0992.github.io/link/cli.html) |
 | Use local HTTP endpoints | [HTTP API](https://gowtham0992.github.io/link/api.html) |
 | Review security boundaries | [Security model](https://gowtham0992.github.io/link/security.html) |
-| Contribute | [Contributing](https://gowtham0992.github.io/link/contributing.html) |
 | Fix setup issues | [Troubleshooting](https://gowtham0992.github.io/link/troubleshooting.html) |
 
 ## Contributing
 
-Contributions should come through pull requests. Please target `main` unless the
-maintainer asks for a different branch. The `develop` branch is a maintainer
-integration branch for staging larger release work before it is proposed to
-`main`.
+Contributions should come through pull requests targeting `main`. The `develop`
+branch is a maintainer integration branch for larger release work before it is
+proposed to `main`.
 
-Before opening a PR, run:
+Before opening a PR:
 
 ```bash
 python3 -m ruff check .
