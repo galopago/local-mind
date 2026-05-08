@@ -570,7 +570,7 @@ Used during query to find related pages, and during lint to detect orphans and b
 
 ## Local Server API
 
-`serve.py` exposes a local HTTP API at `http://localhost:3000`:
+`serve.py` exposes a local HTTP API at `http://127.0.0.1:3000`:
 
 | Endpoint | Description |
 |----------|-------------|

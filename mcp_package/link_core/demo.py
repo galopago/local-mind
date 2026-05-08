@@ -41,8 +41,8 @@ Open the local viewer:
 python3 link.py serve .
 ```
 
-Then visit `http://localhost:3000`, `http://localhost:3000/brief`, and
-`http://localhost:3000/graph`.
+Then visit `http://127.0.0.1:3000`, `http://127.0.0.1:3000/brief`, and
+`http://127.0.0.1:3000/graph`.
 """,
     "raw/agent-memory-session.md": """---
 title: "Agent memory session"

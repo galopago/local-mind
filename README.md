@@ -63,13 +63,13 @@ python3 link.py serve link-demo
 
 Open:
 
-- `http://localhost:3000`
-- `http://localhost:3000/brief`
-- `http://localhost:3000/memory`
-- `http://localhost:3000/audit`
-- `http://localhost:3000/captures`
-- `http://localhost:3000/propose`
-- `http://localhost:3000/graph`
+- `http://127.0.0.1:3000`
+- `http://127.0.0.1:3000/brief`
+- `http://127.0.0.1:3000/memory`
+- `http://127.0.0.1:3000/audit`
+- `http://127.0.0.1:3000/captures`
+- `http://127.0.0.1:3000/propose`
+- `http://127.0.0.1:3000/graph`
 
 Then try:
 

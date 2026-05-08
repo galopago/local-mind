@@ -3023,8 +3023,8 @@ def create_demo(target: Path, force: bool = False) -> int:
     print(f"  {target / 'START_HERE.md'}")
     print("")
     print("Then open:")
-    print("  http://localhost:3000")
-    print("  http://localhost:3000/graph")
+    print("  http://127.0.0.1:3000")
+    print("  http://127.0.0.1:3000/graph")
     return 0
 
 

@@ -332,7 +332,7 @@ class ServeTests(unittest.TestCase):
         message = serve._serve_bind_error_message(OSError(48, "Address already in use"), 3000)
         high_port_message = serve._serve_bind_error_message(OSError(48, "Address already in use"), 65535)
 
-        self.assertIn("localhost:3000 is already in use", message)
+        self.assertIn("127.0.0.1:3000 is already in use", message)
         self.assertIn("python serve.py --port 3001", message)
         self.assertIn("python serve.py --port 3000", high_port_message)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Link — local wiki viewer. python serve.py → http://localhost:3000"""
+"""Link — local wiki viewer. python serve.py → http://127.0.0.1:3000"""
 from __future__ import annotations
 
 import errno
@@ -3530,10 +3530,10 @@ def _serve_bind_error_message(exc: OSError, port: int) -> str:
     if exc.errno in {errno.EADDRINUSE, 48, 98}:
         next_port = port + 1 if port < 65535 else 3000
         return (
-            f"Link could not start because localhost:{port} is already in use.\n"
+            f"Link could not start because 127.0.0.1:{port} is already in use.\n"
             f"Try another port, for example: python serve.py --port {next_port}"
         )
-    return f"Link could not start local server on localhost:{port}: {exc}"
+    return f"Link could not start local server on 127.0.0.1:{port}: {exc}"
 
 
 def main():
@@ -3544,7 +3544,7 @@ def main():
     socketserver.TCPServer.allow_reuse_address = True
     try:
         with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as s:
-            print(f"  Link → http://localhost:{PORT}")
+            print(f"  Link → http://127.0.0.1:{PORT}")
             print("  Local-only: bound to 127.0.0.1; no public host mode.")
             try: s.serve_forever()
             except KeyboardInterrupt: print("\n  stopped.")
