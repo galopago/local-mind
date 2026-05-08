@@ -272,8 +272,6 @@ def _mcp_chat_frame(title: str, user_prompt: str, tool: str, args: str, result: 
     _tool_card(draw, (58, 246), tool, args, result)
     _chat_bubble(draw, (58, 392), 560, "Agent", answer, align="left")
 
-    draw.rectangle((24, SIZE[1] - 38, SIZE[0] - 24, SIZE[1] - 24), fill="#0f172a")
-    draw.text((44, SIZE[1] - 36), "Link gives the agent memory without exposing a cloud account or hidden store.", font=FONT_MONO_SMALL, fill="#9ca3af")
     return image
 
 
