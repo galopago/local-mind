@@ -12,6 +12,7 @@
     <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
     <div class="nav-links">
       <a href="getting-started.html">Start</a>
+      <a href="ui.html">UI</a>
       <a href="concepts.html">Concepts</a>
       <a href="mcp.html" aria-current="page">MCP</a>
       <a href="cli.html">CLI</a>
@@ -34,6 +35,7 @@
     <div class="section-inner doc-grid">
       <aside class="toc">
         <strong>On this page</strong>
+        <a href="#tour">MCP tour</a>
         <a href="#installers">Agent installers</a>
         <a href="#mcp-only">MCP only</a>
         <a href="#workflow">Agent workflow</a>
@@ -41,6 +43,12 @@
         <a href="#verify">Verify setup</a>
       </aside>
       <article class="doc-content">
+        <h2 id="tour">MCP Tour</h2>
+        <figure class="screenshot-card media-wide">
+          <img src="assets/link-mcp-tour.gif" alt="Animated Link MCP agent walkthrough">
+          <figcaption>Agents use natural prompts, then call Link tools for readiness, briefs, query packets, and reviewed memory writes.</figcaption>
+        </figure>
+
         <h2 id="installers">Agent Installers</h2>
         <p>Use the installer for the agent you use most. Installers create or update <code>~/link</code>, install <code>link-mcp</code>, write short agent instructions, and preserve existing wiki data.</p>
         <pre><code>bash integrations/codex/install.sh

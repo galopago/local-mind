@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Use Link's local web UI to review memory, ingest sources, inspect graph context, and audit what agents know.">
+  <title>Link - Web UI</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
+    <div class="nav-links">
+      <a href="getting-started.html">Start</a>
+      <a href="ui.html" aria-current="page">UI</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="mcp.html">MCP</a>
+      <a href="cli.html">CLI</a>
+      <a href="api.html">API</a>
+      <a href="security.html">Security</a>
+      <a href="contributing.html">Contribute</a>
+      <a href="https://github.com/gowtham0992/link">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="page-hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Local viewer</span>
+      <h1>The web UI is where humans trust the memory.</h1>
+      <p>Use it to see what Link knows, inspect source-backed pages, review proposed memories, browse captures, validate ingest, and explore graph neighborhoods.</p>
+    </div>
+  </header>
+
+  <main class="doc-section">
+    <div class="section-inner doc-grid">
+      <aside class="toc">
+        <strong>On this page</strong>
+        <a href="#tour">UI tour</a>
+        <a href="#daily">Daily loop</a>
+        <a href="#graph">Graph at scale</a>
+        <a href="#start">Start it</a>
+      </aside>
+      <article class="doc-content">
+        <h2 id="tour">UI Tour</h2>
+        <figure class="screenshot-card media-wide">
+          <img src="assets/link-ui-tour.gif" alt="Animated Link web UI walkthrough">
+          <figcaption>Prompts, ingest, brief, memory review, and graph exploration in the local viewer.</figcaption>
+        </figure>
+
+        <h2 id="daily">Daily Loop</h2>
+        <div class="grid two-up">
+          <article class="panel"><h3>Start from prompts</h3><p>The home page gives first-run prompts an agent can act on without you memorizing file paths or command syntax.</p></article>
+          <article class="panel"><h3>Check ingest</h3><p>The ingest view shows pending raw files, represented sources, stale ingests, safety warnings, and post-ingest checks.</p></article>
+          <article class="panel"><h3>Review memory</h3><p>Use the memory dashboard, inbox, profile, audit, and explain views to keep recall useful instead of mysterious.</p></article>
+          <article class="panel"><h3>Validate after writes</h3><p>Run validation from the CLI or MCP after ingest and broad repairs so dead links, missing sections, and stale graph indexes do not linger.</p></article>
+        </div>
+
+        <h2 id="graph">Graph At Scale</h2>
+        <p>The graph opens as a bounded overview on large wikis. Search, filters, and focused neighborhoods can pull from the full graph data without forcing the browser to render every node at once.</p>
+        <figure class="screenshot-card media-wide">
+          <img src="assets/link-graph-dark.png" alt="Link graph view">
+          <figcaption>Use search, type filters, neighborhood focus, fullscreen, labels, and motion controls for large graphs.</figcaption>
+        </figure>
+
+        <h2 id="start">Start It</h2>
+        <pre><code>link serve
+
+# from a source checkout
+python3 link.py serve link-demo</code></pre>
+        <p>The server binds to <code>127.0.0.1</code> and is intended for local use. Do not expose it to the internet without adding your own authentication layer.</p>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <div class="section-inner"><a href="getting-started.html">First 10 minutes</a> · <a href="mcp.html">MCP setup</a> · <a href="cli.html">CLI reference</a> · If Link helps your agents remember better, <a href="https://github.com/gowtham0992/link">star it on GitHub</a>.</div>
+  </footer>
+</body>
+</html>

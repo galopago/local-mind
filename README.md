@@ -23,18 +23,11 @@ compound over time.
 
 [Product site](https://gowtham0992.github.io/link/) ·
 [First 10 minutes](https://gowtham0992.github.io/link/getting-started.html) ·
+[Web UI](https://gowtham0992.github.io/link/ui.html) ·
 [MCP setup](https://gowtham0992.github.io/link/mcp.html) ·
 [CLI](https://gowtham0992.github.io/link/cli.html) ·
 [Security](SECURITY.md) ·
 [Changelog](CHANGELOG.md)
-
-<p align="center">
-  <img src="docs/assets/link-product-tour-dark.gif" alt="Link demo flow across home, ingest, brief, memory, graph, and explanation views" width="860">
-</p>
-
-<p align="center">
-  <sub>If Link helps your agents remember better, <a href="https://github.com/gowtham0992/link">star it on GitHub</a> so more people can find it.</sub>
-</p>
 
 ## Why It Exists
 
@@ -81,6 +74,31 @@ The generated demo is the public proof wiki. The repo's root `wiki/` directory
 is only a scaffold for local development and personal testing. Generated content
 inside `wiki/`, `raw/`, and `link-demo/` is ignored by git so personal memory is
 not published by accident.
+
+## Three Ways To Use Link
+
+Pick the surface that matches how you work. They all read and write the same
+local Markdown wiki.
+
+<table>
+  <tr>
+    <td width="33%">
+      <strong>Web UI</strong><br>
+      Review memory, ingest, graph, audits, captures, and explanations in a local viewer.<br><br>
+      <a href="https://gowtham0992.github.io/link/ui.html"><img src="docs/assets/link-ui-tour.gif" alt="Link web UI walkthrough" width="270"></a>
+    </td>
+    <td width="33%">
+      <strong>CLI</strong><br>
+      Script readiness, query packets, briefs, validation, backup, benchmark, and repair.<br><br>
+      <a href="https://gowtham0992.github.io/link/cli.html"><img src="docs/assets/link-cli-tour.gif" alt="Link CLI walkthrough" width="270"></a>
+    </td>
+    <td width="33%">
+      <strong>MCP</strong><br>
+      Let Codex, Claude, Cursor, Kiro, VS Code, Copilot, and other agents recall memory.<br><br>
+      <a href="https://gowtham0992.github.io/link/mcp.html"><img src="docs/assets/link-mcp-tour.gif" alt="Link MCP agent walkthrough" width="270"></a>
+    </td>
+  </tr>
+</table>
 
 ## Install For Your Agent
 
@@ -162,40 +180,18 @@ If a raw file was already ingested and later edited, `link ingest-status` marks 
 as stale and tells your agent to refresh the existing source page instead of
 creating a duplicate.
 
-## What You Get
+## What Agents Get
 
-<table>
-  <tr>
-    <td width="50%">
-      <strong>First-run prompts</strong><br>
-      <img src="docs/assets/link-home-dark.png" alt="Link home with starter prompts" width="420">
-    </td>
-    <td width="50%">
-      <strong>Guided ingest</strong><br>
-      <img src="docs/assets/link-ingest-dark.png" alt="Link ingest workflow" width="420">
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <strong>Memory dashboard</strong><br>
-      <img src="docs/assets/link-memory-dashboard-dark.png" alt="Link memory dashboard" width="420">
-    </td>
-    <td width="50%">
-      <strong>Memory brief</strong><br>
-      <img src="docs/assets/link-brief-dark.png" alt="Link memory brief" width="420">
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <strong>Knowledge graph</strong><br>
-      <img src="docs/assets/link-graph-dark.png" alt="Link knowledge graph" width="420">
-    </td>
-    <td width="50%">
-      <strong>Explain memory</strong><br>
-      <img src="docs/assets/link-explain-memory-dark.png" alt="Link explain memory view" width="420">
-    </td>
-  </tr>
-</table>
+- `query_link`: an answer-ready packet with relevant memories, pages, graph
+  neighborhood, reasons for selection, budget limits, and follow-up actions.
+- `memory_brief`: a compact pre-work brief with user/project preferences,
+  active context, review warnings, and safe memory-use rules.
+- `ingest_status`: exact next steps for raw files, including source safety,
+  stale ingest detection, validation, and memory proposal guidance.
+- `remember_memory`: durable local memory with duplicate/conflict checks,
+  review state, provenance, and audit logging.
+- `explain_memory`: why a memory exists, what it links to, whether it is ready
+  for recall, and what needs review.
 
 ## Agent Contract
 
@@ -241,6 +237,7 @@ More detail: [Security guide](https://gowtham0992.github.io/link/security.html).
 | Need | Go here |
 |------|---------|
 | Run Link for the first time | [First 10 minutes](https://gowtham0992.github.io/link/getting-started.html) |
+| Use the local viewer | [Web UI](https://gowtham0992.github.io/link/ui.html) |
 | Understand raw/wiki/memory | [Concepts](https://gowtham0992.github.io/link/concepts.html) |
 | Configure MCP | [MCP setup](https://gowtham0992.github.io/link/mcp.html) |
 | Find a command | [CLI reference](https://gowtham0992.github.io/link/cli.html) |
@@ -269,3 +266,6 @@ Full contributor guide: [Contributing](https://gowtham0992.github.io/link/contri
 
 Do not include personal wiki data, raw sources, registry tokens, `.env` files, or
 local MCP credentials in a PR.
+
+If Link helps your agents remember better, [star it on GitHub](https://github.com/gowtham0992/link)
+so more people can find it.
