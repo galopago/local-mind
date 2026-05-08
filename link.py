@@ -2955,7 +2955,10 @@ def serve_wiki(target: Path, port: int = 3000) -> int:
         print("Next:")
         print(f"  {_display_command(['link', 'init', str(target)])}")
         return 1
-    return subprocess.run([sys.executable, str(serve_path), "--port", str(port)]).returncode
+    try:
+        return subprocess.run([sys.executable, str(serve_path), "--port", str(port)]).returncode
+    except KeyboardInterrupt:
+        return 130
 
 
 def create_demo(target: Path, force: bool = False) -> int:

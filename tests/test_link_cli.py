@@ -149,6 +149,16 @@ class LinkCliTests(unittest.TestCase):
         run.assert_not_called()
         self.assertIn("--port must be between 1 and 65535", out.getvalue())
 
+    def test_serve_handles_ctrl_c_without_traceback(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-serve-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        with patch.object(link_cli.subprocess, "run", side_effect=KeyboardInterrupt):
+            code = link_cli.serve_wiki(target, port=3010)
+
+        self.assertEqual(code, 130)
+
     def test_demo_creates_preingested_wiki(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-demo-test-"))
         target = tmp / "demo"
