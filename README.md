@@ -29,7 +29,7 @@ compound over time.
 [Changelog](CHANGELOG.md)
 
 <p align="center">
-  <img src="docs/assets/link-demo-flow-dark.gif" alt="Link demo flow across home, ingest, brief, memory, graph, and explanation views" width="860">
+  <img src="docs/assets/link-product-tour-dark.gif" alt="Link demo flow across home, ingest, brief, memory, graph, and explanation views" width="860">
 </p>
 
 ## Why It Exists
