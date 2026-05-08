@@ -95,7 +95,7 @@ local Markdown wiki.
     <td width="33%">
       <strong>MCP</strong><br>
       Let Codex, Claude, Cursor, Kiro, VS Code, Copilot, and other agents recall memory.<br><br>
-      <a href="https://gowtham0992.github.io/link/mcp.html"><img src="docs/assets/link-mcp-tour.gif" alt="Link MCP agent walkthrough" width="270"></a>
+      <a href="https://gowtham0992.github.io/link/mcp.html"><img src="docs/assets/link-mcp-agent-chat.gif" alt="Link MCP agent walkthrough" width="270"></a>
     </td>
   </tr>
 </table>

@@ -312,7 +312,7 @@ def _make_mcp_tour() -> None:
             "Saved locally as Markdown. You can review, update, archive, or forget it.",
         ),
     ]
-    _save_gif(frames, ASSETS / "link-mcp-tour.gif", duration=1650)
+    _save_gif(frames, ASSETS / "link-mcp-agent-chat.gif", duration=1650)
 
 
 def main() -> None:
@@ -320,7 +320,7 @@ def main() -> None:
     _make_cli_tour()
     _make_mcp_tour()
     print("Generated docs GIFs:")
-    for name in ["link-ui-tour.gif", "link-cli-tour.gif", "link-mcp-tour.gif", "link-product-tour-dark.gif"]:
+    for name in ["link-ui-tour.gif", "link-cli-tour.gif", "link-mcp-agent-chat.gif", "link-product-tour-dark.gif"]:
         print(f"- docs/assets/{name}")
 
 
