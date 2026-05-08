@@ -2948,15 +2948,25 @@ def serve_wiki(target: Path, port: int = 3000) -> int:
     if port < 1 or port > 65535:
         print("--port must be between 1 and 65535")
         return 1
-    serve_path = target / "serve.py"
+    serve_path = ROOT / "serve.py"
+    if not serve_path.exists():
+        serve_path = target / "serve.py"
     if not serve_path.exists():
         print(f"Link viewer missing: {serve_path}")
         print("")
         print("Next:")
         print(f"  {_display_command(['link', 'init', str(target)])}")
         return 1
+    if not (target / "wiki").exists():
+        print(f"Link wiki missing: {target / 'wiki'}")
+        print("")
+        print("Next:")
+        print(f"  {_display_command(['link', 'init', str(target)])}")
+        return 1
     try:
-        return subprocess.run([sys.executable, str(serve_path), "--port", str(port)]).returncode
+        return subprocess.run(
+            [sys.executable, str(serve_path), "--root", str(target), "--port", str(port)]
+        ).returncode
     except KeyboardInterrupt:
         return 130
 

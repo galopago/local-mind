@@ -3492,8 +3492,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
 
-def _parse_serve_port(argv: list[str], default: int = PORT) -> int:
-    port = default
+def _parse_serve_args(argv: list[str], default_port: int = PORT, default_root: Path = ROOT) -> tuple[int, Path]:
+    port = default_port
+    root = default_root
     for index, arg in enumerate(argv):
         if arg in {"--host", "--bind"} or arg.startswith("--host=") or arg.startswith("--bind="):
             raise SystemExit("Link serve is local-only; host/bind options are not supported.")
@@ -3509,8 +3510,19 @@ def _parse_serve_port(argv: list[str], default: int = PORT) -> int:
                 port = int(arg.split("=", 1)[1])
             except ValueError as exc:
                 raise SystemExit("--port must be an integer") from exc
+        elif arg == "--root":
+            if index + 1 >= len(argv):
+                raise SystemExit("--root requires a value")
+            root = Path(argv[index + 1]).expanduser().resolve()
+        elif arg.startswith("--root="):
+            root = Path(arg.split("=", 1)[1]).expanduser().resolve()
     if port < 1 or port > 65535:
         raise SystemExit("--port must be between 1 and 65535")
+    return port, root
+
+
+def _parse_serve_port(argv: list[str], default: int = PORT) -> int:
+    port, _ = _parse_serve_args(argv, default_port=default, default_root=ROOT)
     return port
 
 
@@ -3525,8 +3537,10 @@ def _serve_bind_error_message(exc: OSError, port: int) -> str:
 
 
 def main():
-    global PORT
-    PORT = _parse_serve_port(sys.argv[1:], default=PORT)
+    global PORT, WIKI_DIR, RAW_DIR
+    PORT, root = _parse_serve_args(sys.argv[1:], default_port=PORT, default_root=ROOT)
+    WIKI_DIR = root / "wiki"
+    RAW_DIR = root / "raw"
     socketserver.TCPServer.allow_reuse_address = True
     try:
         with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as s:

@@ -312,6 +312,13 @@ class ServeTests(unittest.TestCase):
     def test_server_args_stay_local_only(self):
         self.assertEqual(serve._parse_serve_port(["--port", "3010"], default=3000), 3010)
         self.assertEqual(serve._parse_serve_port(["--port=3011"], default=3000), 3011)
+        port, root = serve._parse_serve_args(
+            ["--root", "/tmp/link-demo", "--port", "3012"],
+            default_port=3000,
+            default_root=Path("/tmp/default"),
+        )
+        self.assertEqual(port, 3012)
+        self.assertEqual(root, Path("/tmp/link-demo").resolve())
         with self.assertRaises(SystemExit):
             serve._parse_serve_port(["--port", "0"], default=3000)
         with self.assertRaises(SystemExit):

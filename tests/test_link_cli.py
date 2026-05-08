@@ -123,9 +123,16 @@ class LinkCliTests(unittest.TestCase):
             code = link_cli.serve_wiki(target, port=3010)
 
         self.assertEqual(code, 0)
-        run.assert_called_once_with([sys.executable, str(target.resolve() / "serve.py"), "--port", "3010"])
+        run.assert_called_once_with([
+            sys.executable,
+            str(link_cli.ROOT / "serve.py"),
+            "--root",
+            str(target.resolve()),
+            "--port",
+            "3010",
+        ])
 
-    def test_serve_reports_missing_viewer(self):
+    def test_serve_reports_missing_wiki(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-serve-test-"))
 
         out = StringIO()
@@ -133,7 +140,7 @@ class LinkCliTests(unittest.TestCase):
             code = link_cli.serve_wiki(tmp / "missing")
 
         self.assertEqual(code, 1)
-        self.assertIn("Link viewer missing", out.getvalue())
+        self.assertIn("Link wiki missing", out.getvalue())
         self.assertIn("link init", out.getvalue())
 
     def test_serve_validates_port_before_spawning_viewer(self):
