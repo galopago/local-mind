@@ -6,6 +6,8 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-08
+
 ### Highlights
 
 - Reframes Link as local personal memory for agents, with the Markdown wiki as the inspectable storage layer.
