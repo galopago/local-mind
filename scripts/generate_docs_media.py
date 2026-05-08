@@ -207,70 +207,112 @@ def _make_cli_tour() -> None:
     _save_gif(frames, ASSETS / "link-cli-tour.gif", duration=1450)
 
 
-def _bubble(
+def _chat_bubble(
     draw: ImageDraw.ImageDraw,
     xy: tuple[int, int],
     width: int,
-    title: str,
+    label: str,
     body: str,
-    fill: str,
-    accent: str,
+    *,
+    align: str,
 ) -> int:
     x, y = xy
-    draw.rounded_rectangle((x, y, x + width, y + 114), radius=14, fill=fill, outline=accent, width=3)
-    draw.text((x + 18, y + 14), title, font=FONT_MONO_BOLD, fill=accent)
-    return _draw_text_block(draw, (x + 18, y + 45), body, FONT_SUBTITLE, COLORS["ink"], width - 36)
+    fill = "#2563eb" if align == "right" else "#1f2937"
+    outline = "#60a5fa" if align == "right" else "#374151"
+    body_color = "#ffffff"
+    label_color = "#bfdbfe" if align == "right" else "#86efac"
+    lines = _fit_text(draw, body, FONT_SUBTITLE, width - 34)
+    height = 50 + (len(lines) * 23)
+    draw.rounded_rectangle((x, y, x + width, y + height), radius=16, fill=fill, outline=outline, width=2)
+    draw.text((x + 16, y + 12), label, font=FONT_MONO_SMALL, fill=label_color)
+    text_y = y + 34
+    for line in lines:
+        draw.text((x + 16, text_y), line, font=FONT_SUBTITLE, fill=body_color)
+        text_y += 23
+    return y + height
 
 
-def _mcp_frame(title: str, step: str, calls: list[tuple[str, str, str]]) -> Image.Image:
-    image, draw = _window_frame(title, step)
-    x_positions = [40, 330]
-    y_positions = [110, 260]
-    for index, (name, body, tone) in enumerate(calls):
-        x = x_positions[index % 2]
-        y = y_positions[index // 2]
-        accent = COLORS["blue"] if tone == "tool" else COLORS["green"]
-        fill = "#e8edff" if tone == "tool" else "#dff8ef"
-        _bubble(draw, (x, y), 250 if index % 2 == 0 else 490, name, body, fill, accent)
+def _tool_card(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int],
+    tool: str,
+    args: str,
+    result: str,
+    *,
+    active: bool = True,
+) -> int:
+    x, y = xy
+    width = 738
+    fill = "#101827" if active else "#111111"
+    outline = COLORS["green"] if active else "#374151"
+    draw.rounded_rectangle((x, y, x + width, y + 128), radius=14, fill=fill, outline=outline, width=3)
+    draw.rectangle((x, y, x + width, y + 38), fill="#172033", outline=outline, width=0)
+    draw.text((x + 18, y + 10), "MCP tool", font=FONT_MONO_SMALL, fill="#9ca3af")
+    draw.text((x + 108, y + 9), f"link / {tool}", font=FONT_MONO_BOLD, fill="#86efac")
+    draw.text((x + width - 88, y + 9), "ready", font=FONT_MONO_SMALL, fill=COLORS["yellow"])
+    draw.text((x + 18, y + 54), "{", font=FONT_MONO_SMALL, fill="#9ca3af")
+    draw.text((x + 34, y + 76), f'"arguments": {args}', font=FONT_MONO_SMALL, fill="#d1d5db")
+    draw.text((x + 18, y + 100), f"→ {result}", font=FONT_MONO_SMALL, fill="#bfdbfe")
+    return y + 128
+
+
+def _mcp_chat_frame(title: str, user_prompt: str, tool: str, args: str, result: str, answer: str) -> Image.Image:
+    image = Image.new("RGB", SIZE, COLORS["paper"])
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 0, SIZE[0] - 1, SIZE[1] - 1), fill=COLORS["paper"], outline=COLORS["border"], width=4)
+    draw.rectangle((20, 20, SIZE[0] - 20, SIZE[1] - 20), fill="#080b10", outline=COLORS["border"], width=4)
+    draw.rectangle((24, 24, SIZE[0] - 24, 70), fill="#151923")
+    for x, color in [(44, COLORS["red"]), (66, COLORS["yellow"]), (88, COLORS["green"])]:
+        draw.ellipse((x, 40, x + 11, 51), fill=color)
+    draw.text((116, 38), "Agent chat", font=FONT_MONO_BOLD, fill=COLORS["ink"])
+    draw.text((SIZE[0] - 280, 38), title, font=FONT_MONO_SMALL, fill="#9ca3af")
+
+    _chat_bubble(draw, (500, 92), 298, "User", user_prompt, align="right")
+    _chat_bubble(draw, (58, 166), 408, "Agent", "I'll ask Link first so I do not guess from chat history.", align="left")
+    _tool_card(draw, (58, 246), tool, args, result)
+    _chat_bubble(draw, (58, 392), 560, "Agent", answer, align="left")
+
+    draw.rectangle((24, SIZE[1] - 38, SIZE[0] - 24, SIZE[1] - 24), fill="#0f172a")
+    draw.text((44, SIZE[1] - 36), "Link gives the agent memory without exposing a cloud account or hidden store.", font=FONT_MONO_SMALL, fill="#9ca3af")
     return image
 
 
 def _make_mcp_tour() -> None:
     frames = [
-        _mcp_frame(
-            "1. User asks naturally",
-            "No path memorization required.",
-            [
-                ("User", "is Link ready?", "user"),
-                ("MCP tool", "link_status checks schema, pages, search backend, and safe next actions.", "tool"),
-            ],
+        _mcp_chat_frame(
+            "1 / readiness",
+            "is Link ready?",
+            "link_status",
+            "{}",
+            "ready: yes · pages: 25 · search: sqlite-fts",
+            "Link is ready. I can query, brief, ingest, or remember from here.",
         ),
-        _mcp_frame(
-            "2. Agent primes itself",
-            "The packet is small by design.",
-            [
-                ("User", "brief me from Link before we continue", "user"),
-                ("MCP tool", "memory_brief returns relevant memories, project context, review warnings, and rules.", "tool"),
-            ],
+        _mcp_chat_frame(
+            "2 / brief",
+            "brief me from Link before we continue",
+            "memory_brief",
+            '{"query": "current task", "project": "link"}',
+            "2 memories · 4 pages · 1 review warning",
+            "I have the relevant preferences, project context, and review notes.",
         ),
-        _mcp_frame(
-            "3. Agent queries smart context",
-            "No whole-wiki dump.",
-            [
-                ("User", "query Link for release process", "user"),
-                ("MCP tool", "query_link returns budgeted memory, pages, graph context, why_selected, and follow-ups.", "tool"),
-            ],
+        _mcp_chat_frame(
+            "3 / smart query",
+            "query Link for release process",
+            "query_link",
+            '{"query": "release process", "budget": "small"}',
+            "why_selected · 3 memories · 5 pages · follow-ups",
+            "Here is the compact release context. I did not dump the whole wiki.",
         ),
-        _mcp_frame(
-            "4. Agent keeps memory healthy",
-            "Writes are reviewable.",
-            [
-                ("User", "remember that I prefer short release notes", "user"),
-                ("MCP tool", "remember_memory checks duplicates/conflicts, writes Markdown, and logs the change.", "tool"),
-            ],
+        _mcp_chat_frame(
+            "4 / reviewed memory",
+            "remember that I prefer short release notes",
+            "remember_memory",
+            '{"memory_type": "preference", "scope": "user"}',
+            "saved · pending review · duplicate check passed",
+            "Saved locally as Markdown. You can review, update, archive, or forget it.",
         ),
     ]
-    _save_gif(frames, ASSETS / "link-mcp-tour.gif", duration=1500)
+    _save_gif(frames, ASSETS / "link-mcp-tour.gif", duration=1650)
 
 
 def main() -> None:
