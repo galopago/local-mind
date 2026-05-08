@@ -2179,6 +2179,54 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("dead wikilinks", out.getvalue())
 
+    def test_doctor_reports_validation_errors(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        page = target / "wiki/sources/agent-memory-session.md"
+        page.write_text(
+            "---\ntype: source\ntitle: Agent Memory Session\n---\n\n"
+            "# Agent Memory Session\n\n"
+            "Captured from raw/agent-memory-session.md.\n",
+            encoding="utf-8",
+        )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.doctor(target)
+
+        self.assertEqual(code, 1)
+        self.assertIn("validation errors:", out.getvalue())
+        self.assertIn("missing_required_section", out.getvalue())
+
+    def test_doctor_fix_repairs_source_page_validation_shape(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        page = target / "wiki/sources/agent-memory-session.md"
+        page.write_text(
+            "---\ntype: source\ntitle: Agent Memory Session\n---\n\n"
+            "# Agent Memory Session\n\n"
+            "Captured from raw/agent-memory-session.md.\n",
+            encoding="utf-8",
+        )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.doctor(target, fix=True)
+
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("repaired validation shape for wiki/sources/agent-memory-session.md", text)
+        self.assertIn("OK ingest validation gate", text)
+        validation = link_cli._core_validate_wiki(target / "wiki")
+        self.assertTrue(validation["passed"])
+        repaired_text = page.read_text(encoding="utf-8")
+        self.assertIn("> **TLDR:** Agent Memory Session source notes.", repaired_text)
+        self.assertIn("## Summary", repaired_text)
+        self.assertIn("## Raw Source", repaired_text)
+        self.assertIn("`raw/agent-memory-session.md`", repaired_text)
+
     def test_doctor_warns_on_missing_summary(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-doctor-test-"))
         target = tmp / "demo"

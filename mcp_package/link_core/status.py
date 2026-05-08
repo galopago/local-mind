@@ -90,14 +90,28 @@ def link_status(
             ))
 
     validation_summary: dict[str, object] = {"checked": False}
+    validation_findings: list[Mapping[str, str]] = []
     if include_validation and wiki_dir.exists():
         validation = validate_wiki(wiki_dir)
+        validation_findings = list(validation.get("findings") or [])
+        validation_error_codes = sorted({
+            str(finding.get("code") or "")
+            for finding in validation_findings
+            if str(finding.get("severity") or "") == "error"
+        })
+        validation_warning_codes = sorted({
+            str(finding.get("code") or "")
+            for finding in validation_findings
+            if str(finding.get("severity") or "") == "warning"
+        })
         validation_summary = {
             "checked": True,
             "passed": validation["passed"],
             "error_count": validation["error_count"],
             "warning_count": validation["warning_count"],
             "finding_count": validation["finding_count"],
+            "error_codes": validation_error_codes,
+            "warning_codes": validation_warning_codes,
         }
 
     active_memory_count = sum(1 for record in record_list if str(record.get("status") or "active").lower() == "active")
@@ -128,7 +142,11 @@ def link_status(
     elif schema.get("status") == "newer":
         next_actions.append(_action("upgrade Link before writing this wiki", "upgrade_link"))
     if include_validation and validation_summary.get("checked") and not validation_summary.get("passed"):
-        next_actions.append(_action("rebuild graph index", "rebuild_backlinks"))
+        error_codes = set(validation_summary.get("error_codes") or [])
+        if error_codes & {"stale_backlinks", "invalid_backlinks"}:
+            next_actions.append(_action("rebuild graph index", "rebuild_backlinks"))
+        if error_codes - {"stale_backlinks", "invalid_backlinks"}:
+            next_actions.append(_action("repair validation findings", "doctor", {"fix": True}))
         next_actions.append(_action("rerun validation gate", "validate_wiki"))
     if ready and content_page_count:
         next_actions.append(_action("answer with compact local context", "query_link", {"query": "<user task>"}))

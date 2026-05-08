@@ -127,6 +127,46 @@ class StatusCoreTests(unittest.TestCase):
         self.assertFalse(payload["ready"])
         self.assertEqual(payload["warnings"][0]["code"], "cache_read_warnings")
 
+    def test_link_status_points_validation_shape_errors_to_doctor_fix(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "sources/bad-source.md",
+            "---\ntype: source\ntitle: Bad Source\n---\n\n"
+            "# Bad Source\n\n"
+            "Captured from raw/bad-source.md.\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki, body_only=False)), encoding="utf-8")
+
+        payload = link_status(wiki, include_validation=True)
+
+        self.assertFalse(payload["ready"])
+        self.assertIn("missing_required_section", payload["validation"]["error_codes"])
+        self.assertEqual(payload["next_actions"][0]["tool"], "doctor")
+        self.assertEqual(payload["next_actions"][0]["arguments"], {"fix": True})
+        self.assertEqual(payload["next_actions"][1]["tool"], "validate_wiki")
+        self.assertNotIn("rebuild_backlinks", [action["tool"] for action in payload["next_actions"]])
+
+    def test_link_status_points_stale_backlinks_to_rebuild(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/linking.md",
+            "---\ntype: concept\ntitle: Linking\n---\n\n"
+            "# Linking\n\n"
+            "> **TLDR:** Valid linked concept.\n\n"
+            "## Overview\n\nLinks to [[prefer-local-memory]].\n\n"
+            "## Sources\n\n- [[prefer-local-memory]]\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps({"backlinks": {}, "forward": {}}), encoding="utf-8")
+
+        payload = link_status(wiki, include_validation=True)
+
+        self.assertFalse(payload["ready"])
+        self.assertIn("stale_backlinks", payload["validation"]["error_codes"])
+        self.assertEqual(payload["next_actions"][0]["tool"], "rebuild_backlinks")
+        self.assertEqual(payload["next_actions"][1]["tool"], "validate_wiki")
+
 
 if __name__ == "__main__":
     unittest.main()

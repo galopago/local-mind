@@ -617,6 +617,92 @@ def _find_source_count_mismatches(wiki_dir: Path) -> list[str]:
     return sorted(mismatches)
 
 
+def _raw_source_refs(text: str) -> list[str]:
+    refs: list[str] = []
+    for pattern in (r"`(raw/[^`\n]+)`", r"(?<![\w/])(raw/[^\s`<>()]+)"):
+        for match in re.finditer(pattern, text):
+            value = match.group(1).strip().rstrip(".,;:]")
+            if value and value not in refs:
+                refs.append(value)
+    return refs
+
+
+def _body_with_tldr(body: str, title: str) -> str:
+    if re.search(r">\s*\*\*(?:TLDR|Query):\*\*", body, flags=re.IGNORECASE):
+        return body
+    summary = f"> **TLDR:** {title} source notes.\n\n"
+    heading = re.search(r"^#\s+.+\n", body, flags=re.MULTILINE)
+    if heading:
+        return body[: heading.end()] + "\n" + summary + body[heading.end():].lstrip("\n")
+    return summary + body.lstrip("\n")
+
+
+def _append_section(body: str, title: str, content: str) -> str:
+    return body.rstrip() + f"\n\n## {title}\n\n{content.strip()}\n"
+
+
+def _repair_source_page_validation_shape(page: Path, findings: list[dict[str, str]]) -> bool:
+    text = page.read_text(encoding="utf-8", errors="replace")
+    frontmatter_match = re.match(r"\A---\n.*?\n---\n?", text, flags=re.DOTALL)
+    if not frontmatter_match:
+        return False
+    prefix = frontmatter_match.group(0).rstrip("\n") + "\n\n"
+    body = text[frontmatter_match.end():].lstrip("\n")
+    meta, parsed_body = _parse_frontmatter(text)
+    if not isinstance(meta, dict) or str(meta.get("type") or "").strip() != "source":
+        return False
+    body = parsed_body
+    title = str(meta.get("title") or page.stem).strip() or page.stem
+    messages = [str(finding.get("message") or "") for finding in findings]
+    codes = {str(finding.get("code") or "") for finding in findings}
+    changed = False
+
+    if "missing_summary" in codes:
+        updated = _body_with_tldr(body, title)
+        changed = changed or updated != body
+        body = updated
+
+    if any("## Summary" in message for message in messages):
+        body = _append_section(body, "Summary", f"{title} source notes.")
+        changed = True
+
+    if any("## Raw Source" in message for message in messages):
+        refs = _raw_source_refs(text)
+        if refs:
+            body = _append_section(body, "Raw Source", f"`{refs[0]}`")
+            changed = True
+
+    if changed:
+        _core_atomic_write_text(page, prefix + body.rstrip() + "\n")
+    return changed
+
+
+def _repair_validation_findings(wiki_dir: Path) -> list[str]:
+    payload = _core_validate_wiki(wiki_dir)
+    findings_by_path: dict[str, list[dict[str, str]]] = {}
+    for finding in payload.get("findings", []):
+        if not isinstance(finding, dict):
+            continue
+        path = str(finding.get("path") or "")
+        code = str(finding.get("code") or "")
+        if not path.startswith("sources/"):
+            continue
+        if code != "missing_summary" and code != "missing_required_section":
+            continue
+        findings_by_path.setdefault(path, []).append(finding)
+
+    fixes: list[str] = []
+    for rel, findings in sorted(findings_by_path.items()):
+        page = wiki_dir / rel
+        try:
+            repaired = _repair_source_page_validation_shape(page, findings)
+        except OSError:
+            repaired = False
+        if repaired:
+            fixes.append(f"repaired validation shape for wiki/{rel}")
+    return fixes
+
+
 def _find_isolated_pages(wiki_dir: Path) -> list[str]:
     stems = _page_stems(wiki_dir)
     records = _wiki_page_records(wiki_dir)
@@ -742,6 +828,15 @@ def _apply_doctor_fixes(target: Path) -> list[str]:
         else:
             fixes.extend(f"schema: {item}" for item in migration["changes"])
 
+        validation_repairs = _repair_validation_findings(wiki_dir)
+        fixes.extend(validation_repairs)
+        if validation_repairs:
+            current, load_error = _load_backlinks(backlinks_path)
+            expected = _build_backlinks(wiki_dir)
+            if load_error or current is None or _normalize_link_index(current) != _normalize_link_index(expected):
+                _core_atomic_write_json(backlinks_path, expected)
+                fixes.append("rebuilt wiki/_backlinks.json")
+
     return fixes
 
 
@@ -825,6 +920,31 @@ def doctor(target: Path, fix: bool = False) -> int:
             warnings.append("source_count metadata mismatch: " + ", ".join(source_count_mismatches[:8]))
         else:
             print("OK source_count metadata matches Sources sections")
+
+        validation = _core_validate_wiki(wiki_dir)
+        doctor_validation_codes = {
+            "invalid_directory",
+            "missing_frontmatter",
+            "missing_frontmatter_field",
+            "missing_required_section",
+            "type_directory_mismatch",
+            "unreadable_page",
+        }
+        validation_errors = [
+            finding
+            for finding in validation.get("findings", [])
+            if isinstance(finding, dict)
+            and finding.get("severity") == "error"
+            and str(finding.get("code") or "") in doctor_validation_codes
+        ]
+        if validation_errors:
+            details = [
+                f"{finding.get('path')} [{finding.get('code')}] {finding.get('message')}"
+                for finding in validation_errors[:8]
+            ]
+            errors.append("validation errors: " + "; ".join(details))
+        else:
+            print("OK ingest validation gate")
 
         isolated = _find_isolated_pages(wiki_dir)
         if isolated:
