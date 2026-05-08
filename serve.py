@@ -2061,6 +2061,13 @@ def _render_graph():
     }});
   }}
 
+  function reseedVisiblePositions() {{
+    var currentNodes = visibleNodes();
+    currentNodes.forEach(function(n, i) {{
+      if (!pinned[n.id]) seedNodePosition(n, i, currentNodes.length);
+    }});
+  }}
+
   // Adjacency
   var adj = {{}}, degree = {{}};
   function rebuildGraphIndexes() {{
@@ -2080,6 +2087,11 @@ def _render_graph():
 
   rebuildGraphIndexes();
   seedMissingPositions();
+  var lockedOverviewIds = null;
+  if (initialGraphMode !== 'full') {{
+    lockedOverviewIds = {{}};
+    nodes.forEach(function(n) {{ lockedOverviewIds[n.id] = true; }});
+  }}
 
   var dragging = null, dragOffX = 0, dragOffY = 0, hoverNode = null, selectedNode = null;
   var panX = 0, panY = 0, panStartX = 0, panStartY = 0, panning = false, didPan = false;
@@ -2161,7 +2173,20 @@ def _render_graph():
   }}
   function capEligibleNodes(eligible) {{
     if (eligible.length <= OVERVIEW_NODE_LIMIT) return eligible;
+    if (fullGraphLoaded && lockedOverviewIds && !searchTerm && categoryValue === 'all' && depthValue === 'all' && !selectedNode) {{
+      var locked = eligible.filter(function(n) {{ return lockedOverviewIds[n.id]; }});
+      if (locked.length) return locked;
+    }}
     var keep = {{}};
+    var keepCount = 0;
+    function markKeep(n) {{
+      if (n && !keep[n.id]) {{
+        keep[n.id] = true;
+        keepCount++;
+      }}
+    }}
+    var highSignalLimit = Math.floor(OVERVIEW_NODE_LIMIT * 0.65);
+    var sampleLimit = Math.max(0, OVERVIEW_NODE_LIMIT - highSignalLimit);
     eligible
       .slice()
       .sort(function(a, b) {{
@@ -2169,11 +2194,20 @@ def _render_graph():
         if (degreeDiff) return degreeDiff;
         return String(a.title || a.id).localeCompare(String(b.title || b.id));
       }})
-      .slice(0, OVERVIEW_NODE_LIMIT)
-      .forEach(function(n) {{ keep[n.id] = true; }});
+      .slice(0, highSignalLimit)
+      .forEach(markKeep);
+    for (var i = 0; i < sampleLimit; i++) {{
+      var sampled = eligible[Math.floor((i + 0.5) * eligible.length / Math.max(sampleLimit, 1))];
+      markKeep(sampled);
+    }}
+    var fillIndex = 0;
+    while (keepCount < OVERVIEW_NODE_LIMIT && fillIndex < eligible.length) {{
+      markKeep(eligible[fillIndex]);
+      fillIndex++;
+    }}
     eligible.forEach(function(n) {{
-      if (searchMatches(n)) keep[n.id] = true;
-      if (selectedNode && (n.id === selectedNode.id || isNeighbor(selectedNode.id, n.id))) keep[n.id] = true;
+      if (searchMatches(n)) markKeep(n);
+      if (selectedNode && (n.id === selectedNode.id || isNeighbor(selectedNode.id, n.id))) markKeep(n);
     }});
     return eligible.filter(function(n) {{ return keep[n.id]; }});
   }}
@@ -2250,6 +2284,7 @@ def _render_graph():
     if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');
     if (graphNeedsFastRender(currentNodes, currentEdges)) parts.push('fast render');
     if (nodes.length > OVERVIEW_NODE_LIMIT && currentNodes.length < nodes.length) parts.push('overview capped');
+    if (fullGraphLoaded && initialGraphMode !== 'full') parts.push('data loaded');
     if (fullGraphLoading) parts.push('loading graph data');
     if (showAllLabels) parts.push('labels all');
     if (searchTerm) {{
@@ -2580,6 +2615,7 @@ def _render_graph():
     if (categoryFilter) categoryFilter.value = 'all';
     if (depthFilter) depthFilter.value = 'all';
     invalidateFilters();
+    reseedVisiblePositions();
     frame = SETTLE;
     autoFit();
     updateInspector();
@@ -2628,10 +2664,10 @@ def _render_graph():
     depthValue = 'all';
     if (depthFilter) depthFilter.value = 'all';
     rebuildGraphIndexes();
-    seedMissingPositions();
     syncCategoryOptions();
     invalidateSearchCache();
     invalidateFilters();
+    if (!lockedOverviewIds) reseedVisiblePositions();
     frame = SETTLE;
     autoFit();
     updateInspector();
@@ -2807,6 +2843,7 @@ def _render_graph():
     depthValue = '1';
     if (depthFilter) depthFilter.value = '1';
     invalidateFilters();
+    reseedVisiblePositions();
     setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
@@ -2818,6 +2855,7 @@ def _render_graph():
       invalidateSearchCache();
       invalidateFilters();
       if (searchTerm && !fullGraphLoaded) loadFullGraph();
+      reseedVisiblePositions();
       autoFit();
       updateStatus();
       drawSoon();
@@ -2832,6 +2870,7 @@ def _render_graph():
   if (categoryFilter) categoryFilter.addEventListener('change', function() {{
     categoryValue = categoryFilter.value || 'all';
     invalidateFilters();
+    reseedVisiblePositions();
     setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
@@ -2840,6 +2879,7 @@ def _render_graph():
   if (depthFilter) depthFilter.addEventListener('change', function() {{
     depthValue = depthFilter.value || 'all';
     invalidateFilters();
+    reseedVisiblePositions();
     setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
@@ -2848,7 +2888,7 @@ def _render_graph():
 
   window.addEventListener('resize', function() {{ resize(); if (fitted) autoFit(); updateStatus(); drawSoon(); }});
   resize();
-  if (motionPaused) {{ autoFit(); fitted = true; frame = SETTLE; }}
+  if (motionPaused) {{ reseedVisiblePositions(); autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
   syncCategoryOptions();
   syncLabelsButton();
