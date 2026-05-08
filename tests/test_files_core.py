@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,7 +11,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.files import atomic_write_json, atomic_write_text  # noqa: E402
+from link_core.files import append_text, atomic_write_json, atomic_write_text  # noqa: E402
 
 
 class FilesCoreTests(unittest.TestCase):
@@ -46,6 +47,35 @@ class FilesCoreTests(unittest.TestCase):
 
         self.assertEqual(path.read_text(encoding="utf-8"), "old\n")
         self.assertEqual(list(path.parent.glob(".*.tmp")), [])
+
+    def test_atomic_write_recovers_stale_lock_file(self):
+        root = Path(tempfile.mkdtemp(prefix="link-files-core-"))
+        path = root / "wiki/index.md"
+        path.parent.mkdir(parents=True)
+        lock = path.parent / ".index.md.lock"
+        lock.write_text("old-pid", encoding="utf-8")
+        os.utime(lock, (0, 0))
+
+        atomic_write_text(path, "new\n")
+
+        self.assertEqual(path.read_text(encoding="utf-8"), "new\n")
+        self.assertFalse(lock.exists())
+
+    def test_append_text_initializes_and_serializes_audit_log(self):
+        root = Path(tempfile.mkdtemp(prefix="link-files-core-"))
+        path = root / "wiki/log.md"
+
+        def append(index: int) -> None:
+            append_text(path, f"entry-{index}\n", initial_text="# Log\n\n")
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            list(executor.map(append, range(25)))
+
+        text = path.read_text(encoding="utf-8")
+        self.assertEqual(text.count("# Log"), 1)
+        for index in range(25):
+            self.assertIn(f"entry-{index}\n", text)
+        self.assertEqual(list(path.parent.glob(".*.lock")), [])
 
 
 if __name__ == "__main__":

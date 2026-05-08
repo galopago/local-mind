@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
 import re
 import shlex
 import shutil
@@ -2689,12 +2690,18 @@ def _mcp_config(python_cmd: str, wiki_dir: Path) -> dict[str, object]:
     }
 
 
+def _display_command(parts: list[str]) -> str:
+    if os.name == "nt":
+        return subprocess.list2cmdline(parts)
+    return shlex.join(parts)
+
+
 def _mcp_verify_action(tool: str, label: str, command: list[str]) -> dict[str, object]:
     return {
         "tool": tool,
         "label": label,
         "command": command,
-        "command_text": shlex.join(command),
+        "command_text": _display_command(command),
     }
 
 
@@ -2851,19 +2858,19 @@ def verify_mcp(
 
     print("")
     print("Next:")
-    quoted_python_cmd = shlex.quote(python_cmd)
+    python_pip = [python_cmd, "-m", "pip", "install", "--upgrade"]
     if not import_status.get("installed"):
-        print(f"  Install: {quoted_python_cmd} -m pip install --upgrade link-mcp")
+        print(f"  Install: {_display_command([*python_pip, 'link-mcp'])}")
         print("  macOS/Homebrew fallback:")
         print("    python3 -m venv ~/.link-mcp-venv")
         print("    ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp")
         print("    Then rerun with: python3 link.py verify-mcp . --python ~/.link-mcp-venv/bin/python")
     elif not mcp_sdk_ready:
         print(f"  Reinstall link-mcp dependencies for Link {LINK_VERSION}:")
-        print(f"    {quoted_python_cmd} -m pip install --upgrade link-mcp=={LINK_VERSION}")
+        print(f"    {_display_command([*python_pip, f'link-mcp=={LINK_VERSION}'])}")
     elif not version_matches:
         print(f"  Upgrade link-mcp to match Link {LINK_VERSION}:")
-        print(f"    {quoted_python_cmd} -m pip install --upgrade link-mcp=={LINK_VERSION}")
+        print(f"    {_display_command([*python_pip, f'link-mcp=={LINK_VERSION}'])}")
     if not wiki_exists:
         print("  Create a wiki with an installer, or try: python3 link.py init")
     print("")
@@ -2946,23 +2953,21 @@ def serve_wiki(target: Path, port: int = 3000) -> int:
         print(f"Link viewer missing: {serve_path}")
         print("")
         print("Next:")
-        print(f"  link init {shlex.quote(str(target))}")
+        print(f"  {_display_command(['link', 'init', str(target)])}")
         return 1
     return subprocess.run([sys.executable, str(serve_path), "--port", str(port)]).returncode
 
 
-def create_demo(target: Path, force: bool = False) -> None:
+def create_demo(target: Path, force: bool = False) -> int:
     target = target.expanduser().resolve()
     if target.exists() and any(target.iterdir()):
         marker = target / DEMO_MARKER
         if not force:
-            raise SystemExit(
-                f"{target} already exists. Re-run with --force to replace a Link demo directory."
-            )
+            print(f"{target} already exists. Re-run with --force to replace a Link demo directory.", file=sys.stderr)
+            return 1
         if not marker.exists():
-            raise SystemExit(
-                f"{target} does not look like a Link demo directory; refusing to overwrite it."
-            )
+            print(f"{target} does not look like a Link demo directory; refusing to overwrite it.", file=sys.stderr)
+            return 1
         shutil.rmtree(target)
 
     target.mkdir(parents=True, exist_ok=True)
@@ -2994,12 +2999,12 @@ def create_demo(target: Path, force: bool = False) -> None:
     print(f"Link demo created at {target}")
     print("")
     print("View it:")
-    print(f"  python3 link.py serve {shlex.quote(str(target))}")
+    print(f"  {_display_command(['python3', 'link.py', 'serve', str(target)])}")
     print("")
     print("Try the value loop:")
-    print(f"  python3 link.py query \"why does Link help agents?\" {shlex.quote(str(target))} --budget small")
-    print(f"  python3 link.py brief \"working on agent memory\" {shlex.quote(str(target))}")
-    print(f"  python3 link.py memory-audit {shlex.quote(str(target))}")
+    print(f"  {_display_command(['python3', 'link.py', 'query', 'why does Link help agents?', str(target), '--budget', 'small'])}")
+    print(f"  {_display_command(['python3', 'link.py', 'brief', 'working on agent memory', str(target)])}")
+    print(f"  {_display_command(['python3', 'link.py', 'memory-audit', str(target)])}")
     print("")
     print("Guide:")
     print(f"  {target / 'START_HERE.md'}")
@@ -3007,6 +3012,7 @@ def create_demo(target: Path, force: bool = False) -> None:
     print("Then open:")
     print("  http://localhost:3000")
     print("  http://localhost:3000/graph")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -3228,8 +3234,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "serve":
         return serve_wiki(Path(args.target), port=args.port)
     if args.command == "demo":
-        create_demo(Path(args.target), force=args.force)
-        return 0
+        return create_demo(Path(args.target), force=args.force)
     if args.command == "prompts":
         return starter_prompts(Path(args.target), project=args.project, json_output=args.json)
     if args.command == "status":

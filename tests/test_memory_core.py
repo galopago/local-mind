@@ -557,8 +557,8 @@ class MemoryCoreTests(unittest.TestCase):
             path, record, error = resolve_memory_page(wiki, "wiki/memories/prefer-focused-commits.md")
         self.assertIsNone(error)
         self.assertEqual(path, (memories / "prefer-focused-commits.md").resolve())
-        self.assertIsNone(record)
-        self.assertEqual(mocked_records.call_count, 1)
+        self.assertEqual(record["title"], "Prefer focused commits")
+        self.assertEqual(mocked_records.call_count, 0)
 
         path, record, error = resolve_memory_page(wiki, "../log.md")
         self.assertIsNone(path)

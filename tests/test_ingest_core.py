@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -197,6 +198,17 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(matches["raw/source (v1)+.md"], ["alpha"])
         self.assertEqual(matches["raw/source.md"], [])
         self.assertEqual(matches["raw/source.md.backup"], ["alpha"])
+
+    def test_source_matches_by_raw_compiles_one_pattern_per_chunk(self):
+        source_records = {"alpha": {"text": "`raw/a.md` `raw/d.md`"}}
+        raw_rels = ["raw/a.md", "raw/b.md", "raw/c.md", "raw/d.md"]
+
+        with patch("link_core.ingest.re.compile", wraps=re.compile) as mocked_compile:
+            matches = source_matches_by_raw(source_records, raw_rels, chunk_size=1)
+
+        self.assertEqual(mocked_compile.call_count, len(raw_rels))
+        self.assertEqual(matches["raw/a.md"], ["alpha"])
+        self.assertEqual(matches["raw/d.md"], ["alpha"])
 
     def test_collect_ingest_status_warns_on_represented_secret_raw(self):
         root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))

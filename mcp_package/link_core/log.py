@@ -19,9 +19,7 @@ def write_default_log(path: Path) -> None:
 
 def append_log(wiki_dir: Path, timestamp: str, operation: str, description: str, lines: list[str]) -> None:
     log_path = wiki_dir / "log.md"
-    if not log_path.exists():
-        write_default_log(log_path)
     entry = [f"## [{timestamp}] {operation} | {description}", ""]
     entry.extend(f"- {line}" for line in lines)
     entry.extend(["", "---", ""])
-    append_text(log_path, "\n".join(entry))
+    append_text(log_path, "\n".join(entry), initial_text=DEFAULT_LOG_TEXT)

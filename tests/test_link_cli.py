@@ -20,7 +20,9 @@ SPEC.loader.exec_module(link_cli)
 
 def create_demo_quiet(target: Path, force: bool = False) -> None:
     with redirect_stdout(StringIO()):
-        link_cli.create_demo(target, force=force)
+        code = link_cli.create_demo(target, force=force)
+    if code != 0:
+        raise AssertionError(f"create_demo failed with exit code {code}")
 
 
 class LinkCliTests(unittest.TestCase):
@@ -181,9 +183,12 @@ class LinkCliTests(unittest.TestCase):
         target.mkdir()
         (target / "keep.txt").write_text("do not replace", encoding="utf-8")
 
-        with self.assertRaises(SystemExit):
-            link_cli.create_demo(target, force=True)
+        err = StringIO()
+        with redirect_stderr(err):
+            code = link_cli.create_demo(target, force=True)
 
+        self.assertEqual(code, 1)
+        self.assertIn("refusing to overwrite", err.getvalue())
         self.assertEqual((target / "keep.txt").read_text(encoding="utf-8"), "do not replace")
 
     def test_demo_force_replaces_demo_directory(self):

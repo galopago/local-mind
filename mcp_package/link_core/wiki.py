@@ -189,6 +189,8 @@ def build_wiki_cache(wiki_dir: Path, *, use_persistent_cache: bool = True) -> di
     pages: list[dict[str, Any]] = []
     page_index: dict[str, Path] = {}
     fulltext: dict[str, str] = {}
+    body_index: dict[str, str] = {}
+    meta_index: dict[str, dict[str, Any]] = {}
     normalized_fulltext: dict[str, str] = {}
     text_words_index: dict[str, set[str]] = {}
     meta_words_index: dict[str, set[str]] = {}
@@ -238,6 +240,8 @@ def build_wiki_cache(wiki_dir: Path, *, use_persistent_cache: bool = True) -> di
 
         text_lower = text.lower()
         fulltext[stem] = text_lower
+        body_index[stem] = body
+        meta_index[stem] = dict(meta)
         text_normalized = normalized_search_text(text_lower)
         normalized_fulltext[stem] = text_normalized
         text_words_index[stem] = search_words(text_normalized)
@@ -293,6 +297,8 @@ def build_wiki_cache(wiki_dir: Path, *, use_persistent_cache: bool = True) -> di
         "pages": pages,
         "page_index": page_index,
         "fulltext": fulltext,
+        "body_index": body_index,
+        "meta_index": meta_index,
         "normalized_fulltext": normalized_fulltext,
         "text_words_index": text_words_index,
         "meta_words_index": meta_words_index,
@@ -418,13 +424,18 @@ def context_for_topic(
             context_names.append(name)
 
     context_pages = []
+    body_index = cache.get("body_index") if isinstance(cache.get("body_index"), dict) else {}
+    meta_index = cache.get("meta_index") if isinstance(cache.get("meta_index"), dict) else {}
     for name in context_names[:limit]:
         page_path = cache["page_index"].get(name)
         if not page_path or not page_path.exists():
             continue
         cached_page = cache.get("page_map", {}).get(name, {})
-        text = page_path.read_text(encoding="utf-8", errors="replace")
-        meta, body = parse_frontmatter(text)
+        body = str(body_index.get(name) or "")
+        meta = dict(meta_index.get(name) or {})
+        if not body and not meta:
+            text = page_path.read_text(encoding="utf-8", errors="replace")
+            meta, body = parse_frontmatter(text)
         is_primary = name == primary_name
         if is_primary:
             content = body

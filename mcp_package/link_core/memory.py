@@ -1,8 +1,10 @@
 """Shared memory logic for Link CLI, HTTP, and MCP runtimes."""
 from __future__ import annotations
 
+import os
 import re
 import shlex
+import subprocess
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
@@ -220,6 +222,40 @@ def _heading_title(body: str) -> str:
     return match.group(1).strip() if match else ""
 
 
+def memory_record_from_page(wiki_dir: Path, path: Path, include_body: bool = True) -> dict[str, object]:
+    wiki_root = wiki_dir.expanduser().resolve()
+    path = path.expanduser().resolve()
+    text = path.read_text(encoding="utf-8", errors="replace")
+    meta, body = parse_frontmatter(text)
+    title = meta.get("title") or _heading_title(body) or memory_title(body) or path.stem
+    record: dict[str, object] = {
+        "name": path.stem,
+        "path": f"wiki/{path.relative_to(wiki_root).as_posix()}",
+        "title": title,
+        "memory_type": meta.get("memory_type") or "note",
+        "scope": meta.get("scope") or "user",
+        "project": normalize_project(str(meta.get("project", ""))),
+        "status": meta.get("status") or "active",
+        "date_captured": meta.get("date_captured", ""),
+        "updated_at": meta.get("updated_at", ""),
+        "update_count": meta.get("update_count", "0"),
+        "last_update_source": meta.get("last_update_source", ""),
+        "archived_at": meta.get("archived_at", ""),
+        "archive_reason": meta.get("archive_reason", ""),
+        "restored_at": meta.get("restored_at", ""),
+        "source": meta.get("source", ""),
+        "review_status": meta.get("review_status") or "pending",
+        "reviewed_at": meta.get("reviewed_at", ""),
+        "review_note": meta.get("review_note", ""),
+        "tags": meta_tags(meta.get("tags", "")),
+        "tldr": extract_tldr(body),
+        "snippet": first_body_snippet(body),
+    }
+    if include_body:
+        record["body"] = body
+    return record
+
+
 def memory_records(wiki_dir: Path, include_body: bool = True) -> list[dict[str, object]]:
     memories_dir = wiki_dir / "memories"
     if not memories_dir.exists():
@@ -228,35 +264,7 @@ def memory_records(wiki_dir: Path, include_body: bool = True) -> list[dict[str, 
     for path in sorted(memories_dir.rglob("*.md")):
         if path.name.startswith("."):
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        meta, body = parse_frontmatter(text)
-        title = meta.get("title") or _heading_title(body) or memory_title(body) or path.stem
-        record: dict[str, object] = {
-            "name": path.stem,
-            "path": f"wiki/{path.relative_to(wiki_dir).as_posix()}",
-            "title": title,
-            "memory_type": meta.get("memory_type") or "note",
-            "scope": meta.get("scope") or "user",
-            "project": normalize_project(str(meta.get("project", ""))),
-            "status": meta.get("status") or "active",
-            "date_captured": meta.get("date_captured", ""),
-            "updated_at": meta.get("updated_at", ""),
-            "update_count": meta.get("update_count", "0"),
-            "last_update_source": meta.get("last_update_source", ""),
-            "archived_at": meta.get("archived_at", ""),
-            "archive_reason": meta.get("archive_reason", ""),
-            "restored_at": meta.get("restored_at", ""),
-            "source": meta.get("source", ""),
-            "review_status": meta.get("review_status") or "pending",
-            "reviewed_at": meta.get("reviewed_at", ""),
-            "review_note": meta.get("review_note", ""),
-            "tags": meta_tags(meta.get("tags", "")),
-            "tldr": extract_tldr(body),
-            "snippet": first_body_snippet(body),
-        }
-        if include_body:
-            record["body"] = body
-        records.append(record)
+        records.append(memory_record_from_page(wiki_dir, path, include_body=include_body))
     return records
 
 
@@ -669,7 +677,7 @@ def resolve_memory_page(
             continue
         if candidate.exists() and candidate.is_file():
             if record_list is None:
-                record_list = memory_records(wiki_dir)
+                return candidate, memory_record_from_page(wiki_dir, candidate), None
             record = next(
                 (record for record in record_list if str(record.get("name") or "") == candidate.stem),
                 None,
@@ -1773,7 +1781,12 @@ def proposal_title(memory: str, memory_type: str) -> str:
 
 
 def _shell_words(*parts: object) -> str:
-    return " ".join(shlex.quote(str(part)) for part in parts if str(part) != "")
+    words = [str(part) for part in parts if str(part) != ""]
+    if not words:
+        return ""
+    if os.name == "nt":
+        return subprocess.list2cmdline(words)
+    return shlex.join(words)
 
 
 def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:

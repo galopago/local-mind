@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +26,40 @@ def _fsync_directory(path: Path) -> None:
         os.close(fd)
 
 
-def atomic_write_bytes(path: Path, data: bytes) -> None:
+@contextmanager
+def _file_lock(path: Path, *, timeout: float = 10.0, stale_after: float = 120.0):
+    """Serialize local writes to one target file across Link runtimes."""
+    target = path.expanduser()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = target.with_name(f".{target.name}.lock")
+    start = time.monotonic()
+    fd: int | None = None
+    while fd is None:
+        try:
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode("utf-8"))
+        except FileExistsError:
+            try:
+                if time.time() - lock_path.stat().st_mtime >= stale_after:
+                    os.unlink(lock_path)
+                    continue
+            except OSError:
+                pass
+            if time.monotonic() - start >= timeout:
+                raise TimeoutError(f"timed out waiting for write lock: {lock_path}")
+            time.sleep(0.025)
+    try:
+        yield
+    finally:
+        if fd is not None:
+            os.close(fd)
+        try:
+            os.unlink(lock_path)
+        except OSError:
+            pass
+
+
+def _atomic_write_bytes_unlocked(path: Path, data: bytes) -> None:
     """Write bytes via temp file + os.replace to avoid partial target files."""
     target = path.expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -51,6 +86,12 @@ def atomic_write_bytes(path: Path, data: bytes) -> None:
         raise
 
 
+def atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Write bytes with a temp-file replace and a per-target local lock."""
+    with _file_lock(path):
+        _atomic_write_bytes_unlocked(path, data)
+
+
 def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
     atomic_write_bytes(path, text.encode(encoding))
 
@@ -62,11 +103,14 @@ def atomic_write_json(path: Path, payload: Any, *, indent: int = 2, trailing_new
     atomic_write_text(path, text)
 
 
-def append_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
-    """Append one complete text block and fsync it for local audit trails."""
+def append_text(path: Path, text: str, *, encoding: str = "utf-8", initial_text: str = "") -> None:
+    """Append one complete text block under the same local lock as replacements."""
     target = path.expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("a", encoding=encoding) as handle:
-        handle.write(text)
-        handle.flush()
-        os.fsync(handle.fileno())
+    with _file_lock(target):
+        with target.open("a", encoding=encoding) as handle:
+            if initial_text and target.stat().st_size == 0:
+                handle.write(initial_text)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
