@@ -1074,6 +1074,8 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
         print(f"Source page read warnings: {status['source_read_warning_count']}")
     print(f"Represented in wiki/sources: {status['represented_count']}")
     print(f"Pending ingest: {status['pending_count']}")
+    if int(status.get("stale_count") or 0):
+        print(f"Stale represented raw: {status['stale_count']}")
     print(f"Backlinks: {status['backlinks_status']} ({status['backlinks_message']})")
     safety = status.get("safety") if isinstance(status.get("safety"), dict) else {}
     if safety:
@@ -1094,6 +1096,9 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
             elif warnings:
                 labels = ", ".join(str(label) for label in warnings)
                 print(f"- {item['raw']} [redact before ingest: {labels}]")
+            elif item.get("stale"):
+                reason = str(item.get("stale_reason") or "raw changed after wiki source page")
+                print(f"- {item['raw']} [refresh source page: {reason}]")
             else:
                 print(f"- {item['raw']}")
         if len(pending_raw) > 20:
@@ -1137,7 +1142,7 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
             print("  Batch:")
             for item in batch[:5]:
                 subject = item.get("raw") or item.get("page") or ""
-                target_page = item.get("suggested_source_page") or item.get("error") or ""
+                target_page = item.get("target_source_page") or item.get("suggested_source_page") or item.get("error") or ""
                 print(f"  - {subject} -> {target_page}")
         if post_checks:
             print("  Post-ingest checks:")

@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -317,6 +318,32 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Memory review: propose memories from raw/agent-memory-session.md", text)
         self.assertIn("Retrieval check: query Link for agent memory session", text)
         self.assertIn("Next check: brief me from Link before we continue", text)
+
+    def test_ingest_status_reports_stale_represented_raw_file(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        raw_page = target / "raw/agent-memory-session.md"
+        time.sleep(0.02)
+        raw_page.write_text("# Agent memory session\n\nUpdated after ingest.\n", encoding="utf-8")
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.ingest_status(target)
+
+        text = out.getvalue()
+        self.assertEqual(code, 0)
+        self.assertIn("Represented in wiki/sources: 2", text)
+        self.assertIn("Pending ingest: 1", text)
+        self.assertIn("Stale represented raw: 1", text)
+        self.assertIn(
+            "raw/agent-memory-session.md [refresh source page: raw changed after wiki source page]",
+            text,
+        )
+        self.assertIn("Guidance: 1 represented raw file changed after its source page was written.", text)
+        self.assertIn("Ask your agent: re-ingest raw/agent-memory-session.md into Link", text)
+        self.assertIn("Suggested workflow: Refresh stale source pages", text)
+        self.assertIn("raw/agent-memory-session.md -> wiki/sources/agent-memory-session.md", text)
 
     def test_ingest_status_warns_before_secret_raw_ingest(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))

@@ -91,6 +91,10 @@ EOF</code></pre>
           <strong>Safety gate</strong>
           Link blocks normal ingest guidance when raw files contain secret-looking values or cannot be read safely. Redact or fix those local files first.
         </div>
+        <div class="callout">
+          <strong>Existing Link data</strong>
+          If you already have files in <code>~/link/raw/</code>, <code>link ingest-status</code> may point to a different pending file first. If <code>first-memory.md</code> was already ingested and you overwrite it, Link marks that raw file as stale and asks the agent to refresh the existing source page.
+        </div>
 
         <h2 id="memory">4. Save One Direct Memory</h2>
         <p>Use natural language with an agent:</p>

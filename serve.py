@@ -1507,6 +1507,7 @@ def _render_ingest():
         f'<div class="stat"><span class="num">{int(status.get("raw_count") or 0)}</span><span class="label">raw</span></div>'
         f'<div class="stat"><span class="num">{int(status.get("represented_count") or 0)}</span><span class="label">represented</span></div>'
         f'<div class="stat"><span class="num">{int(status.get("pending_count") or 0)}</span><span class="label">pending</span></div>'
+        f'<div class="stat"><span class="num">{int(status.get("stale_count") or 0)}</span><span class="label">stale</span></div>'
         f'<div class="stat"><span class="num">{html.escape(str(status.get("backlinks_status") or "unknown"))}</span><span class="label">graph</span></div>'
         f'<div class="stat"><span class="num">{html.escape(str(safety.get("status") or "unknown"))}</span><span class="label">safety</span></div>'
         f'</div>'
@@ -1621,6 +1622,15 @@ def _render_ingest():
                     f'{int(item.get("size_bytes") or 0)} bytes · '
                     f'could not inspect: {html.escape(str(item.get("scan_error") or ""))} · fix access before ingest'
                 )
+            elif item.get("stale"):
+                target_pages = item.get("source_page_paths") if isinstance(item.get("source_page_paths"), list) else []
+                target_label = ", ".join(html.escape(str(page)) for page in target_pages if page)
+                target_text = f" · refresh {target_label}" if target_label else " · refresh existing source page"
+                meta = (
+                    f'{int(item.get("size_bytes") or 0)} bytes · '
+                    f'{html.escape(str(item.get("stale_reason") or "raw changed after wiki source page"))}'
+                    f'{target_text}'
+                )
             else:
                 meta = (
                     f'{int(item.get("size_bytes") or 0)} bytes · '
@@ -1662,7 +1672,7 @@ def _render_ingest():
             for item in batch[:5]:
                 rows += (
                     f'<li><code>{html.escape(str(item.get("raw") or ""))}</code>'
-                    f'<span class="type">{html.escape(str(item.get("suggested_source_page") or ""))}</span></li>'
+                    f'<span class="type">{html.escape(str(item.get("target_source_page") or item.get("suggested_source_page") or ""))}</span></li>'
                 )
             batch_html = f'<h3>Batch</h3><ul class="page-list">{rows}</ul>'
         checks_html = ""

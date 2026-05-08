@@ -183,6 +183,10 @@ link query "what should I know before changing the MCP tools?" --budget small
 link validate
 ```
 
+If a raw file was already ingested and later edited, `link ingest-status` marks it
+as stale and tells your agent to refresh the existing source page instead of
+creating a duplicate.
+
 ## What You Get
 
 ### Wiki Home

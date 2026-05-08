@@ -1714,6 +1714,35 @@ class ServeTests(unittest.TestCase):
         self.assertIn('data-copy-text="query Link for represented source"', html)
         self.assertIn("brief me from Link before we continue", html)
 
+    def test_ingest_page_marks_stale_represented_raw(self):
+        wiki = self.make_wiki()
+        raw = wiki.parent / "raw"
+        raw.mkdir()
+        raw_page = raw / "represented-source.md"
+        raw_page.write_text("# Represented source\n\nOriginal note.\n", encoding="utf-8")
+        (wiki / "sources").mkdir(parents=True, exist_ok=True)
+        (wiki / "sources" / "represented-source.md").write_text(
+            "---\ntype: source\ntitle: Represented Source\n---\n\n"
+            "# Represented Source\n\n"
+            "## Raw Source\n\n`raw/represented-source.md`\n",
+            encoding="utf-8",
+        )
+        time.sleep(0.02)
+        raw_page.write_text("# Represented source\n\nUpdated note.\n", encoding="utf-8")
+        reset_wiki(wiki)
+
+        api_status, payload = run_handler("GET", "/api/ingest-status")
+        html = serve._render_ingest()
+
+        self.assertEqual(api_status, 200)
+        self.assertEqual(payload["guidance"]["state"], "stale_raw")
+        self.assertEqual(payload["stale_count"], 1)
+        self.assertIn("<span class=\"label\">stale</span>", html)
+        self.assertIn("raw changed after wiki source page", html)
+        self.assertIn("Refresh stale source pages", html)
+        self.assertIn("wiki/sources/represented-source.md", html)
+        self.assertIn('data-copy-text="re-ingest raw/represented-source.md into Link"', html)
+
     def test_ingest_page_blocks_secret_looking_raw(self):
         wiki = self.make_wiki()
         raw = wiki.parent / "raw"

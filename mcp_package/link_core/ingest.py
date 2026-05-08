@@ -72,12 +72,17 @@ def source_page_index(
                 })
             continue
         meta, body = parse_frontmatter(text)
+        try:
+            page_mtime = page.stat().st_mtime
+        except OSError:
+            page_mtime = 0.0
         name = page.stem.lower()
         records[name] = {
             "name": page.stem,
             "path": f"wiki/{page.relative_to(wiki_dir).as_posix()}",
             "title": str(meta.get("title") or _heading_title(body) or page.stem),
             "text": text,
+            "mtime": page_mtime,
         }
     return records
 
@@ -202,16 +207,28 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
     guidance = status.get("guidance") if isinstance(status.get("guidance"), dict) else {}
     state = str(guidance.get("state") or "unknown")
     pending_raw = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
+    ordered_pending_raw = sorted(
+        pending_raw,
+        key=lambda item: (0 if isinstance(item, dict) and item.get("stale") else 1, str(item.get("raw") or "")),
+    )
     batch: list[dict[str, object]] = []
-    for item in pending_raw[: max(limit, 1)]:
+    for item in ordered_pending_raw[: max(limit, 1)]:
         raw_rel = str(item.get("raw") or "")
         if not raw_rel:
             continue
-        batch.append({
+        batch_item = {
             "raw": raw_rel,
             "size_bytes": int(item.get("size_bytes") or 0),
             "suggested_source_page": _source_page_suggestion(raw_rel),
-        })
+        }
+        if item.get("stale"):
+            source_page_paths = list(item.get("source_page_paths") or [])
+            batch_item["stale"] = True
+            batch_item["stale_reason"] = str(item.get("stale_reason") or "")
+            batch_item["source_page_paths"] = source_page_paths
+            if source_page_paths:
+                batch_item["target_source_page"] = source_page_paths[0]
+        batch.append(batch_item)
 
     if state == "pending_raw" and batch:
         first = batch[0]
@@ -226,6 +243,32 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "Read each raw file completely before writing wiki pages.",
                 "Create or update one source page per raw file and include the exact raw path.",
                 "Update existing concept/entity/memory pages before creating new thin pages.",
+                "Keep durable memories proposal-only until the human approves them.",
+                "Rebuild index and backlinks, then validate before reporting ingest complete.",
+            ],
+            "agent_prompt": guidance.get("agent_prompt"),
+            "memory_prompt": f"propose memories from {first['raw']}",
+            "post_checks": [
+                "link rebuild-index",
+                "link rebuild-backlinks",
+                "link validate",
+                "link status --validate",
+            ],
+        }
+
+    if state == "stale_raw" and batch:
+        first = batch[0]
+        batch_count = len(batch)
+        file_label = "file" if batch_count == 1 else "files"
+        return {
+            "state": state,
+            "title": "Refresh stale source pages",
+            "summary": f"Start with {first['raw']} and refresh at most {batch_count} stale raw {file_label} in this pass.",
+            "batch": batch,
+            "steps": [
+                "Read each changed raw file completely before editing wiki pages.",
+                "Update the existing source page rather than creating a duplicate page.",
+                "Update affected concept/entity pages only where the source materially changed.",
                 "Keep durable memories proposal-only until the human approves them.",
                 "Rebuild index and backlinks, then validate before reporting ingest complete.",
             ],
@@ -438,6 +481,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
     source_read_warning_count = int(status.get("source_read_warning_count") or 0)
     secret_items = _secret_blocked_items(pending_items)
     access_items = _access_blocked_items(pending_items)
+    stale_items = [item for item in pending_items if isinstance(item, dict) and item.get("stale")]
 
     if not has_raw_dir or not has_wiki_dir:
         return {
@@ -491,6 +535,23 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "notes": [
                 "Do not ask an agent to ingest flagged raw files until the secret-looking values are removed or redacted.",
                 "After redaction, refresh ingest status and continue with the normal ingest prompt.",
+            ],
+        }
+
+    if stale_items:
+        first = str(stale_items[0].get("raw", "raw/<file>"))
+        count = len(stale_items)
+        summary = f"{count} represented raw file changed after its source page was written."
+        if count != 1:
+            summary = f"{count} represented raw files changed after their source pages were written."
+        return {
+            "state": "stale_raw",
+            "summary": summary,
+            "agent_prompt": f"re-ingest {first} into Link",
+            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link status --validate"],
+            "notes": [
+                "The raw file is represented, but it is newer than the linked source page.",
+                "Ask the agent to refresh the existing source page before relying on retrieval.",
             ],
         }
 
@@ -554,6 +615,7 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     pending_raw: list[dict[str, object]] = []
     raw_secret_warning_count = 0
     raw_scan_warnings: list[dict[str, str]] = []
+    stale_raw: list[dict[str, object]] = []
     for raw_path, rel in zip(raw_files, raw_rels):
         matches = source_matches.get(rel, [])
         match_records = [source_records[source_name] for source_name in matches]
@@ -561,12 +623,22 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
         warnings = list(scan.get("labels") or [])
         scan_error = str(scan.get("error") or "")
         raw_secret_warning_count += len(warnings)
+        raw_mtime = 0.0
         try:
-            size_bytes = raw_path.stat().st_size
+            raw_stat = raw_path.stat()
+            size_bytes = raw_stat.st_size
+            raw_mtime = raw_stat.st_mtime
         except OSError as exc:
             size_bytes = 0
             if not scan_error:
                 scan_error = str(exc)
+        source_mtimes = [
+            float(record.get("mtime") or 0)
+            for record in match_records
+            if record.get("mtime") is not None
+        ]
+        latest_source_mtime = max(source_mtimes) if source_mtimes else 0.0
+        is_stale = bool(matches and raw_mtime and latest_source_mtime and raw_mtime > latest_source_mtime + 0.001)
         if scan_error:
             raw_scan_warnings.append({"raw": rel, "error": scan_error})
         item = {
@@ -579,8 +651,15 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
             "secret_warning_count": len(warnings),
             "readable": not bool(scan_error),
             "scan_error": scan_error,
+            "stale": is_stale,
+            "stale_reason": "raw changed after wiki source page" if is_stale else "",
+            "raw_mtime": raw_mtime,
+            "latest_source_mtime": latest_source_mtime,
         }
-        if matches:
+        if is_stale:
+            stale_raw.append(item)
+            pending_raw.append(item)
+        elif matches:
             represented_raw.append(item)
         else:
             pending_raw.append(item)
@@ -599,6 +678,8 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
         "source_read_warnings": source_read_warnings,
         "represented_count": len(represented_raw),
         "pending_count": len(pending_raw),
+        "stale_count": len(stale_raw),
+        "stale_raw": stale_raw,
         "represented_raw": represented_raw,
         "pending_raw": pending_raw,
         "raw_secret_warning_count": raw_secret_warning_count,

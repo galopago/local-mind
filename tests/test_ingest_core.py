@@ -2,6 +2,7 @@ import json
 import re
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -179,6 +180,42 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["completion"]["items"][0]["source_pages"][0]["path"], "wiki/sources/source.md")
         self.assertEqual(payload["completion"]["items"][0]["memory_prompt"], "propose memories from raw/source.md")
         self.assertEqual(payload["completion"]["next_prompt"], "brief me from Link before we continue")
+
+    def test_collect_ingest_status_reports_stale_represented_raw(self):
+        root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))
+        raw = root / "raw"
+        wiki = root / "wiki"
+        raw.mkdir()
+        raw_page = raw / "source.md"
+        raw_page.write_text("# Source\n\nOriginal note.\n", encoding="utf-8")
+        write_page(wiki, "index.md", "# Index\n")
+        write_page(wiki, "log.md", "# Log\n")
+        write_page(
+            wiki,
+            "sources/custom-source.md",
+            "---\ntype: source\ntitle: Custom Source\n---\n\n"
+            "# Custom Source\n\n"
+            "## Raw Source\n\n`raw/source.md`\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki)), encoding="utf-8")
+        time.sleep(0.02)
+        raw_page.write_text("# Source\n\nUpdated note.\n", encoding="utf-8")
+
+        payload = collect_ingest_status(root)
+
+        self.assertEqual(payload["pending_count"], 1)
+        self.assertEqual(payload["represented_count"], 0)
+        self.assertEqual(payload["stale_count"], 1)
+        self.assertEqual(payload["stale_raw"][0]["raw"], "raw/source.md")
+        self.assertTrue(payload["pending_raw"][0]["stale"])
+        self.assertEqual(payload["pending_raw"][0]["stale_reason"], "raw changed after wiki source page")
+        self.assertEqual(payload["pending_raw"][0]["source_page_paths"], ["wiki/sources/custom-source.md"])
+        self.assertEqual(payload["guidance"]["state"], "stale_raw")
+        self.assertEqual(payload["guidance"]["agent_prompt"], "re-ingest raw/source.md into Link")
+        self.assertEqual(payload["plan"]["title"], "Refresh stale source pages")
+        self.assertEqual(payload["plan"]["batch"][0]["target_source_page"], "wiki/sources/custom-source.md")
+        self.assertEqual(payload["completion"]["represented_count"], 0)
+        self.assertEqual(payload["completion"]["pending_count"], 1)
 
     def test_source_matches_by_raw_handles_special_characters_and_prefixes(self):
         source_records = {
