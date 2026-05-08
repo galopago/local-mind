@@ -48,6 +48,11 @@
 cd link
 python3 link.py demo
 python3 link.py serve link-demo</code></pre>
+        <div class="callout">
+          <strong>Judge the generated demo</strong>
+          The repo's root <code>wiki/</code> is only a scaffold for local development and personal testing. Generated content in <code>wiki/</code>, <code>raw/</code>, and <code>link-demo/</code> is ignored by git so private memory is not published by accident.
+        </div>
+        <p>The demo includes one pending memory intentionally, so the review inbox and explain-memory workflow are visible. Run <code>link review-memory prefer-local-personal-memory link-demo</code> if you want memory audit to be fully clear.</p>
         <p>Open <code>http://localhost:3000</code>, then inspect <code>/brief</code>, <code>/memory</code>, <code>/audit</code>, <code>/captures</code>, <code>/propose</code>, and <code>/graph</code>.</p>
         <pre><code>python3 link.py query "why does Link help agents?" link-demo --budget small
 python3 link.py brief "working on agent memory" link-demo

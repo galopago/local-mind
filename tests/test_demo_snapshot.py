@@ -1,4 +1,5 @@
 import importlib.util
+import re
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -94,6 +95,25 @@ class DemoSnapshotTests(unittest.TestCase):
         self.assertEqual(raw_files, EXPECTED_RAW_FILES)
         self.assertEqual(wiki_pages, EXPECTED_WIKI_PAGES)
         self.assertTrue((target / "logo.svg").exists())
+        self.assertTrue((target / "wiki/memories/prefer-local-personal-memory.md").exists())
+        self.assertTrue((target / "wiki/explorations/why-link-helps-agents.md").exists())
+
+        memory = (target / "wiki/memories/prefer-local-personal-memory.md").read_text(encoding="utf-8")
+        self.assertIn("review_status: pending", memory)
+        self.assertIn("## Source", memory)
+        self.assertIn("[[link]]", memory)
+
+        log_text = (target / "wiki/log.md").read_text(encoding="utf-8")
+        self.assertIn("Created: memories/prefer-local-personal-memory.md", log_text)
+        self.assertIn("Created: explorations/why-link-helps-agents.md", log_text)
+
+        raw_refs = set()
+        for source_page in (target / "wiki/sources").glob("*.md"):
+            source_text = source_page.read_text(encoding="utf-8")
+            page_refs = set(re.findall(r"`(raw/[^`]+)`", source_text))
+            self.assertTrue(page_refs, source_page)
+            raw_refs.update(page_refs)
+        self.assertEqual(raw_refs, {f"raw/{name}" for name in EXPECTED_RAW_FILES})
 
         status = link_cli._collect_ingest_status(target)
         self.assertEqual(status["raw_count"], 3)

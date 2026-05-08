@@ -84,6 +84,15 @@ The first query should return a compact packet with relevant memory, the best
 wiki page, graph context, provenance, and follow-up actions. The demo also
 writes `link-demo/START_HERE.md` with prompts and checks to try.
 
+The generated demo is the public proof wiki. The repo's root `wiki/` directory
+is only a scaffold for local development and personal testing; generated content
+inside `wiki/`, `raw/`, and `link-demo/` is ignored by git so personal memory is
+not published by accident.
+
+The demo includes one pending memory on purpose so you can see the review inbox,
+explain-memory view, and audit trail. Mark it reviewed when you want a clean
+memory-audit state.
+
 ## Install Paths
 
 ### I Want To Try Link
