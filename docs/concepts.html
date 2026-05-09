@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How Link stores raw sources, wiki pages, memories, graph indexes, and query packets.">
+  <title>Link - Concepts</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
+    <div class="nav-links">
+      <a href="getting-started.html">Start</a>
+      <a href="why-link.html">Why</a>
+      <a href="ui.html">UI</a>
+      <a href="concepts.html" aria-current="page">Concepts</a>
+      <a href="mcp.html">MCP</a>
+      <a href="cli.html">CLI</a>
+      <a href="api.html">API</a>
+      <a href="security.html">Security</a>
+      <a href="contributing.html">Contribute</a>
+      <a href="https://github.com/gowtham0992/link">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="page-hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Mental model</span>
+      <h1>The wiki is the storage. Memory is the product.</h1>
+      <p>Link keeps knowledge outside the chat window, makes claims inspectable, and gives every local agent the same source-backed context.</p>
+    </div>
+  </header>
+
+  <main class="doc-section">
+    <div class="section-inner doc-grid">
+      <aside class="toc">
+        <strong>On this page</strong>
+        <a href="#layers">Storage layers</a>
+        <a href="#moves">Three user moves</a>
+        <a href="#memory">Memory lifecycle</a>
+        <a href="#query">Smart query packets</a>
+        <a href="#graph">Graph context</a>
+        <a href="#scale">Scale model</a>
+      </aside>
+      <article class="doc-content">
+        <h2 id="layers">Storage Layers</h2>
+        <pre><code>raw sources -> agent ingest -> Markdown wiki -> backlinks/graph -> MCP recall
+                         \
+                          -> direct memories -> review/update/archive</code></pre>
+        <div class="callout">
+          <strong>Public repo versus local memory</strong>
+          Link deliberately keeps generated <code>raw/</code>, <code>wiki/</code>, and <code>link-demo/</code> content out of git. The tracked root wiki is scaffolding; <code>python3 link.py demo</code> creates the product-story demo wiki.
+        </div>
+        <div class="doc-table">
+          <div><strong>raw/</strong>Immutable notes, papers, articles, transcripts, images, and PDFs.</div>
+          <div><strong>wiki/sources/</strong>One source page per ingested raw file.</div>
+          <div><strong>wiki/memories/</strong>Preferences, decisions, project facts, and user context.</div>
+          <div><strong>indexes</strong>Backlinks, page index, local cache, token index, and optional SQLite FTS.</div>
+        </div>
+        <p>Markdown remains the source of truth. Derived indexes can be rebuilt. Agents maintain the files, but the files stay inspectable in git, Obsidian, or any editor.</p>
+
+        <h2 id="moves">Three User Moves</h2>
+        <p>Link deliberately separates knowledge from memory:</p>
+        <pre><code>ingest raw/file.md into Link
+remember that I prefer short release notes
+query Link for the release process</code></pre>
+        <p>Raw files do not silently personalize future agents. Ingest creates source-backed wiki knowledge. Explicit <code>remember</code> creates durable user or project memory.</p>
+
+        <h2 id="memory">Memory Lifecycle</h2>
+        <p>A memory is a Markdown page with status, scope, source, review state, graph links, and local log entries. It can be proposed, remembered, reviewed, updated, archived, restored, explained, or forgotten.</p>
+        <div class="grid">
+          <article class="feature"><h3>Propose</h3><p>Generate candidate memories from chat notes or raw captures without writing durable memory.</p></article>
+          <article class="feature"><h3>Approve</h3><p>Save only the memories the user explicitly wants agents to carry forward.</p></article>
+          <article class="feature"><h3>Explain</h3><p>Show why a memory exists, whether it is recall-ready, and what graph links support it.</p></article>
+        </div>
+
+        <h2 id="query">Smart Query Packets</h2>
+        <p><code>query_link</code> is designed for agents. It returns a compact packet with relevant memory, ranked wiki pages, graph context, provenance, budget reports, estimated size, and follow-up actions.</p>
+        <p>Budget tiers keep context predictable:</p>
+        <ul>
+          <li><code>small</code>: fast, compact context for most questions.</li>
+          <li><code>medium</code>: more memory and page context for active tasks.</li>
+          <li><code>large</code>: broader context when the agent needs to plan or compare.</li>
+        </ul>
+
+        <h2 id="graph">Graph Context</h2>
+        <p>Link builds forward and reverse wikilinks so agents can inspect what links to a page and what that page references. Large graphs open as bounded overviews first, with explicit controls for type filters, search, neighborhood depth, and full-graph loading.</p>
+        <figure class="screenshot-card">
+          <img src="assets/link-graph-dark.png" alt="Link graph view">
+          <figcaption>Graph context stays bounded by default so it remains useful for humans and agents.</figcaption>
+        </figure>
+
+        <h2 id="scale">Scale Model</h2>
+        <p>Link uses local caching, token indexes, bounded page APIs, bounded graph summaries, and optional in-memory SQLite FTS5 for fast search. If SQLite is unavailable, Link falls back to the token index.</p>
+        <pre><code>link benchmark "agent memory"
+link graph-summary "local memory" --limit 40 --depth 1
+link validate
+link rebuild-backlinks</code></pre>
+        <p>Use <code>link benchmark</code> when a wiki starts to feel slow. It reports cache, search, query, graph payload, backend, and readiness recommendations.</p>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <div class="section-inner"><a href="getting-started.html">First 10 minutes</a> · <a href="mcp.html">MCP setup</a> · <a href="security.html">Security</a> · If Link helps your agents remember better, <a href="https://github.com/gowtham0992/link">star it on GitHub</a>.</div>
+  </footer>
+</body>
+</html>

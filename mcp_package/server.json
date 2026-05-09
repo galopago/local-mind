@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.gowtham0992/link",
-  "description": "Personal knowledge wiki as MCP tools \u2014 search, context, graph traversal.",
+  "description": "Local personal memory for agents as MCP tools \u2014 remember, recall, search, context, graph traversal.",
   "repository": {
     "url": "https://github.com/gowtham0992/link",
     "source": "github"
   },
-  "version": "1.0.7",
+  "version": "1.1.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "link-mcp",
-      "version": "1.0.7",
+      "version": "1.1.0",
       "transport": {
         "type": "stdio"
       }

@@ -40,12 +40,6 @@ if [ -f "$MCP_MARKER" ]; then
     MCP_PYTHON="$(cat "$MCP_MARKER")"
 fi
 
-echo ""
-echo "Done."
-echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
-echo "  View wiki: python ~/link/serve.py"
-echo ""
-
 # Auto-register MCP in ~/.codex/config.toml
 CODEX_CONFIG="$HOME/.codex/config.toml"
 if [ -f "$CODEX_CONFIG" ]; then
@@ -78,3 +72,5 @@ elif [ ! -f "$CODEX_CONFIG" ]; then
     echo "  command = \"$MCP_PYTHON\""
     echo "  args = [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"]"
 fi
+
+link_print_next_steps "$MODE"

@@ -9,6 +9,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MODE="${1:---global}"
+. "$SCRIPT_DIR/../_shared/instructions.sh"
 
 if [ "$MODE" = "--global" ]; then
     INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
@@ -76,7 +77,4 @@ elif [ ! -f "$MCP_CONFIG" ]; then
     echo "  { \"mcpServers\": { \"link\": { \"command\": \"$MCP_PYTHON\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
 fi
 
-echo ""
-echo "Done."
-echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
-echo "  View wiki: python ~/link/serve.py"
+link_print_next_steps "$MODE"

@@ -14,13 +14,14 @@ from pathlib import Path
 
 target = Path(os.environ["LINK_TARGET"]).expanduser()
 source = Path(os.environ["LINK_SOURCE"]).read_text(encoding="utf-8").rstrip()
-header = "## Link — Personal Knowledge Wiki"
+headers = ["## Link — Local Agent Memory", "## Link — Personal Knowledge Wiki"]
 
 existing = ""
 if target.exists():
     existing = target.read_text(encoding="utf-8", errors="replace")
 
-pattern = re.compile(rf"(^|\n){re.escape(header)}\n.*?(?=\n## |\Z)", re.DOTALL)
+header_pattern = "|".join(re.escape(header) for header in headers)
+pattern = re.compile(rf"(^|\n)(?:{header_pattern})\n.*?(?=\n## |\Z)", re.DOTALL)
 match = pattern.search(existing)
 if match:
     prefix = "\n" if match.group(1) else ""
@@ -32,4 +33,32 @@ else:
 target.write_text(updated, encoding="utf-8")
 PYEOF
     echo "$label → $target"
+}
+
+link_print_next_steps() {
+    local mode="${1:---global}"
+
+    echo ""
+    echo "Done."
+    if [ "$mode" = "--project" ]; then
+        echo "  Drop sources into raw/."
+        echo "  View wiki: python3 link.py serve"
+        echo "  Print starter prompts: python3 link.py prompts"
+        echo "  Try in your agent:"
+        echo "    is Link ready?"
+        echo "    brief me from Link before we continue"
+        echo "    remember that this project uses Link for local agent memory"
+        echo "    query Link for what this project remembers"
+        echo "    ingest raw/<file> into Link"
+    else
+        echo "  Drop sources into ~/link/raw/."
+        echo "  View wiki: link serve"
+        echo "  Print starter prompts: link prompts"
+        echo "  Try in your agent:"
+        echo "    is Link ready?"
+        echo "    brief me from Link before we continue"
+        echo "    remember that I prefer local-first agent memory"
+        echo "    query Link for what you know about me"
+        echo "    ingest raw/<file> into Link"
+    fi
 }

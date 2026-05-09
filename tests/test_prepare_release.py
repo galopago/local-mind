@@ -19,12 +19,17 @@ SPEC.loader.exec_module(prepare_release)
 def make_release_root() -> Path:
     root = Path(tempfile.mkdtemp(prefix="link-release-test-"))
     (root / "mcp_package/link_mcp").mkdir(parents=True)
+    (root / "mcp_package/link_core").mkdir(parents=True)
     (root / "mcp_package/pyproject.toml").write_text(
         '[project]\nname = "link-mcp"\nversion = "1.0.5"\n',
         encoding="utf-8",
     )
     (root / "mcp_package/link_mcp/__init__.py").write_text(
         '__version__ = "1.0.5"\n',
+        encoding="utf-8",
+    )
+    (root / "mcp_package/link_core/version.py").write_text(
+        'LINK_VERSION = "1.0.5"\n',
         encoding="utf-8",
     )
     (root / "mcp_package/server.json").write_text(
@@ -69,12 +74,14 @@ class PrepareReleaseTests(unittest.TestCase):
             {
                 "mcp_package/pyproject.toml",
                 "mcp_package/link_mcp/__init__.py",
+                "mcp_package/link_core/version.py",
                 "mcp_package/server.json",
                 "CHANGELOG.md",
             },
         )
         self.assertIn('version = "1.0.6"', (root / "mcp_package/pyproject.toml").read_text(encoding="utf-8"))
         self.assertIn('__version__ = "1.0.6"', (root / "mcp_package/link_mcp/__init__.py").read_text(encoding="utf-8"))
+        self.assertIn('LINK_VERSION = "1.0.6"', (root / "mcp_package/link_core/version.py").read_text(encoding="utf-8"))
 
         server = json.loads((root / "mcp_package/server.json").read_text(encoding="utf-8"))
         self.assertEqual(server["version"], "1.0.6")
@@ -90,7 +97,7 @@ class PrepareReleaseTests(unittest.TestCase):
 
         changed = prepare_release.prepare_release(root, "1.0.6", "2026-05-04", dry_run=True)
 
-        self.assertEqual(len(changed), 4)
+        self.assertEqual(len(changed), 5)
         self.assertEqual((root / "mcp_package/pyproject.toml").read_text(encoding="utf-8"), before)
 
     def test_prepare_release_rejects_non_incrementing_version(self):
@@ -120,6 +127,8 @@ class PrepareReleaseTests(unittest.TestCase):
 
         self.assertIn('git tag -a v1.0.6 -m "v1.0.6"', commands)
         self.assertTrue(any("glob('*.egg-info')" in command for command in commands))
+        self.assertIn("TWINE_USERNAME=__token__ python3 -m twine upload dist/link_mcp-1.0.6*", commands)
+        self.assertIn("mcp-publisher validate", commands)
         self.assertIn("mcp-publisher publish", commands)
 
 

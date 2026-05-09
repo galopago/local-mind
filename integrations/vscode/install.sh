@@ -9,6 +9,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MODE="${1:---global}"
+. "$SCRIPT_DIR/../_shared/instructions.sh"
 TARGET=".vscode/settings.json"
 mkdir -p .vscode
 
@@ -38,7 +39,8 @@ if not isinstance(instructions, list):
     instructions = []
 instructions = [
     i for i in instructions
-    if '## Link — Personal Knowledge Wiki' not in i.get('text', '')
+    if '## Link — Local Agent Memory' not in i.get('text', '')
+    and '## Link — Personal Knowledge Wiki' not in i.get('text', '')
     and 'Link, an LLM-maintained knowledge wiki' not in i.get('text', '')
 ]
 instructions.append({'text': instructions_text})
@@ -61,9 +63,7 @@ if [ -f "$MCP_MARKER" ]; then
 fi
 
 echo ""
-echo "Done."
-echo "  Drop sources into raw/ and say 'ingest' to process them."
-echo "  View wiki: python ~/link/serve.py"
-echo ""
 echo "  MCP: add to .vscode/mcp.json:"
 echo "  { \"servers\": { \"link\": { \"type\": \"stdio\", \"command\": \"$MCP_PYTHON\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
+
+link_print_next_steps "$MODE"

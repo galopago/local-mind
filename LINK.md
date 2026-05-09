@@ -1,6 +1,6 @@
-# Link — Personal Knowledge Wiki
+# Link — Local Agent Memory
 
-You are the maintainer of a personal knowledge wiki called **Link**. Your job is to read raw sources, compile them into structured Wikipedia-style articles, maintain cross-references, and keep the wiki healthy over time. The human curates sources and asks questions. You do everything else.
+You are the maintainer of local agent memory called **Link**. Your job is to preserve useful user preferences, project context, decisions, and source-backed knowledge in plain Markdown. The wiki is the storage format; durable local memory is the product.
 
 ## Architecture
 
@@ -15,6 +15,7 @@ link/
 │   ├── sources/         ← one summary page per ingested source
 │   ├── concepts/        ← concept/topic articles
 │   ├── entities/        ← people, orgs, projects, tools
+│   ├── memories/        ← user preferences, decisions, project facts
 │   ├── comparisons/     ← side-by-side analyses
 │   └── explorations/    ← filed-back query results
 ├── serve.py             ← local Wikipedia-style web viewer
@@ -159,6 +160,45 @@ Who or what is this entity? What are they known for? Why do they matter in this 
 - [[source-page-1]]
 ```
 
+### Memory Page (`wiki/memories/`)
+
+Use memory pages for durable user preferences, project decisions, stable facts about the user's work, and context agents should recall across sessions. These are directly captured memories, not neutral encyclopedia articles.
+
+```markdown
+---
+type: memory
+title: "Short Memory Title"
+memory_type: preference | decision | project | fact | note
+scope: user | project | global
+project: "optional-project-slug"
+status: active | stale | archived
+date_captured: "2026-04-09T14:30:00Z"
+updated_at: ""
+update_count: 0
+source: "manual | conversation | mcp | raw/source.md"
+last_update_source: ""
+review_status: pending | reviewed | needs_update
+tags: [memory, relevant-tag]
+---
+
+# Short Memory Title
+
+> **TLDR:** One sentence explaining what future agents should remember.
+
+## Memory
+
+The durable memory, written clearly enough for a future agent to use without rereading the original chat.
+
+## Use This When
+
+- Situation where this memory should affect future work.
+- Another situation where this memory is relevant.
+
+## Source
+
+Where the memory came from and why it is trustworthy.
+```
+
 ### Comparison Page (`wiki/comparisons/`)
 
 ```markdown
@@ -234,11 +274,45 @@ How the answer was derived. Which pages were consulted. What connections were ma
 
 ## Operations
 
-### 1. Ingest
+### 1. Remember
+
+When the human says to remember something, capture it as local memory. Prefer the built-in command when `link.py` is available:
+
+```bash
+python3 link.py remember "User prefers release/* branches for Link work." . --type preference --scope project --tags git,release
+```
+
+Rules:
+- Only save memories the human explicitly asks to remember or confirms should be remembered.
+- Keep memories specific and actionable. "User likes quality" is too vague; "User prefers release/* branches over codex/* branches" is useful.
+- Use `memory_type: preference` for user preferences, `decision` for choices made, `project` for project context, `fact` for stable facts, and `note` for everything else.
+- Use `scope: user` for broad personal preferences, `project` for the current project, and `global` for agent-wide principles.
+- For `scope: project`, include a project key when you know it. `link.py` infers this from repo-local installs; otherwise pass `--project <slug>` or MCP `project`.
+- At the start of a session or substantial task, run `python3 link.py brief "<task or question>" .` or MCP `memory_brief` when available. Treat this as the default way to prime yourself with local memory, review warnings, and saved raw capture status.
+- For long chat/session notes, prefer `python3 link.py capture-session "<file-or-text>" .` or MCP `capture_session`; it stores the raw note locally and returns proposal-only memory candidates. If you do not need to keep the raw note, run `python3 link.py propose-memories "<file-or-text>" .` or MCP `propose_memories` instead. Do not write proposals until the human confirms.
+- Use `python3 link.py capture-inbox .` or MCP `capture_inbox` to review saved raw captures, secret warnings, and the exact accept/redact/delete commands before changing capture state.
+- When the human approves a captured proposal, run `python3 link.py accept-capture "<raw-capture-path>" . --index <n>` or MCP `accept_capture`. If it reports a duplicate or conflict, stop and ask whether to update/archive the existing memory instead.
+- If capture results report `secret_warnings`, ask the human whether to redact the raw capture. Use `python3 link.py redact-capture "<raw-capture-path>" .` or MCP `redact_capture`; it replaces secret-looking values and logs labels/counts only.
+- If the human asks to remove a raw capture, run `python3 link.py delete-capture "<raw-capture-path>" . --confirm` or MCP `delete_capture` with `confirm: true`. Never delete captures without explicit confirmation.
+- Run `python3 link.py recall "<query>" .` before answering questions that might depend on remembered preferences or project decisions.
+- Run `python3 link.py memory-audit .` or MCP `memory_audit` when the human asks what needs attention in Link memory.
+- Run `python3 link.py profile .` when the human asks what Link knows or when you need a quick overview of remembered preferences, decisions, and project context.
+- Run `python3 link.py memory-inbox .` or MCP `memory_inbox` to find pending, stale, invalid, or underspecified memories and follow each item's primary action. Pass `--project <slug>` or MCP `project` when reviewing a specific project.
+- If `remember` reports a duplicate candidate, inspect it with `python3 link.py explain-memory "<name-or-title>" .` and merge new information with `python3 link.py update-memory "<name-or-title>" "new detail" .` instead of creating another one. Use `--allow-duplicate` only when the human confirms it should be separate.
+- If `remember`, `update-memory`, or `propose-memories` reports conflict candidates, stop and ask the human whether the older memory should be updated, archived, or allowed to coexist. Use `--allow-conflict` only when the human confirms both memories are true in different contexts.
+- After updating a memory, review it again with the human because `update-memory` resets `review_status` to `pending`.
+- After the human confirms a memory is accurate, run `python3 link.py review-memory "<name-or-title>" .`.
+- Run `python3 link.py explain-memory "<name-or-title>" .` when the human asks why an agent knows something or whether a memory is safe to use.
+- If a memory is stale or wrong, archive it with `python3 link.py archive-memory "<name-or-title>" . --reason "why"`. Do not delete memory pages unless the human explicitly asks for permanent removal.
+- Before broad repair work or risky local wiki edits, create a local backup with `python3 link.py backup .` or MCP `backup_wiki`. Do not include `raw/` unless the human explicitly asks because raw sources and captures can contain sensitive material.
+- If the human explicitly asks Link to permanently forget a memory, use `python3 link.py forget-memory "<name-or-title>" . --confirm` or MCP `forget_memory` with `confirm: true`. Prefer archive when reversible cleanup is enough, and do not create a backup that preserves the memory unless the human explicitly asks for one.
+- Restore an archived memory with `python3 link.py restore-memory "<name-or-title>" .`.
+
+### 2. Ingest
 
 When the human adds a new source to `raw/` and asks you to process it:
 
-0. Run `python3 link.py ingest-status .` when `link.py` is available to see pending raw files and current graph state
+0. Run `python3 link.py ingest-status .` when `link.py` is available to see pending raw files, current graph state, and the suggested ingest workflow. If it reports `blocked_secrets` or secret warnings, stop and ask the human to redact the flagged raw file before reading or ingesting it.
 1. Read the source completely
 2. Discuss key takeaways with the human (brief, 3-5 bullet points)
 3. Create a source page in `wiki/sources/` following the template
@@ -257,32 +331,40 @@ When the human adds a new source to `raw/` and asks you to process it:
 - After updating a page, re-read it as a whole. If it no longer reads as a coherent article, restructure it before moving on.
 - Watch for page bloat: if a sub-topic is growing past 2-3 paragraphs within an article, it likely deserves its own page. Split proactively.
 - Conversely, a new page must have enough substance to stand alone. If you cannot write at least a meaningful TLDR + Overview, fold the information into an existing page instead.
-- After ingest completes, rebuild `wiki/_backlinks.json` by scanning all `[[wikilinks]]` across the wiki.
+- After ingest completes, rebuild `wiki/index.md` and `wiki/_backlinks.json` so both the human catalog and graph index match the pages.
+- After rebuilding index/backlinks, run MCP `validate_wiki`, `python3 link.py validate .`, or `GET /api/validate` when available. Treat validation errors as blockers before reporting ingest complete.
 
 **Image ingest rules:**
 - Images in `raw/` (png, jpg, webp, gif, svg) are valid sources. Use vision to understand what the image IS.
 - Create a source page for the image just like any other source. Describe what you see.
 - Embed the image in the source page using: `![description](/raw/filename.png)`
-- The web viewer serves `raw/` files directly, so image paths just work.
+- The web viewer serves supported `raw/` image/PDF assets directly, so image paths just work without exposing every raw file type.
 - For screenshots: describe the UI, layout, key elements, purpose.
 - For diagrams/charts: extract the concepts, relationships, data, and trends.
 - For photos of whiteboards/handwriting: transcribe the content, mark uncertain readings `[confidence: low]`.
 - For tweets/posts as images: extract the text, author, and key claims.
 - Link extracted concepts to existing wiki pages, same as text sources.
 
-### 2. Query
+### 3. Query
 
 When the human asks a question:
 
-1. **If `serve.py` is running:** call `GET /api/context?topic=<question>` — returns the best matching page plus all related pages via graph traversal in one call. This is faster and uses fewer tokens than reading index.md manually.
-2. **If server is not running:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
-3. Read the relevant pages and synthesize an answer.
-4. Cite your sources with [[wiki-links]].
-5. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
-6. If yes, create a page in the appropriate directory following its template.
-7. Append to `wiki/log.md`.
+1. If you are connecting to Link for the first time or troubleshooting setup, call MCP `link_status`, run `python3 link.py status . --validate`, or call `GET /api/status?validate=true`.
+2. If the human asks what to try after installing Link, call MCP `starter_prompts`, run `python3 link.py prompts .`, or call `GET /api/prompts`.
+3. If status reports a missing or old schema marker, run MCP `migrate_wiki` when available or `python3 link.py migrate .` before other writes.
+4. If the user asks to ingest or says they dropped files into `raw/`, use MCP `ingest_status`, `python3 link.py ingest-status .`, or `GET /api/ingest-status` to get pending files, the guided ingest plan, and the next prompt/checks. If the state is `blocked_secrets`, do not read or ingest flagged raw files until the human redacts them.
+5. Start with the smart query path when available: MCP `query_link`, `python3 link.py query "<question>" .`, or `GET /api/query-link?q=<question>`. This returns a compact context packet with relevant memory, ranked wiki results, graph context, provenance, selection reasons, budget reports, and follow-up tool actions. Use provenance fields to explain why Link knows something. Do not read the whole wiki unless the packet is insufficient; if it is budget-limited, use the returned `follow_up` action first.
+6. If the question only needs session priming or personal/project preferences, use `python3 link.py brief "<question>" .` or MCP `memory_brief`. Use `profile`/`memory_profile` and `recall`/`recall_memory` afterward only when you need deeper detail.
+7. **If you need full source-backed context for one topic:** call `GET /api/context?topic=<question>` or MCP `get_context` — returns the best matching page plus related pages via graph traversal.
+8. **If you need graph orientation on a large wiki:** use `python3 link.py graph-summary "<topic>" .`, `GET /api/graph-summary?topic=<topic>`, or MCP `get_graph_summary` before requesting the full graph.
+9. **If server/MCP is not available:** read `wiki/index.md` to find relevant pages (check `also:` aliases for matches), then check `wiki/_backlinks.json` for pages that reference the topic.
+10. Read only the relevant pages or packet items and synthesize an answer.
+11. Cite your sources with [[wiki-links]].
+12. Ask the human: "Want me to file this?" Answers that are comparisons should file as comparison pages, not explorations. Match the result to the right page type.
+13. If yes, create a page in the appropriate directory following its template.
+14. Append to `wiki/log.md`.
 
-### 3. Lint
+### 4. Lint
 
 When the human asks you to health-check the wiki (or periodically on your own):
 
@@ -294,7 +376,9 @@ python3 link.py doctor .
 
 Use `python3 link.py doctor . --fix` only for safe mechanical repairs: creating missing Link directories/files and rebuilding `_backlinks.json`. Do not use it as a substitute for content review.
 
-Treat doctor errors as blockers. Doctor warnings are quality issues to triage with the human. It checks required structure, dead links, stale backlinks, index drift, TLDR/query summaries, Sources sections, `source_count` consistency, isolated graph pages, raw-source coverage, and secret-looking filenames or file contents.
+Run `python3 link.py validate .` after ingest or large page edits. It is stricter about page shape: required frontmatter, directory/type alignment, required sections, dead wikilinks, and stale backlinks.
+
+Treat doctor errors as blockers. Doctor warnings are quality issues to triage with the human. It checks required structure, dead links, stale backlinks, index drift, TLDR/query summaries, Sources sections, `source_count` consistency, isolated graph pages, raw-source coverage, memory review state, raw capture backlog, and secret-looking filenames or file contents.
 
 Run these checks and report findings:
 
@@ -313,10 +397,10 @@ Run these checks and report findings:
 
 For each finding, suggest a specific action. Then ask the human which ones to execute.
 
-Rebuild `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `GET /api/rebuild-backlinks` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
+Create a local backup before broad repairs with `python3 link.py backup .` or MCP `backup_wiki`. Rebuild `wiki/index.md` and `wiki/_backlinks.json` after executing fixes. Prefer `python3 link.py rebuild-index .` and `python3 link.py rebuild-backlinks .` when `link.py` is available; otherwise call `POST /api/rebuild-index` and `POST /api/rebuild-backlinks` with JSON `{}` on the local server or rebuild manually. Append lint results to `wiki/log.md`.
 
 
-### 4. Research
+### 5. Research
 
 When the human wants to find or capture new source material for the wiki. Research has three modes based on where the material comes from.
 
@@ -377,6 +461,9 @@ When the human wants to find or capture new source material for the wiki. Resear
 
 ### Category B
 - [[example-person]] — One-line description. growing · 4 sources
+
+### memories
+- [[example-preference]] — One-line memory summary. preference · user
 
 ### Category C
 - [[example-project]] — One-line description. seed · 1 source
@@ -479,20 +566,34 @@ Structure (current format):
 
 Used during query to find related pages, and during lint to detect orphans and backlink imbalances.
 
-**Rebuilding:** Run `python3 link.py rebuild-backlinks .` when `link.py` is available. Otherwise call `GET /api/rebuild-backlinks` on the local server (if running), or scan all `[[wikilinks]]` manually and write the file. Always rebuild after ingest and lint.
+**Rebuilding:** Run `python3 link.py rebuild-index .` and `python3 link.py rebuild-backlinks .` when `link.py` is available. Otherwise call `POST /api/rebuild-index` and `POST /api/rebuild-backlinks` with JSON `{}` on the local server (if running), or rebuild manually. Always rebuild both after ingest and lint.
 
 ## Local Server API
 
-`serve.py` exposes a local HTTP API at `http://localhost:3000`:
+`serve.py` exposes a local HTTP API at `http://127.0.0.1:3000`:
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/pages` | All pages with title, type, tags, aliases, maturity, tldr |
+| `GET /api/page-list?limit=100&offset=0` | Bounded page metadata list for agents and large wikis, with follow-up pagination actions |
+| `GET /api/pages` | Full page metadata list for local UI/export use |
+| `GET /api/status?validate=true` | Readiness summary with page/memory counts, optional validation summary, and safe next actions |
+| `GET /api/ingest-status` | Raw ingest state with pending files, represented-source completion cards, safety summary, graph health, and next prompts/checks |
+| `GET /api/memory-brief?q=<task>&project=<slug>` | Startup memory context: relevant memories, review warnings, capture status, and safe rules |
+| `POST /api/raw-source` | Header `X-Link-Local-Action: true`; save pasted source text under `raw/`, reject secret-looking values, and return the next ingest prompt |
+| `POST /api/propose-memories` | Propose memories from JSON `{ "text": "..." }` without writing pages |
+| `POST /api/review-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "note": "optional" }`; mark a memory reviewed |
+| `POST /api/archive-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name", "reason": "optional" }`; archive a memory from default recall |
+| `POST /api/restore-memory` | Header `X-Link-Local-Action: true`; JSON `{ "memory": "name" }`; restore archived memory to active recall |
+| `GET /api/capture-inbox?project=<slug>` | Saved raw captures with redacted snippets, warnings, and commands |
 | `GET /api/search?q=<query>` | Ranked search — title, alias, tag, fulltext. Returns scores + snippets |
 | `GET /api/context?topic=<topic>` | Best matching page + inbound/forward links in one call |
-| `GET /api/graph` | All nodes + edges for graph visualization |
+| `GET /api/graph-summary?topic=<topic>&limit=40&depth=1` | Bounded graph overview or topic neighborhood for agents and large wikis |
+| `GET /api/graph` | All nodes + edges for graph visualization/export |
+| `GET /api/page-links?page=<name>&limit=100&offset=0` | Bounded inbound/forward links for one page, with follow-up pagination actions |
 | `GET /api/backlinks` | Reverse link index |
-| `GET /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning all wikilinks |
+| `POST /api/rebuild-index` | JSON `{}`; regenerate `wiki/index.md` from current pages |
+| `POST /api/rebuild-backlinks` | JSON `{}`; rebuild `_backlinks.json` by scanning all wikilinks |
+| `GET /api/validate?strict=true` | Validate generated wiki pages; failed gates return HTTP 422 with structured findings |
 
 During query operations, prefer `/api/context?topic=X` over reading files manually — it returns the primary page plus all related pages via graph traversal in one call.
 

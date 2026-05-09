@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Link is local, source-backed memory for LLM agents, stored as inspectable Markdown on your machine.">
+  <title>Link - Local Agent Memory</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
+    <div class="nav-links">
+      <a href="getting-started.html">Start</a>
+      <a href="why-link.html">Why</a>
+      <a href="ui.html">UI</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="mcp.html">MCP</a>
+      <a href="cli.html">CLI</a>
+      <a href="api.html">API</a>
+      <a href="security.html">Security</a>
+      <a href="contributing.html">Contribute</a>
+      <a href="https://github.com/gowtham0992/link">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="hero-copy">
+      <span class="eyebrow">Local agent memory</span>
+      <h1>Link gives every agent the same memory.</h1>
+      <p>Source-backed Markdown memory for Codex, Claude, Cursor, Kiro, VS Code, Copilot, and any MCP client. Local files. Inspectable sources. Budgeted context.</p>
+      <ul class="hero-notes" aria-label="Link storage model">
+        <li>raw/</li>
+        <li>wiki/</li>
+        <li>memories/</li>
+        <li>graph</li>
+        <li>MCP</li>
+      </ul>
+      <div class="actions">
+        <a class="button primary" href="getting-started.html">Try Link</a>
+        <a class="button" href="https://github.com/gowtham0992/link">View on GitHub</a>
+        <a class="button" href="https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink">MCP Registry</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="why">
+      <div class="section-inner">
+        <p class="section-kicker">The product</p>
+        <h2>Not another notes app. A local memory layer agents can actually use.</h2>
+        <p class="lead">Link turns raw notes, transcripts, project context, and explicit memories into a source-backed wiki. Agents query a compact packet instead of reading your entire folder.</p>
+        <div class="grid">
+          <article class="feature"><h3>Personal memory</h3><p>Preferences, decisions, facts, and project context stay durable across agent sessions.</p></article>
+          <article class="feature"><h3>Source-backed wiki</h3><p>Raw sources compile into Markdown pages with citations, backlinks, and reviewable provenance.</p></article>
+          <article class="feature"><h3>MCP-native recall</h3><p>One local memory works across MCP-capable tools through the same query, brief, graph, and memory lifecycle tools.</p></article>
+          <article class="feature"><h3>Budgeted context</h3><p>Smart query packets return the right memory, pages, graph neighborhood, and follow-up actions without flooding tokens.</p></article>
+          <article class="feature"><h3>Private by default</h3><p>No hosted backend, no telemetry, no cloud lock-in. Your memory stays on disk as plain Markdown.</p></article>
+          <article class="feature"><h3>Auditable lifecycle</h3><p>Capture, propose, approve, review, archive, restore, forget, and explain what Link remembers.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="quick-start">
+      <div class="section-inner flow">
+        <div>
+          <p class="section-kicker">First 2 minutes</p>
+          <h2>Run a finished memory wiki locally.</h2>
+          <p class="lead">The demo includes raw sources, wiki pages, one starter memory, backlinks, graph context, and a compact query packet.</p>
+          <div class="actions">
+            <a class="button primary" href="getting-started.html">First 10 minutes</a>
+            <a class="button" href="troubleshooting.html">Troubleshooting</a>
+          </div>
+        </div>
+        <pre><code>git clone https://github.com/gowtham0992/link.git
+cd link
+python3 link.py demo
+python3 link.py serve link-demo
+
+# then try
+python3 link.py query "why does Link help agents?" link-demo --budget small
+python3 link.py brief "working on agent memory" link-demo
+python3 link.py benchmark "agent memory" link-demo</code></pre>
+      </div>
+    </section>
+
+    <section id="surfaces">
+      <div class="section-inner">
+        <p class="section-kicker">Three surfaces</p>
+        <h2>Review it, script it, or let an agent call it.</h2>
+        <p class="lead">The web UI, CLI, and MCP server all operate on the same local Markdown wiki. Pick the surface for the job instead of learning three separate systems.</p>
+        <div class="media-grid">
+          <article class="media-card">
+            <a href="ui.html"><img src="assets/link-ui-tour.gif" alt="Animated Link web UI walkthrough"></a>
+            <h3><a href="ui.html">Web UI</a></h3>
+            <p>Inspect memory, ingest sources, review captures, browse pages, explain recall, and explore the graph.</p>
+          </article>
+          <article class="media-card">
+            <a href="cli.html"><img src="assets/link-cli-tour.gif" alt="Animated Link CLI walkthrough"></a>
+            <h3><a href="cli.html">CLI</a></h3>
+            <p>Run status checks, query packets, briefs, validation, backup, benchmark, and repair from a terminal.</p>
+          </article>
+          <article class="media-card">
+            <a href="mcp.html"><img src="assets/link-mcp-agent-chat.gif" alt="Animated Link MCP agent walkthrough"></a>
+            <h3><a href="mcp.html">MCP</a></h3>
+            <p>Give Codex, Claude, Cursor, Kiro, VS Code, Copilot, and other agents the same local memory.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="memory">
+      <div class="section-inner">
+        <p class="section-kicker">Visible trust</p>
+        <h2>Memory is inspectable, reviewable, and explainable.</h2>
+        <p class="lead">A memory is not a hidden vector. It is a Markdown page with status, scope, source, review state, graph links, and an audit trail.</p>
+        <div class="screenshot-row">
+          <figure class="screenshot-card">
+            <img src="assets/link-memory-dashboard-dark.png" alt="Link memory dashboard">
+            <figcaption>Memory dashboard: profile, inbox, captures, and review states.</figcaption>
+          </figure>
+          <figure class="screenshot-card">
+            <img src="assets/link-explain-memory-dark.png" alt="Link explain memory view">
+            <figcaption>Explain memory: why Link knows something and whether it is ready to recall.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="mcp">
+      <div class="section-inner flow">
+        <figure class="screenshot-card">
+          <img src="assets/link-graph-dark.png" alt="Link graph view">
+          <figcaption>Graph view: bounded by default, expandable when you need the whole neighborhood.</figcaption>
+        </figure>
+        <div>
+          <p class="section-kicker">Agent contract</p>
+          <h2>Agents get a small set of reliable moves.</h2>
+          <p class="lead">Check readiness, brief before work, ingest raw files, remember explicit facts, query smart context, validate after writes, and explain why a memory exists.</p>
+          <div class="compare">
+            <div><strong>Before</strong>Repeated context in every chat.</div>
+            <div><strong>After</strong>Shared local memory across agents.</div>
+            <div><strong>Storage</strong>Plain Markdown and JSON indexes.</div>
+            <div><strong>Scale</strong>SQLite FTS, bounded graph payloads, local cache.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-inner">
+        <p class="section-kicker">Read next</p>
+        <h2>Start small, then make it your agent memory.</h2>
+        <p class="lead">The docs are arranged by user path: try the demo, understand the model, wire MCP, then use the CLI and maintenance tools when you need them.</p>
+        <div class="grid">
+          <article class="feature"><h3><a href="getting-started.html">First 10 minutes</a></h3><p>Run the demo, add one source, save one direct memory, and verify the loop.</p></article>
+          <article class="feature"><h3><a href="why-link.html">Why Link?</a></h3><p>Understand where Link fits versus notes apps, hosted memory APIs, agent runtimes, and graph memory systems.</p></article>
+          <article class="feature"><h3><a href="ui.html">Web UI</a></h3><p>Use the local viewer for ingest, memory review, graph exploration, and human-readable audits.</p></article>
+          <article class="feature"><h3><a href="concepts.html">Concepts</a></h3><p>Understand raw sources, wiki pages, memories, graph indexes, and budgeted query packets.</p></article>
+          <article class="feature"><h3><a href="mcp.html">MCP setup</a></h3><p>Install the MCP server and teach local agents how to use Link reliably.</p></article>
+          <article class="feature"><h3><a href="cli.html">CLI reference</a></h3><p>Every local command, grouped by daily workflow and maintenance jobs.</p></article>
+          <article class="feature"><h3><a href="api.html">HTTP API</a></h3><p>Local endpoints for status, query, memory, graph, validation, and web UI actions.</p></article>
+          <article class="feature"><h3><a href="security.html">Security model</a></h3><p>Local-first constraints, secret scanning, backup behavior, and HTTP safety boundaries.</p></article>
+          <article class="feature"><h3><a href="contributing.html">Contributing</a></h3><p>PR expectations, test gates, branch policy, and what not to include in public changes.</p></article>
+          <article class="feature"><h3><a href="troubleshooting.html">Troubleshooting</a></h3><p>Fix MCP setup, blocked ingest, stale graph indexes, slow wikis, and Python packaging issues.</p></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="section-inner">MIT licensed. Built for local-first agent memory. <a href="https://github.com/gowtham0992/link">GitHub</a> · If Link helps your agents remember better, <a href="https://github.com/gowtham0992/link">star it on GitHub</a>.</div>
+  </footer>
+</body>
+</html>

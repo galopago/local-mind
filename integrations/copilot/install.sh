@@ -36,9 +36,7 @@ if [ -f "$MCP_MARKER" ]; then
 fi
 
 echo ""
-echo "Done."
-echo "  Drop sources into raw/ and say 'ingest' to process them."
-echo "  View wiki: python ~/link/serve.py"
-echo ""
 echo "  MCP: add to your Copilot MCP config:"
 echo "  { \"mcpServers\": { \"link\": { \"command\": \"$MCP_PYTHON\", \"args\": [\"-m\", \"link_mcp\", \"--wiki\", \"$WIKI_PATH\"] } } }"
+
+link_print_next_steps "$MODE"

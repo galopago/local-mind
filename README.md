@@ -1,62 +1,117 @@
 <p align="center">
-  <img src="logo.svg" alt="Link" width="120">
+  <img src="logo.svg" alt="Link" width="112">
 </p>
 
 # Link
 
-Local personal memory for LLM agents.
+**Local, source-backed memory for LLM agents.**
 
-Link turns raw sources into a local Markdown wiki that agents can search, cite, traverse, and maintain over time. It implements the [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): keep knowledge outside the chat window, make every claim inspectable, and let the memory compound.
+Link gives Codex, Claude, Cursor, Kiro, VS Code, Copilot, and other MCP clients
+the same durable memory about you and your work. It stays on your machine as
+plain Markdown, with sources, backlinks, graph context, review state, and an
+audit trail you can inspect.
+
+It follows Andrej Karpathy's
+[LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f):
+keep knowledge outside the chat window, make claims inspectable, and let context
+compound over time.
 
 [![GitHub](https://img.shields.io/github/stars/gowtham0992/link?style=flat)](https://github.com/gowtham0992/link)
 [![CI](https://github.com/gowtham0992/link/actions/workflows/ci.yml/badge.svg)](https://github.com/gowtham0992/link/actions/workflows/ci.yml)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.gowtham0992%2Flink-blue)](https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink)
 [![PyPI](https://img.shields.io/pypi/v/link-mcp)](https://pypi.org/project/link-mcp/)
 
-Release notes: [CHANGELOG.md](CHANGELOG.md)
+[Product site](https://gowtham0992.github.io/link/) ·
+[First 10 minutes](https://gowtham0992.github.io/link/getting-started.html) ·
+[Why Link?](https://gowtham0992.github.io/link/why-link.html) ·
+[Web UI](https://gowtham0992.github.io/link/ui.html) ·
+[MCP setup](https://gowtham0992.github.io/link/mcp.html) ·
+[CLI](https://gowtham0992.github.io/link/cli.html) ·
+[Security](SECURITY.md) ·
+[Changelog](CHANGELOG.md)
+
+## Why It Exists
+
+Most agent sessions start from zero. You re-explain preferences, repo decisions,
+project constraints, and why something matters. Link turns that repeated context
+into local memory agents can query.
+
+| Pain | Link's answer |
+|------|---------------|
+| Agents forget you between sessions. | Save reviewed preferences, decisions, facts, and project context. |
+| Notes are private or messy. | Keep raw sources local, then turn them into source-backed Markdown. |
+| Context windows are expensive. | Return compact query packets with provenance and follow-up actions. |
+| Memory needs trust. | Every page and memory can be inspected, reviewed, archived, or forgotten. |
 
 ## Quick Start
 
-Try a finished, pre-ingested wiki before touching your own files:
+Run the demo first. It creates a complete local wiki with raw sources, wiki
+pages, one starter memory, graph data, and query packets ready to inspect.
 
 ```bash
 git clone https://github.com/gowtham0992/link.git
 cd link
 python3 link.py demo
-cd link-demo
-python3 serve.py
+python3 link.py serve link-demo
 ```
 
 Open:
 
-- `http://localhost:3000`
-- `http://localhost:3000/graph`
-
-The demo shows the full loop: raw notes, source pages, concept pages, backlinks, graph context, search, and MCP-ready retrieval.
-
-Check the demo:
-
-```bash
-python3 link.py ingest-status .
-python3 link.py doctor .
+```text
+http://127.0.0.1:3000
+http://127.0.0.1:3000/graph
 ```
 
-## First 10 Minutes
+The web viewer is for local use only. It binds to `127.0.0.1`, has no user
+accounts or authentication, and should not be exposed to the internet unless you
+add your own auth layer.
 
-Use this path to turn one real note into local agent memory.
-
-### 1. Create your wiki
-
-From the cloned `link/` checkout, not `link-demo/`:
+Try the value loop:
 
 ```bash
-bash integrations/kiro/install.sh
+python3 link.py query "why does Link help agents?" link-demo --budget small
+python3 link.py brief "working on agent memory" link-demo
+python3 link.py benchmark "agent memory" link-demo
+python3 link.py status --validate link-demo
 ```
 
-Use the installer for your agent if it is not Kiro:
+The generated demo is the public proof wiki. The repo's root `wiki/` directory
+is only a scaffold for local development and personal testing. Generated content
+inside `wiki/`, `raw/`, and `link-demo/` is ignored by git so personal memory is
+not published by accident.
+
+## Three Ways To Use Link
+
+Pick the surface that matches how you work. They all read and write the same
+local Markdown wiki.
+
+<table>
+  <tr>
+    <td width="33%">
+      <strong>Web UI</strong><br>
+      Review memory, ingest, graph, audits, captures, and explanations in a local viewer.<br><br>
+      <a href="https://gowtham0992.github.io/link/ui.html"><img src="docs/assets/link-ui-tour.gif" alt="Link web UI walkthrough" width="270"></a>
+    </td>
+    <td width="33%">
+      <strong>CLI</strong><br>
+      Script readiness, query packets, briefs, validation, backup, benchmark, and repair.<br><br>
+      <a href="https://gowtham0992.github.io/link/cli.html"><img src="docs/assets/link-cli-tour.gif" alt="Link CLI walkthrough" width="270"></a>
+    </td>
+    <td width="33%">
+      <strong>MCP</strong><br>
+      Let Codex, Claude, Cursor, Kiro, VS Code, Copilot, and other agents recall memory.<br><br>
+      <a href="https://gowtham0992.github.io/link/mcp.html"><img src="docs/assets/link-mcp-agent-chat.gif" alt="Link MCP agent walkthrough" width="270"></a>
+    </td>
+  </tr>
+</table>
+
+## Install For Your Agent
+
+Run one installer from the cloned checkout:
 
 ```bash
 bash integrations/codex/install.sh
+bash integrations/kiro/install.sh
 bash integrations/claude-code/install.sh
 bash integrations/cursor/install.sh
 bash integrations/copilot/install.sh
@@ -64,92 +119,23 @@ bash integrations/vscode/install.sh
 bash integrations/antigravity/install.sh
 ```
 
-This creates `~/link/`, installs or upgrades `link-mcp`, and writes lightweight agent instructions. Your wiki data is left alone on reinstall.
+Installers create or update `~/link`, install or upgrade `link-mcp`, write
+lightweight agent instructions, and preserve existing wiki data on reinstall.
+Use `--project` when a repo needs separate project memory.
 
-### 2. Add one source
-
-```bash
-cat > ~/link/raw/first-memory.md <<'EOF'
----
-title: "First Link memory"
-source_type: note
-date_captured: 2026-05-04
----
-
-# First Link memory
-
-I am testing Link as local personal memory for agents.
-Raw notes stay local. The agent turns them into source-cited wiki pages.
-EOF
-```
-
-Check what is pending:
-
-```bash
-python3 ~/link/link.py ingest-status ~/link
-```
-
-### 3. Ask your agent to ingest it
-
-In your agent chat:
+Then ask your agent:
 
 ```text
-ingest raw/first-memory.md into Link
+is Link ready?
+brief me from Link before we continue
+ingest raw/notes.md into Link
+remember that I prefer short release notes
+query Link for the release process
+what does Link remember about local personal memory?
 ```
 
-The agent reads `~/link/LINK.md`, creates a source page under `wiki/sources/`, creates or updates concept/entity pages, updates `wiki/index.md`, appends `wiki/log.md`, and rebuilds backlinks.
-
-### 4. Verify the loop
-
-```bash
-python3 ~/link/link.py doctor ~/link --fix
-python3 ~/link/link.py ingest-status ~/link
-python3 ~/link/link.py verify-mcp ~/link
-```
-
-Then ask your MCP-enabled agent:
-
-```text
-query Link for first Link memory
-```
-
-If the agent answers from Link, the local memory loop is working.
-
-## Choose Your Path
-
-### I want to try Link
-
-Use the demo:
-
-```bash
-python3 link.py demo
-cd link-demo
-python3 serve.py
-```
-
-### I want my agent to use Link
-
-Run the installer for your agent:
-
-```bash
-bash integrations/kiro/install.sh          # Kiro
-bash integrations/claude-code/install.sh   # Claude Code
-bash integrations/codex/install.sh         # Codex
-bash integrations/cursor/install.sh        # Cursor
-bash integrations/copilot/install.sh       # Copilot
-bash integrations/vscode/install.sh        # VS Code
-bash integrations/antigravity/install.sh   # Google Antigravity
-```
-
-For project-specific memory instead of global `~/link`, add `--project`.
-
-To update after `git pull`, rerun the same installer. It refreshes code and instructions without replacing your wiki pages.
-
-The installers try the current `python3` first. If that Python is externally managed, they install `link-mcp` into `~/.link-mcp-venv` and register MCP with that venv Python.
-
-### I want MCP only
-
-Install `link-mcp` and point it at a wiki:
+<details>
+<summary>MCP-only install</summary>
 
 ```bash
 python3 -m pip install --upgrade link-mcp
@@ -166,127 +152,66 @@ python3 -m pip install --upgrade link-mcp
 }
 ```
 
-On macOS/Homebrew Python, if pip reports `externally-managed-environment`, use a dedicated venv:
+On macOS/Homebrew Python, if pip reports `externally-managed-environment`, use a
+dedicated venv:
 
 ```bash
 python3 -m venv ~/.link-mcp-venv
 ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp
 ```
 
-Then use that Python in your MCP config:
+Full setup: [MCP guide](https://gowtham0992.github.io/link/mcp.html).
+</details>
 
-```json
-{
-  "mcpServers": {
-    "link": {
-      "command": "/Users/YOU/.link-mcp-venv/bin/python",
-      "args": ["-m", "link_mcp", "--wiki", "/Users/YOU/link/wiki"]
-    }
-  }
-}
-```
+## How Link Works
 
-### I want to develop or release Link
-
-```bash
-python3 -m unittest discover -s tests
-python3 scripts/check_release_hygiene.py
-python3 scripts/prepare_release.py 1.0.6 --dry-run
-```
-
-Release flow details are lower in this document.
-
-## Core Concepts
-
-| Concept | Meaning |
-|---------|---------|
-| `raw/` | Immutable sources: notes, papers, articles, transcripts, images, PDFs. |
-| `wiki/` | Agent-maintained Markdown memory compiled from sources. |
-| Source pages | One page per ingested source, stored under `wiki/sources/`. |
-| Concept/entity pages | Synthesized knowledge pages with source citations and confidence tags. |
-| `_backlinks.json` | Reverse and forward link index used by search, graph, HTTP API, and MCP. |
-| `log.md` | Append-only audit trail of ingest, query, lint, and maintenance operations. |
-
-You curate sources and ask questions. The LLM writes and maintains the wiki.
-
-## Daily Workflow
-
-Add source material:
-
-```bash
-cp notes.md ~/link/raw/
-python3 ~/link/link.py ingest-status ~/link
-```
-
-Ask your agent:
+Link has one simple rule:
 
 ```text
-ingest raw/notes.md into Link
+Sources become wiki knowledge.
+Explicit "remember" becomes agent memory.
+Queries use both.
 ```
 
-Maintain the wiki:
+The storage model is plain and inspectable:
 
-```bash
-python3 ~/link/link.py doctor ~/link --fix
-python3 ~/link/link.py rebuild-backlinks ~/link
-python3 ~/link/link.py verify-mcp ~/link
-```
+| Layer | What lives there |
+|-------|------------------|
+| `raw/` | Original notes, transcripts, articles, PDFs, screenshots, and project files. |
+| `wiki/` | Source-backed pages, concepts, entities, explorations, comparisons, and memories. |
+| MCP tools | Compact packets agents can use without dumping the whole wiki into context. |
 
-View the wiki:
+If a raw file was already ingested and later edited, `link ingest-status` marks it
+as stale and tells your agent to refresh the existing source page instead of
+creating a duplicate.
 
-```bash
-cd ~/link
-python3 serve.py
-```
+## What Agents Get
 
-Open `http://localhost:3000`.
+- `query_link`: an answer-ready packet with relevant memories, pages, graph
+  neighborhood, reasons for selection, budget limits, and follow-up actions.
+- `memory_brief`: a compact pre-work brief with user/project preferences,
+  active context, review warnings, and safe memory-use rules.
+- `ingest_status`: exact next steps for raw files, including source safety,
+  stale ingest detection, validation, and memory proposal guidance.
+- `remember_memory`: durable local memory with duplicate/conflict checks,
+  review state, provenance, and audit logging.
+- `explain_memory`: why a memory exists, what it links to, whether it is ready
+  for recall, and what needs review.
 
-Obsidian also works: open the `wiki/` folder as a vault.
+## Agent Contract
 
-## Local Commands
+Agents should use Link in this order:
 
-| Command | What it does |
-|---------|-------------|
-| `python3 link.py demo` | Create `./link-demo` with a pre-ingested sample wiki. |
-| `python3 link.py ingest-status <dir>` | Show pending raw files and graph index status. |
-| `python3 link.py doctor <dir>` | Check structure, graph health, source hygiene, and secret-looking content. |
-| `python3 link.py doctor <dir> --fix` | Create missing structure and repair backlinks safely. |
-| `python3 link.py rebuild-backlinks <dir>` | Regenerate `wiki/_backlinks.json`. |
-| `python3 link.py verify-mcp <dir>` | Verify `link-mcp` import and print MCP config. |
+1. `link_status` to check readiness and safe next actions.
+2. `starter_prompts` when the user asks what to try first.
+3. `ingest_status` before touching raw sources.
+4. `query_link` for compact answer-ready context.
+5. `memory_brief` before longer work.
+6. `get_graph_summary` when graph context is useful but the full graph would be noisy.
+7. `backup_wiki` before broad repair or migration work.
+8. `validate_wiki` after ingest or broad wiki edits.
 
-## MCP Server
-
-Link is listed on the [official MCP Registry](https://registry.modelcontextprotocol.io/?q=io.github.gowtham0992%2Flink) as `io.github.gowtham0992/link`.
-
-Available tools:
-
-| Tool | Description |
-|------|-------------|
-| `search_wiki` | Ranked search by title, alias, tag, and full text. Returns scores and snippets. |
-| `get_context` | Primary tool. Returns the best page plus inbound and forward graph neighbors. |
-| `get_pages` | Lists pages with metadata. Filter by category, type, or maturity. |
-| `get_backlinks` | Returns inbound and forward links for one page. |
-| `get_graph` | Returns all nodes and edges for graph reasoning. |
-| `rebuild_backlinks` | Rebuilds `_backlinks.json` after ingest or maintenance. |
-
-Use `get_context` for answering questions. It gives the agent the primary page plus its graph neighborhood in one call.
-
-## HTTP API
-
-`serve.py` exposes the same local memory over HTTP while the web viewer is running.
-
-Local use only: `serve.py` binds to `127.0.0.1` and has no authentication. Do not expose it to the internet without adding auth.
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/pages` | All pages with title, type, tags, aliases, maturity, and TLDR. |
-| `GET /api/search?q=<query>` | Ranked search by title, alias, tag, TLDR, and full text. |
-| `GET /api/context?topic=<topic>` | Best matching page plus inbound and forward graph links. |
-| `GET /api/graph` | Nodes and edges for graph visualization. |
-| `GET /api/backlinks` | Reverse and forward link index. |
-| `GET /api/rebuild-backlinks` | Rebuild `_backlinks.json` by scanning wikilinks. |
-
-Search uses an in-memory token index. `/api/context` is the main endpoint for agents that need a topic and its surrounding graph.
+Full MCP tool list: [MCP setup](https://gowtham0992.github.io/link/mcp.html).
 
 ## Privacy And Safety
 
@@ -296,84 +221,57 @@ Link is local-first:
 - No hosted backend.
 - No external API calls from `serve.py` or `link-mcp`.
 - Raw sources and generated wiki pages are ignored by git by default.
-- Registry token files and common secret-looking files are ignored and checked by release hygiene.
+- `link backup` excludes `raw/` unless you explicitly pass `--include-raw`.
+- Secret-looking values are detected in raw sources, captures, and release
+  hygiene checks.
+- The local web server binds to `127.0.0.1` and is not meant to be exposed to
+  the internet without additional auth.
 
 Before sharing a repo, demo, or wiki:
 
 ```bash
-python3 link.py doctor .
+python3 link.py doctor
+python3 link.py validate
 python3 scripts/check_release_hygiene.py
 ```
 
-Treat `doctor` errors as blockers. Warnings usually mean quality work: missing summaries, missing source sections, stale source counts, isolated pages, or raw files not represented in source pages.
+More detail: [Security guide](https://gowtham0992.github.io/link/security.html).
 
-Use `git push`, `git archive`, or clean build artifacts for public sharing. Do not zip a whole working directory; ignored local files, `.git/`, caches, raw sources, and build outputs can be included by accident.
+## Documentation
 
-## Develop And Release
+| Need | Go here |
+|------|---------|
+| Run Link for the first time | [First 10 minutes](https://gowtham0992.github.io/link/getting-started.html) |
+| Decide whether Link fits | [Why Link?](https://gowtham0992.github.io/link/why-link.html) |
+| Use the local viewer | [Web UI](https://gowtham0992.github.io/link/ui.html) |
+| Understand raw/wiki/memory | [Concepts](https://gowtham0992.github.io/link/concepts.html) |
+| Configure MCP | [MCP setup](https://gowtham0992.github.io/link/mcp.html) |
+| Find a command | [CLI reference](https://gowtham0992.github.io/link/cli.html) |
+| Use local HTTP endpoints | [HTTP API](https://gowtham0992.github.io/link/api.html) |
+| Review security boundaries | [Security model](https://gowtham0992.github.io/link/security.html) |
+| Fix setup issues | [Troubleshooting](https://gowtham0992.github.io/link/troubleshooting.html) |
 
-Run the local gate:
+## Contributing
+
+Contributions should come through pull requests targeting `main`. The `develop`
+branch is a maintainer integration branch for larger release work before it is
+proposed to `main`.
+
+Before opening a PR:
 
 ```bash
+python3 -m ruff check .
 python3 -m unittest discover -s tests
-python3 -m py_compile link.py serve.py scripts/check_release_hygiene.py scripts/prepare_release.py mcp_package/link_mcp/server.py
 python3 scripts/check_release_hygiene.py
-bash -n integrations/*/install.sh integrations/*/uninstall.sh integrations/_shared/*.sh
+python3 scripts/check_runtime_duplication.py
+python3 scripts/check_tool_contract.py
 git diff --check
 ```
 
-Prepare release files:
+Full contributor guide: [Contributing](https://gowtham0992.github.io/link/contributing.html).
 
-```bash
-python3 scripts/prepare_release.py 1.0.6
-```
+Do not include personal wiki data, raw sources, registry tokens, `.env` files, or
+local MCP credentials in a PR.
 
-This bumps the MCP version files and moves `CHANGELOG.md` `Unreleased` notes into a dated version section.
-
-After the release PR merges and CI passes:
-
-```bash
-git switch main
-git pull --ff-only
-git tag -a v1.0.6 -m "v1.0.6"
-git push origin v1.0.6
-cd mcp_package
-python3 -c "from pathlib import Path; import shutil; shutil.rmtree('dist', ignore_errors=True); [shutil.rmtree(p, ignore_errors=True) for p in Path('.').glob('*.egg-info')]"
-python3 -m build
-python3 -m twine check dist/*
-TWINE_USERNAME=__token__ python3 -m twine upload dist/*
-mcp-publisher publish
-```
-
-Never reuse a published PyPI version or move a public release tag. If a release needs another fix, bump to the next version.
-
-## Project Structure
-
-```text
-link/
-├── LINK.md              # schema and instructions for agents
-├── raw/                 # source documents, ignored by git
-├── wiki/                # compiled knowledge, ignored by git except scaffolding
-│   ├── index.md         # master catalog
-│   ├── _backlinks.json  # reverse and forward link index
-│   ├── log.md           # append-only operation history
-│   ├── sources/         # one page per ingested source
-│   ├── concepts/        # topic articles
-│   ├── entities/        # people, orgs, projects
-│   ├── comparisons/     # side-by-side analyses
-│   └── explorations/    # filed query results
-├── integrations/        # one-step setup per AI tool
-├── mcp_package/         # PyPI package for link-mcp
-├── scripts/             # release and hygiene tooling
-├── serve.py             # local web viewer and HTTP API
-└── link.py              # local utility CLI
-```
-
-## Design Principles
-
-- Every claim links to a source.
-- Confidence tags make uncertainty visible.
-- `log.md` records wiki operations.
-- Pages mature from seed to established.
-- Agents should use `/api/context` or MCP `get_context` before reading files manually.
-- The local web viewer has no runtime dependencies beyond Python stdlib.
-- The wiki is plain Markdown, so it works with git, Obsidian, and normal editors.
+If Link helps your agents remember better, [star it on GitHub](https://github.com/gowtham0992/link)
+so more people can find it.

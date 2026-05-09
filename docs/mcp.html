@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install and use Link's MCP server with Codex, Claude, Cursor, Kiro, VS Code, Copilot, and other agents.">
+  <title>Link - MCP Setup</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Main">
+    <a class="brand" href="index.html"><img src="assets/logo.svg" alt="">Link</a>
+    <div class="nav-links">
+      <a href="getting-started.html">Start</a>
+      <a href="why-link.html">Why</a>
+      <a href="ui.html">UI</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="mcp.html" aria-current="page">MCP</a>
+      <a href="cli.html">CLI</a>
+      <a href="api.html">API</a>
+      <a href="security.html">Security</a>
+      <a href="contributing.html">Contribute</a>
+      <a href="https://github.com/gowtham0992/link">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="page-hero">
+    <div class="hero-inner">
+      <span class="eyebrow">Agent integration</span>
+      <h1>One local memory, many agents.</h1>
+      <p>Link is listed as <code>io.github.gowtham0992/link</code> on the MCP Registry and also ships as the <code>link-mcp</code> PyPI package.</p>
+    </div>
+  </header>
+
+  <main class="doc-section">
+    <div class="section-inner doc-grid">
+      <aside class="toc">
+        <strong>On this page</strong>
+        <a href="#tour">MCP tour</a>
+        <a href="#installers">Agent installers</a>
+        <a href="#mcp-only">MCP only</a>
+        <a href="#workflow">Agent workflow</a>
+        <a href="#tools">MCP tools</a>
+        <a href="#verify">Verify setup</a>
+      </aside>
+      <article class="doc-content">
+        <h2 id="tour">MCP Tour</h2>
+        <figure class="screenshot-card media-wide">
+          <img src="assets/link-mcp-agent-chat.gif" alt="Animated Link MCP agent walkthrough">
+          <figcaption>Agents use natural prompts, then call Link tools for readiness, briefs, query packets, and reviewed memory writes.</figcaption>
+        </figure>
+
+        <h2 id="installers">Agent Installers</h2>
+        <p>Use the installer for the agent you use most. Installers create or update <code>~/link</code>, install <code>link-mcp</code>, write short agent instructions, and preserve existing wiki data.</p>
+        <pre><code>bash integrations/codex/install.sh
+bash integrations/kiro/install.sh
+bash integrations/claude-code/install.sh
+bash integrations/cursor/install.sh
+bash integrations/copilot/install.sh
+bash integrations/vscode/install.sh
+bash integrations/antigravity/install.sh</code></pre>
+        <p>Use <code>--project</code> from a repo when memory should be project-scoped.</p>
+
+        <h2 id="mcp-only">MCP Only</h2>
+        <pre><code>python3 -m pip install --upgrade link-mcp</code></pre>
+        <pre><code>{
+  "mcpServers": {
+    "link": {
+      "command": "python3",
+      "args": ["-m", "link_mcp", "--wiki", "~/link/wiki"]
+    }
+  }
+}</code></pre>
+        <p>On macOS/Homebrew Python, if pip reports <code>externally-managed-environment</code>, use a dedicated venv:</p>
+        <pre><code>python3 -m venv ~/.link-mcp-venv
+~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp</code></pre>
+        <pre><code>{
+  "mcpServers": {
+    "link": {
+      "command": "/Users/YOU/.link-mcp-venv/bin/python",
+      "args": ["-m", "link_mcp", "--wiki", "/Users/YOU/link/wiki"]
+    }
+  }
+}</code></pre>
+
+        <h2 id="workflow">Predictable Agent Workflow</h2>
+        <p>Agents should use Link in this order:</p>
+        <ol>
+          <li>Call <code>link_status</code> when connecting or troubleshooting.</li>
+          <li>Call <code>starter_prompts</code> when the user asks what to try next.</li>
+          <li>Call <code>ingest_status</code> before ingesting raw files.</li>
+          <li>Call <code>query_link</code> first for most answers.</li>
+          <li>Call <code>memory_brief</code> before longer work.</li>
+          <li>Call <code>get_graph_summary</code> when graph context is needed.</li>
+          <li>Call <code>backup_wiki</code> before broad repair work.</li>
+          <li>Call <code>validate_wiki</code> after ingest or substantial page edits.</li>
+        </ol>
+
+        <h2 id="tools">MCP Tools</h2>
+        <p>Full tool set:</p>
+        <pre><code>link_status
+starter_prompts
+migrate_wiki
+ingest_status
+query_link
+validate_wiki
+backup_wiki
+memory_brief
+memory_audit
+memory_profile
+memory_inbox
+review_memory
+explain_memory
+search_wiki
+recall_memory
+remember_memory
+propose_memories
+capture_session
+capture_inbox
+accept_capture
+redact_capture
+delete_capture
+update_memory
+archive_memory
+restore_memory
+forget_memory
+get_context
+get_pages
+get_backlinks
+get_graph_summary
+get_graph
+rebuild_index
+rebuild_backlinks</code></pre>
+        <p>Memory write tools return <code>duplicate_candidates</code> or <code>conflict_candidates</code> when review, update, or archive is safer than creating another memory page.</p>
+        <p>Project-aware tools accept an optional <code>project</code> argument. When set, Link returns broad user/global memory plus memories for that project, while excluding memories from other explicit projects.</p>
+
+        <h2 id="verify">Verify Setup</h2>
+        <pre><code>link verify-mcp
+link status --validate
+link prompts</code></pre>
+        <p><code>link verify-mcp --json</code> is useful when an agent or script should read structured issues and next actions.</p>
+        <div class="callout">
+          <strong>Natural prompts to try</strong>
+          <p><code>is Link ready?</code></p>
+          <p><code>brief me from Link before we continue</code></p>
+          <p><code>query Link for my current project context</code></p>
+          <p><code>remember that I prefer short release notes</code></p>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <div class="section-inner"><a href="getting-started.html">First 10 minutes</a> · <a href="cli.html">CLI reference</a> · <a href="troubleshooting.html">Troubleshooting</a> · If Link helps your agents remember better, <a href="https://github.com/gowtham0992/link">star it on GitHub</a>.</div>
+  </footer>
+</body>
+</html>

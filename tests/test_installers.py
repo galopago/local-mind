@@ -23,6 +23,23 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn("--break-system-packages", scaffold)
         self.assertIn(".link-mcp-venv", scaffold)
         self.assertIn(".link-mcp-python", scaffold)
+        self.assertIn("LINK_MCP_INSTALLED=false", scaffold)
+        self.assertIn('[ "$LINK_MCP_INSTALLED" = true ]', scaffold)
+
+    def test_scaffold_installs_short_global_link_command(self):
+        scaffold = (ROOT / "integrations/_shared/scaffold.sh").read_text(encoding="utf-8")
+
+        self.assertIn('LINK_CLI_BIN="$LINK_CLI_DIR/link"', scaffold)
+        self.assertIn("Link command wrapper", scaffold)
+        self.assertIn("not overwriting", scaffold)
+        self.assertIn("link status --validate", scaffold)
+        self.assertIn('if [ "$MODE" = "--project" ]', scaffold)
+
+    def test_scaffold_project_mode_uses_absolute_target(self):
+        scaffold = (ROOT / "integrations/_shared/scaffold.sh").read_text(encoding="utf-8")
+
+        self.assertIn('TARGET_DIR="$(pwd)"', scaffold)
+        self.assertNotIn('TARGET_DIR="."', scaffold)
 
     def test_installers_read_resolved_mcp_python_marker(self):
         for installer in INSTALLERS:
@@ -30,6 +47,26 @@ class InstallerTests(unittest.TestCase):
                 text = installer.read_text(encoding="utf-8")
                 self.assertIn("MCP_PYTHON", text)
                 self.assertIn(".link-mcp-python", text)
+
+    def test_installers_print_mode_specific_next_steps(self):
+        instructions = (ROOT / "integrations/_shared/instructions.sh").read_text(encoding="utf-8")
+
+        self.assertIn("link_print_next_steps()", instructions)
+        self.assertIn('if [ "$mode" = "--project" ]; then', instructions)
+        self.assertIn("View wiki: python3 link.py serve", instructions)
+        self.assertIn("View wiki: link serve", instructions)
+        self.assertIn("Try in your agent:", instructions)
+        self.assertIn("is Link ready?", instructions)
+        self.assertIn("brief me from Link before we continue", instructions)
+        self.assertIn("ingest raw/<file> into Link", instructions)
+        self.assertIn("query Link for what you know about me", instructions)
+        self.assertIn("query Link for what this project remembers", instructions)
+
+        for installer in INSTALLERS:
+            with self.subTest(installer=installer.name):
+                text = installer.read_text(encoding="utf-8")
+                self.assertIn('. "$SCRIPT_DIR/../_shared/instructions.sh"', text)
+                self.assertIn('link_print_next_steps "$MODE"', text)
 
     def test_codex_and_kiro_update_existing_mcp_registration(self):
         codex = (ROOT / "integrations/codex/install.sh").read_text(encoding="utf-8")

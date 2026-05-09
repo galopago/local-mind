@@ -1,0 +1,56 @@
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "mcp_package"))
+
+from link_core.prompts import starter_prompt_payload  # noqa: E402
+
+
+class PromptsCoreTests(unittest.TestCase):
+    def make_wiki(self, parent: Path) -> Path:
+        wiki = parent / "wiki"
+        wiki.mkdir(parents=True, exist_ok=True)
+        (wiki / "index.md").write_text("# Index\n", encoding="utf-8")
+        return wiki
+
+    def test_global_wiki_gets_personal_memory_prompts(self):
+        root = Path(tempfile.mkdtemp(prefix="link-prompts-core-"))
+        wiki = self.make_wiki(root)
+
+        payload = starter_prompt_payload(wiki)
+        prompts = [str(item["prompt"]) for item in payload["prompts"]]
+
+        self.assertEqual(payload["project"], "")
+        self.assertIn("remember that I prefer local-first agent memory", prompts)
+        self.assertIn("query Link for what you know about me", prompts)
+        self.assertIn("propose memories from raw/<file>", prompts)
+        self.assertIn("link status --validate", payload["commands"])
+
+    def test_git_project_gets_project_memory_prompts(self):
+        root = Path(tempfile.mkdtemp(prefix="link-prompts-core-"))
+        project = root / "Client Launch"
+        (project / ".git").mkdir(parents=True)
+        wiki = self.make_wiki(project)
+
+        payload = starter_prompt_payload(wiki)
+        prompts = [str(item["prompt"]) for item in payload["prompts"]]
+
+        self.assertEqual(payload["project"], "client-launch")
+        self.assertIn("remember that this project uses Link for local agent memory", prompts)
+        self.assertIn("query Link for what this project remembers", prompts)
+
+    def test_explicit_project_is_normalized(self):
+        root = Path(tempfile.mkdtemp(prefix="link-prompts-core-"))
+        wiki = self.make_wiki(root)
+
+        payload = starter_prompt_payload(wiki, project="Client Launch")
+
+        self.assertEqual(payload["project"], "client-launch")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -11,6 +11,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MODE="${1:---global}"
+. "$SCRIPT_DIR/../_shared/instructions.sh"
 
 if [ "$MODE" = "--global" ]; then
     INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions.md")
@@ -54,10 +55,7 @@ except Exception as e:
 PYEOF
     fi
 
-    echo ""
-    echo "Done."
-    echo "  Drop sources into ~/link/raw/ and say 'ingest' to process them."
-    echo "  View wiki: python ~/link/serve.py"
+    link_print_next_steps "$MODE"
 
 elif [ "$MODE" = "--project" ]; then
     INSTRUCTIONS=$(cat "$SCRIPT_DIR/../_shared/link-instructions-project.md")
@@ -68,8 +66,7 @@ elif [ "$MODE" = "--project" ]; then
     echo "Link steering → $TARGET"
 
     bash "$SCRIPT_DIR/../_shared/scaffold.sh" --project
-    echo ""
-    echo "Done. Drop sources into raw/ and say 'ingest' to process them."
+    link_print_next_steps "$MODE"
 else
     echo "Usage: bash install.sh [--project]"
     exit 1
