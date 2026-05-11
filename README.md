@@ -48,6 +48,16 @@ into local memory agents can query.
 Run the demo first. It creates a complete local wiki with raw sources, wiki
 pages, one starter memory, graph data, and query packets ready to inspect.
 
+macOS with Homebrew:
+
+```bash
+brew install gowtham0992/link/link
+link demo
+link serve link-demo
+```
+
+Or from source:
+
 ```bash
 git clone https://github.com/gowtham0992/link.git
 cd link
@@ -67,6 +77,15 @@ accounts or authentication, and should not be exposed to the internet unless you
 add your own auth layer.
 
 Try the value loop:
+
+```bash
+link query "why does Link help agents?" link-demo --budget small
+link brief "working on agent memory" link-demo
+link benchmark "agent memory" link-demo
+link status --validate link-demo
+```
+
+From a source checkout, use `python3 link.py ...`:
 
 ```bash
 python3 link.py query "why does Link help agents?" link-demo --budget small

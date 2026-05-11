@@ -72,15 +72,21 @@
             <a class="button" href="troubleshooting.html">Troubleshooting</a>
           </div>
         </div>
-        <pre><code>git clone https://github.com/gowtham0992/link.git
+        <pre><code># macOS
+brew install gowtham0992/link/link
+link demo
+link serve link-demo
+
+# or from source
+git clone https://github.com/gowtham0992/link.git
 cd link
 python3 link.py demo
 python3 link.py serve link-demo
 
 # then try
-python3 link.py query "why does Link help agents?" link-demo --budget small
-python3 link.py brief "working on agent memory" link-demo
-python3 link.py benchmark "agent memory" link-demo</code></pre>
+link query "why does Link help agents?" link-demo --budget small
+link brief "working on agent memory" link-demo
+link benchmark "agent memory" link-demo</code></pre>
       </div>
     </section>
 

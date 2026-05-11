@@ -6,6 +6,11 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ## [Unreleased]
 
+### Added
+
+- Added tap-ready Homebrew Formula packaging and maintainer instructions for publishing `gowtham0992/homebrew-link`.
+- Added public Homebrew install instructions to README and the product docs.
+
 ## [1.1.0] - 2026-05-08
 
 ### Highlights
