@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Link architecture: local sources become wiki knowledge, reviewed memory, and MCP context for agents</title>
+  <desc id="desc">A four step diagram showing capture, structure, remember, and retrieve, with a plain Markdown knowledge base underneath.</desc>
+  <defs>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#17120c" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+    <filter id="paperShadow" x="-8%" y="-8%" width="120%" height="120%">
+      <feDropShadow dx="7" dy="7" stdDeviation="0" flood-color="#17120c" flood-opacity="1"/>
+    </filter>
+    <style>
+      .bg { fill: #fff4b8; }
+      .paper { fill: #fffdf1; stroke: #17120c; stroke-width: 4; filter: url(#paperShadow); }
+      .soft-green { fill: #dff8ef; }
+      .soft-blue { fill: #e8edff; }
+      .soft-red { fill: #ffe1dc; }
+      .soft-yellow { fill: #fff4b8; }
+      .ink { fill: #17120c; }
+      .muted { fill: #5f5549; }
+      .green { fill: #54c79d; }
+      .blue { fill: #5b8cff; }
+      .red { fill: #ff6d5f; }
+      .purple { fill: #a87cff; }
+      .yellow { fill: #ffd342; }
+      .black { fill: #0b0b0b; }
+      .line { fill: none; stroke: #17442d; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+      .dash { fill: none; stroke: #17442d; stroke-width: 4; stroke-dasharray: 12 10; stroke-linecap: round; }
+      text { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17120c; letter-spacing: 0; }
+      .serif { font-family: Georgia, "Times New Roman", serif; font-weight: 800; }
+      .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+      .h1 { font-size: 96px; font-weight: 900; }
+      .tagline { font-size: 36px; }
+      .badge { font-size: 20px; font-weight: 800; }
+      .step { font-size: 33px; font-weight: 900; }
+      .body { font-size: 23px; font-weight: 650; }
+      .small { font-size: 17px; font-weight: 750; }
+      .tiny { font-size: 15px; font-weight: 800; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#17442d"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1600" height="900"/>
+  <rect width="1600" height="900" fill="url(#grid)"/>
+
+  <g transform="translate(52 48)">
+    <text class="serif h1" x="0" y="78">Link</text>
+    <text class="serif tagline" x="0" y="128">Local memory for agents, stored as plain Markdown.</text>
+    <g transform="translate(0 158)">
+      <rect x="0" y="0" width="140" height="44" rx="22" fill="#fffdf1" stroke="#9e967e" stroke-width="2"/>
+      <text class="badge" x="44" y="29">local</text>
+      <circle cx="24" cy="22" r="11" class="green"/>
+      <path d="M 19 22 l4 4 7 -9" fill="none" stroke="#17120c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <rect x="154" y="0" width="172" height="44" rx="22" fill="#fffdf1" stroke="#9e967e" stroke-width="2"/>
+      <text class="badge" x="198" y="29">auditable</text>
+      <circle cx="178" cy="22" r="11" class="blue"/>
+      <path d="M 174 16 h8 v12 h-8 z M176 20 h4 M176 24 h4" fill="none" stroke="#17120c" stroke-width="2" stroke-linecap="round"/>
+
+      <rect x="340" y="0" width="184" height="44" rx="22" fill="#fffdf1" stroke="#9e967e" stroke-width="2"/>
+      <text class="badge" x="384" y="29">source-backed</text>
+      <circle cx="364" cy="22" r="11" class="yellow"/>
+      <path d="M 358 22 h12 M364 16 v12" stroke="#17120c" stroke-width="3" stroke-linecap="round"/>
+
+      <rect x="538" y="0" width="180" height="44" rx="22" fill="#fffdf1" stroke="#9e967e" stroke-width="2"/>
+      <text class="badge" x="582" y="29">MCP-native</text>
+      <circle cx="562" cy="22" r="11" class="purple"/>
+      <path d="M 558 22 h8 M562 18 v8" stroke="#17120c" stroke-width="3" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <g transform="translate(52 282)">
+    <rect class="paper" x="0" y="0" width="302" height="356" rx="15"/>
+    <circle cx="44" cy="45" r="24" fill="#17442d"/>
+    <text x="35" y="56" fill="#fffdf1" class="body">1</text>
+    <text class="step" x="92" y="57">Capture</text>
+
+    <g transform="translate(28 96)">
+      <rect class="soft-yellow" x="0" y="0" width="246" height="57" rx="10" stroke="#c7b98a" stroke-width="2"/>
+      <text class="body" x="82" y="37">notes</text>
+      <path d="M 31 15 h28 l12 12 v26 h-40 z M59 15 v12 h12 M40 34 h22 M40 43 h16" fill="none" stroke="#17120c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <rect class="soft-yellow" x="0" y="65" width="246" height="57" rx="10" stroke="#c7b98a" stroke-width="2"/>
+      <text class="body" x="82" y="102">transcripts</text>
+      <path d="M 36 85 q0 -11 16 -11 t16 11 q0 11 -16 11 h-8 l-10 9 3 -12 q-1 -4 -1 -8" fill="none" stroke="#17120c" stroke-width="3"/>
+
+      <rect class="soft-yellow" x="0" y="130" width="246" height="57" rx="10" stroke="#c7b98a" stroke-width="2"/>
+      <text class="body" x="82" y="167">project docs</text>
+      <path d="M 36 145 h32 v30 h-32 z M44 153 h16 M44 162 h16" fill="none" stroke="#17120c" stroke-width="3" stroke-linecap="round"/>
+
+      <rect class="soft-yellow" x="0" y="195" width="246" height="57" rx="10" stroke="#c7b98a" stroke-width="2"/>
+      <text class="body" x="82" y="232">decisions</text>
+      <path d="M 42 212 h22 M42 222 h22 M42 232 h16 M33 212 l3 3 6 -8" fill="none" stroke="#17120c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <path class="line" d="M 374 460 H 416" marker-end="url(#arrow)"/>
+
+  <g transform="translate(420 282)">
+    <rect class="paper" x="0" y="0" width="370" height="356" rx="15"/>
+    <circle cx="44" cy="45" r="24" fill="#17442d"/>
+    <text x="35" y="56" fill="#fffdf1" class="body">2</text>
+    <text class="step" x="92" y="57">Structure</text>
+
+    <rect class="soft-blue" x="38" y="110" width="132" height="72" rx="12" stroke="#5b8cff" stroke-width="3"/>
+    <text class="body" x="76" y="154">sources</text>
+    <path d="M 58 126 h23 l10 10 v29 h-33 z M81 126 v10 h10 M65 146 h18 M65 155 h13" fill="none" stroke="#17120c" stroke-width="3" stroke-linecap="round"/>
+
+    <rect class="soft-green" x="206" y="82" width="126" height="72" rx="12" stroke="#54c79d" stroke-width="3"/>
+    <text class="body" x="235" y="126">claims</text>
+    <path d="M 107 110 C 142 86, 183 86, 218 102" class="line" marker-end="url(#arrow)"/>
+
+    <rect class="soft-red" x="206" y="210" width="126" height="72" rx="12" stroke="#ff6d5f" stroke-width="3"/>
+    <text class="body" x="232" y="254">entities</text>
+    <path d="M 106 182 C 142 218, 180 236, 218 246" class="line" marker-end="url(#arrow)"/>
+
+    <rect class="soft-yellow" x="38" y="236" width="132" height="72" rx="12" stroke="#c79b27" stroke-width="3"/>
+    <text class="body" x="69" y="280">graph</text>
+    <path d="M 206 246 C 176 280, 138 288, 118 276" class="line" marker-end="url(#arrow)"/>
+
+    <text class="small muted" x="38" y="329">ingest validates shape, links, and sources</text>
+  </g>
+
+  <path class="line" d="M 810 460 H 852" marker-end="url(#arrow)"/>
+
+  <g transform="translate(858 282)">
+    <rect class="paper" x="0" y="0" width="352" height="356" rx="15"/>
+    <circle cx="44" cy="45" r="24" fill="#17442d"/>
+    <text x="35" y="56" fill="#fffdf1" class="body">3</text>
+    <text class="step" x="92" y="57">Remember</text>
+
+    <rect class="soft-green" x="28" y="98" width="296" height="56" rx="10" stroke="#c7b98a" stroke-width="2"/>
+    <text class="body" x="88" y="135">propose memories</text>
+    <circle cx="58" cy="126" r="16" class="green"/>
+    <path d="M 51 126 l5 5 10 -13" fill="none" stroke="#17120c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect class="soft-blue" x="28" y="166" width="296" height="56" rx="10" stroke="#c7b98a" stroke-width="2"/>
+    <text class="body" x="88" y="203">review and approve</text>
+    <circle cx="58" cy="194" r="16" class="blue"/>
+    <path d="M 50 194 h16 M58 186 v16" stroke="#17120c" stroke-width="3" stroke-linecap="round"/>
+
+    <rect class="soft-red" x="28" y="234" width="296" height="56" rx="10" stroke="#c7b98a" stroke-width="2"/>
+    <text class="body" x="88" y="271">archive, restore, forget</text>
+    <circle cx="58" cy="262" r="16" class="red"/>
+    <path d="M 52 256 l12 12 M64 256 l-12 12" stroke="#17120c" stroke-width="3" stroke-linecap="round"/>
+
+    <text class="small muted" x="28" y="329">writes are local, logged, and explainable</text>
+  </g>
+
+  <path class="line" d="M 1230 460 H 1270" marker-end="url(#arrow)"/>
+
+  <g transform="translate(1278 282)">
+    <rect class="paper" x="0" y="0" width="270" height="356" rx="15"/>
+    <circle cx="44" cy="45" r="24" fill="#17442d"/>
+    <text x="35" y="56" fill="#fffdf1" class="body">4</text>
+    <text class="step" x="92" y="57">Retrieve</text>
+
+    <rect x="34" y="98" width="202" height="94" rx="12" fill="#123b27" stroke="#0b0b0b" stroke-width="4"/>
+    <text class="mono" x="56" y="130" fill="#fffdf1" font-size="18">$ query_link</text>
+    <text class="mono" x="56" y="158" fill="#fffdf1" font-size="18">$ memory_brief</text>
+    <text class="mono" x="56" y="186" fill="#fffdf1" font-size="18">$ graph_summary</text>
+
+    <path class="dash" d="M 136 196 V 232"/>
+    <rect class="soft-green" x="46" y="232" width="180" height="62" rx="10" stroke="#54c79d" stroke-width="3"/>
+    <text class="body" x="80" y="269">context packet</text>
+    <path class="line" d="M 226 263 H 252" marker-end="url(#arrow)"/>
+
+    <rect class="soft-blue" x="54" y="312" width="164" height="32" rx="8" stroke="#5b8cff" stroke-width="2"/>
+    <text class="small" x="82" y="334">agent uses it</text>
+  </g>
+
+  <g transform="translate(462 688)">
+    <rect class="paper" x="0" y="0" width="676" height="152" rx="16"/>
+    <rect x="32" y="28" width="54" height="54" rx="12" fill="#17442d"/>
+    <path d="M 46 47 q13 -15 26 0 v18 q-13 14 -26 0 z M46 47 q13 12 26 0 M46 65 q13 12 26 0" fill="none" stroke="#fffdf1" stroke-width="3"/>
+    <text class="step" x="106" y="66">Plain Markdown knowledge base</text>
+    <g transform="translate(32 104)">
+      <text class="mono tiny" x="0" y="0">raw/ original source</text>
+      <text class="mono tiny" x="178" y="0">wiki/ source-backed pages</text>
+      <text class="mono tiny" x="410" y="0">memories/ reviewed recall</text>
+    </g>
+    <line x1="32" y1="90" x2="644" y2="90" stroke="#c7b98a" stroke-width="2"/>
+  </g>
+
+  <path class="dash" d="M 205 638 C 244 790, 332 774, 462 764" marker-end="url(#arrow)"/>
+  <path class="dash" d="M 640 638 C 650 676, 650 688, 650 688" marker-end="url(#arrow)"/>
+  <path class="dash" d="M 1034 638 C 1028 676, 1024 688, 1024 688" marker-end="url(#arrow)"/>
+  <path class="dash" d="M 1278 638 C 1190 692, 1158 730, 1138 756" marker-end="url(#arrow)"/>
+
+  <g transform="translate(1228 725)">
+    <path d="M 112 10 C 166 18, 198 57, 196 116 C 194 179, 152 215, 98 207 C 42 199, 6 154, 17 96 C 26 45, 59 2, 112 10 Z" fill="#fffdf1" stroke="#17120c" stroke-width="4"/>
+    <circle cx="78" cy="102" r="9" fill="#17120c"/>
+    <circle cx="134" cy="102" r="9" fill="#17120c"/>
+    <path d="M 83 136 C 101 151, 124 151, 141 136" fill="none" stroke="#17120c" stroke-width="5" stroke-linecap="round"/>
+    <path d="M 27 130 C 71 154, 123 158, 187 132 L 178 164 C 121 190, 71 184, 20 156 Z" fill="#17442d" stroke="#17120c" stroke-width="4"/>
+    <rect x="151" y="151" width="34" height="34" rx="8" fill="#54c79d" stroke="#17120c" stroke-width="4"/>
+  </g>
+</svg>

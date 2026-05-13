@@ -48,6 +48,10 @@
         <pre><code>raw sources -> agent ingest -> Markdown wiki -> backlinks/graph -> MCP recall
                          \
                           -> direct memories -> review/update/archive</code></pre>
+        <figure class="architecture-card">
+          <img src="assets/link-architecture.svg" alt="Link architecture: raw sources, structured wiki, reviewed memory, and MCP retrieval">
+          <figcaption>The wiki is the storage layer. Reviewed memory and MCP context are the product surface agents use.</figcaption>
+        </figure>
         <div class="callout">
           <strong>Public repo versus local memory</strong>
           Link deliberately keeps generated <code>raw/</code>, <code>wiki/</code>, and <code>link-demo/</code> content out of git. The tracked root wiki is scaffolding; <code>python3 link.py demo</code> creates the product-story demo wiki.

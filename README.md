@@ -192,6 +192,8 @@ Explicit "remember" becomes agent memory.
 Queries use both.
 ```
 
+![Link architecture: raw sources become structured wiki knowledge, reviewed memory, and MCP context for agents](docs/assets/link-architecture.svg)
+
 The storage model is plain and inspectable:
 
 | Layer | What lives there |
