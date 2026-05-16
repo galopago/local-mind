@@ -111,6 +111,9 @@ from link_core.web_proposals import (
     proposal_source_payload as _core_proposal_source_payload,
     proposal_sources as _core_proposal_sources,
 )
+from link_core.web_search import (
+    render_search_page as _core_render_search_page,
+)
 from link_core.status import (
     link_status as _core_link_status,
 )
@@ -2778,33 +2781,14 @@ def _render_graph():
 
 def _render_search(query):
     q = query.lower().strip()
-    if not q:
-        return _layout("Search",
-            f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
-            f'<h1>Search</h1><p>Enter a search term above.</p>')
-    results = _search_pages(q, limit=30)
-    total = len(results)
-    cap_note = f" (showing 30 of {total})" if total > 30 else ""
-
-    def _highlight(text: str, term: str) -> str:
-        """Wrap all occurrences of term in <mark> tags (case-insensitive)."""
-        if not term or not text: return html.escape(text)
-        parts = re.split(f"({re.escape(term)})", text, flags=re.IGNORECASE)
-        return "".join(
-            f"<mark>{html.escape(p)}</mark>" if p.lower() == term.lower() else html.escape(p)
-            for p in parts
-        )
-
-    items = "".join(
-        f'<li><a href="{_page_href(r["name"])}">{_highlight(r["title"], query)}</a>'
-        f'<br><small style="color:#888">...{_highlight(r.get("snippet",""), query)}...</small></li>'
-        for r in results[:30]
+    results = _search_pages(q, limit=30) if q else []
+    return _core_render_search_page(
+        query,
+        results,
+        page_href=_page_href,
+        layout=_layout,
+        limit=30,
     )
-    return _layout(f"Search: {query}",
-        f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
-        f'<h1>Search: {html.escape(query)}</h1>'
-        f'<p>{total} result{"s" if total != 1 else ""}{cap_note}</p>'
-        f'<ul class="page-list search-results">{items}</ul>')
 
 
 # ---------------------------------------------------------------------------
