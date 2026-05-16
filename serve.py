@@ -52,14 +52,8 @@ from link_core.log import (
 from link_core.markdown import (
     markdown_to_html as _core_markdown_to_html,
 )
-from link_core.raw import (
-    RawSourceError as _RawSourceError,
-    create_raw_source as _core_create_raw_source,
-)
 from link_core.security import (
     clean_text_input as _clean_text_input,
-    redact_secret_values as _redact_secret_values,
-    secret_file_scan as _secret_file_scan,
 )
 from link_core.query import (
     query_link as _core_query_link,
@@ -111,6 +105,11 @@ from link_core.web_http import (
     SVG_CONTENT_SECURITY_POLICY as _core_svg_content_security_policy,
     validate_local_browser_source_headers as _core_validate_local_browser_source_headers,
     validate_local_host_header as _core_validate_local_host_header,
+)
+from link_core.web_proposals import (
+    create_raw_source_payload as _core_create_raw_source_payload,
+    proposal_source_payload as _core_proposal_source_payload,
+    proposal_sources as _core_proposal_sources,
 )
 from link_core.status import (
     link_status as _core_link_status,
@@ -817,183 +816,31 @@ def _resolve_raw_static_path(url_fragment: str) -> tuple[Path | None, str | None
     return _core_resolve_raw_static_path(RAW_DIR, url_fragment, RAW_STATIC_TYPES)
 
 
-def _proposal_source_title(text: str, fallback: str) -> str:
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("# "):
-            return stripped[2:].strip()[:100] or fallback
-        if stripped:
-            return stripped[:100]
-    return fallback
-
-
-def _proposal_source_snippet(text: str) -> str:
-    lines = [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip() and not line.strip().startswith("---")
-    ]
-    return " ".join(lines[:3])[:260]
-
-
-def _proposal_source_preview(path: Path) -> tuple[str, str]:
-    try:
-        with path.open("r", encoding="utf-8", errors="replace") as handle:
-            return handle.read(MAX_PROPOSAL_SOURCE_BYTES + 1), ""
-    except OSError as exc:
-        return "", str(exc)
-
-
-def _resolve_proposal_source_path(source_path: str) -> Path | None:
-    raw_text = str(source_path or "").strip()
-    if len(raw_text) > 1000:
-        return None
-    decoded = urllib.parse.unquote(raw_text).strip().lstrip("/")
-    if decoded.startswith("raw/"):
-        decoded = decoded[4:]
-    if not decoded:
-        return None
-    resolved = _safe_resolve(RAW_DIR / decoded)
-    raw_root = RAW_DIR.resolve()
-    if not resolved or not _is_relative_to(resolved, raw_root):
-        return None
-    if any(part.startswith(".") for part in resolved.relative_to(raw_root).parts):
-        return None
-    if not resolved.is_file() or resolved.suffix.lower() not in PROPOSAL_SOURCE_SUFFIXES:
-        return None
-    return resolved
-
-
-def _proposal_source_record(path: Path, include_text: bool = False) -> dict[str, object]:
-    raw_root = RAW_DIR.resolve()
-    rel = path.relative_to(raw_root).as_posix()
-    try:
-        size = path.stat().st_size
-    except OSError as exc:
-        return {
-            "path": f"raw/{rel}",
-            "source": f"raw/{rel}",
-            "title": rel,
-            "size": 0,
-            "snippet": "",
-            "secret_warnings": [],
-            "warning_count": 0,
-            "loadable": False,
-            "truncated": False,
-            "action": "unavailable",
-            "action_label": "Unavailable",
-            "error": str(exc),
-        }
-    text, read_error = _proposal_source_preview(path)
-    scan = _secret_file_scan(path)
-    labels = list(scan.get("labels") or [])
-    scan_error = str(scan.get("error") or "")
-    read_error = read_error or scan_error
-    redacted, _, _ = _redact_secret_values(text) if labels else (text, [], 0)
-    truncated = size > MAX_PROPOSAL_SOURCE_BYTES
-    if read_error:
-        action = "unavailable"
-        action_label = "Fix access"
-    elif labels:
-        action = "redact"
-        action_label = "Redact first"
-    elif truncated:
-        action = "split"
-        action_label = "Split file"
-    else:
-        action = "load"
-        action_label = "Use in form"
-    record: dict[str, object] = {
-        "path": f"raw/{rel}",
-        "source": f"raw/{rel}",
-        "title": _proposal_source_title(redacted, rel),
-        "size": size,
-        "snippet": _proposal_source_snippet(redacted),
-        "secret_warnings": labels,
-        "warning_count": len(labels),
-        "loadable": action == "load",
-        "truncated": truncated,
-        "action": action,
-        "action_label": action_label,
-    }
-    if read_error:
-        record["error"] = read_error
-    if include_text and record["loadable"]:
-        record["text"] = text[:MAX_PROPOSAL_SOURCE_BYTES]
-    return record
-
-
 def _proposal_sources(limit: int = 50) -> dict[str, object]:
-    if not RAW_DIR.exists():
-        return {"count": 0, "sources": [], "raw_dir": str(RAW_DIR), "warning_count": 0}
-    raw_root = RAW_DIR.resolve()
-    sources: list[dict[str, object]] = []
-    for path in sorted(RAW_DIR.rglob("*")):
-        resolved = _safe_resolve(path)
-        if not resolved or not _is_relative_to(resolved, raw_root):
-            continue
-        if not resolved.is_file() or resolved.suffix.lower() not in PROPOSAL_SOURCE_SUFFIXES:
-            continue
-        if any(part.startswith(".") for part in resolved.relative_to(raw_root).parts):
-            continue
-        sources.append(_proposal_source_record(resolved))
-        if len(sources) >= limit:
-            break
-    warning_count = sum(int(source.get("warning_count") or 0) for source in sources)
-    return {
-        "count": len(sources),
-        "sources": sources,
-        "raw_dir": str(RAW_DIR),
-        "warning_count": warning_count,
-    }
+    return _core_proposal_sources(
+        RAW_DIR,
+        suffixes=PROPOSAL_SOURCE_SUFFIXES,
+        max_bytes=MAX_PROPOSAL_SOURCE_BYTES,
+        limit=limit,
+    )
 
 
 def _proposal_source_payload(source_path: str) -> tuple[dict[str, object], int]:
-    path = _resolve_proposal_source_path(source_path)
-    if not path:
-        return {"found": False, "error": "source path not found or unsupported"}, 404
-    record = _proposal_source_record(path, include_text=True)
-    if record.get("warning_count"):
-        record["found"] = True
-        record["error"] = "source contains secret-looking values; redact before loading"
-        return record, 409
-    if not record.get("loadable"):
-        record["found"] = True
-        if record.get("action") == "unavailable":
-            record["error"] = record.get("error") or "source could not be read"
-            return record, 423
-        record["error"] = "source is too large to load into the proposal form"
-        return record, 413
-    record["found"] = True
-    return record, 200
+    return _core_proposal_source_payload(
+        RAW_DIR,
+        source_path,
+        suffixes=PROPOSAL_SOURCE_SUFFIXES,
+        max_bytes=MAX_PROPOSAL_SOURCE_BYTES,
+    )
 
 
 def _create_raw_source_payload(payload: dict[str, object]) -> tuple[dict[str, object], int]:
-    try:
-        result = _core_create_raw_source(
-            WIKI_DIR.parent,
-            title=payload.get("title", ""),
-            filename=payload.get("filename", ""),
-            text=payload.get("text", ""),
-            max_bytes=MAX_RAW_SOURCE_BYTES,
-        )
-    except _RawSourceError as exc:
-        return {
-            "created": False,
-            "error": str(exc),
-            "secret_warnings": exc.labels,
-        }, exc.status
-    _append_log(
-        _utc_timestamp(),
-        "add-raw-source",
-        f"Added {result['path']} from local web UI",
-        [
-            f"Raw source: {result['path']}",
-            f"Size bytes: {result['size_bytes']}",
-            "Secret warnings: none",
-        ],
+    return _core_create_raw_source_payload(
+        WIKI_DIR.parent,
+        WIKI_DIR,
+        payload,
+        max_bytes=MAX_RAW_SOURCE_BYTES,
     )
-    return result, 201
 
 
 # ---------------------------------------------------------------------------
