@@ -111,6 +111,9 @@ from link_core.web_proposals import (
     proposal_source_payload as _core_proposal_source_payload,
     proposal_sources as _core_proposal_sources,
 )
+from link_core.web_pages import (
+    render_all_pages as _core_render_all_pages,
+)
 from link_core.web_search import (
     render_search_page as _core_render_search_page,
 )
@@ -1016,36 +1019,15 @@ def _render_all(query: dict[str, list[str]] | None = None):
     assert offset is not None
     sorted_pages = sorted(pages, key=lambda x: x["title"])
     window = sorted_pages[offset:offset + limit]
-    items = "".join(
-        f'<li><a href="{_page_href(p["name"])}">{html.escape(p["title"])}</a>'
-        f'<span class="type">{p["type"] or p["category"]}</span></li>'
-        for p in window
+    return _core_render_all_pages(
+        window,
+        total=total,
+        limit=limit,
+        offset=offset,
+        page_href=_page_href,
+        layout=_layout,
+        error=error or "",
     )
-    next_offset = offset + limit
-    prev_offset = max(0, offset - limit)
-    controls = ""
-    if total > limit or offset:
-        start = 0 if total == 0 else offset + 1
-        end = min(offset + limit, total)
-        prev_href = html.escape(f"/all?limit={limit}&offset={prev_offset}", quote=True)
-        next_href = html.escape(f"/all?limit={limit}&offset={next_offset}", quote=True)
-        prev_link = (
-            f'<a class="button-link" href="{prev_href}">Previous</a>'
-            if offset > 0
-            else '<span class="button-link disabled">Previous</span>'
-        )
-        next_link = (
-            f'<a class="button-link" href="{next_href}">Next</a>'
-            if next_offset < total
-            else '<span class="button-link disabled">Next</span>'
-        )
-        controls = (
-            f'<div class="pager"><span>Showing {start}-{end} of {total}</span>'
-            f'{prev_link}{next_link}</div>'
-        )
-    warning = f'<p class="error">{html.escape(error)}</p>' if error else ""
-    return _layout("All Pages", f'<div class="breadcrumb"><a href="/">Link</a> / all pages</div>'
-                   f"<h1>All Pages ({total})</h1>{warning}{controls}<ul class='page-list'>{items}</ul>{controls}")
 
 
 def _render_memory_card(record: dict[str, object], include_issues: bool = False) -> str:
