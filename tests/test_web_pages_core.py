@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.web_pages import render_all_pages, render_page_controls  # noqa: E402
+from link_core.web_pages import render_all_pages, render_page_controls, render_wiki_page  # noqa: E402
 
 
 def _layout(title: str, body: str) -> str:
@@ -57,3 +57,29 @@ def test_render_all_pages_includes_error_and_pagination():
 
 def test_render_page_controls_is_empty_without_pagination():
     assert render_page_controls(total=1, limit=250, offset=0) == ""
+
+
+def test_render_wiki_page_escapes_breadcrumb_and_meta():
+    html = render_wiki_page(
+        "<Title>",
+        category="<concepts>",
+        meta={
+            "type": "<concept>",
+            "maturity": "<seed>",
+            "source_count": "<2>",
+            "date_updated": "<today>",
+            "aliases": ["<alias>", "Link"],
+        },
+        body_html="<h1>Trusted body</h1>",
+        layout=_layout,
+    )
+
+    assert "&lt;concepts&gt;" in html
+    assert "&lt;Title&gt;" in html
+    assert "&lt;concept&gt;" in html
+    assert "&lt;seed&gt;" in html
+    assert "&lt;2&gt; sources" in html
+    assert "updated &lt;today&gt;" in html
+    assert "also: &lt;alias&gt;, Link" in html
+    assert "<h1>Trusted body</h1>" in html
+    assert "<concept>" not in html

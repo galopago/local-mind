@@ -113,6 +113,7 @@ from link_core.web_proposals import (
 )
 from link_core.web_pages import (
     render_all_pages as _core_render_all_pages,
+    render_wiki_page as _core_render_wiki_page,
 )
 from link_core.web_search import (
     render_search_page as _core_render_search_page,
@@ -983,24 +984,7 @@ def _render_page(page_path):
 
     rel = page_path.relative_to(WIKI_DIR)
     cat = rel.parts[0] if len(rel.parts) > 1 else ""
-    crumb = f'<div class="breadcrumb"><a href="/">Link</a>'
-    if cat:
-        crumb += f' / {html.escape(cat)}'
-    crumb += f' / {html.escape(title)}</div>'
-
-    parts = []
-    if meta.get("type"): parts.append(f'<span class="badge">{html.escape(str(meta["type"]))}</span>')
-    if meta.get("maturity"): parts.append(html.escape(str(meta["maturity"])))
-    if meta.get("source_count"): parts.append(f'{meta["source_count"]} sources')
-    if meta.get("date_updated"): parts.append(f'updated {meta["date_updated"]}')
-    aliases = meta.get("aliases", [])
-    if isinstance(aliases, list) and aliases:
-        parts.append("also: " + ", ".join(html.escape(a) for a in aliases))
-    elif isinstance(aliases, str) and aliases:
-        parts.append(f"also: {html.escape(aliases)}")
-    meta_line = f'<div class="meta">{" · ".join(parts)}</div>' if parts else ""
-
-    return _layout(title, crumb + meta_line + body_html)
+    return _core_render_wiki_page(str(title), category=cat, meta=meta, body_html=body_html, layout=_layout)
 
 
 def _render_all(query: dict[str, list[str]] | None = None):
