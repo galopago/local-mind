@@ -69,12 +69,12 @@ from link_core.version import (
 )
 from link_core.web_assets import CSS  # noqa: F401 - kept as serve.CSS for tests and compatibility
 from link_core.web_memory import (
-    render_capture_card as _core_render_capture_card,
-    render_capture_section as _core_render_capture_section,
-    render_memory_action_button as _core_render_memory_action_button,
-    render_memory_action_commands as _core_render_memory_action_commands,
+    render_capture_card as _render_capture_card,
+    render_capture_section as _render_capture_section,
+    render_memory_action_button as _render_memory_action_button,
+    render_memory_action_commands as _render_memory_action_commands,
     render_memory_card as _core_render_memory_card,
-    render_memory_next_actions as _core_render_memory_next_actions,
+    render_memory_next_actions as _render_memory_next_actions,
     render_memory_section as _core_render_memory_section,
 )
 from link_core.web_layout import (
@@ -1054,14 +1054,6 @@ def _render_memory_card(record: dict[str, object], include_issues: bool = False)
     )
 
 
-def _render_memory_action_commands(actions: list[dict[str, object]] | tuple[dict[str, object], ...]) -> str:
-    return _core_render_memory_action_commands(actions)
-
-
-def _render_memory_action_button(action: dict[str, object]) -> str:
-    return _core_render_memory_action_button(action)
-
-
 def _render_memory_section(title: str, records: list[dict[str, object]], empty: str, href: str = "", include_issues: bool = False) -> str:
     return _core_render_memory_section(
         title,
@@ -1072,18 +1064,6 @@ def _render_memory_section(title: str, records: list[dict[str, object]], empty: 
         href=href,
         include_issues=include_issues,
     )
-
-
-def _render_capture_card(capture: dict[str, object]) -> str:
-    return _core_render_capture_card(capture)
-
-
-def _render_capture_section(captures: list[dict[str, object]]) -> str:
-    return _core_render_capture_section(captures)
-
-
-def _render_memory_next_actions(actions: list[dict[str, str]]) -> str:
-    return _core_render_memory_next_actions(actions)
 
 
 def _render_brief(query: str = "", project: str | None = None):
