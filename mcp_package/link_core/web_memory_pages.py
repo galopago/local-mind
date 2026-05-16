@@ -1,0 +1,329 @@
+"""HTML page renderers for Link's memory web views."""
+from __future__ import annotations
+
+import html
+import urllib.parse
+from collections.abc import Callable, Mapping
+
+from .web_layout import render_stat_grid
+from .web_memory import (
+    MemoryActionHints,
+    render_capture_section,
+    render_memory_action_commands,
+    render_memory_next_actions,
+    render_memory_section,
+)
+
+
+PageHref = Callable[[str], str]
+PageLayout = Callable[[str, str], str]
+
+
+def render_brief_page(
+    brief: Mapping[str, object],
+    query: str,
+    *,
+    page_href: PageHref,
+    action_hints: MemoryActionHints,
+    layout: PageLayout,
+) -> str:
+    profile = _mapping(brief.get("profile"))
+    captures = _mapping(brief.get("captures"))
+    review = _mapping(brief.get("review"))
+    stats = render_stat_grid([
+        (profile.get("active_count", 0), "active"),
+        (brief.get("relevant_count", 0), "relevant"),
+        (review.get("count", 0), "review"),
+        (captures.get("count", 0), "captures"),
+    ])
+    guidance = "".join(
+        f"<li>{html.escape(str(item))}</li>"
+        for item in _sequence(brief.get("agent_guidance"))
+    )
+    project = str(brief.get("project") or "")
+    project_field = (
+        f'<input type="hidden" name="project" value="{html.escape(project, quote=True)}">'
+        if project else ""
+    )
+    body = (
+        '<div class="breadcrumb"><a href="/">Link</a> / brief</div>'
+        '<h1>Memory Brief</h1>'
+        '<div class="memory-profile">'
+        '<p class="summary">Startup context for local agents before answering, coding, or planning.</p>'
+        '<form class="brief-form" action="/brief" method="get">'
+        f'<input type="text" name="q" value="{html.escape(str(query), quote=True)}" placeholder="task or question">'
+        f'{project_field}<button type="submit">Brief</button></form>'
+        f'{_project_line(project)}'
+        f'{stats}'
+        f'<h2>Agent Guidance</h2><ul>{guidance}</ul>'
+        f'{render_memory_section("Relevant memories", _dict_list(brief.get("relevant_memories")), "No relevant memories yet.", page_href=page_href, action_hints=action_hints)}'
+        f'{render_memory_section("Review queue", _dict_list(review.get("items")), "No memory review items.", page_href=page_href, action_hints=action_hints, href="/inbox", include_issues=True)}'
+        f'{render_capture_section(_dict_list(captures.get("items")))}'
+        '</div>'
+    )
+    return layout("Memory Brief", body)
+
+
+def render_memory_dashboard_page(
+    dashboard: Mapping[str, object],
+    *,
+    page_href: PageHref,
+    action_hints: MemoryActionHints,
+    layout: PageLayout,
+) -> str:
+    stats = render_stat_grid([
+        (dashboard.get("memory_count", 0), "memories"),
+        (dashboard.get("active_count", 0), "active"),
+        (dashboard.get("review_count", 0), "review"),
+        (dashboard.get("updated_count", 0), "updated"),
+        (dashboard.get("capture_count", 0), "captures"),
+        (dashboard.get("archived_count", 0), "archived"),
+    ])
+    counts = ""
+    by_type = _mapping(dashboard.get("by_type"))
+    by_scope = _mapping(dashboard.get("by_scope"))
+    if by_type:
+        counts += _counts_line("Types", by_type)
+    if by_scope:
+        counts += _counts_line("Scopes", by_scope)
+    project = str(dashboard.get("project") or "")
+    body = (
+        '<div class="breadcrumb"><a href="/">Link</a> / memory</div>'
+        '<h1>Memory Dashboard</h1>'
+        '<div class="memory-dashboard">'
+        '<p class="summary">Read-only command center for what local agents can remember, what needs review, and what changed recently.</p>'
+        f'{_project_line(project)}'
+        f'{stats}'
+        f'{render_memory_next_actions(_dict_list(dashboard.get("next_actions")))}'
+        f'{counts}'
+        f'{render_memory_section("Review needed", _dict_list(dashboard.get("review")), "No memories need review.", page_href=page_href, action_hints=action_hints, href="/inbox", include_issues=True)}'
+        f'{render_capture_section(_dict_list(dashboard.get("captures")))}'
+        f'{render_memory_section("Recent updates", _dict_list(dashboard.get("recent_updates")), "No memory updates yet.", page_href=page_href, action_hints=action_hints)}'
+        f'{render_memory_section("Active memories", _dict_list(dashboard.get("active")), "No active memories yet.", page_href=page_href, action_hints=action_hints, href="/profile")}'
+        f'{render_memory_section("Archived memories", _dict_list(dashboard.get("archived")), "No archived memories.", page_href=page_href, action_hints=action_hints)}'
+        '</div>'
+    )
+    return layout("Memory Dashboard", body)
+
+
+def render_profile_page(
+    profile: Mapping[str, object],
+    *,
+    page_href: PageHref,
+    layout: PageLayout,
+) -> str:
+    stats = render_stat_grid([
+        (profile.get("memory_count", 0), "memories"),
+        (profile.get("active_count", 0), "active"),
+        (profile.get("review_count", 0), "review"),
+    ])
+    archived = _dict_list(profile.get("archived"))
+    body = (
+        '<div class="breadcrumb"><a href="/">Link</a> / profile</div>'
+        '<h1>Memory Profile</h1>'
+        '<div class="memory-profile">'
+        '<p class="summary">What Link currently remembers about the user, projects, decisions, and preferences.</p>'
+        f'{_project_line(str(profile.get("project") or ""))}'
+        f'{stats}'
+        f'{_counts_line("Types", _mapping(profile.get("by_type")))}'
+        f'{_counts_line("Scopes", _mapping(profile.get("by_scope")))}'
+        f'{_counts_line("Status", _mapping(profile.get("by_status")))}'
+        f'{_profile_section("Recent memories", _dict_list(profile.get("recent")), page_href=page_href)}'
+        f'{_profile_section("Preferences", _dict_list(profile.get("preferences")), page_href=page_href)}'
+        f'{_profile_section("Decisions", _dict_list(profile.get("decisions")), page_href=page_href)}'
+        f'{_profile_section("Project context", _dict_list(profile.get("projects")), page_href=page_href)}'
+        f'{_profile_section("Archived memories", archived, page_href=page_href) if archived else ""}'
+        '</div>'
+    )
+    return layout("Memory Profile", body)
+
+
+def render_memory_audit_page(
+    audit: Mapping[str, object],
+    *,
+    page_href: PageHref,
+    action_hints: MemoryActionHints,
+    layout: PageLayout,
+) -> str:
+    profile = _mapping(audit.get("profile"))
+    captures = _mapping(audit.get("captures"))
+    inbox = _mapping(audit.get("inbox"))
+    stats = render_stat_grid([
+        (profile.get("memory_count", 0), "memories"),
+        (profile.get("active_count", 0), "active"),
+        (profile.get("review_count", 0), "review"),
+        (captures.get("count", 0), "captures"),
+        (captures.get("warning_count", 0), "warnings"),
+        (captures.get("read_warning_count", 0), "read warnings"),
+    ])
+    risk_factors = _dict_list(audit.get("risk_factors"))
+    if risk_factors:
+        risk_html = "<h2>Needs attention</h2><ul class='memory-issues'>" + "".join(
+            f'<li><span class="severity">review</span> {html.escape(str(item.get("code") or ""))}: '
+            f'{html.escape(str(item.get("message") or ""))}</li>'
+            for item in risk_factors
+        ) + "</ul>"
+    else:
+        risk_html = "<h2>Needs attention</h2><p>No memory audit risks detected.</p>"
+    body = (
+        '<div class="breadcrumb"><a href="/">Link</a> / audit</div>'
+        '<h1>Memory Audit</h1>'
+        '<div class="memory-profile">'
+        '<p class="summary">Read-only health report for local agent memory, review backlog, raw captures, and safe next actions.</p>'
+        f'{_project_line(str(audit.get("project") or ""))}'
+        f'<p><strong>Status:</strong> {html.escape(str(audit.get("status") or ""))}</p>'
+        f'{stats}'
+        f'{risk_html}'
+        f'{render_memory_next_actions(_dict_list(audit.get("next_actions")))}'
+        f'{render_memory_section("Memory inbox sample", _dict_list(inbox.get("items")), "No memory review items.", page_href=page_href, action_hints=action_hints, href="/inbox", include_issues=True)}'
+        f'{render_capture_section(_dict_list(captures.get("items")))}'
+        '</div>'
+    )
+    return layout("Memory Audit", body)
+
+
+def render_captures_page(inbox: Mapping[str, object], *, layout: PageLayout) -> str:
+    warning_count = int(inbox.get("warning_count") or 0)
+    stats = render_stat_grid([
+        (inbox.get("count", 0), "captures"),
+        (warning_count, "warnings"),
+        (inbox.get("read_warning_count", 0), "read warnings"),
+    ])
+    warning_html = ""
+    if warning_count:
+        warning_html = (
+            '<div class="memory-next"><strong>Needs redaction</strong>'
+            f'<p>{warning_count} raw capture'
+            f'{"s contain" if warning_count != 1 else " contains"} secret-looking values.</p>'
+            '<code>python3 link.py redact-capture raw/memory-captures/&lt;capture&gt;.md .</code></div>'
+        )
+    read_warning_html = ""
+    read_warnings = _dict_list(inbox.get("read_warnings"))
+    if read_warnings:
+        rows = "".join(
+            f'<li><code>{html.escape(str(item.get("capture") or ""))}</code> '
+            f'{html.escape(str(item.get("error") or "unreadable"))}</li>'
+            for item in read_warnings[:50]
+        )
+        read_warning_html = (
+            '<div class="memory-next"><strong>Fix capture access</strong>'
+            '<p>Some raw captures could not be read and are not listed for approval.</p>'
+            f'<ul>{rows}</ul></div>'
+        )
+    body = (
+        '<div class="breadcrumb"><a href="/">Link</a> / captures</div>'
+        '<h1>Raw Capture Inbox</h1>'
+        '<div class="memory-profile">'
+        '<p class="summary">Saved proposal-only session notes waiting for human review before they become durable memory.</p>'
+        f'{_project_line(str(inbox.get("project") or ""))}'
+        f'{stats}'
+        f'{warning_html}'
+        f'{read_warning_html}'
+        f'{render_capture_section(_dict_list(inbox.get("captures")))}'
+        '</div>'
+    )
+    return layout("Raw Capture Inbox", body)
+
+
+def render_inbox_page(
+    inbox: Mapping[str, object],
+    *,
+    page_href: PageHref,
+    layout: PageLayout,
+) -> str:
+    stats = render_stat_grid([(inbox.get("review_count", 0), "review")])
+    severity_html = _counts_line("Severity", _mapping(inbox.get("counts_by_severity")))
+    items = _dict_list(inbox.get("items"))
+    if not items:
+        content = "<p>Inbox is clear.</p>"
+    else:
+        rows = "".join(_render_inbox_item(item, page_href=page_href) for item in items)
+        content = f"<ul class='page-list'>{rows}</ul>"
+    body = (
+        '<div class="breadcrumb"><a href="/">Link</a> / inbox</div>'
+        '<h1>Memory Review Inbox</h1>'
+        '<div class="memory-profile">'
+        '<p class="summary">Memories that need confirmation, stronger metadata, or cleanup.</p>'
+        f'{_project_line(str(inbox.get("project") or ""))}'
+        f'{stats}'
+        f'{severity_html}'
+        f'{content}'
+        '</div>'
+    )
+    return layout("Memory Review Inbox", body)
+
+
+def _render_inbox_item(item: Mapping[str, object], *, page_href: PageHref) -> str:
+    name = str(item.get("name") or "")
+    summary = item.get("tldr") or item.get("snippet") or ""
+    meta = f'{item.get("memory_type", "")} · {item.get("scope", "")} · {item.get("status", "")}'
+    issues = "".join(
+        f'<li><span class="severity">{html.escape(str(issue.get("severity") or ""))}</span> '
+        f'{html.escape(str(issue.get("code") or ""))}: {html.escape(str(issue.get("message") or ""))}</li>'
+        for issue in _dict_list(item.get("issues"))
+    )
+    primary = _mapping(item.get("primary_action"))
+    primary_html = ""
+    if primary:
+        primary_html = (
+            f'<p class="summary"><strong>Next:</strong> {html.escape(str(primary.get("label") or ""))} '
+            f'- {html.escape(str(primary.get("description") or ""))}</p>'
+        )
+    return (
+        f'<li><a href="{html.escape(page_href(name), quote=True)}">{html.escape(str(item.get("title") or name))}</a>'
+        f'<div class="memory-meta">{html.escape(meta)}</div>'
+        f'<div class="memory-meta"><a href="/explain-memory?memory={urllib.parse.quote(name, safe="")}">explain</a></div>'
+        f'{f"<small>{html.escape(str(summary))}</small>" if summary else ""}'
+        f'<ul class="memory-issues">{issues}</ul>'
+        f'{primary_html}'
+        f'{render_memory_action_commands(_dict_list(item.get("actions")))}</li>'
+    )
+
+
+def _profile_section(
+    title: str,
+    records: list[dict[str, object]],
+    *,
+    page_href: PageHref,
+    empty: str = "none",
+) -> str:
+    if not records:
+        return f"<h2>{html.escape(title)}</h2><p>{html.escape(empty)}</p>"
+    items = ""
+    for record in records:
+        name = str(record.get("name") or "")
+        summary = record.get("tldr") or record.get("snippet") or ""
+        meta = f'{record.get("memory_type", "")} · {record.get("scope", "")}'
+        items += (
+            f'<li><a href="{html.escape(page_href(name), quote=True)}">{html.escape(str(record.get("title") or name))}</a>'
+            f'<div class="memory-meta">{html.escape(meta)}</div>'
+            f'<div class="memory-meta"><a href="/explain-memory?memory={urllib.parse.quote(name, safe="")}">explain</a></div>'
+            f'{f"<small>{html.escape(str(summary))}</small>" if summary else ""}</li>'
+        )
+    return f"<h2>{html.escape(title)}</h2><ul class='page-list'>{items}</ul>"
+
+
+def _counts_line(title: str, counts: Mapping[str, object]) -> str:
+    if not counts:
+        return ""
+    parts = ", ".join(
+        f"{html.escape(str(name))}: {html.escape(str(count))}"
+        for name, count in counts.items()
+    )
+    return f"<p><strong>{html.escape(title)}:</strong> {parts}</p>"
+
+
+def _project_line(project: str) -> str:
+    return f"<p><strong>Project:</strong> {html.escape(project)}</p>" if project else ""
+
+
+def _mapping(value: object) -> Mapping[str, object]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _sequence(value: object) -> list[object]:
+    return list(value) if isinstance(value, list) else []
+
+
+def _dict_list(value: object) -> list[dict[str, object]]:
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
