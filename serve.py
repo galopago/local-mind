@@ -91,6 +91,10 @@ from link_core.web_graph import (
     graph_legend_items as _core_graph_legend_items,
     graph_needs_bounded_overview as _core_graph_needs_bounded_overview,
 )
+from link_core.web_home import (
+    plural_type_label as _core_plural_type_label,
+    render_home_page as _core_render_home_page,
+)
 from link_core.web_http import (
     CONTENT_SECURITY_POLICY as _core_content_security_policy,
     is_allowed_static_file as _core_is_allowed_static_file,
@@ -360,10 +364,7 @@ def _page_href(name: str) -> str:
 
 
 def _plural_type_label(page_type: str) -> str:
-    irregular = {"entity": "entities", "memory": "memories"}
-    if page_type in irregular:
-        return irregular[page_type]
-    return page_type if page_type.endswith("s") else page_type + "s"
+    return _core_plural_type_label(page_type)
 
 
 def _memory_records() -> list[dict[str, object]]:
@@ -879,61 +880,12 @@ def _layout(title, body, page_class: str = ""):
 # ---------------------------------------------------------------------------
 
 def _render_home():
-    pages = _get_all_pages()
-    counts = {}
-    for p in pages:
-        t = p["type"] or "other"
-        counts[t] = counts.get(t, 0) + 1
-
-    stats_items = f'<div class="stat"><span class="num">{len(pages)}</span><span class="label">pages</span></div>'
-    for t in ["memory", "source", "concept", "entity", "comparison", "exploration"]:
-        if counts.get(t, 0) > 0:
-            label = _plural_type_label(t)
-            stats_items += f'<div class="stat"><span class="num">{counts[t]}</span><span class="label">{label}</span></div>'
-    stats = f'<div class="home-stats">{stats_items}</div>'
-
-    cats = {}
-    for p in pages:
-        if p["category"] == "root": continue
-        cats.setdefault(p["category"], []).append(p)
-
-    sections = ""
-    for cat in sorted(cats.keys()):
-        items = "".join(
-            f'<li><a href="{_page_href(p["name"])}">{html.escape(p["title"])}</a>'
-            f'<span class="type">{p["type"]}</span></li>'
-            for p in sorted(cats[cat], key=lambda x: x["title"])
-        )
-        sections += f'<h2>{html.escape(cat)}</h2><ul class="page-list">{items}</ul>'
-
-    if not cats:
-        sections = "<p>Wiki is empty. Drop sources into <code>raw/</code> and tell your agent to ingest them.</p>"
-
-    lanes = (
-        '<div class="product-lanes" aria-label="How Link stores context">'
-        '<section class="product-lane"><h2>1. Sources become wiki knowledge</h2>'
-        '<p>Drop files into <code>raw/</code> and say <code>ingest raw/file.md into Link</code>. '
-        'Link creates source-backed pages, concepts, backlinks, index entries, and logs.</p></section>'
-        '<section class="product-lane"><h2>2. Remember saves agent memory</h2>'
-        '<p>Say <code>remember that ...</code> when a preference, decision, or project fact should affect future agents. '
-        'Ingest alone does not silently personalize recall.</p></section>'
-        '<section class="product-lane"><h2>3. Query uses both safely</h2>'
-        '<p>Ask <code>query Link for ...</code> or open a memory brief. Link combines reviewed memory, wiki pages, and graph context.</p></section>'
-        '</div>'
+    return _core_render_home_page(
+        _get_all_pages(),
+        starter_prompts=_starter_prompts_payload(),
+        page_href=_page_href,
+        layout=_layout,
     )
-    prompt_codes = ""
-    for item in _starter_prompts_payload().get("prompts", []):
-        if isinstance(item, dict):
-            prompt_codes += f'<code>{html.escape(str(item.get("prompt") or ""))}</code>'
-    prompts = (
-        '<section class="prompt-strip" aria-label="First Link prompts">'
-        '<h2>Try These Prompts</h2>'
-        '<p>Ask from Codex, Claude, Cursor, Kiro, or any agent with Link installed. <a href="/prompts">Open starter prompts</a>.</p>'
-        '<div class="prompt-grid">'
-        f'{prompt_codes}</div></section>'
-    )
-
-    return _layout("Link", f"<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>{lanes}{prompts}{stats}{sections}")
 
 
 def _starter_prompts_payload(project: str | None = None) -> dict[str, object]:
