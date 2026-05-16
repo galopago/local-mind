@@ -115,6 +115,9 @@ from link_core.web_proposals import (
     proposal_source_payload as _core_proposal_source_payload,
     proposal_sources as _core_proposal_sources,
 )
+from link_core.web_prompts import (
+    render_prompts_page as _core_render_prompts_page,
+)
 from link_core.web_pages import (
     render_all_pages as _core_render_all_pages,
     render_wiki_page as _core_render_wiki_page,
@@ -893,35 +896,7 @@ def _starter_prompts_payload(project: str | None = None) -> dict[str, object]:
 
 
 def _render_prompts(project: str | None = None):
-    payload = _starter_prompts_payload(project=project)
-    prompt_rows = ""
-    for item in payload.get("prompts", []):
-        if not isinstance(item, dict):
-            continue
-        prompt_rows += (
-            f'<article class="proposal-card">'
-            f'<h3>{html.escape(str(item.get("label") or "Prompt"))}</h3>'
-            f'<code class="proposal-command">{html.escape(str(item.get("prompt") or ""))}</code>'
-            f'<p class="summary">{html.escape(str(item.get("when") or ""))}</p>'
-            f'</article>'
-        )
-    command_rows = "".join(
-        f'<li><code>{html.escape(str(command))}</code></li>'
-        for command in payload.get("commands", [])
-    )
-    project_line = (
-        f'<p class="summary">Project examples are scoped to <code>{html.escape(str(payload["project"]))}</code>.</p>'
-        if payload.get("project")
-        else '<p class="summary">These prompts work for a personal Link wiki. Add <code>?project=slug</code> for project wording.</p>'
-    )
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / prompts</div>'
-        f'<h1>Starter Prompts</h1>'
-        f'{project_line}'
-        f'<section><h2>Ask Your Agent</h2><div class="proposal-results">{prompt_rows}</div></section>'
-        f'<section><h2>Local Checks</h2><ul class="page-list">{command_rows}</ul></section>'
-    )
-    return _layout("Starter Prompts", body)
+    return _core_render_prompts_page(_starter_prompts_payload(project=project), layout=_layout)
 
 
 def _render_page(page_path):
