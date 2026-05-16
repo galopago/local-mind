@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.web_layout import render_footer_html, render_header_html, render_layout  # noqa: E402
+from link_core.web_layout import render_footer_html, render_header_html, render_layout, render_stat_grid  # noqa: E402
 
 
 class WebLayoutCoreTests(unittest.TestCase):
@@ -37,6 +37,14 @@ class WebLayoutCoreTests(unittest.TestCase):
         self.assertIn("localStorage.getItem('link-theme')", html)
         self.assertIn("navigator.clipboard.writeText", html)
         self.assertIn("/api/raw-source", html)
+
+    def test_stat_grid_escapes_values_and_labels(self):
+        html = render_stat_grid([("<2>", "raw <files>")])
+
+        self.assertIn("home-stats", html)
+        self.assertIn("&lt;2&gt;", html)
+        self.assertIn("raw &lt;files&gt;", html)
+        self.assertNotIn("<2>", html)
 
 
 if __name__ == "__main__":

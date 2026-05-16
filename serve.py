@@ -81,6 +81,7 @@ from link_core.web_layout import (
     render_footer_html as _core_render_footer_html,
     render_header_html as _core_render_header_html,
     render_layout as _core_render_layout,
+    render_stat_grid as _core_render_stat_grid,
 )
 from link_core.web_graph import (
     GRAPH_CATEGORY_COLORS as _core_graph_category_colors,
@@ -966,14 +967,12 @@ def _render_brief(query: str = "", project: str | None = None):
     brief = _memory_brief(query=query, limit=8, project=project)
     profile = brief["profile"]
     captures = brief["captures"]
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{profile["active_count"]}</span><span class="label">active</span></div>'
-        f'<div class="stat"><span class="num">{brief["relevant_count"]}</span><span class="label">relevant</span></div>'
-        f'<div class="stat"><span class="num">{brief["review"]["count"]}</span><span class="label">review</span></div>'
-        f'<div class="stat"><span class="num">{captures["count"]}</span><span class="label">captures</span></div>'
-        f'</div>'
-    )
+    stats = _core_render_stat_grid([
+        (profile["active_count"], "active"),
+        (brief["relevant_count"], "relevant"),
+        (brief["review"]["count"], "review"),
+        (captures["count"], "captures"),
+    ])
     guidance = "".join(
         f"<li>{html.escape(str(item))}</li>"
         for item in brief["agent_guidance"]
@@ -1004,16 +1003,14 @@ def _render_brief(query: str = "", project: str | None = None):
 
 def _render_memory_dashboard(project: str | None = None):
     dashboard = _memory_dashboard(limit=8, project=project)
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{dashboard["memory_count"]}</span><span class="label">memories</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["active_count"]}</span><span class="label">active</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["review_count"]}</span><span class="label">review</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["updated_count"]}</span><span class="label">updated</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["capture_count"]}</span><span class="label">captures</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["archived_count"]}</span><span class="label">archived</span></div>'
-        f'</div>'
-    )
+    stats = _core_render_stat_grid([
+        (dashboard["memory_count"], "memories"),
+        (dashboard["active_count"], "active"),
+        (dashboard["review_count"], "review"),
+        (dashboard["updated_count"], "updated"),
+        (dashboard["capture_count"], "captures"),
+        (dashboard["archived_count"], "archived"),
+    ])
     counts = ""
     if dashboard["by_type"]:
         counts += "<p><strong>Types:</strong> " + ", ".join(
@@ -1046,13 +1043,11 @@ def _render_profile(project: str | None = None):
     profile = _memory_profile(limit=12, project=project)
     memory_count = profile["memory_count"]
     active_count = profile["active_count"]
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{memory_count}</span><span class="label">memories</span></div>'
-        f'<div class="stat"><span class="num">{active_count}</span><span class="label">active</span></div>'
-        f'<div class="stat"><span class="num">{profile["review_count"]}</span><span class="label">review</span></div>'
-        f'</div>'
-    )
+    stats = _core_render_stat_grid([
+        (memory_count, "memories"),
+        (active_count, "active"),
+        (profile["review_count"], "review"),
+    ])
 
     def counts_line(title: str, counts: dict[str, int]) -> str:
         if not counts:
@@ -1099,16 +1094,14 @@ def _render_memory_audit(project: str | None = None):
     audit = _memory_audit(limit=10, project=project)
     profile = audit["profile"]
     captures = audit["captures"]
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{profile["memory_count"]}</span><span class="label">memories</span></div>'
-        f'<div class="stat"><span class="num">{profile["active_count"]}</span><span class="label">active</span></div>'
-        f'<div class="stat"><span class="num">{profile["review_count"]}</span><span class="label">review</span></div>'
-        f'<div class="stat"><span class="num">{captures["count"]}</span><span class="label">captures</span></div>'
-        f'<div class="stat"><span class="num">{captures["warning_count"]}</span><span class="label">warnings</span></div>'
-        f'<div class="stat"><span class="num">{captures.get("read_warning_count", 0)}</span><span class="label">read warnings</span></div>'
-        f'</div>'
-    )
+    stats = _core_render_stat_grid([
+        (profile["memory_count"], "memories"),
+        (profile["active_count"], "active"),
+        (profile["review_count"], "review"),
+        (captures["count"], "captures"),
+        (captures["warning_count"], "warnings"),
+        (captures.get("read_warning_count", 0), "read warnings"),
+    ])
     risk_html = ""
     if audit["risk_factors"]:
         risk_html = "<h2>Needs attention</h2><ul class='memory-issues'>" + "".join(
@@ -1137,13 +1130,11 @@ def _render_memory_audit(project: str | None = None):
 
 def _render_captures(project: str | None = None):
     inbox = _capture_inbox(limit=50, project=project)
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{inbox["count"]}</span><span class="label">captures</span></div>'
-        f'<div class="stat"><span class="num">{inbox["warning_count"]}</span><span class="label">warnings</span></div>'
-        f'<div class="stat"><span class="num">{inbox.get("read_warning_count", 0)}</span><span class="label">read warnings</span></div>'
-        f'</div>'
-    )
+    stats = _core_render_stat_grid([
+        (inbox["count"], "captures"),
+        (inbox["warning_count"], "warnings"),
+        (inbox.get("read_warning_count", 0), "read warnings"),
+    ])
     warning_html = ""
     if inbox["warning_count"]:
         warning_html = (
@@ -1262,16 +1253,14 @@ def _render_ingest():
     propose_href = "/propose?source=" + urllib.parse.quote(first_raw) if pending else "/propose"
     state = str(guidance.get("state") or plan.get("state") or "unknown")
 
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{int(status.get("raw_count") or 0)}</span><span class="label">raw</span></div>'
-        f'<div class="stat"><span class="num">{int(status.get("represented_count") or 0)}</span><span class="label">represented</span></div>'
-        f'<div class="stat"><span class="num">{int(status.get("pending_count") or 0)}</span><span class="label">pending</span></div>'
-        f'<div class="stat"><span class="num">{int(status.get("stale_count") or 0)}</span><span class="label">stale</span></div>'
-        f'<div class="stat"><span class="num">{html.escape(str(status.get("backlinks_status") or "unknown"))}</span><span class="label">graph</span></div>'
-        f'<div class="stat"><span class="num">{html.escape(str(safety.get("status") or "unknown"))}</span><span class="label">safety</span></div>'
-        f'</div>'
-    )
+    stats = _core_render_stat_grid([
+        (int(status.get("raw_count") or 0), "raw"),
+        (int(status.get("represented_count") or 0), "represented"),
+        (int(status.get("pending_count") or 0), "pending"),
+        (int(status.get("stale_count") or 0), "stale"),
+        (status.get("backlinks_status") or "unknown", "graph"),
+        (safety.get("status") or "unknown", "safety"),
+    ])
     safety_html = ""
     if safety:
         labels = safety.get("labels") if isinstance(safety.get("labels"), list) else []
@@ -1549,11 +1538,7 @@ def _render_ingest():
 def _render_inbox(project: str | None = None):
     inbox = _memory_inbox(limit=50, project=project)
     review_count = inbox["review_count"]
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{review_count}</span><span class="label">review</span></div>'
-        f'</div>'
-    )
+    stats = _core_render_stat_grid([(review_count, "review")])
     if inbox["counts_by_severity"]:
         severity = ", ".join(
             f"{html.escape(name)}: {count}"
