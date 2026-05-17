@@ -124,21 +124,17 @@ from link_core.backup import (
     list_backups as _core_list_backups,
 )
 from link_core.capture import (
-    capture_filename as _core_capture_filename,
     capture_inbox as _core_capture_inbox,
     capture_notes_from_markdown as _core_capture_notes_from_markdown,
     capture_records as _core_capture_records,
     capture_review_summary as _core_capture_review_summary,
-    capture_title as _core_capture_title,
     mcp_capture_commands as _core_mcp_capture_commands,
     resolve_capture_file as _core_resolve_capture_file,
+    write_session_capture as _core_write_session_capture,
 )
 from link_core.files import (
     atomic_write_json as _core_atomic_write_json,
     atomic_write_text as _core_atomic_write_text,
-)
-from link_core.frontmatter import (
-    frontmatter_string as _frontmatter_string,
 )
 from link_core.ingest import (
     collect_ingest_status as _core_collect_ingest_status,
@@ -150,7 +146,6 @@ from link_core.log import (
 from link_core.security import (
     clean_text_input as _clean_text_input,
     redact_secret_values as _redact_secret_values,
-    secret_value_warnings as _secret_value_warnings,
 )
 from link_core.query import (
     query_link as _core_query_link,
@@ -415,41 +410,15 @@ def _capture_session(
         raise ValueError("session text required")
     clean_source = _clean_text_input(source, max_len=500) or "mcp"
     project_name = _resolve_project(project)
-    timestamp = _utc_timestamp()
-    capture_title = _core_capture_title(
-        clean_text,
-        clean_source,
-        _clean_text_input(title, max_len=200),
+    capture_record = _core_write_session_capture(
+        WIKI_DIR.parent,
+        text=clean_text,
+        source=clean_source,
+        title=_clean_text_input(title, max_len=200),
+        project=project_name,
         default_source="mcp",
     )
-    secret_warnings = _secret_value_warnings(clean_text)
-    root = WIKI_DIR.parent
-    capture_dir = root / "raw" / "memory-captures"
-    capture_dir.mkdir(parents=True, exist_ok=True)
-    capture_path = _core_capture_filename(timestamp, capture_title, capture_dir)
-    project_line = f'project: "{_frontmatter_string(project_name)}"\n' if project_name else ""
-    _core_atomic_write_text(
-        capture_path,
-        f"""---
-title: "{_frontmatter_string(capture_title)}"
-source_type: conversation
-date_captured: "{timestamp}"
-{project_line}---
-
-# {capture_title}
-
-Captured locally for Link memory review. This raw note is proposal-only until the user approves durable memories.
-
-## Source Input
-
-{clean_source}
-
-## Notes
-
-{clean_text}
-""",
-    )
-    rel_path = capture_path.relative_to(root).as_posix()
+    rel_path = str(capture_record["path"])
     proposals = _propose_memories_from_text(
         clean_text,
         source=rel_path,
@@ -457,13 +426,13 @@ Captured locally for Link memory review. This raw note is proposal-only until th
         project=project_name,
     )
     _append_log(
-        timestamp,
+        str(capture_record["timestamp"]),
         "capture-session",
         f"Captured proposal-only session notes at {rel_path}",
         [
             f"Source input: {clean_source}",
-            f"Project: {project_name or 'none'}",
-            f"Secret warnings: {', '.join(secret_warnings) if secret_warnings else 'none'}",
+            f"Project: {capture_record['project'] or 'none'}",
+            f"Secret warnings: {', '.join(capture_record['secret_warnings']) if capture_record['secret_warnings'] else 'none'}",
             f"Proposals: {proposals['count']}",
         ],
     )
@@ -472,9 +441,9 @@ Captured locally for Link memory review. This raw note is proposal-only until th
         "captured": True,
         "path": rel_path,
         "source": clean_source,
-        "title": capture_title,
-        "project": project_name,
-        "secret_warnings": secret_warnings,
+        "title": capture_record["title"],
+        "project": capture_record["project"],
+        "secret_warnings": capture_record["secret_warnings"],
         "proposals": proposals,
     }
 

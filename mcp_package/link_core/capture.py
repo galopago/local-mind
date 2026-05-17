@@ -5,7 +5,9 @@ import re
 from pathlib import Path
 from typing import Callable
 
-from .frontmatter import parse_frontmatter
+from .files import atomic_write_text
+from .frontmatter import frontmatter_string, parse_frontmatter
+from .log import utc_timestamp
 from .memory import normalize_project, slugify
 from .security import redact_secret_values, secret_value_warnings
 
@@ -51,6 +53,69 @@ def capture_filename(timestamp: str, title: str, raw_dir: Path) -> Path:
         candidate = raw_dir / f"{base}-{counter}.md"
         counter += 1
     return candidate
+
+
+def write_session_capture(
+    root: Path,
+    *,
+    text: str,
+    source: str,
+    title: str | None = None,
+    project: str | None = None,
+    timestamp: str | None = None,
+    default_source: str = "inline",
+    path_source: bool = False,
+) -> dict[str, object]:
+    """Persist proposal-only session notes under raw/memory-captures."""
+    root = root.expanduser().resolve()
+    notes = text.strip()
+    if not notes:
+        raise ValueError("session capture input is required")
+    source_value = str(source or default_source).strip() or default_source
+    captured_at = timestamp or utc_timestamp()
+    project_name = normalize_project(project)
+    capture_name = capture_title(
+        notes,
+        source_value,
+        title,
+        default_source=default_source,
+        path_source=path_source,
+    )
+    secret_warnings = secret_value_warnings(notes)
+    capture_dir = root / "raw" / "memory-captures"
+    capture_dir.mkdir(parents=True, exist_ok=True)
+    capture_path = capture_filename(captured_at, capture_name, capture_dir)
+    project_line = f'project: "{frontmatter_string(project_name)}"\n' if project_name else ""
+    atomic_write_text(
+        capture_path,
+        f"""---
+title: "{frontmatter_string(capture_name)}"
+source_type: conversation
+date_captured: "{captured_at}"
+{project_line}---
+
+# {capture_name}
+
+Captured locally for Link memory review. This raw note is proposal-only until the user approves durable memories.
+
+## Source Input
+
+{source_value}
+
+## Notes
+
+{notes}
+""",
+    )
+    return {
+        "path": capture_path.relative_to(root).as_posix(),
+        "absolute_path": str(capture_path),
+        "source": source_value,
+        "title": capture_name,
+        "project": project_name,
+        "timestamp": captured_at,
+        "secret_warnings": secret_warnings,
+    }
 
 
 def resolve_capture_file(root: Path, capture: str, *, max_len: int | None = None) -> Path | None:

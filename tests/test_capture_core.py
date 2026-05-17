@@ -17,6 +17,7 @@ from mcp_package.link_core.capture import (
     render_delete_capture_text,
     render_redact_capture_text,
     resolve_capture_file,
+    write_session_capture,
 )
 
 
@@ -53,6 +54,35 @@ class CaptureCoreTests(unittest.TestCase):
 
         self.assertEqual(first.name, "20260506T010203Z-first-memory.md")
         self.assertEqual(second.name, "20260506T010203Z-first-memory-2.md")
+
+    def test_write_session_capture_persists_proposal_only_markdown(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-write-"))
+
+        payload = write_session_capture(
+            root,
+            text="Remember that Link uses local markdown memory.",
+            source="raw/first-memory.md",
+            title=None,
+            project="Link Product",
+            timestamp="2026-05-06T01:02:03Z",
+            path_source=True,
+        )
+
+        capture_path = root / str(payload["path"])
+        text = capture_path.read_text(encoding="utf-8")
+        self.assertEqual(payload["path"], "raw/memory-captures/20260506T010203Z-first-memory.md")
+        self.assertEqual(payload["title"], "Memory capture: First Memory")
+        self.assertEqual(payload["project"], "link-product")
+        self.assertEqual(payload["secret_warnings"], [])
+        self.assertIn('project: "link-product"', text)
+        self.assertIn("## Source Input\n\nraw/first-memory.md", text)
+        self.assertIn("## Notes\n\nRemember that Link uses local markdown memory.", text)
+
+    def test_write_session_capture_rejects_empty_notes(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-write-"))
+
+        with self.assertRaises(ValueError):
+            write_session_capture(root, text="   ", source="inline")
 
     def test_resolve_capture_file_accepts_supported_root_relative_forms(self):
         root = Path(tempfile.mkdtemp(prefix="link-capture-core-"))
