@@ -145,7 +145,9 @@ from link_core.cli_parser import (
     build_cli_parser as _core_build_cli_parser,
 )
 from link_core.cli_memory import (
+    render_explain_memory_text as _core_render_explain_memory_text,
     render_forget_memory_text as _core_render_forget_memory_text,
+    render_memory_inbox_text as _core_render_memory_inbox_text,
     render_memory_status_text as _core_render_memory_status_text,
     render_recall_text as _core_render_recall_text,
     render_review_memory_text as _core_render_review_memory_text,
@@ -1821,39 +1823,9 @@ def memory_inbox(
         print(json.dumps(inbox, indent=2))
         return 0
 
-    print(f"Link memory inbox: {target}")
-    if inbox.get("project"):
-        print(f"Project: {inbox['project']}")
-    if include_archived:
-        print("Including archived memories")
-    print("")
-    review_count = inbox["review_count"]
-    print(f"{review_count} memor{'y' if review_count == 1 else 'ies'} need review")
-    if inbox["counts_by_severity"]:
-        print(f"Severity: {_format_counts(inbox['counts_by_severity'])}")
-    print("")
-    if not inbox["items"]:
-        print("Inbox is clear.")
-        return 0
-
-    for item in inbox["items"]:
-        print(f"- {item['title']} ({item['memory_type']} · {item['scope']} · {item['status']})")
-        print(f"  {item['path']}")
-        for issue in item["issues"]:
-            print(f"  [{issue['severity']}] {issue['code']}: {issue['message']}")
-        primary = item.get("primary_action") or {}
-        if primary:
-            print(f"  Next: {primary['label']} - {primary['description']}")
-            print(f"  Command: {primary['command']}")
-        actions = [
-            action
-            for action in item.get("actions", [])
-            if action.get("kind") != primary.get("kind")
-        ][:3]
-        if actions:
-            labels = ", ".join(str(action.get("label") or "") for action in actions)
-            print(f"  Other actions: {labels}")
-    return 0
+    code, text = _core_render_memory_inbox_text(inbox, target=target, include_archived=include_archived)
+    print(text)
+    return code
 
 
 def review_memory(target: Path, identifier: str, note: str | None = None, json_output: bool = False) -> int:
@@ -1888,43 +1860,9 @@ def explain_memory(target: Path, identifier: str, json_output: bool = False) -> 
         print(json.dumps(explanation, indent=2))
         return 0
 
-    memory = explanation["memory"]
-    recall_info = explanation["recall"]
-    review = explanation["review"]
-    provenance = explanation["provenance"]
-    lifecycle = explanation["lifecycle"]
-    graph = explanation["graph"]
-
-    print(f"Link memory explanation: {memory['title']}")
-    print("")
-    print(f"Path: {memory['path']}")
-    print(f"Type: {memory['memory_type']} · Scope: {memory['scope']} · Status: {lifecycle['status']}")
-    print(f"Source: {provenance['source'] or 'missing'}")
-    print(f"Captured: {provenance['date_captured'] or 'missing'}")
-    print(f"Review: {review['status']} · Issues: {review['issue_count']}")
-    print(f"Recall: {recall_info['state']} ({'enabled' if recall_info['default_enabled'] else 'disabled'} by default)")
-    print(f"Reason: {recall_info['reason']}")
-    summary = memory.get("tldr") or memory.get("snippet")
-    if summary:
-        print("")
-        print(f"Summary: {summary}")
-    if review["issues"]:
-        print("")
-        print("Review issues:")
-        for issue in review["issues"]:
-            print(f"- [{issue['severity']}] {issue['code']}: {issue['message']}")
-            print(f"  Action: {issue['suggested_action']}")
-    print("")
-    print("Graph:")
-    print(f"- Forward links: {', '.join(graph['forward']) if graph['forward'] else 'none'}")
-    print(f"- Inbound links: {', '.join(graph['inbound']) if graph['inbound'] else 'none'}")
-    if explanation["log_entries"]:
-        print("")
-        print("Recent lifecycle log:")
-        for entry in explanation["log_entries"][-3:]:
-            first_line = next((line for line in entry.splitlines() if line.strip().startswith("## ")), "")
-            print(f"- {first_line[3:] if first_line.startswith('## ') else first_line or 'log entry'}")
-    return 0
+    code, text = _core_render_explain_memory_text(explanation)
+    print(text)
+    return code
 
 
 def _format_counts(counts: dict[str, int]) -> str:

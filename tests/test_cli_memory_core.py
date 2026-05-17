@@ -2,6 +2,8 @@ import unittest
 
 from mcp_package.link_core.cli_memory import (
     render_forget_memory_text,
+    render_explain_memory_text,
+    render_memory_inbox_text,
     render_memory_status_text,
     render_recall_text,
     render_review_memory_text,
@@ -179,6 +181,94 @@ class CliMemoryCoreTests(unittest.TestCase):
         self.assertIn("Memory reviewed", text)
         self.assertIn("1 issue still need attention:", text)
         self.assertIn("[medium] missing_source: Memory should cite a source.", text)
+
+    def test_render_memory_inbox(self):
+        code, text = render_memory_inbox_text({
+            "project": "link",
+            "review_count": 1,
+            "counts_by_severity": {"medium": 1},
+            "items": [{
+                "title": "Prefer local memory",
+                "memory_type": "preference",
+                "scope": "user",
+                "status": "active",
+                "path": "wiki/memories/prefer-local-memory.md",
+                "issues": [{
+                    "severity": "medium",
+                    "code": "pending_review",
+                    "message": "Memory needs review.",
+                }],
+                "primary_action": {
+                    "kind": "review",
+                    "label": "Review",
+                    "description": "Mark memory reviewed",
+                    "command": "link review-memory prefer-local-memory",
+                },
+                "actions": [
+                    {"kind": "review", "label": "Review"},
+                    {"kind": "archive", "label": "Archive"},
+                ],
+            }],
+        }, target="/tmp/link", include_archived=True)
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link memory inbox: /tmp/link", text)
+        self.assertIn("Project: link", text)
+        self.assertIn("Severity: medium: 1", text)
+        self.assertIn("Next: Review - Mark memory reviewed", text)
+        self.assertIn("Other actions: Archive", text)
+
+    def test_render_memory_inbox_clear(self):
+        code, text = render_memory_inbox_text({
+            "review_count": 0,
+            "counts_by_severity": {},
+            "items": [],
+        }, target="/tmp/link")
+
+        self.assertEqual(code, 0)
+        self.assertIn("0 memories need review", text)
+        self.assertIn("Inbox is clear.", text)
+
+    def test_render_explain_memory(self):
+        code, text = render_explain_memory_text({
+            "memory": {
+                "title": "Prefer local memory",
+                "path": "wiki/memories/prefer-local-memory.md",
+                "memory_type": "preference",
+                "scope": "user",
+                "tldr": "User prefers local memory.",
+            },
+            "recall": {
+                "state": "needs_review",
+                "default_enabled": True,
+                "reason": "Pending review",
+            },
+            "review": {
+                "status": "pending",
+                "issue_count": 1,
+                "issues": [{
+                    "severity": "medium",
+                    "code": "pending_review",
+                    "message": "Memory needs review.",
+                    "suggested_action": "review-memory",
+                }],
+            },
+            "provenance": {
+                "source": "manual",
+                "date_captured": "2026-05-16T00:00:00Z",
+            },
+            "lifecycle": {"status": "active"},
+            "graph": {"forward": ["agent-memory"], "inbound": []},
+            "log_entries": ["## remember | Prefer local memory\n\nCreated."],
+        })
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link memory explanation: Prefer local memory", text)
+        self.assertIn("Recall: needs_review (enabled by default)", text)
+        self.assertIn("Summary: User prefers local memory.", text)
+        self.assertIn("Action: review-memory", text)
+        self.assertIn("Forward links: agent-memory", text)
+        self.assertIn("remember | Prefer local memory", text)
 
 
 if __name__ == "__main__":

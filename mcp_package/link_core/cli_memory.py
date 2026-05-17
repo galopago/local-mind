@@ -32,6 +32,12 @@ def _first_candidate_name(candidates: object) -> str | None:
     return None
 
 
+def format_counts(counts: Mapping[str, int]) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{name}: {count}" for name, count in counts.items())
+
+
 def render_remember_text(result: Mapping[str, object]) -> tuple[int, str]:
     if not result.get("created"):
         if result.get("conflict"):
@@ -209,4 +215,104 @@ def render_review_memory_text(result: Mapping[str, object]) -> tuple[int, str]:
             for issue in remaining:
                 if isinstance(issue, Mapping):
                     lines.append(f"- [{issue['severity']}] {issue['code']}: {issue['message']}")
+    return 0, "\n".join(lines)
+
+
+def render_memory_inbox_text(
+    inbox: Mapping[str, object],
+    *,
+    target: object,
+    include_archived: bool = False,
+) -> tuple[int, str]:
+    lines = [f"Link memory inbox: {target}"]
+    if inbox.get("project"):
+        lines.append(f"Project: {inbox['project']}")
+    if include_archived:
+        lines.append("Including archived memories")
+    lines.append("")
+    review_count = int(inbox.get("review_count") or 0)
+    lines.append(f"{review_count} memor{'y' if review_count == 1 else 'ies'} need review")
+    counts = inbox.get("counts_by_severity")
+    if isinstance(counts, Mapping) and counts:
+        lines.append(f"Severity: {format_counts(counts)}")
+    lines.append("")
+    items = inbox.get("items", [])
+    if not isinstance(items, Sequence) or isinstance(items, (str, bytes)) or not items:
+        lines.append("Inbox is clear.")
+        return 0, "\n".join(lines)
+
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        lines.append(f"- {item['title']} ({item['memory_type']} · {item['scope']} · {item['status']})")
+        lines.append(f"  {item['path']}")
+        issues = item.get("issues", [])
+        if isinstance(issues, Sequence) and not isinstance(issues, (str, bytes)):
+            for issue in issues:
+                if isinstance(issue, Mapping):
+                    lines.append(f"  [{issue['severity']}] {issue['code']}: {issue['message']}")
+        primary = item.get("primary_action") if isinstance(item.get("primary_action"), Mapping) else {}
+        if primary:
+            lines.append(f"  Next: {primary['label']} - {primary['description']}")
+            lines.append(f"  Command: {primary['command']}")
+        actions = []
+        raw_actions = item.get("actions", [])
+        if isinstance(raw_actions, Sequence) and not isinstance(raw_actions, (str, bytes)):
+            primary_kind = primary.get("kind") if primary else None
+            actions = [
+                action
+                for action in raw_actions
+                if isinstance(action, Mapping) and action.get("kind") != primary_kind
+            ][:3]
+        if actions:
+            labels = ", ".join(str(action.get("label") or "") for action in actions)
+            lines.append(f"  Other actions: {labels}")
+    return 0, "\n".join(lines)
+
+
+def render_explain_memory_text(explanation: Mapping[str, object]) -> tuple[int, str]:
+    memory = explanation["memory"]
+    recall_info = explanation["recall"]
+    review = explanation["review"]
+    provenance = explanation["provenance"]
+    lifecycle = explanation["lifecycle"]
+    graph = explanation["graph"]
+    if not all(isinstance(value, Mapping) for value in (memory, recall_info, review, provenance, lifecycle, graph)):
+        raise ValueError("Invalid memory explanation payload")
+
+    lines = [
+        f"Link memory explanation: {memory['title']}",
+        "",
+        f"Path: {memory['path']}",
+        f"Type: {memory['memory_type']} · Scope: {memory['scope']} · Status: {lifecycle['status']}",
+        f"Source: {provenance['source'] or 'missing'}",
+        f"Captured: {provenance['date_captured'] or 'missing'}",
+        f"Review: {review['status']} · Issues: {review['issue_count']}",
+        f"Recall: {recall_info['state']} ({'enabled' if recall_info['default_enabled'] else 'disabled'} by default)",
+        f"Reason: {recall_info['reason']}",
+    ]
+    summary = memory.get("tldr") or memory.get("snippet")
+    if summary:
+        lines.extend(["", f"Summary: {summary}"])
+    issues = review.get("issues", [])
+    if isinstance(issues, Sequence) and not isinstance(issues, (str, bytes)) and issues:
+        lines.extend(["", "Review issues:"])
+        for issue in issues:
+            if isinstance(issue, Mapping):
+                lines.append(f"- [{issue['severity']}] {issue['code']}: {issue['message']}")
+                lines.append(f"  Action: {issue['suggested_action']}")
+    forward = graph.get("forward") if isinstance(graph.get("forward"), Sequence) else []
+    inbound = graph.get("inbound") if isinstance(graph.get("inbound"), Sequence) else []
+    lines.extend([
+        "",
+        "Graph:",
+        f"- Forward links: {', '.join(str(item) for item in forward) if forward else 'none'}",
+        f"- Inbound links: {', '.join(str(item) for item in inbound) if inbound else 'none'}",
+    ])
+    log_entries = explanation.get("log_entries", [])
+    if isinstance(log_entries, Sequence) and not isinstance(log_entries, (str, bytes)) and log_entries:
+        lines.extend(["", "Recent lifecycle log:"])
+        for entry in log_entries[-3:]:
+            first_line = next((line for line in str(entry).splitlines() if line.strip().startswith("## ")), "")
+            lines.append(f"- {first_line[3:] if first_line.startswith('## ') else first_line or 'log entry'}")
     return 0, "\n".join(lines)
