@@ -192,6 +192,29 @@ def _parse_limit(value, default: int = 20, max_limit: int = 50) -> int:
     return min(max(limit, 1), max_limit)
 
 
+def _pagination_args(
+    limit: int,
+    offset: int,
+    include_all: bool,
+    *,
+    default_limit: int = 100,
+    max_limit: int = 1000,
+) -> tuple[int, int, bool]:
+    try:
+        parsed_offset = int(offset)
+    except (TypeError, ValueError):
+        parsed_offset = 0
+    if isinstance(include_all, bool):
+        parsed_include_all = include_all
+    else:
+        parsed_include_all = str(include_all).strip().lower() in {"1", "true", "yes", "on"}
+    return (
+        _parse_limit(limit, default=default_limit, max_limit=max_limit),
+        max(parsed_offset, 0),
+        parsed_include_all,
+    )
+
+
 def _default_project() -> str:
     return _core_default_project_for_target(WIKI_DIR)
 
@@ -1173,15 +1196,16 @@ def get_pages(
     Use search_wiki, query_link, or get_context instead of paging through the
     whole wiki when answering a question.
     """
+    parsed_limit, parsed_offset, parsed_include_all = _pagination_args(limit, offset, include_all)
     return json.dumps(
         _core_list_pages(
             _build_cache(),
             category=_clean_text_input(category).lower(),
             page_type=_clean_text_input(page_type).lower(),
             maturity=_clean_text_input(maturity).lower(),
-            limit=limit,
-            offset=offset,
-            include_all=include_all,
+            limit=parsed_limit,
+            offset=parsed_offset,
+            include_all=parsed_include_all,
         ),
         ensure_ascii=False,
     )
@@ -1210,13 +1234,14 @@ def get_backlinks(page_name: str, limit: int = 100, offset: int = 0, include_all
     if not page_name:
         return json.dumps({"error": "page_name required", "inbound": [], "forward": []})
 
+    parsed_limit, parsed_offset, parsed_include_all = _pagination_args(limit, offset, include_all)
     return json.dumps(
         _core_page_link_summary(
             backlinks,
             page_name,
-            limit=limit,
-            offset=offset,
-            include_all=include_all,
+            limit=parsed_limit,
+            offset=parsed_offset,
+            include_all=parsed_include_all,
         ),
         ensure_ascii=False,
     )
