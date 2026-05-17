@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -129,8 +128,9 @@ from link_core.benchmark import (
     render_benchmark_text as _core_render_benchmark_text,
 )
 from link_core.demo import (
-    DEMO_FILES,
-    DEMO_MARKER,
+    DemoError as _CoreDemoError,
+    copy_runtime_files as _core_copy_runtime_files,
+    create_demo_workspace as _core_create_demo_workspace,
 )
 from link_core.doctor import (
     DoctorReport as _CoreDoctorReport,
@@ -1905,27 +1905,7 @@ def verify_mcp(
 
 
 def _copy_runtime_files(target: Path) -> None:
-    target.mkdir(parents=True, exist_ok=True)
-    for name in ("serve.py", "link.py", "LINK.md", ".linkignore"):
-        src = ROOT / name
-        dst = target / name
-        if src.exists() and src.resolve() != dst.resolve():
-            shutil.copy2(src, dst)
-    core_src = ROOT / "mcp_package" / "link_core"
-    if not core_src.exists():
-        core_src = ROOT / "link_core"
-    if core_src.exists():
-        core_target = target / "link_core"
-        core_target.mkdir(exist_ok=True)
-        for src in core_src.glob("*.py"):
-            dst = core_target / src.name
-            if src.resolve() != dst.resolve():
-                shutil.copy2(src, dst)
-    for name in ("logo.png", "logo.svg"):
-        src = ROOT / name
-        dst = target / name
-        if src.exists() and src.resolve() != dst.resolve():
-            shutil.copy2(src, dst)
+    _core_copy_runtime_files(ROOT, target)
 
 
 def init_wiki(target: Path) -> int:
@@ -1980,41 +1960,11 @@ def serve_wiki(target: Path, port: int = 3000) -> int:
 
 def create_demo(target: Path, force: bool = False) -> int:
     target = target.expanduser().resolve()
-    if target.exists() and any(target.iterdir()):
-        marker = target / DEMO_MARKER
-        if not force:
-            print(f"{target} already exists. Re-run with --force to replace a Link demo directory.", file=sys.stderr)
-            return 1
-        if not marker.exists():
-            print(f"{target} does not look like a Link demo directory; refusing to overwrite it.", file=sys.stderr)
-            return 1
-        shutil.rmtree(target)
-
-    target.mkdir(parents=True, exist_ok=True)
-    _core_atomic_write_text(target / DEMO_MARKER, "Link demo directory\n")
-    _copy_runtime_files(target)
-
-    for directory in (
-        "raw",
-        "wiki/sources",
-        "wiki/concepts",
-        "wiki/entities",
-        "wiki/memories",
-        "wiki/comparisons",
-        "wiki/explorations",
-    ):
-        path = target / directory
-        path.mkdir(parents=True, exist_ok=True)
-        (path / ".gitkeep").touch()
-
-    for rel, content in DEMO_FILES.items():
-        path = target / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        _core_atomic_write_text(path, content.strip() + "\n")
-
-    backlinks = _build_backlinks(target / "wiki")
-    _core_atomic_write_json(target / "wiki/_backlinks.json", backlinks)
-    _core_migrate_wiki(target / "wiki")
+    try:
+        _core_create_demo_workspace(target, source_root=ROOT, force=force)
+    except _CoreDemoError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
     code, text = _core_render_demo_text(
         target=target,
