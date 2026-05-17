@@ -145,7 +145,10 @@ from link_core.cli_parser import (
     build_cli_parser as _core_build_cli_parser,
 )
 from link_core.cli_memory import (
+    render_forget_memory_text as _core_render_forget_memory_text,
+    render_memory_status_text as _core_render_memory_status_text,
     render_recall_text as _core_render_recall_text,
+    render_review_memory_text as _core_render_review_memory_text,
     render_remember_text as _core_render_remember_text,
     render_update_memory_text as _core_render_update_memory_text,
 )
@@ -1740,18 +1743,9 @@ def archive_memory(target: Path, identifier: str, reason: str | None = None, jso
         print(json.dumps(result, indent=2))
         return 0
 
-    if result["updated"]:
-        print("Memory archived")
-    else:
-        print("Memory already archived")
-    print(f"Title: {result['title']}")
-    print(f"Path: {result['path']}")
-    print(f"Previous status: {result['previous_status']}")
-    print(f"Status: {result['status']}")
-    print("")
-    print("Next:")
-    print(f"  Restore: python3 link.py restore-memory \"{result['name']}\" .")
-    return 0
+    code, text = _core_render_memory_status_text(result, action="archive")
+    print(text)
+    return code
 
 
 def restore_memory(target: Path, identifier: str, json_output: bool = False) -> int:
@@ -1765,15 +1759,9 @@ def restore_memory(target: Path, identifier: str, json_output: bool = False) -> 
         print(json.dumps(result, indent=2))
         return 0
 
-    if result["updated"]:
-        print("Memory restored")
-    else:
-        print("Memory already active")
-    print(f"Title: {result['title']}")
-    print(f"Path: {result['path']}")
-    print(f"Previous status: {result['previous_status']}")
-    print(f"Status: {result['status']}")
-    return 0
+    code, text = _core_render_memory_status_text(result, action="restore")
+    print(text)
+    return code
 
 
 def forget_memory(target: Path, identifier: str, confirm: bool = False, json_output: bool = False) -> int:
@@ -1807,19 +1795,12 @@ def forget_memory(target: Path, identifier: str, confirm: bool = False, json_out
         print(json.dumps(result, indent=2))
         return 0 if result.get("forgotten") else 1
 
+    code, text = _core_render_forget_memory_text(result, identifier=identifier)
     if not result.get("found"):
-        print(f"Memory not found: {identifier}", file=sys.stderr)
-        return 1
-    if result.get("confirmation_required"):
-        print("Confirmation required.")
-        print(f"Run: python3 link.py forget-memory \"{result['name']}\" . --confirm")
-        return 1
-
-    print("Memory forgotten")
-    print(f"Title: {result['title']}")
-    print(f"Deleted: {result['path']}")
-    print(f"Backlinks rebuilt: {'yes' if result.get('backlinks_rebuilt') else 'no'}")
-    return 0
+        print(text, file=sys.stderr)
+    else:
+        print(text)
+    return code
 
 
 def memory_inbox(
@@ -1886,20 +1867,9 @@ def review_memory(target: Path, identifier: str, note: str | None = None, json_o
         print(json.dumps(result, indent=2))
         return 0
 
-    if result["updated"]:
-        print("Memory reviewed")
-    else:
-        print("Memory was already reviewed")
-    print(f"Title: {result['title']}")
-    print(f"Path: {result['path']}")
-    print(f"Previous review status: {result['previous_review_status']}")
-    print(f"Review status: {result['review_status']}")
-    if result["remaining_issue_count"]:
-        print("")
-        print(f"{result['remaining_issue_count']} issue{'s' if result['remaining_issue_count'] != 1 else ''} still need attention:")
-        for issue in result["remaining_issues"]:
-            print(f"- [{issue['severity']}] {issue['code']}: {issue['message']}")
-    return 0
+    code, text = _core_render_review_memory_text(result)
+    print(text)
+    return code
 
 
 def explain_memory(target: Path, identifier: str, json_output: bool = False) -> int:

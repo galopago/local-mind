@@ -1,7 +1,10 @@
 import unittest
 
 from mcp_package.link_core.cli_memory import (
+    render_forget_memory_text,
+    render_memory_status_text,
     render_recall_text,
+    render_review_memory_text,
     render_remember_text,
     render_update_memory_text,
 )
@@ -104,6 +107,78 @@ class CliMemoryCoreTests(unittest.TestCase):
         self.assertIn("1 memory", text)
         self.assertIn("Recall: ready", text)
         self.assertIn("Use release branches for public changes.", text)
+
+    def test_render_memory_status_archive(self):
+        code, text = render_memory_status_text({
+            "updated": True,
+            "name": "prefer-local-memory",
+            "title": "Prefer local memory",
+            "path": "wiki/memories/prefer-local-memory.md",
+            "previous_status": "active",
+            "status": "archived",
+        }, action="archive")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Memory archived", text)
+        self.assertIn('Restore: python3 link.py restore-memory "prefer-local-memory" .', text)
+
+    def test_render_memory_status_restore(self):
+        code, text = render_memory_status_text({
+            "updated": False,
+            "name": "prefer-local-memory",
+            "title": "Prefer local memory",
+            "path": "wiki/memories/prefer-local-memory.md",
+            "previous_status": "active",
+            "status": "active",
+        }, action="restore")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Memory already active", text)
+        self.assertNotIn("Restore:", text)
+
+    def test_render_forget_memory_requires_confirmation(self):
+        code, text = render_forget_memory_text({
+            "found": True,
+            "confirmation_required": True,
+            "name": "prefer-local-memory",
+        }, identifier="prefer-local-memory")
+
+        self.assertEqual(code, 1)
+        self.assertIn("Confirmation required.", text)
+        self.assertIn('--confirm', text)
+
+    def test_render_forget_memory_done(self):
+        code, text = render_forget_memory_text({
+            "found": True,
+            "forgotten": True,
+            "title": "Prefer local memory",
+            "path": "wiki/memories/prefer-local-memory.md",
+            "backlinks_rebuilt": True,
+        }, identifier="prefer-local-memory")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Memory forgotten", text)
+        self.assertIn("Backlinks rebuilt: yes", text)
+
+    def test_render_review_memory_with_remaining_issues(self):
+        code, text = render_review_memory_text({
+            "updated": True,
+            "title": "Prefer local memory",
+            "path": "wiki/memories/prefer-local-memory.md",
+            "previous_review_status": "pending",
+            "review_status": "reviewed",
+            "remaining_issue_count": 1,
+            "remaining_issues": [{
+                "severity": "medium",
+                "code": "missing_source",
+                "message": "Memory should cite a source.",
+            }],
+        })
+
+        self.assertEqual(code, 0)
+        self.assertIn("Memory reviewed", text)
+        self.assertIn("1 issue still need attention:", text)
+        self.assertIn("[medium] missing_source: Memory should cite a source.", text)
 
 
 if __name__ == "__main__":

@@ -149,3 +149,64 @@ def render_recall_text(
         if summary:
             lines.append(f"  {summary}")
     return 0, "\n".join(lines)
+
+
+def render_memory_status_text(result: Mapping[str, object], *, action: str) -> tuple[int, str]:
+    if action == "archive":
+        headline = "Memory archived" if result["updated"] else "Memory already archived"
+        next_lines = [
+            "",
+            "Next:",
+            f"  Restore: python3 link.py restore-memory \"{result['name']}\" .",
+        ]
+    elif action == "restore":
+        headline = "Memory restored" if result["updated"] else "Memory already active"
+        next_lines = []
+    else:
+        raise ValueError(f"Unsupported memory status action: {action}")
+
+    return 0, "\n".join([
+        headline,
+        f"Title: {result['title']}",
+        f"Path: {result['path']}",
+        f"Previous status: {result['previous_status']}",
+        f"Status: {result['status']}",
+        *next_lines,
+    ])
+
+
+def render_forget_memory_text(result: Mapping[str, object], *, identifier: str) -> tuple[int, str]:
+    if not result.get("found"):
+        return 1, f"Memory not found: {identifier}"
+    if result.get("confirmation_required"):
+        return 1, "\n".join([
+            "Confirmation required.",
+            f"Run: python3 link.py forget-memory \"{result['name']}\" . --confirm",
+        ])
+    return 0, "\n".join([
+        "Memory forgotten",
+        f"Title: {result['title']}",
+        f"Deleted: {result['path']}",
+        f"Backlinks rebuilt: {'yes' if result.get('backlinks_rebuilt') else 'no'}",
+    ])
+
+
+def render_review_memory_text(result: Mapping[str, object]) -> tuple[int, str]:
+    lines = [
+        "Memory reviewed" if result["updated"] else "Memory was already reviewed",
+        f"Title: {result['title']}",
+        f"Path: {result['path']}",
+        f"Previous review status: {result['previous_review_status']}",
+        f"Review status: {result['review_status']}",
+    ]
+    if result["remaining_issue_count"]:
+        lines.extend([
+            "",
+            f"{result['remaining_issue_count']} issue{'s' if result['remaining_issue_count'] != 1 else ''} still need attention:",
+        ])
+        remaining = result.get("remaining_issues", [])
+        if isinstance(remaining, Sequence) and not isinstance(remaining, (str, bytes)):
+            for issue in remaining:
+                if isinstance(issue, Mapping):
+                    lines.append(f"- [{issue['severity']}] {issue['code']}: {issue['message']}")
+    return 0, "\n".join(lines)
