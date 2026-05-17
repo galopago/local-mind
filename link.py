@@ -205,8 +205,9 @@ from link_core.log import (
     write_default_log as _core_write_default_log,
 )
 from link_core.mcp_verify import (
+    build_mcp_verify_status as _core_build_mcp_verify_status,
+    check_link_mcp_import as _core_check_link_mcp_import,
     display_command as _core_display_command,
-    mcp_verify_guidance as _core_mcp_verify_guidance,
     render_mcp_verify_text as _core_render_mcp_verify_text,
 )
 from link_core.schema import (
@@ -1872,122 +1873,31 @@ def memory_audit(target: Path, limit: int = 10, project: str | None = None, json
     return code
 
 
-def _check_link_mcp_import(python_cmd: str) -> dict[str, object]:
-    code = (
-        "import json\n"
-        "status = {'installed': False, 'version': None, 'mcp_sdk': False, 'error': None}\n"
-        "try:\n"
-        "    import link_mcp\n"
-        "    status['installed'] = True\n"
-        "    status['version'] = getattr(link_mcp, '__version__', 'unknown')\n"
-        "    from mcp.server.fastmcp import FastMCP\n"
-        "    status['mcp_sdk'] = True\n"
-        "except Exception as exc:\n"
-        "    status['error'] = str(exc)\n"
-        "print(json.dumps(status))\n"
-    )
-    try:
-        result = subprocess.run(
-            [python_cmd, "-c", code],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-    except OSError as exc:
-        return {"installed": False, "version": None, "error": str(exc)}
-    if result.returncode != 0:
-        error = (result.stderr or result.stdout).strip()
-        return {"installed": False, "version": None, "error": error}
-    try:
-        data = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return {"installed": False, "version": None, "error": "could not parse link_mcp import output"}
-    return {
-        "installed": bool(data.get("installed")),
-        "version": data.get("version") or "unknown",
-        "mcp_sdk": bool(data.get("mcp_sdk")),
-        "error": data.get("error"),
-    }
-
-
-def _mcp_config(python_cmd: str, wiki_dir: Path) -> dict[str, object]:
-    return {
-        "mcpServers": {
-            "link": {
-                "command": python_cmd,
-                "args": ["-m", "link_mcp", "--wiki", str(wiki_dir)],
-            }
-        }
-    }
-
-
 def _display_command(parts: list[str]) -> str:
     return _core_display_command(parts)
-
-
-def _resolve_mcp_python(target: Path, wiki_dir: Path, python_cmd: str | None) -> str:
-    if python_cmd:
-        return str(Path(python_cmd).expanduser())
-
-    root = wiki_dir.parent if wiki_dir.name == "wiki" else target
-    marker = root / ".link-mcp-python"
-    if marker.exists():
-        configured = marker.read_text(encoding="utf-8", errors="replace").strip()
-        if configured:
-            return str(Path(configured).expanduser())
-
-    return sys.executable
 
 
 def verify_mcp(
     target: Path,
     json_output: bool = False,
     python_cmd: str | None = None,
-    import_check: Callable[[str], dict[str, object]] = _check_link_mcp_import,
+    import_check: Callable[[str], dict[str, object]] = _core_check_link_mcp_import,
 ) -> int:
     target = target.expanduser().resolve()
     wiki_dir = _resolve_wiki_dir(target)
-    python_cmd = _resolve_mcp_python(target, wiki_dir, python_cmd)
-    import_status = import_check(python_cmd)
-    wiki_exists = wiki_dir.exists() and wiki_dir.is_dir()
-    config = _mcp_config(python_cmd, wiki_dir)
-    installed_version = str(import_status.get("version") or "")
-    mcp_sdk_ready = bool(import_status.get("mcp_sdk", import_status.get("installed")))
-    version_matches = bool(import_status.get("installed")) and installed_version == LINK_VERSION
-    ready = bool(import_status.get("installed")) and mcp_sdk_ready and wiki_exists and version_matches
-    normalized_import_status = dict(import_status)
-    normalized_import_status.setdefault("mcp_sdk", mcp_sdk_ready)
-    normalized_import_status.setdefault("error", None)
-    issues, next_actions = _core_mcp_verify_guidance(
+    status = _core_build_mcp_verify_status(
         target=target,
+        wiki_dir=wiki_dir,
         init_command=[sys.executable, str(ROOT / "link.py"), "init", str(target)],
         expected_version=LINK_VERSION,
         python_cmd=python_cmd,
-        import_status=normalized_import_status,
-        mcp_sdk_ready=mcp_sdk_ready,
-        version_matches=version_matches,
-        wiki_exists=wiki_exists,
+        default_python=sys.executable,
+        import_check=import_check,
     )
-    status = {
-        "ready": ready,
-        "target": str(target),
-        "python": python_cmd,
-        "expected_version": LINK_VERSION,
-        "version_matches": version_matches,
-        "link_mcp": normalized_import_status,
-        "wiki": {
-            "path": str(wiki_dir),
-            "exists": wiki_exists,
-        },
-        "config": config,
-        "issues": issues,
-        "next_actions": next_actions,
-    }
 
     if json_output:
         print(json.dumps(status, indent=2))
-        return 0 if ready else 1
+        return 0 if status["ready"] else 1
 
     code, text = _core_render_mcp_verify_text(status)
     print(text)

@@ -1,9 +1,13 @@
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
 from mcp_package.link_core.mcp_verify import (
+    build_mcp_verify_status,
     display_command,
     mcp_verify_guidance,
+    resolve_mcp_python,
     render_mcp_verify_text,
 )
 
@@ -71,6 +75,55 @@ class McpVerifyCoreTests(unittest.TestCase):
         text = display_command(["/tmp/Link Python/bin/python", "-m", "pip"])
 
         self.assertIn("'/tmp/Link Python/bin/python'", text)
+
+    def test_resolve_mcp_python_uses_marker(self):
+        root = Path(tempfile.mkdtemp(prefix="link-mcp-verify-"))
+        self.addCleanup(lambda: shutil.rmtree(root, ignore_errors=True))
+        (root / ".link-mcp-python").write_text("/tmp/link-python\n", encoding="utf-8")
+
+        python = resolve_mcp_python(root, root / "wiki", None, default_python="/usr/bin/python")
+
+        self.assertEqual(python, "/tmp/link-python")
+
+    def test_build_status_ready(self):
+        target = Path("/tmp/link")
+        status = build_mcp_verify_status(
+            target=target,
+            wiki_dir=Path(__file__).resolve().parents[1],
+            expected_version="1.2.0",
+            init_command=["python3", "link.py", "init", "/tmp/link"],
+            default_python="/tmp/python",
+            import_check=lambda _python: {
+                "installed": True,
+                "version": "1.2.0",
+                "mcp_sdk": True,
+                "error": None,
+            },
+        )
+
+        self.assertTrue(status["ready"])
+        self.assertEqual(status["python"], "/tmp/python")
+        self.assertEqual(status["next_actions"], [])
+        self.assertEqual(status["config"]["mcpServers"]["link"]["command"], "/tmp/python")
+
+    def test_build_status_reports_missing_wiki_and_version_mismatch(self):
+        status = build_mcp_verify_status(
+            target=Path("/tmp/link"),
+            wiki_dir=Path("/tmp/link/missing-wiki"),
+            expected_version="1.2.0",
+            init_command=["python3", "link.py", "init", "/tmp/link"],
+            default_python="/tmp/python",
+            import_check=lambda _python: {
+                "installed": True,
+                "version": "1.1.0",
+                "mcp_sdk": True,
+                "error": None,
+            },
+        )
+
+        self.assertFalse(status["ready"])
+        self.assertEqual([issue["code"] for issue in status["issues"]], ["version_mismatch", "wiki_missing"])
+        self.assertEqual([action["tool"] for action in status["next_actions"]], ["upgrade_link_mcp", "init_wiki"])
 
 
 if __name__ == "__main__":

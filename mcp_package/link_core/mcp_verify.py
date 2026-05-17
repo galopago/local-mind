@@ -6,7 +6,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Mapping
+from typing import Callable, Mapping
 
 
 def display_command(parts: list[str]) -> str:
@@ -22,6 +22,118 @@ def mcp_verify_action(tool: str, label: str, command: list[str]) -> dict[str, ob
         "label": label,
         "command": command,
         "command_text": display_command(command),
+    }
+
+
+def check_link_mcp_import(python_cmd: str) -> dict[str, object]:
+    """Check whether link-mcp and its MCP SDK dependency import in a Python runtime."""
+    code = (
+        "import json\n"
+        "status = {'installed': False, 'version': None, 'mcp_sdk': False, 'error': None}\n"
+        "try:\n"
+        "    import link_mcp\n"
+        "    status['installed'] = True\n"
+        "    status['version'] = getattr(link_mcp, '__version__', 'unknown')\n"
+        "    from mcp.server.fastmcp import FastMCP\n"
+        "    status['mcp_sdk'] = True\n"
+        "except Exception as exc:\n"
+        "    status['error'] = str(exc)\n"
+        "print(json.dumps(status))\n"
+    )
+    try:
+        result = subprocess.run(
+            [python_cmd, "-c", code],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except OSError as exc:
+        return {"installed": False, "version": None, "error": str(exc)}
+    if result.returncode != 0:
+        error = (result.stderr or result.stdout).strip()
+        return {"installed": False, "version": None, "error": error}
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {"installed": False, "version": None, "error": "could not parse link_mcp import output"}
+    return {
+        "installed": bool(data.get("installed")),
+        "version": data.get("version") or "unknown",
+        "mcp_sdk": bool(data.get("mcp_sdk")),
+        "error": data.get("error"),
+    }
+
+
+def mcp_config(python_cmd: str, wiki_dir: Path) -> dict[str, object]:
+    return {
+        "mcpServers": {
+            "link": {
+                "command": python_cmd,
+                "args": ["-m", "link_mcp", "--wiki", str(wiki_dir)],
+            }
+        }
+    }
+
+
+def resolve_mcp_python(target: Path, wiki_dir: Path, python_cmd: str | None, *, default_python: str) -> str:
+    if python_cmd:
+        return str(Path(python_cmd).expanduser())
+
+    root = wiki_dir.parent if wiki_dir.name == "wiki" else target
+    marker = root / ".link-mcp-python"
+    if marker.exists():
+        configured = marker.read_text(encoding="utf-8", errors="replace").strip()
+        if configured:
+            return str(Path(configured).expanduser())
+
+    return default_python
+
+
+def build_mcp_verify_status(
+    *,
+    target: Path,
+    wiki_dir: Path,
+    expected_version: str,
+    init_command: list[str],
+    python_cmd: str | None = None,
+    default_python: str,
+    import_check: Callable[[str], dict[str, object]] = check_link_mcp_import,
+) -> dict[str, object]:
+    resolved_python = resolve_mcp_python(target, wiki_dir, python_cmd, default_python=default_python)
+    import_status = import_check(resolved_python)
+    wiki_exists = wiki_dir.exists() and wiki_dir.is_dir()
+    installed_version = str(import_status.get("version") or "")
+    mcp_sdk_ready = bool(import_status.get("mcp_sdk", import_status.get("installed")))
+    version_matches = bool(import_status.get("installed")) and installed_version == expected_version
+    ready = bool(import_status.get("installed")) and mcp_sdk_ready and wiki_exists and version_matches
+    normalized_import_status = dict(import_status)
+    normalized_import_status.setdefault("mcp_sdk", mcp_sdk_ready)
+    normalized_import_status.setdefault("error", None)
+    issues, next_actions = mcp_verify_guidance(
+        target=target,
+        init_command=init_command,
+        expected_version=expected_version,
+        python_cmd=resolved_python,
+        import_status=normalized_import_status,
+        mcp_sdk_ready=mcp_sdk_ready,
+        version_matches=version_matches,
+        wiki_exists=wiki_exists,
+    )
+    return {
+        "ready": ready,
+        "target": str(target),
+        "python": resolved_python,
+        "expected_version": expected_version,
+        "version_matches": version_matches,
+        "link_mcp": normalized_import_status,
+        "wiki": {
+            "path": str(wiki_dir),
+            "exists": wiki_exists,
+        },
+        "config": mcp_config(resolved_python, wiki_dir),
+        "issues": issues,
+        "next_actions": next_actions,
     }
 
 

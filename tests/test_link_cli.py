@@ -1908,11 +1908,11 @@ class LinkCliTests(unittest.TestCase):
             "error": "No module named mcp",
         })
         with patch.object(
-            link_cli.subprocess,
+            link_cli._core_check_link_mcp_import.__globals__["subprocess"],
             "run",
             return_value=subprocess.CompletedProcess(["/tmp/python"], 0, stdout=stdout, stderr=""),
         ) as run:
-            payload = link_cli._check_link_mcp_import("/tmp/python")
+            payload = link_cli._core_check_link_mcp_import("/tmp/python")
 
         self.assertTrue(payload["installed"])
         self.assertEqual(payload["version"], link_cli.LINK_VERSION)
