@@ -4,6 +4,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from mcp_package.link_core.capture import (
+    capture_accept_memory_args,
+    capture_accept_payload,
     capture_filename,
     capture_inbox,
     capture_notes_from_markdown,
@@ -167,6 +169,55 @@ class CaptureCoreTests(unittest.TestCase):
         self.assertEqual(selection["proposal_index"], 2)
         self.assertEqual(selection["proposal"]["title"], "Second")
         self.assertEqual(selection["proposals"]["limit"], 10)
+
+    def test_capture_accept_memory_args_and_payload(self):
+        selection = {
+            "capture": "raw/memory-captures/session.md",
+            "proposal_index": 2,
+            "project": "link",
+            "proposal": {
+                "title": "Prefer release branches",
+                "memory": "The user prefers release branches.",
+                "memory_type": "preference",
+                "scope": "project",
+                "project": "link",
+            },
+        }
+
+        args = capture_accept_memory_args(selection, title="Release branch preference", tags="workflow")
+        payload = capture_accept_payload(selection, {
+            "created": True,
+            "path": "wiki/memories/release-branch-preference.md",
+            "project": "link",
+        })
+
+        self.assertEqual(args["text"], "The user prefers release branches.")
+        self.assertEqual(args["title"], "Release branch preference")
+        self.assertEqual(args["memory_type"], "preference")
+        self.assertEqual(args["scope"], "project")
+        self.assertEqual(args["tags"], "workflow")
+        self.assertEqual(args["source"], "raw/memory-captures/session.md")
+        self.assertEqual(args["project"], "link")
+        self.assertTrue(payload["accepted"])
+        self.assertEqual(payload["proposal_index"], 2)
+        self.assertEqual(payload["result"]["path"], "wiki/memories/release-branch-preference.md")
+
+    def test_capture_accept_memory_args_omits_project_for_user_scope(self):
+        selection = {
+            "capture": "raw/memory-captures/session.md",
+            "project": "link",
+            "proposal": {
+                "title": "Prefer local memory",
+                "memory": "The user prefers local memory.",
+                "memory_type": "preference",
+                "scope": "user",
+            },
+        }
+
+        args = capture_accept_memory_args(selection)
+
+        self.assertEqual(args["scope"], "user")
+        self.assertEqual(args["project"], "")
 
     def test_capture_proposal_selection_validates_index_and_notes(self):
         root = Path(tempfile.mkdtemp(prefix="link-capture-selection-"))

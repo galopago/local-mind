@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 from .files import atomic_write_text
 from .frontmatter import frontmatter_string, parse_frontmatter
@@ -213,6 +213,46 @@ def capture_proposal_selection(
         "notes": notes,
         "proposals": proposals,
         "proposal": proposal,
+    }
+
+
+def capture_accept_memory_args(
+    selection: Mapping[str, object],
+    *,
+    title: str | None = None,
+    memory_type: str | None = None,
+    scope: str | None = None,
+    tags: str | None = None,
+) -> dict[str, object]:
+    """Build write_memory_page arguments for an accepted capture proposal."""
+    proposal = selection.get("proposal")
+    if not isinstance(proposal, Mapping):
+        raise ValueError("capture proposal is invalid")
+    project_name = str(selection.get("project") or "")
+    chosen_scope = str(scope or proposal.get("scope") or "user")
+    return {
+        "text": str(proposal.get("memory") or ""),
+        "title": title or str(proposal.get("title") or "Memory"),
+        "memory_type": memory_type or str(proposal.get("memory_type") or "note"),
+        "scope": chosen_scope,
+        "tags": tags,
+        "source": str(selection.get("capture") or ""),
+        "project": project_name if chosen_scope == "project" else "",
+    }
+
+
+def capture_accept_payload(selection: Mapping[str, object], result: Mapping[str, object]) -> dict[str, object]:
+    """Build the public accept-capture payload from selection and write result."""
+    proposal = selection.get("proposal")
+    if not isinstance(proposal, Mapping):
+        raise ValueError("capture proposal is invalid")
+    return {
+        "accepted": bool(result.get("created")),
+        "capture": str(selection.get("capture") or ""),
+        "proposal_index": selection.get("proposal_index"),
+        "project": str(result.get("project") or proposal.get("project") or ""),
+        "proposal": proposal,
+        "result": dict(result),
     }
 
 

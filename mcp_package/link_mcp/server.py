@@ -123,6 +123,8 @@ from link_core.backup import (
     list_backups as _core_list_backups,
 )
 from link_core.capture import (
+    capture_accept_memory_args as _core_capture_accept_memory_args,
+    capture_accept_payload as _core_capture_accept_payload,
     capture_inbox as _core_capture_inbox,
     capture_proposal_selection as _core_capture_proposal_selection,
     capture_records as _core_capture_records,
@@ -530,30 +532,26 @@ def _accept_capture(
         ),
     )
     rel_path = str(selection["capture"])
-    project_name = str(selection["project"])
     proposal_index = int(selection["proposal_index"])
-    proposal = selection["proposal"]
-    chosen_scope = _clean_text_input(scope).lower() or str(proposal["scope"])
-    chosen_project = project_name if chosen_scope == "project" else ""
-    result = _write_memory_page(
-        str(proposal["memory"]),
-        title=_clean_text_input(title) or str(proposal["title"]),
-        memory_type=_clean_text_input(memory_type).lower() or str(proposal["memory_type"]),
-        scope=chosen_scope,
+    memory_args = _core_capture_accept_memory_args(
+        selection,
+        title=_clean_text_input(title),
+        memory_type=_clean_text_input(memory_type).lower(),
+        scope=_clean_text_input(scope).lower(),
         tags=tags,
-        source=rel_path,
+    )
+    result = _write_memory_page(
+        str(memory_args["text"]),
+        title=str(memory_args["title"]),
+        memory_type=str(memory_args["memory_type"]),
+        scope=str(memory_args["scope"]),
+        tags=memory_args["tags"] if isinstance(memory_args["tags"], str) else "",
+        source=str(memory_args["source"]),
         allow_duplicate=allow_duplicate,
         allow_conflict=allow_conflict,
-        project=chosen_project,
+        project=str(memory_args["project"]),
     )
-    payload = {
-        "accepted": bool(result.get("created")),
-        "capture": rel_path,
-        "proposal_index": proposal_index,
-        "project": str(result.get("project") or proposal.get("project") or ""),
-        "proposal": proposal,
-        "result": result,
-    }
+    payload = _core_capture_accept_payload(selection, result)
     if result.get("created"):
         _append_log(
             _utc_timestamp(),

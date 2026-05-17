@@ -166,6 +166,8 @@ from link_core.cli_memory import (
     render_update_memory_text as _core_render_update_memory_text,
 )
 from link_core.capture import (
+    capture_accept_memory_args as _core_capture_accept_memory_args,
+    capture_accept_payload as _core_capture_accept_payload,
     capture_inbox as _core_capture_inbox,
     capture_proposal_selection as _core_capture_proposal_selection,
     capture_records as _core_capture_records,
@@ -925,30 +927,26 @@ def accept_capture(
         return 1
 
     rel_path = str(selection["capture"])
-    project_name = str(selection["project"])
-    proposal = selection["proposal"]
-    chosen_scope = scope or str(proposal["scope"])
-    chosen_project = project_name if chosen_scope == "project" else ""
+    memory_args = _core_capture_accept_memory_args(
+        selection,
+        title=title,
+        memory_type=memory_type,
+        scope=scope,
+        tags=tags,
+    )
     result = _write_memory_page(
         target,
-        str(proposal["memory"]),
-        title=title or str(proposal["title"]),
-        memory_type=memory_type or str(proposal["memory_type"]),
-        scope=chosen_scope,
-        tags=tags,
-        source=rel_path,
+        str(memory_args["text"]),
+        title=str(memory_args["title"]),
+        memory_type=str(memory_args["memory_type"]),
+        scope=str(memory_args["scope"]),
+        tags=memory_args["tags"] if isinstance(memory_args["tags"], str) else None,
+        source=str(memory_args["source"]),
         allow_duplicate=allow_duplicate,
         allow_conflict=allow_conflict,
-        project=chosen_project,
+        project=str(memory_args["project"]),
     )
-    payload = {
-        "accepted": bool(result.get("created")),
-        "capture": rel_path,
-        "proposal_index": selection["proposal_index"],
-        "project": str(result.get("project") or proposal.get("project") or ""),
-        "proposal": proposal,
-        "result": result,
-    }
+    payload = _core_capture_accept_payload(selection, result)
     if result.get("created"):
         _append_log(
             wiki_dir,
