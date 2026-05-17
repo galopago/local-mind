@@ -122,6 +122,9 @@ from link_core.web_proposals import (
     proposal_source_payload as _core_proposal_source_payload,
     proposal_sources as _core_proposal_sources,
 )
+from link_core.web_propose import (
+    render_propose_page as _core_render_propose_page,
+)
 from link_core.web_prompts import (
     render_prompts_page as _core_render_prompts_page,
 )
@@ -1006,54 +1009,11 @@ def _render_captures(project: str | None = None):
 
 
 def _render_propose(project: str | None = None, source: str | None = None):
-    project_value = html.escape(_clean_text_input(project, max_len=80), quote=True)
-    source_value = html.escape(_clean_text_input(source, max_len=500), quote=True)
-    proposal_path = (
-        f'<section class="ingest-path" aria-label="Memory proposal path">'
-        f'<article class="ingest-step"><span class="step-num">1</span>'
-        f'<h3>Load source</h3><p>Paste notes or load a safe local raw file. The source stays local.</p>'
-        f'<code>raw/file.md</code></article>'
-        f'<article class="ingest-step"><span class="step-num">2</span>'
-        f'<h3>Propose</h3><p>Link returns candidates only. This step never writes durable memory.</p>'
-        f'<code>Propose</code></article>'
-        f'<article class="ingest-step"><span class="step-num">3</span>'
-        f'<h3>Approve explicitly</h3><p>Copy the approval prompt into your agent chat only for memories you want kept.</p>'
-        f'<code>remember that ...</code></article>'
-        f'<article class="ingest-step"><span class="step-num">4</span>'
-        f'<h3>Review later</h3><p>Use the inbox and explain views to review, archive, update, or forget memories.</p>'
-        f'<code>link memory-inbox</code></article>'
-        f'</section>'
+    return _core_render_propose_page(
+        _clean_text_input(project, max_len=80),
+        _clean_text_input(source, max_len=500),
+        layout=_layout,
     )
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / propose</div>'
-        f'<h1>Propose Memories</h1>'
-        f'<p class="summary">Paste source notes, session notes, or a raw excerpt. Link returns memory candidates without writing anything.</p>'
-        f'<div class="memory-next"><strong>Trust rule</strong>'
-        f'<p>Source-backed wiki knowledge and durable agent memory are separate. Save only preferences, decisions, or project facts you approve.</p></div>'
-        f'<section><h2>Review Gate</h2><div class="proposal-checklist">'
-        f'<strong>Before saving memory</strong>'
-        f'<span>Keep ordinary facts in wiki pages; save only durable preferences, decisions, project context, or user facts.</span>'
-        f'<span>Check source label, scope, project, duplicate candidates, and conflict warnings.</span>'
-        f'<span>Use direct approval only when the proposal is clean; otherwise copy the approval prompt into your agent chat.</span>'
-        f'</div></section>'
-        f'{proposal_path}'
-        f'<section><div class="section-heading"><h2>Local Raw Sources</h2><a href="/captures">captures</a></div>'
-        f'<div class="proposal-source-list" data-proposal-sources aria-live="polite"></div></section>'
-        f'<form class="proposal-form" data-proposal-form data-initial-source="{source_value}">'
-        f'<label>Source or session notes'
-        f'<textarea name="text" placeholder="Paste notes here. Example: I prefer short release notes. We decided to keep Link local-first."></textarea>'
-        f'</label>'
-        f'<div class="proposal-controls">'
-        f'<label>Source label<input name="source" value="web proposal" autocomplete="off"></label>'
-        f'<label>Project<input name="project" value="{project_value}" placeholder="optional" autocomplete="off"></label>'
-        f'<label>Limit<input name="limit" type="number" min="1" max="20" value="10"></label>'
-        f'<button type="submit">Propose</button>'
-        f'</div>'
-        f'<div class="proposal-status" data-proposal-status aria-live="polite"></div>'
-        f'</form>'
-        f'<section class="proposal-results" data-proposal-results aria-live="polite"></section>'
-    )
-    return _layout("Propose Memories", body)
 
 
 def _render_ingest():
