@@ -315,6 +315,21 @@ def _top_tags(records: list[dict[str, object]], limit: int = 12) -> list[dict[st
     return _core_top_tags(records, limit=limit)
 
 
+def _emit_json_or_text(
+    payload: dict[str, object],
+    json_output: bool,
+    renderer: Callable[[dict[str, object]], tuple[int, str]],
+    *,
+    json_code: int = 0,
+) -> int:
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return json_code
+    code, text = renderer(payload)
+    print(text)
+    return code
+
+
 def _recent_memories(records: list[dict[str, object]]) -> list[dict[str, object]]:
     return _core_recent_memories(records)
 
@@ -703,13 +718,7 @@ def remember(
         print(f"Could not remember: {exc}", file=sys.stderr)
         return 1
 
-    if json_output:
-        print(json.dumps(result, indent=2))
-        return 0
-
-    code, text = _core_render_remember_text(result)
-    print(text)
-    return code
+    return _emit_json_or_text(result, json_output, _core_render_remember_text)
 
 
 def _read_proposal_input(target: Path, value: str) -> tuple[str, str]:
@@ -1076,13 +1085,7 @@ def update_memory(
         print(f"Could not update memory: {exc}", file=sys.stderr)
         return 1
 
-    if json_output:
-        print(json.dumps(result, indent=2))
-        return 0
-
-    code, text = _core_render_update_memory_text(result)
-    print(text)
-    return code
+    return _emit_json_or_text(result, json_output, _core_render_update_memory_text)
 
 
 def recall(
@@ -1134,13 +1137,11 @@ def archive_memory(target: Path, identifier: str, reason: str | None = None, jso
         print(f"Could not archive memory: {exc}", file=sys.stderr)
         return 1
 
-    if json_output:
-        print(json.dumps(result, indent=2))
-        return 0
-
-    code, text = _core_render_memory_status_text(result, action="archive")
-    print(text)
-    return code
+    return _emit_json_or_text(
+        result,
+        json_output,
+        lambda payload: _core_render_memory_status_text(payload, action="archive"),
+    )
 
 
 def restore_memory(target: Path, identifier: str, json_output: bool = False) -> int:
@@ -1150,13 +1151,11 @@ def restore_memory(target: Path, identifier: str, json_output: bool = False) -> 
         print(f"Could not restore memory: {exc}", file=sys.stderr)
         return 1
 
-    if json_output:
-        print(json.dumps(result, indent=2))
-        return 0
-
-    code, text = _core_render_memory_status_text(result, action="restore")
-    print(text)
-    return code
+    return _emit_json_or_text(
+        result,
+        json_output,
+        lambda payload: _core_render_memory_status_text(payload, action="restore"),
+    )
 
 
 def forget_memory(target: Path, identifier: str, confirm: bool = False, json_output: bool = False) -> int:
@@ -1212,13 +1211,15 @@ def memory_inbox(
         return 1
     inbox = _memory_inbox(wiki_dir, limit=limit, include_archived=include_archived, project=project)
 
-    if json_output:
-        print(json.dumps(inbox, indent=2))
-        return 0
-
-    code, text = _core_render_memory_inbox_text(inbox, target=target, include_archived=include_archived)
-    print(text)
-    return code
+    return _emit_json_or_text(
+        inbox,
+        json_output,
+        lambda payload: _core_render_memory_inbox_text(
+            payload,
+            target=target,
+            include_archived=include_archived,
+        ),
+    )
 
 
 def review_memory(target: Path, identifier: str, note: str | None = None, json_output: bool = False) -> int:
@@ -1228,13 +1229,7 @@ def review_memory(target: Path, identifier: str, note: str | None = None, json_o
         print(f"Could not review memory: {exc}", file=sys.stderr)
         return 1
 
-    if json_output:
-        print(json.dumps(result, indent=2))
-        return 0
-
-    code, text = _core_render_review_memory_text(result)
-    print(text)
-    return code
+    return _emit_json_or_text(result, json_output, _core_render_review_memory_text)
 
 
 def explain_memory(target: Path, identifier: str, json_output: bool = False) -> int:
