@@ -9,6 +9,78 @@ MemoryActionHints = Callable[[dict[str, object]], list[dict[str, object]]]
 PageHref = Callable[[str], str]
 
 
+def memory_dashboard_next_actions(
+    *,
+    memory_count: int,
+    review_count: int,
+    updated_count: int,
+    archived_count: int,
+    capture_count: int = 0,
+    capture_warning_count: int = 0,
+) -> list[dict[str, str]]:
+    """Return web dashboard next actions for current memory/capture state."""
+    actions: list[dict[str, str]] = []
+    if capture_warning_count:
+        actions.append({
+            "label": "Redact capture warnings",
+            "detail": f"{capture_warning_count} raw capture{'s' if capture_warning_count != 1 else ''} contain secret-looking values.",
+            "href": "/captures",
+            "command": "python3 link.py redact-capture raw/memory-captures/<capture>.md .",
+            "priority": "high",
+        })
+    if review_count:
+        memory_label = "memory" if review_count == 1 else "memories"
+        verb = "needs" if review_count == 1 else "need"
+        actions.append({
+            "label": "Review pending memories",
+            "detail": f"{review_count} {memory_label} {verb} confirmation or metadata cleanup.",
+            "href": "/inbox",
+            "command": "python3 link.py memory-inbox .",
+            "priority": "high",
+        })
+    if updated_count:
+        actions.append({
+            "label": "Audit recent memory updates",
+            "detail": f"{updated_count} memory update{'s' if updated_count != 1 else ''} should be checked for accuracy.",
+            "href": "/memory",
+            "command": "python3 link.py profile .",
+            "priority": "medium",
+        })
+    if archived_count:
+        actions.append({
+            "label": "Inspect archived memory",
+            "detail": f"{archived_count} archived memory page{'s' if archived_count != 1 else ''} remain inspectable but hidden from default recall.",
+            "href": "/profile",
+            "command": "python3 link.py profile .",
+            "priority": "low",
+        })
+    if capture_count and not capture_warning_count:
+        actions.append({
+            "label": "Review raw captures",
+            "detail": f"{capture_count} saved raw capture{'s' if capture_count != 1 else ''} can be accepted, redacted, or deleted.",
+            "href": "/captures",
+            "command": "python3 link.py accept-capture raw/memory-captures/<capture>.md . --index 1",
+            "priority": "medium",
+        })
+    if not memory_count:
+        actions.append({
+            "label": "Create the first memory",
+            "detail": "Save an explicit preference, decision, project fact, or note for local agents.",
+            "href": "",
+            "command": 'python3 link.py remember "User prefers ..." . --type preference --scope user',
+            "priority": "high",
+        })
+    if not actions:
+        actions.append({
+            "label": "Memory is recall-ready",
+            "detail": "No pending review items or recent updates need attention.",
+            "href": "/profile",
+            "command": "python3 link.py profile .",
+            "priority": "info",
+        })
+    return actions[:3]
+
+
 def render_memory_action_button(action: dict[str, object]) -> str:
     kind = str(action.get("kind") or "")
     if kind not in {"review", "archive", "restore"}:

@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.web_memory import (  # noqa: E402
+    memory_dashboard_next_actions,
     render_capture_card,
     render_memory_action_button,
     render_memory_card,
@@ -99,6 +100,46 @@ class WebMemoryCoreTests(unittest.TestCase):
         self.assertIn('<a href="/inbox">Review</a>', html)
         self.assertIn("Open inbox.", html)
         self.assertIn("link memory-inbox", html)
+
+    def test_memory_dashboard_next_actions_cover_empty_ready_and_review_states(self):
+        empty_actions = memory_dashboard_next_actions(
+            memory_count=0,
+            review_count=0,
+            updated_count=0,
+            archived_count=0,
+        )
+        ready_actions = memory_dashboard_next_actions(
+            memory_count=2,
+            review_count=0,
+            updated_count=0,
+            archived_count=0,
+        )
+        review_actions = memory_dashboard_next_actions(
+            memory_count=1,
+            review_count=1,
+            updated_count=0,
+            archived_count=0,
+        )
+
+        self.assertEqual(empty_actions[0]["label"], "Create the first memory")
+        self.assertIn("remember", empty_actions[0]["command"])
+        self.assertEqual(ready_actions[0]["label"], "Memory is recall-ready")
+        self.assertEqual(ready_actions[0]["href"], "/profile")
+        self.assertIn("1 memory needs confirmation", review_actions[0]["detail"])
+
+    def test_memory_dashboard_next_actions_prioritize_capture_warnings(self):
+        actions = memory_dashboard_next_actions(
+            memory_count=2,
+            review_count=1,
+            updated_count=1,
+            archived_count=1,
+            capture_count=1,
+            capture_warning_count=1,
+        )
+
+        self.assertEqual(actions[0]["label"], "Redact capture warnings")
+        self.assertEqual(actions[1]["label"], "Review pending memories")
+        self.assertEqual(actions[2]["label"], "Audit recent memory updates")
 
 
 if __name__ == "__main__":

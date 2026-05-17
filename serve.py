@@ -70,6 +70,7 @@ from link_core.version import (
 )
 from link_core.web_assets import CSS  # noqa: F401 - kept as serve.CSS for tests and compatibility
 from link_core.web_memory import (
+    memory_dashboard_next_actions as _core_memory_dashboard_next_actions,
     render_memory_card as _core_render_memory_card,
     render_memory_section as _core_render_memory_section,
 )
@@ -596,66 +597,14 @@ def _memory_dashboard_next_actions(
     capture_count: int = 0,
     capture_warning_count: int = 0,
 ) -> list[dict[str, str]]:
-    actions: list[dict[str, str]] = []
-    if capture_warning_count:
-        actions.append({
-            "label": "Redact capture warnings",
-            "detail": f"{capture_warning_count} raw capture{'s' if capture_warning_count != 1 else ''} contain secret-looking values.",
-            "href": "/captures",
-            "command": "python3 link.py redact-capture raw/memory-captures/<capture>.md .",
-            "priority": "high",
-        })
-    if review_count:
-        memory_label = "memory" if review_count == 1 else "memories"
-        verb = "needs" if review_count == 1 else "need"
-        actions.append({
-            "label": "Review pending memories",
-            "detail": f"{review_count} {memory_label} {verb} confirmation or metadata cleanup.",
-            "href": "/inbox",
-            "command": "python3 link.py memory-inbox .",
-            "priority": "high",
-        })
-    if updated_count:
-        actions.append({
-            "label": "Audit recent memory updates",
-            "detail": f"{updated_count} memory update{'s' if updated_count != 1 else ''} should be checked for accuracy.",
-            "href": "/memory",
-            "command": "python3 link.py profile .",
-            "priority": "medium",
-        })
-    if archived_count:
-        actions.append({
-            "label": "Inspect archived memory",
-            "detail": f"{archived_count} archived memory page{'s' if archived_count != 1 else ''} remain inspectable but hidden from default recall.",
-            "href": "/profile",
-            "command": "python3 link.py profile .",
-            "priority": "low",
-        })
-    if capture_count and not capture_warning_count:
-        actions.append({
-            "label": "Review raw captures",
-            "detail": f"{capture_count} saved raw capture{'s' if capture_count != 1 else ''} can be accepted, redacted, or deleted.",
-            "href": "/captures",
-            "command": "python3 link.py accept-capture raw/memory-captures/<capture>.md . --index 1",
-            "priority": "medium",
-        })
-    if not memory_count:
-        actions.append({
-            "label": "Create the first memory",
-            "detail": "Save an explicit preference, decision, project fact, or note for local agents.",
-            "href": "",
-            "command": 'python3 link.py remember "User prefers ..." . --type preference --scope user',
-            "priority": "high",
-        })
-    if not actions:
-        actions.append({
-            "label": "Memory is recall-ready",
-            "detail": "No pending review items or recent updates need attention.",
-            "href": "/profile",
-            "command": "python3 link.py profile .",
-            "priority": "info",
-        })
-    return actions[:3]
+    return _core_memory_dashboard_next_actions(
+        memory_count=memory_count,
+        review_count=review_count,
+        updated_count=updated_count,
+        archived_count=archived_count,
+        capture_count=capture_count,
+        capture_warning_count=capture_warning_count,
+    )
 
 
 def _capture_records(limit: int = 12, project: str | None = None) -> list[dict[str, object]]:
