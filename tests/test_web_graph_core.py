@@ -14,6 +14,7 @@ from link_core.web_graph import (  # noqa: E402
     graph_needs_bounded_overview,
     render_graph_empty_body,
     render_graph_page_body,
+    render_graph_script,
 )
 
 
@@ -125,6 +126,25 @@ class WebGraphCoreTests(unittest.TestCase):
         )
 
         self.assertNotIn("Load graph data", html)
+
+    def test_render_graph_script_uses_supplied_json_payloads(self):
+        script = render_graph_script(
+            nodes_json='[{"id":"a","title":"A","category":"concepts"}]',
+            edges_json='[{"source":"a","target":"b"}]',
+            cat_colors_json='{"concepts":"#fff"}',
+            graph_mode_json='"summary"',
+            total_node_count=10,
+            total_edge_count=20,
+        )
+
+        self.assertIn('var nodes = [{"id":"a","title":"A","category":"concepts"}];', script)
+        self.assertIn('var edges = [{"source":"a","target":"b"}];', script)
+        self.assertIn('var catColors = {"concepts":"#fff"};', script)
+        self.assertIn('var initialGraphMode = "summary";', script)
+        self.assertIn("var totalNodeCount = 10;", script)
+        self.assertIn("var totalEdgeCount = 20;", script)
+        self.assertIn("function visibleNodes()", script)
+        self.assertIn("canvas.addEventListener('dblclick'", script)
 
 
 if __name__ == "__main__":
