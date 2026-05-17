@@ -13,6 +13,7 @@ from mcp_package.link_core.capture import (
     mcp_capture_commands,
     render_accept_capture_text,
     render_capture_inbox_text,
+    render_capture_session_text,
     render_delete_capture_text,
     render_redact_capture_text,
     resolve_capture_file,
@@ -273,6 +274,38 @@ class CaptureCoreTests(unittest.TestCase):
         })
         self.assertEqual(code, 0)
         self.assertIn("Capture deleted", text)
+
+    def test_render_capture_session_text_lists_proposals(self):
+        text = render_capture_session_text({
+            "path": "raw/memory-captures/session.md",
+            "project": "link",
+            "secret_warnings": ["OpenAI API key"],
+            "proposals": {
+                "count": 1,
+                "proposals": [{
+                    "title": "Prefer release branches",
+                    "confidence": "high",
+                    "memory_type": "preference",
+                    "scope": "project",
+                    "project": "link",
+                    "suggested_action": "remember",
+                    "memory": "The user prefers release branches.",
+                }],
+            },
+        })
+
+        self.assertIn("Session captured", text)
+        self.assertIn("Path: raw/memory-captures/session.md", text)
+        self.assertIn("Project: link", text)
+        self.assertIn("Secret-looking content: OpenAI API key", text)
+        self.assertIn("1. Prefer release branches [high]", text)
+        self.assertIn("Ask the user which proposals to remember", text)
+
+        text = render_capture_session_text({
+            "path": "raw/memory-captures/session.md",
+            "proposals": {"count": 0, "proposals": []},
+        })
+        self.assertIn("No durable memory candidates found.", text)
 
 
 if __name__ == "__main__":

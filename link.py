@@ -155,6 +155,7 @@ from link_core.capture import (
     capture_title as _core_capture_title,
     cli_capture_commands as _core_cli_capture_commands,
     render_accept_capture_text as _core_render_accept_capture_text,
+    render_capture_session_text as _core_render_capture_session_text,
     render_capture_inbox_text as _core_render_capture_inbox_text,
     render_delete_capture_text as _core_render_delete_capture_text,
     render_redact_capture_text as _core_render_redact_capture_text,
@@ -1447,27 +1448,7 @@ Captured locally for Link memory review. This raw note is proposal-only until th
         print(json.dumps(payload, indent=2))
         return 0
 
-    print("Session captured")
-    print(f"Path: {rel_path}")
-    if project_name:
-        print(f"Project: {project_name}")
-    if secret_warnings:
-        print("Secret-looking content: " + ", ".join(secret_warnings))
-    print(f"Proposals: {result['count']}")
-    if not result["proposals"]:
-        print("No durable memory candidates found.")
-        return 0
-    for index, proposal in enumerate(result["proposals"], start=1):
-        print("")
-        print(f"{index}. {proposal['title']} [{proposal['confidence']}]")
-        print(f"   Type: {proposal['memory_type']} | Scope: {proposal['scope']}")
-        if proposal.get("project"):
-            print(f"   Project: {proposal['project']}")
-        print(f"   Action: {proposal['suggested_action']}")
-        print(f"   Memory: {proposal['memory']}")
-    print("")
-    print("Next:")
-    print("  Ask the user which proposals to remember, update, or discard.")
+    print(_core_render_capture_session_text(payload))
     return 0
 
 
