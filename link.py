@@ -144,6 +144,11 @@ from link_core.doctor import (
 from link_core.cli_parser import (
     build_cli_parser as _core_build_cli_parser,
 )
+from link_core.cli_memory import (
+    render_recall_text as _core_render_recall_text,
+    render_remember_text as _core_render_remember_text,
+    render_update_memory_text as _core_render_update_memory_text,
+)
 from link_core.capture import (
     capture_filename as _core_capture_filename,
     capture_inbox as _core_capture_inbox,
@@ -1247,53 +1252,9 @@ def remember(
         print(json.dumps(result, indent=2))
         return 0
 
-    if not result.get("created"):
-        if result.get("conflict"):
-            print("Possible conflicting memory found")
-            print(f"Title requested: {result['title']}")
-            print(f"Type: {result['memory_type']}")
-            print(f"Scope: {result['scope']}")
-            print("")
-            print("Conflict candidates:")
-            for candidate in result.get("conflict_candidates", []):
-                reasons = ", ".join(candidate.get("conflict_reasons", []))
-                print(f"- {candidate['title']} ({candidate['path']})")
-                if reasons:
-                    print(f"  Reasons: {reasons}")
-            print("")
-            print("Next:")
-            first = next(iter(result.get("conflict_candidates", [])), None)
-            if first:
-                print(f"  python3 link.py explain-memory \"{first['name']}\" .")
-            print("  Update/archive the old memory, or use --allow-conflict only if both should coexist.")
-            return 0
-        print("Similar memory already exists")
-        print(f"Title requested: {result['title']}")
-        print(f"Type: {result['memory_type']}")
-        print(f"Scope: {result['scope']}")
-        print("")
-        print("Existing candidates:")
-        for candidate in result.get("candidates", []):
-            print(f"- {candidate['title']} ({candidate['path']})")
-        print("")
-        print("Next:")
-        first = next(iter(result.get("candidates", [])), None)
-        if first:
-            print(f"  python3 link.py explain-memory \"{first['name']}\" .")
-        print("  Use --allow-duplicate only if this should be a separate memory.")
-        return 0
-
-    print("Memory saved")
-    print(f"Title: {result['title']}")
-    print(f"Path: {result['path']}")
-    print(f"Type: {result['memory_type']}")
-    print(f"Scope: {result['scope']}")
-    if result.get("project"):
-        print(f"Project: {result['project']}")
-    print("")
-    print("Next:")
-    print(f"  python3 link.py recall \"{result['title']}\" .")
-    return 0
+    code, text = _core_render_remember_text(result)
+    print(text)
+    return code
 
 
 def _read_proposal_input(target: Path, value: str) -> tuple[str, str]:
@@ -1721,34 +1682,9 @@ def update_memory(
         print(json.dumps(result, indent=2))
         return 0
 
-    if not result.get("updated") and result.get("conflict"):
-        print("Possible conflicting memory found")
-        print(f"Memory being updated: {result['title']} ({result['path']})")
-        print("")
-        print("Conflict candidates:")
-        for candidate in result.get("conflict_candidates", []):
-            reasons = ", ".join(candidate.get("conflict_reasons", []))
-            print(f"- {candidate['title']} ({candidate['path']})")
-            if reasons:
-                print(f"  Reasons: {reasons}")
-        print("")
-        print("Next:")
-        first = next(iter(result.get("conflict_candidates", [])), None)
-        if first:
-            print(f"  python3 link.py explain-memory \"{first['name']}\" .")
-        print("  Update/archive the conflicting memory, or use --allow-conflict only if both should coexist.")
-        return 0
-
-    print("Memory updated")
-    print(f"Title: {result['title']}")
-    print(f"Path: {result['path']}")
-    print(f"Update count: {result['update_count']}")
-    print(f"Review: {result['previous_review_status']} -> {result['review_status']}")
-    print("")
-    print("Next:")
-    print(f"  python3 link.py explain-memory \"{result['name']}\" .")
-    print(f"  python3 link.py review-memory \"{result['name']}\" .")
-    return 0
+    code, text = _core_render_update_memory_text(result)
+    print(text)
+    return code
 
 
 def recall(
@@ -1783,30 +1719,14 @@ def recall(
         }, indent=2))
         return 0
 
-    print(f"Link memory recall: {query}")
-    if project_name:
-        print(f"Project: {project_name}")
-    if include_archived:
-        print("Including archived/stale memories")
-    print("")
-    if not results:
-        print("No matching memories found.")
-        print("")
-        print("Next:")
-        print("  Add one: python3 link.py remember \"Memory to keep\" .")
-        return 0
-
-    print(f"{len(results)} memor{'y' if len(results) == 1 else 'ies'}")
-    for record in results:
-        print(f"- {record['title']} ({record['memory_type']} · {record['scope']})")
-        print(f"  {record['path']}")
-        recall = record.get("recall") if isinstance(record.get("recall"), dict) else {}
-        if recall.get("state"):
-            print(f"  Recall: {recall['state']}")
-        summary = record.get("tldr") or record.get("snippet")
-        if summary:
-            print(f"  {summary}")
-    return 0
+    code, text = _core_render_recall_text(
+        query=query,
+        results=results,
+        include_archived=include_archived,
+        project=project_name,
+    )
+    print(text)
+    return code
 
 
 def archive_memory(target: Path, identifier: str, reason: str | None = None, json_output: bool = False) -> int:
