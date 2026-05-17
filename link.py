@@ -35,7 +35,6 @@ Usage:
 """
 from __future__ import annotations
 
-import fnmatch
 import json
 import re
 import shutil
@@ -210,6 +209,8 @@ from link_core.schema import (
 )
 from link_core.security import (
     clean_text_input as _clean_text_input,
+    find_sensitive_filenames as _core_find_sensitive_filenames,
+    find_sensitive_values as _core_find_sensitive_values,
     redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
@@ -785,52 +786,19 @@ def _find_isolated_pages(wiki_dir: Path) -> list[str]:
 
 
 def _find_sensitive_filenames(target: Path) -> list[str]:
-    matches: list[str] = []
-    stack = [target]
-    while stack:
-        current = stack.pop()
-        for path in current.iterdir():
-            if path.is_dir():
-                if path.name not in SKIP_SCAN_DIRS:
-                    stack.append(path)
-                continue
-            if not path.is_file():
-                continue
-            name = path.name
-            if any(fnmatch.fnmatch(name, pattern) for pattern in SECRET_NAME_PATTERNS):
-                matches.append(str(path.relative_to(target)))
-    return sorted(matches)
-
-
-def _iter_scannable_files(target: Path) -> list[Path]:
-    files: list[Path] = []
-    stack = [target]
-    while stack:
-        current = stack.pop()
-        for path in current.iterdir():
-            if path.is_dir():
-                if path.name not in SKIP_SCAN_DIRS:
-                    stack.append(path)
-                continue
-            if not path.is_file() or path.suffix.lower() in SKIP_SCAN_SUFFIXES:
-                continue
-            files.append(path)
-    return sorted(files)
+    return _core_find_sensitive_filenames(
+        target,
+        skip_dirs=SKIP_SCAN_DIRS,
+        patterns=SECRET_NAME_PATTERNS,
+    )
 
 
 def _find_sensitive_values(target: Path) -> tuple[list[str], list[str]]:
-    matches: list[str] = []
-    read_errors: list[str] = []
-    for path in _iter_scannable_files(target):
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
-            read_errors.append(f"{path.relative_to(target)} ({exc})")
-            continue
-        warnings = _secret_value_warnings(text)
-        if warnings:
-            matches.append(f"{path.relative_to(target)} ({warnings[0]})")
-    return sorted(matches), sorted(read_errors)
+    return _core_find_sensitive_values(
+        target,
+        skip_dirs=SKIP_SCAN_DIRS,
+        skip_suffixes=SKIP_SCAN_SUFFIXES,
+    )
 
 
 def _required_paths(target: Path) -> list[Path]:

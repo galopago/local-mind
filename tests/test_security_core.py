@@ -4,6 +4,9 @@ from pathlib import Path
 
 from mcp_package.link_core.security import (
     clean_text_input,
+    find_sensitive_filenames,
+    find_sensitive_values,
+    iter_scannable_files,
     redact_secret_values,
     secret_file_warnings,
     secret_value_warnings,
@@ -45,6 +48,42 @@ class SecurityCoreTests(unittest.TestCase):
         warnings = secret_file_warnings(tmp / "missing.md")
 
         self.assertEqual(warnings, [])
+
+    def test_sensitive_filename_scan_skips_configured_dirs(self):
+        root = Path(tempfile.mkdtemp(prefix="link-sensitive-name-"))
+        (root / "raw").mkdir()
+        (root / "raw" / ".env").write_text("secret\n", encoding="utf-8")
+        (root / ".git").mkdir()
+        (root / ".git" / ".env").write_text("ignored\n", encoding="utf-8")
+
+        matches = find_sensitive_filenames(
+            root,
+            skip_dirs={".git"},
+            patterns=(".env", "*.key"),
+        )
+
+        self.assertEqual(matches, ["raw/.env"])
+
+    def test_iter_scannable_files_skips_binary_suffixes(self):
+        root = Path(tempfile.mkdtemp(prefix="link-scannable-"))
+        (root / "note.md").write_text("text\n", encoding="utf-8")
+        (root / "image.png").write_bytes(b"png")
+        (root / "node_modules").mkdir()
+        (root / "node_modules" / "note.md").write_text("ignored\n", encoding="utf-8")
+
+        files = iter_scannable_files(root, skip_dirs={"node_modules"}, skip_suffixes={".png"})
+
+        self.assertEqual([path.name for path in files], ["note.md"])
+
+    def test_find_sensitive_values_reports_matches(self):
+        root = Path(tempfile.mkdtemp(prefix="link-sensitive-values-"))
+        fake_key = "sk-" + ("A" * 24)
+        (root / "note.md").write_text(f"token {fake_key}\n", encoding="utf-8")
+
+        matches, read_errors = find_sensitive_values(root, skip_dirs=set(), skip_suffixes=set())
+
+        self.assertEqual(matches, ["note.md (OpenAI API key)"])
+        self.assertEqual(read_errors, [])
 
 
 if __name__ == "__main__":
