@@ -47,7 +47,6 @@ from typing import Callable, Mapping
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_DEMO_DIR = "link-demo"
-WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
 SECRET_NAME_PATTERNS = (
     ".env",
     ".env.*",
@@ -136,6 +135,12 @@ from link_core.demo import (
 from link_core.doctor import (
     DoctorReport as _CoreDoctorReport,
     doctor_validation_errors as _core_doctor_validation_errors,
+    find_dead_links as _core_find_dead_links,
+    find_isolated_pages as _core_find_isolated_pages,
+    find_pages_missing_source_sections as _core_find_pages_missing_source_sections,
+    find_pages_missing_summaries as _core_find_pages_missing_summaries,
+    find_source_count_mismatches as _core_find_source_count_mismatches,
+    find_unindexed_pages as _core_find_unindexed_pages,
     format_validation_error_summary as _core_format_validation_error_summary,
     join_limited as _core_join_limited,
     render_doctor_report as _core_render_doctor_report,
@@ -262,30 +267,11 @@ def _build_backlinks(wiki_dir: Path) -> dict[str, dict[str, list[str]]]:
     return _core_build_backlinks(wiki_dir, body_only=False)
 
 
-def _wiki_page_records(wiki_dir: Path) -> list[dict[str, object]]:
-    records: list[dict[str, object]] = []
-    for md in _wiki_pages(wiki_dir):
-        text = md.read_text(encoding="utf-8", errors="replace")
-        meta, body = _parse_frontmatter(text)
-        records.append({
-            "path": md,
-            "rel": str(md.relative_to(wiki_dir)),
-            "stem": md.stem.lower(),
-            "meta": meta,
-            "body": body,
-        })
-    return records
-
-
 def _wiki_pages(wiki_dir: Path) -> list[Path]:
     return sorted(
         md for md in wiki_dir.rglob("*.md")
         if not md.name.startswith(".")
     )
-
-
-def _page_stems(wiki_dir: Path) -> set[str]:
-    return {md.stem.lower() for md in _wiki_pages(wiki_dir)}
 
 
 def _load_backlinks(path: Path) -> tuple[dict[str, dict[str, list[str]]] | None, str | None]:
@@ -580,26 +566,11 @@ def _normalize_link_index(data: dict[str, dict[str, list[str]]]) -> dict[str, di
 
 
 def _find_dead_links(wiki_dir: Path) -> list[str]:
-    stems = _page_stems(wiki_dir)
-    dead: list[str] = []
-    for md in _wiki_pages(wiki_dir):
-        source = md.stem.lower()
-        text = md.read_text(encoding="utf-8", errors="replace")
-        for match in WIKILINK_RE.finditer(text):
-            target = match.group(1).strip().lower()
-            if target and target not in stems:
-                dead.append(f"{source} -> {target}")
-    return sorted(set(dead))
+    return _core_find_dead_links(wiki_dir)
 
 
 def _find_unindexed_pages(wiki_dir: Path) -> list[str]:
-    index_path = wiki_dir / "index.md"
-    if not index_path.exists():
-        return []
-    index_text = index_path.read_text(encoding="utf-8", errors="replace")
-    indexed = {m.group(1).strip().lower() for m in WIKILINK_RE.finditer(index_text)}
-    roots = {"index", "log"}
-    return sorted(stem for stem in _page_stems(wiki_dir) if stem not in indexed and stem not in roots)
+    return _core_find_unindexed_pages(wiki_dir)
 
 
 def _raw_ingest_findings(target: Path) -> dict[str, list[str]]:
@@ -631,56 +602,15 @@ def _collect_ingest_status(target: Path) -> dict[str, object]:
 
 
 def _find_pages_missing_summaries(wiki_dir: Path) -> list[str]:
-    missing: list[str] = []
-    for record in _wiki_page_records(wiki_dir):
-        stem = str(record["stem"])
-        if stem in {"index", "log"}:
-            continue
-        body = str(record["body"])
-        if "> **TLDR:**" not in body and "> **Query:**" not in body:
-            missing.append(str(record["rel"]))
-    return sorted(missing)
+    return _core_find_pages_missing_summaries(wiki_dir)
 
 
 def _find_pages_missing_source_sections(wiki_dir: Path) -> list[str]:
-    missing: list[str] = []
-    source_backed_dirs = {"concepts", "entities", "comparisons", "explorations"}
-    for record in _wiki_page_records(wiki_dir):
-        rel = str(record["rel"])
-        top_dir = rel.split("/", 1)[0]
-        if top_dir not in source_backed_dirs:
-            continue
-        body = str(record["body"])
-        if not re.search(r"^## Sources\b", body, flags=re.MULTILINE):
-            missing.append(rel)
-    return sorted(missing)
-
-
-def _source_section_links(body: str) -> set[str]:
-    match = re.search(r"^## Sources[^\n]*\n(?P<section>.*?)(?=^## |\Z)", body, flags=re.MULTILINE | re.DOTALL)
-    if not match:
-        return set()
-    return {m.group(1).strip().lower() for m in WIKILINK_RE.finditer(match.group("section"))}
+    return _core_find_pages_missing_source_sections(wiki_dir)
 
 
 def _find_source_count_mismatches(wiki_dir: Path) -> list[str]:
-    mismatches: list[str] = []
-    for record in _wiki_page_records(wiki_dir):
-        rel = str(record["rel"])
-        if rel.split("/", 1)[0] == "sources":
-            continue
-        meta = record["meta"]
-        if not isinstance(meta, dict) or "source_count" not in meta:
-            continue
-        try:
-            expected = int(str(meta["source_count"]))
-        except ValueError:
-            mismatches.append(f"{rel} has non-integer source_count")
-            continue
-        actual = len(_source_section_links(str(record["body"])))
-        if expected != actual:
-            mismatches.append(f"{rel} source_count={expected}, sources section has {actual}")
-    return sorted(mismatches)
+    return _core_find_source_count_mismatches(wiki_dir)
 
 
 def _raw_source_refs(text: str) -> list[str]:
@@ -770,19 +700,7 @@ def _repair_validation_findings(wiki_dir: Path) -> list[str]:
 
 
 def _find_isolated_pages(wiki_dir: Path) -> list[str]:
-    stems = _page_stems(wiki_dir)
-    records = _wiki_page_records(wiki_dir)
-    graph = _build_backlinks(wiki_dir)
-    isolated: list[str] = []
-    for record in records:
-        stem = str(record["stem"])
-        if stem in {"index", "log"}:
-            continue
-        inbound = [name for name in graph["backlinks"].get(stem, []) if name in stems and name != stem]
-        outgoing = [name for name in graph["forward"].get(stem, []) if name in stems and name != stem]
-        if not inbound and not outgoing:
-            isolated.append(str(record["rel"]))
-    return sorted(isolated)
+    return _core_find_isolated_pages(wiki_dir)
 
 
 def _find_sensitive_filenames(target: Path) -> list[str]:

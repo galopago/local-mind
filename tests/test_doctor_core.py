@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -9,9 +10,16 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 from link_core.doctor import (  # noqa: E402
     DoctorReport,
     doctor_validation_errors,
+    find_dead_links,
+    find_isolated_pages,
+    find_pages_missing_source_sections,
+    find_pages_missing_summaries,
+    find_source_count_mismatches,
+    find_unindexed_pages,
     format_validation_error_summary,
     join_limited,
     render_doctor_report,
+    source_section_links,
 )
 
 
@@ -60,6 +68,51 @@ class DoctorCoreTests(unittest.TestCase):
         text = join_limited("items: ", [str(index) for index in range(10)], limit=3)
 
         self.assertEqual(text, "items: 0, 1, 2")
+
+    def test_page_health_helpers_find_doctor_findings(self):
+        root = Path(tempfile.mkdtemp(prefix="link-doctor-core-"))
+        wiki = root / "wiki"
+        (wiki / "concepts").mkdir(parents=True)
+        (wiki / "sources").mkdir()
+        (wiki / "index.md").write_text("# Index\n\n[[agent-memory]]\n", encoding="utf-8")
+        (wiki / "log.md").write_text("# Log\n", encoding="utf-8")
+        (wiki / "concepts" / "agent-memory.md").write_text(
+            "---\n"
+            "type: concept\n"
+            "title: Agent Memory\n"
+            "source_count: 2\n"
+            "---\n"
+            "# Agent Memory\n\n"
+            "> **TLDR:** Durable context.\n\n"
+            "Links to [[missing-page]].\n\n"
+            "## Sources\n\n"
+            "- [[source-one]]\n",
+            encoding="utf-8",
+        )
+        (wiki / "concepts" / "orphan.md").write_text(
+            "---\ntype: concept\ntitle: Orphan\n---\n# Orphan\n\nNo summary.\n",
+            encoding="utf-8",
+        )
+        (wiki / "concepts" / "no-sources.md").write_text(
+            "---\ntype: concept\ntitle: No Sources\n---\n# No Sources\n\n> **TLDR:** Missing sources.\n",
+            encoding="utf-8",
+        )
+        (wiki / "sources" / "source-one.md").write_text(
+            "---\ntype: source\ntitle: Source One\n---\n# Source One\n\n> **TLDR:** Source.\n\n[[agent-memory]]\n",
+            encoding="utf-8",
+        )
+
+        self.assertEqual(find_dead_links(wiki), ["agent-memory -> missing-page"])
+        self.assertEqual(find_unindexed_pages(wiki), ["no-sources", "orphan", "source-one"])
+        self.assertEqual(find_pages_missing_summaries(wiki), ["concepts/orphan.md"])
+        self.assertEqual(find_pages_missing_source_sections(wiki), ["concepts/no-sources.md", "concepts/orphan.md"])
+        self.assertEqual(find_source_count_mismatches(wiki), ["concepts/agent-memory.md source_count=2, sources section has 1"])
+        self.assertEqual(find_isolated_pages(wiki), ["concepts/no-sources.md", "concepts/orphan.md"])
+
+    def test_source_section_links_reads_only_sources_section(self):
+        links = source_section_links("Intro [[outside]]\n\n## Sources\n\n- [[inside]]\n\n## Next\n\n[[later]]")
+
+        self.assertEqual(links, {"inside"})
 
 
 if __name__ == "__main__":
