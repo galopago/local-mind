@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core.doctor import (  # noqa: E402
     DoctorReport,
+    apply_doctor_fixes,
     doctor_validation_errors,
     find_dead_links,
     find_isolated_pages,
@@ -20,6 +21,7 @@ from link_core.doctor import (  # noqa: E402
     join_limited,
     repair_source_page_validation_shape,
     repair_validation_findings,
+    required_paths,
     render_doctor_report,
     raw_source_refs,
     source_section_links,
@@ -71,6 +73,30 @@ class DoctorCoreTests(unittest.TestCase):
         text = join_limited("items: ", [str(index) for index in range(10)], limit=3)
 
         self.assertEqual(text, "items: 0, 1, 2")
+
+    def test_apply_doctor_fixes_initializes_workspace(self):
+        root = Path(tempfile.mkdtemp(prefix="link-doctor-fixes-"))
+
+        fixes = apply_doctor_fixes(root)
+
+        self.assertTrue((root / "raw").is_dir())
+        self.assertTrue((root / "wiki/index.md").exists())
+        self.assertTrue((root / "wiki/log.md").exists())
+        self.assertTrue((root / "wiki/_backlinks.json").exists())
+        self.assertTrue((root / "wiki/_link_schema.json").exists())
+        self.assertTrue((root / "wiki/sources").is_dir())
+        self.assertTrue((root / "wiki/memories").is_dir())
+        self.assertIn("created raw", fixes)
+        self.assertIn("created wiki/log.md", fixes)
+        self.assertIn("created wiki/index.md", fixes)
+
+    def test_required_paths_lists_workspace_shape(self):
+        root = Path("/tmp/link")
+        paths = [path.relative_to(root).as_posix() for path in required_paths(root)]
+
+        self.assertIn("raw", paths)
+        self.assertIn("wiki/index.md", paths)
+        self.assertIn("wiki/memories", paths)
 
     def test_page_health_helpers_find_doctor_findings(self):
         root = Path(tempfile.mkdtemp(prefix="link-doctor-core-"))

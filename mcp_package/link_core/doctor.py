@@ -6,10 +6,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-from .files import atomic_write_text
+from .files import atomic_write_json, atomic_write_text
 from .frontmatter import parse_frontmatter
+from .log import write_default_log
+from .schema import migrate_wiki
 from .validation import validate_wiki
-from .wiki import WIKILINK_RE, build_backlinks
+from .wiki import WIKILINK_RE, build_backlinks, load_backlinks_index, rebuild_index
 
 
 DOCTOR_VALIDATION_CODES = {
@@ -78,6 +80,25 @@ def wiki_pages(wiki_dir: Path) -> list[Path]:
         md for md in wiki_dir.rglob("*.md")
         if not md.name.startswith(".")
     )
+
+
+def required_paths(target: Path) -> list[Path]:
+    """Return the required Link workspace paths for doctor/init repair."""
+    wiki_dir = target / "wiki"
+    raw_dir = target / "raw"
+    return [
+        raw_dir,
+        wiki_dir,
+        wiki_dir / "index.md",
+        wiki_dir / "log.md",
+        wiki_dir / "_backlinks.json",
+        wiki_dir / "sources",
+        wiki_dir / "concepts",
+        wiki_dir / "entities",
+        wiki_dir / "memories",
+        wiki_dir / "comparisons",
+        wiki_dir / "explorations",
+    ]
 
 
 def page_stems(wiki_dir: Path) -> set[str]:
@@ -272,6 +293,78 @@ def repair_validation_findings(wiki_dir: Path) -> list[str]:
             repaired = False
         if repaired:
             fixes.append(f"repaired validation shape for wiki/{rel}")
+    return fixes
+
+
+def _normalize_link_index(data: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:
+    normalized: dict[str, dict[str, list[str]]] = {"backlinks": {}, "forward": {}}
+    for section in ("backlinks", "forward"):
+        for key, values in data.get(section, {}).items():
+            if isinstance(values, list):
+                normalized[section][key.lower()] = sorted({str(value).lower() for value in values})
+    return normalized
+
+
+def _backlinks_need_rebuild(wiki_dir: Path, backlinks_path: Path) -> tuple[bool, dict[str, dict[str, list[str]]]]:
+    current, load_error = load_backlinks_index(
+        backlinks_path,
+        missing_error="missing wiki/_backlinks.json",
+        invalid_prefix="invalid wiki/_backlinks.json",
+    )
+    expected = build_backlinks(wiki_dir, body_only=False)
+    if load_error or _normalize_link_index(current) != _normalize_link_index(expected):
+        return True, expected
+    return False, expected
+
+
+def apply_doctor_fixes(target: Path) -> list[str]:
+    """Repair missing generated Link workspace files and return human-readable changes."""
+    target = target.expanduser().resolve()
+    wiki_dir = target / "wiki"
+    fixes: list[str] = []
+
+    for path in required_paths(target):
+        if path.suffix:
+            continue
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+            fixes.append(f"created {path.relative_to(target)}")
+
+    log_path = wiki_dir / "log.md"
+    if not log_path.exists():
+        write_default_log(log_path)
+        fixes.append("created wiki/log.md")
+
+    if not wiki_dir.exists():
+        return fixes
+
+    index_path = wiki_dir / "index.md"
+    index_missing = not index_path.exists()
+    unindexed = [] if index_missing else find_unindexed_pages(wiki_dir)
+    if index_missing or unindexed:
+        rebuild_index(wiki_dir)
+        fixes.append("created wiki/index.md" if index_missing else "rebuilt wiki/index.md")
+
+    backlinks_path = wiki_dir / "_backlinks.json"
+    needs_rebuild, expected = _backlinks_need_rebuild(wiki_dir, backlinks_path)
+    if needs_rebuild:
+        atomic_write_json(backlinks_path, expected)
+        fixes.append("rebuilt wiki/_backlinks.json")
+
+    migration = migrate_wiki(wiki_dir)
+    if not migration["ok"]:
+        fixes.append(f"schema migration skipped: {migration['error']}")
+    else:
+        fixes.extend(f"schema: {item}" for item in migration["changes"])
+
+    validation_repairs = repair_validation_findings(wiki_dir)
+    fixes.extend(validation_repairs)
+    if validation_repairs:
+        needs_rebuild, expected = _backlinks_need_rebuild(wiki_dir, backlinks_path)
+        if needs_rebuild:
+            atomic_write_json(backlinks_path, expected)
+            fixes.append("rebuilt wiki/_backlinks.json")
+
     return fixes
 
 

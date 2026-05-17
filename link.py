@@ -134,6 +134,7 @@ from link_core.demo import (
 )
 from link_core.doctor import (
     DoctorReport as _CoreDoctorReport,
+    apply_doctor_fixes as _core_apply_doctor_fixes,
     doctor_validation_errors as _core_doctor_validation_errors,
     find_dead_links as _core_find_dead_links,
     find_isolated_pages as _core_find_isolated_pages,
@@ -144,6 +145,7 @@ from link_core.doctor import (
     format_validation_error_summary as _core_format_validation_error_summary,
     join_limited as _core_join_limited,
     repair_validation_findings as _core_repair_validation_findings,
+    required_paths as _core_required_paths,
     render_doctor_report as _core_render_doctor_report,
 )
 from link_core.cli_parser import (
@@ -202,7 +204,6 @@ from link_core.ingest import (
 from link_core.log import (
     append_log as _core_append_log,
     utc_timestamp as _core_utc_timestamp,
-    write_default_log as _core_write_default_log,
 )
 from link_core.mcp_verify import (
     build_mcp_verify_status as _core_build_mcp_verify_status,
@@ -622,75 +623,11 @@ def _find_sensitive_values(target: Path) -> tuple[list[str], list[str]]:
 
 
 def _required_paths(target: Path) -> list[Path]:
-    wiki_dir = target / "wiki"
-    raw_dir = target / "raw"
-    return [
-        raw_dir,
-        wiki_dir,
-        wiki_dir / "index.md",
-        wiki_dir / "log.md",
-        wiki_dir / "_backlinks.json",
-        wiki_dir / "sources",
-        wiki_dir / "concepts",
-        wiki_dir / "entities",
-        wiki_dir / "memories",
-        wiki_dir / "comparisons",
-        wiki_dir / "explorations",
-    ]
-
-
-def _write_default_log(path: Path) -> None:
-    _core_write_default_log(path)
+    return _core_required_paths(target)
 
 
 def _apply_doctor_fixes(target: Path) -> list[str]:
-    target = target.expanduser().resolve()
-    wiki_dir = target / "wiki"
-    fixes: list[str] = []
-
-    for path in _required_paths(target):
-        if path.suffix:
-            continue
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
-            fixes.append(f"created {path.relative_to(target)}")
-
-    log_path = wiki_dir / "log.md"
-    if not log_path.exists():
-        _write_default_log(log_path)
-        fixes.append("created wiki/log.md")
-
-    if wiki_dir.exists():
-        index_path = wiki_dir / "index.md"
-        index_missing = not index_path.exists()
-        unindexed = [] if index_missing else _find_unindexed_pages(wiki_dir)
-        if index_missing or unindexed:
-            _core_rebuild_index(wiki_dir)
-            fixes.append("created wiki/index.md" if index_missing else "rebuilt wiki/index.md")
-
-        backlinks_path = wiki_dir / "_backlinks.json"
-        current, load_error = _load_backlinks(backlinks_path)
-        expected = _build_backlinks(wiki_dir)
-        if load_error or current is None or _normalize_link_index(current) != _normalize_link_index(expected):
-            _core_atomic_write_json(backlinks_path, expected)
-            fixes.append("rebuilt wiki/_backlinks.json")
-
-        migration = _core_migrate_wiki(wiki_dir)
-        if not migration["ok"]:
-            fixes.append(f"schema migration skipped: {migration['error']}")
-        else:
-            fixes.extend(f"schema: {item}" for item in migration["changes"])
-
-        validation_repairs = _repair_validation_findings(wiki_dir)
-        fixes.extend(validation_repairs)
-        if validation_repairs:
-            current, load_error = _load_backlinks(backlinks_path)
-            expected = _build_backlinks(wiki_dir)
-            if load_error or current is None or _normalize_link_index(current) != _normalize_link_index(expected):
-                _core_atomic_write_json(backlinks_path, expected)
-                fixes.append("rebuilt wiki/_backlinks.json")
-
-    return fixes
+    return _core_apply_doctor_fixes(target)
 
 
 def doctor(target: Path, fix: bool = False) -> int:
