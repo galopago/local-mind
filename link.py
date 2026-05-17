@@ -135,6 +135,13 @@ from link_core.demo import (
     DEMO_FILES,
     DEMO_MARKER,
 )
+from link_core.doctor import (
+    DoctorReport as _CoreDoctorReport,
+    doctor_validation_errors as _core_doctor_validation_errors,
+    format_validation_error_summary as _core_format_validation_error_summary,
+    join_limited as _core_join_limited,
+    render_doctor_report as _core_render_doctor_report,
+)
 from link_core.cli_parser import (
     build_cli_parser as _core_build_cli_parser,
 )
@@ -861,172 +868,126 @@ def doctor(target: Path, fix: bool = False) -> int:
     target = target.expanduser().resolve()
     wiki_dir = target / "wiki"
     raw_dir = target / "raw"
-    errors: list[str] = []
-    warnings: list[str] = []
-
-    print(f"Link doctor: {target}")
-    print("")
+    report = _CoreDoctorReport(str(target), fix_requested=fix)
     if fix:
-        fixes = _apply_doctor_fixes(target)
-        if fixes:
-            print("Fixes applied:")
-            for item in fixes:
-                print(f"- {item}")
-            print("")
-        else:
-            print("Fixes applied: none")
-            print("")
+        report.fixes = _apply_doctor_fixes(target)
 
     required = _required_paths(target)
     missing = [str(path.relative_to(target)) for path in required if not path.exists()]
     if missing:
-        errors.append("missing required paths: " + ", ".join(missing))
+        report.add_error("missing required paths: " + ", ".join(missing))
     else:
-        print("OK required wiki structure")
+        report.add_ok("OK required wiki structure")
 
     if wiki_dir.exists():
         pages = _wiki_pages(wiki_dir)
-        print(f"OK markdown pages: {len(pages)}")
+        report.add_ok(f"OK markdown pages: {len(pages)}")
 
         dead_links = _find_dead_links(wiki_dir)
         if dead_links:
-            errors.append("dead wikilinks: " + ", ".join(dead_links[:8]))
+            report.add_error(_core_join_limited("dead wikilinks: ", dead_links))
         else:
-            print("OK no dead wikilinks")
+            report.add_ok("OK no dead wikilinks")
 
         unindexed = _find_unindexed_pages(wiki_dir)
         if unindexed:
-            warnings.append("pages missing from index: " + ", ".join(unindexed[:8]))
+            report.add_warning(_core_join_limited("pages missing from index: ", unindexed))
         else:
-            print("OK index lists wiki pages")
+            report.add_ok("OK index lists wiki pages")
 
         current, load_error = _load_backlinks(wiki_dir / "_backlinks.json")
         if load_error:
-            errors.append(load_error)
+            report.add_error(load_error)
         elif current is not None:
             expected = _build_backlinks(wiki_dir)
             if _normalize_link_index(current) != _normalize_link_index(expected):
-                errors.append("wiki/_backlinks.json is stale; run: python3 link.py rebuild-backlinks .")
+                report.add_error("wiki/_backlinks.json is stale; run: python3 link.py rebuild-backlinks .")
             else:
-                print("OK backlinks are current")
+                report.add_ok("OK backlinks are current")
 
         schema = _core_schema_status(wiki_dir)
         if schema["status"] == "current":
-            print(f"OK wiki schema v{schema['version']}")
+            report.add_ok(f"OK wiki schema v{schema['version']}")
         elif schema["status"] in {"missing", "old"}:
-            warnings.append("wiki schema marker needs migration; run: link migrate")
+            report.add_warning("wiki schema marker needs migration; run: link migrate")
         elif schema["status"] == "newer":
-            errors.append(str(schema["error"]))
+            report.add_error(str(schema["error"]))
         else:
-            errors.append(str(schema["error"] or "invalid wiki schema marker"))
+            report.add_error(str(schema["error"] or "invalid wiki schema marker"))
 
         missing_summaries = _find_pages_missing_summaries(wiki_dir)
         if missing_summaries:
-            warnings.append("pages missing TLDR/query summary: " + ", ".join(missing_summaries[:8]))
+            report.add_warning(_core_join_limited("pages missing TLDR/query summary: ", missing_summaries))
         else:
-            print("OK wiki pages have summaries")
+            report.add_ok("OK wiki pages have summaries")
 
         missing_sources = _find_pages_missing_source_sections(wiki_dir)
         if missing_sources:
-            warnings.append("source-backed pages missing Sources section: " + ", ".join(missing_sources[:8]))
+            report.add_warning(_core_join_limited("source-backed pages missing Sources section: ", missing_sources))
         else:
-            print("OK source-backed pages cite sources")
+            report.add_ok("OK source-backed pages cite sources")
 
         source_count_mismatches = _find_source_count_mismatches(wiki_dir)
         if source_count_mismatches:
-            warnings.append("source_count metadata mismatch: " + ", ".join(source_count_mismatches[:8]))
+            report.add_warning(_core_join_limited("source_count metadata mismatch: ", source_count_mismatches))
         else:
-            print("OK source_count metadata matches Sources sections")
+            report.add_ok("OK source_count metadata matches Sources sections")
 
         validation = _core_validate_wiki(wiki_dir)
-        doctor_validation_codes = {
-            "invalid_directory",
-            "missing_frontmatter",
-            "missing_frontmatter_field",
-            "missing_required_section",
-            "type_directory_mismatch",
-            "unreadable_page",
-        }
-        validation_errors = [
-            finding
-            for finding in validation.get("findings", [])
-            if isinstance(finding, dict)
-            and finding.get("severity") == "error"
-            and str(finding.get("code") or "") in doctor_validation_codes
-        ]
+        validation_errors = _core_doctor_validation_errors(validation)
         if validation_errors:
-            details = [
-                f"{finding.get('path')} [{finding.get('code')}] {finding.get('message')}"
-                for finding in validation_errors[:8]
-            ]
-            errors.append("validation errors: " + "; ".join(details))
+            report.add_error(_core_format_validation_error_summary(validation_errors))
         else:
-            print("OK ingest validation gate")
+            report.add_ok("OK ingest validation gate")
 
         isolated = _find_isolated_pages(wiki_dir)
         if isolated:
-            warnings.append("isolated wiki pages: " + ", ".join(isolated[:8]))
+            report.add_warning(_core_join_limited("isolated wiki pages: ", isolated))
         else:
-            print("OK graph has no isolated wiki pages")
+            report.add_ok("OK graph has no isolated wiki pages")
 
         memory_review = _memory_inbox(wiki_dir, limit=8, include_archived=True)
         if memory_review["review_count"]:
             names = ", ".join(item["name"] for item in memory_review["items"][:8])
-            warnings.append(f"memories need review: {names}")
+            report.add_warning(f"memories need review: {names}")
         else:
-            print("OK memories are reviewed")
+            report.add_ok("OK memories are reviewed")
 
         captures = _capture_records(target, limit=50)
         capture_warning_count = sum(1 for capture in captures if capture["warning_count"])
         if captures:
-            warnings.append(f"raw memory captures pending review: {len(captures)}")
+            report.add_warning(f"raw memory captures pending review: {len(captures)}")
         else:
-            print("OK no raw memory captures pending review")
+            report.add_ok("OK no raw memory captures pending review")
         if capture_warning_count:
-            warnings.append(f"raw memory captures with secret warnings: {capture_warning_count}")
+            report.add_warning(f"raw memory captures with secret warnings: {capture_warning_count}")
 
     raw_ingest_findings = _raw_ingest_findings(target)
     if raw_ingest_findings["blocked"]:
-        warnings.append("raw files blocked before ingest: " + ", ".join(raw_ingest_findings["blocked"][:8]))
+        report.add_warning(_core_join_limited("raw files blocked before ingest: ", raw_ingest_findings["blocked"]))
     if raw_ingest_findings["stale"]:
-        warnings.append("raw files need source refresh: " + ", ".join(raw_ingest_findings["stale"][:8]))
+        report.add_warning(_core_join_limited("raw files need source refresh: ", raw_ingest_findings["stale"]))
     if raw_ingest_findings["new"]:
-        warnings.append("raw files not referenced by wiki source pages: " + ", ".join(raw_ingest_findings["new"][:8]))
+        report.add_warning(_core_join_limited("raw files not referenced by wiki source pages: ", raw_ingest_findings["new"]))
     if not any(raw_ingest_findings.values()) and raw_dir.exists():
-        print("OK raw files are represented in wiki sources")
+        report.add_ok("OK raw files are represented in wiki sources")
 
     sensitive_names = _find_sensitive_filenames(target)
     if sensitive_names:
-        errors.append("sensitive-looking filenames present: " + ", ".join(sensitive_names[:8]))
+        report.add_error(_core_join_limited("sensitive-looking filenames present: ", sensitive_names))
     else:
-        print("OK no sensitive-looking filenames")
+        report.add_ok("OK no sensitive-looking filenames")
 
     sensitive_values, sensitive_read_errors = _find_sensitive_values(target)
     if sensitive_values:
-        errors.append("sensitive-looking file contents present: " + ", ".join(sensitive_values[:8]))
+        report.add_error(_core_join_limited("sensitive-looking file contents present: ", sensitive_values))
     else:
-        print("OK no sensitive-looking file contents")
+        report.add_ok("OK no sensitive-looking file contents")
     if sensitive_read_errors:
-        errors.append("could not scan file contents for secrets: " + ", ".join(sensitive_read_errors[:8]))
+        report.add_error(_core_join_limited("could not scan file contents for secrets: ", sensitive_read_errors))
 
-    if warnings:
-        print("")
-        print("Warnings:")
-        for warning in warnings:
-            print(f"- {warning}")
-
-    if errors:
-        print("")
-        print("Errors:")
-        for error in errors:
-            print(f"- {error}")
-        print("")
-        print("Result: needs attention")
-        return 1
-
-    print("")
-    print("Result: healthy")
-    return 0
+    print(_core_render_doctor_report(report))
+    return 0 if report.healthy else 1
 
 
 def validate(target: Path, strict: bool = False, json_output: bool = False) -> int:
