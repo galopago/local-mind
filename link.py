@@ -156,6 +156,8 @@ from link_core.capture import (
     cli_capture_commands as _core_cli_capture_commands,
     render_accept_capture_text as _core_render_accept_capture_text,
     render_capture_inbox_text as _core_render_capture_inbox_text,
+    render_delete_capture_text as _core_render_delete_capture_text,
+    render_redact_capture_text as _core_render_redact_capture_text,
     resolve_capture_file as _core_resolve_capture_file,
 )
 from link_core.files import (
@@ -1654,14 +1656,7 @@ def redact_capture(
         print(json.dumps(payload, indent=2))
         return 0
 
-    if replacement_count:
-        print("Capture redacted")
-        print(f"Path: {rel_path}")
-        print("Labels: " + ", ".join(labels))
-        print(f"Replacement count: {replacement_count}")
-    else:
-        print("No secret-looking values found.")
-        print(f"Path: {rel_path}")
+    print(_core_render_redact_capture_text(payload))
     return 0
 
 
@@ -1691,8 +1686,8 @@ def delete_capture(
         if json_output:
             print(json.dumps(payload, indent=2))
         else:
-            print("Confirmation required.")
-            print(f"Run: python3 link.py delete-capture \"{rel_path}\" . --confirm")
+            _, text = _core_render_delete_capture_text(payload)
+            print(text)
         return 1
 
     capture_path.unlink()
@@ -1708,9 +1703,9 @@ def delete_capture(
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
-    print("Capture deleted")
-    print(f"Path: {rel_path}")
-    return 0
+    code, text = _core_render_delete_capture_text(payload)
+    print(text)
+    return code
 
 
 def update_memory(

@@ -13,6 +13,8 @@ from mcp_package.link_core.capture import (
     mcp_capture_commands,
     render_accept_capture_text,
     render_capture_inbox_text,
+    render_delete_capture_text,
+    render_redact_capture_text,
     resolve_capture_file,
 )
 
@@ -237,6 +239,40 @@ class CaptureCoreTests(unittest.TestCase):
 
         self.assertEqual(code, 1)
         self.assertIn("Duplicate candidate: Prefer local memory", text)
+
+    def test_render_redact_and_delete_capture_text(self):
+        text = render_redact_capture_text({
+            "redacted": True,
+            "path": "raw/memory-captures/alpha.md",
+            "labels": ["OpenAI API key"],
+            "replacement_count": 2,
+        })
+
+        self.assertIn("Capture redacted", text)
+        self.assertIn("Labels: OpenAI API key", text)
+        self.assertIn("Replacement count: 2", text)
+
+        text = render_redact_capture_text({
+            "redacted": False,
+            "path": "raw/memory-captures/alpha.md",
+        })
+        self.assertIn("No secret-looking values found.", text)
+
+        code, text = render_delete_capture_text({
+            "deleted": False,
+            "path": "raw/memory-captures/alpha.md",
+            "confirmation_required": True,
+        })
+        self.assertEqual(code, 1)
+        self.assertIn("--confirm", text)
+
+        code, text = render_delete_capture_text({
+            "deleted": True,
+            "path": "raw/memory-captures/alpha.md",
+            "confirmation_required": False,
+        })
+        self.assertEqual(code, 0)
+        self.assertIn("Capture deleted", text)
 
 
 if __name__ == "__main__":

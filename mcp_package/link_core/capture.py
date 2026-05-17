@@ -255,6 +255,41 @@ def render_accept_capture_text(payload: dict[str, object]) -> tuple[int, str]:
     return 0, "\n".join(lines)
 
 
+def render_redact_capture_text(payload: dict[str, object]) -> str:
+    """Render redact-capture CLI output."""
+    if payload.get("redacted"):
+        labels = payload.get("labels") if isinstance(payload.get("labels"), list) else []
+        return "\n".join([
+            "Capture redacted",
+            f"Path: {payload.get('path')}",
+            "Labels: " + ", ".join(str(label) for label in labels),
+            f"Replacement count: {payload.get('replacement_count', 0)}",
+        ])
+    return "\n".join([
+        "No secret-looking values found.",
+        f"Path: {payload.get('path')}",
+    ])
+
+
+def render_delete_capture_text(payload: dict[str, object]) -> tuple[int, str]:
+    """Render delete-capture CLI output and return the corresponding exit code."""
+    path = str(payload.get("path") or "")
+    if payload.get("confirmation_required"):
+        return 1, "\n".join([
+            "Confirmation required.",
+            f"Run: python3 link.py delete-capture \"{path}\" . --confirm",
+        ])
+    if payload.get("deleted"):
+        return 0, "\n".join([
+            "Capture deleted",
+            f"Path: {path}",
+        ])
+    return 1, "\n".join([
+        "Capture was not deleted.",
+        f"Path: {path}",
+    ])
+
+
 def capture_review_summary(
     root: Path,
     limit: int = 3,
