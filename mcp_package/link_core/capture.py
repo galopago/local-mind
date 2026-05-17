@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from .files import atomic_write_text
 from .frontmatter import frontmatter_string, parse_frontmatter
@@ -13,6 +13,7 @@ from .security import redact_secret_values, secret_value_warnings
 
 
 CaptureCommands = Callable[[str], dict[str, str]]
+CaptureProposalBuilder = Callable[[str, str, int, str], dict[str, object]]
 
 
 def capture_title(
@@ -157,6 +158,62 @@ def capture_notes_from_markdown(text: str) -> tuple[dict[str, object], str]:
     match = re.search(r"^## Notes\s*(.*?)(?=^## |\Z)", body, flags=re.MULTILINE | re.DOTALL)
     notes = match.group(1).strip() if match else body.strip()
     return meta, notes
+
+
+def capture_proposal_selection(
+    root: Path,
+    capture: str,
+    *,
+    index: int = 1,
+    project: str | None = None,
+    default_project: str = "",
+    propose_memories: CaptureProposalBuilder,
+    max_capture_len: int | None = None,
+) -> dict[str, object]:
+    """Resolve a raw capture and return the selected proposal plus context."""
+    try:
+        proposal_index = int(index)
+    except (TypeError, ValueError):
+        raise ValueError("proposal index must be an integer")
+    if proposal_index < 1:
+        raise ValueError("proposal index must be 1 or greater")
+
+    root = root.expanduser().resolve()
+    capture_path = resolve_capture_file(root, capture, max_len=max_capture_len)
+    if capture_path is None:
+        raise ValueError(f"capture not found: {str(capture or '').strip()[:max_capture_len] if max_capture_len else capture}")
+
+    raw_text = capture_path.read_text(encoding="utf-8", errors="replace")
+    meta, notes = capture_notes_from_markdown(raw_text)
+    if not notes:
+        raise ValueError("capture has no notes")
+
+    rel_path = capture_path.relative_to(root).as_posix()
+    project_name = normalize_project(project or str(meta.get("project") or "") or default_project)
+    proposals = propose_memories(
+        notes,
+        rel_path,
+        max(1, min(max(proposal_index, 10), 50)),
+        project_name,
+    )
+    proposal_items = proposals.get("proposals")
+    if not isinstance(proposal_items, list):
+        proposal_items = []
+    if proposal_index > len(proposal_items):
+        raise ValueError(f"capture has {len(proposal_items)} proposal(s); index {proposal_index} is unavailable")
+    proposal = proposal_items[proposal_index - 1]
+    if not isinstance(proposal, dict):
+        raise ValueError(f"capture proposal {proposal_index} is invalid")
+    return {
+        "capture_path": capture_path,
+        "capture": rel_path,
+        "proposal_index": proposal_index,
+        "project": project_name,
+        "meta": meta,
+        "notes": notes,
+        "proposals": proposals,
+        "proposal": proposal,
+    }
 
 
 def cli_capture_commands(rel_path: str) -> dict[str, str]:

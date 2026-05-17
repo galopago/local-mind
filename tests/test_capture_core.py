@@ -7,6 +7,7 @@ from mcp_package.link_core.capture import (
     capture_filename,
     capture_inbox,
     capture_notes_from_markdown,
+    capture_proposal_selection,
     capture_records,
     capture_review_summary,
     capture_title,
@@ -126,6 +127,60 @@ class CaptureCoreTests(unittest.TestCase):
         self.assertEqual(meta["title"], "Session")
         self.assertEqual(meta["project"], "link")
         self.assertEqual(notes, "Important memory candidate.")
+
+    def test_capture_proposal_selection_reads_capture_and_selects_index(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-selection-"))
+        capture_dir = root / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        (capture_dir / "session.md").write_text(
+            "---\n"
+            "title: Session\n"
+            "project: Alpha Project\n"
+            "---\n\n"
+            "## Notes\n\n"
+            "Remember the selected proposal.\n",
+            encoding="utf-8",
+        )
+
+        def propose(notes: str, source: str, limit: int, project: str) -> dict[str, object]:
+            return {
+                "count": 2,
+                "proposals": [
+                    {"title": "First", "memory": notes, "scope": "user", "project": project},
+                    {"title": "Second", "memory": source, "scope": "project", "project": project},
+                ],
+                "limit": limit,
+            }
+
+        selection = capture_proposal_selection(
+            root,
+            "session",
+            index=2,
+            default_project="default",
+            propose_memories=propose,
+        )
+
+        self.assertEqual(selection["capture"], "raw/memory-captures/session.md")
+        self.assertEqual(selection["project"], "alpha-project")
+        self.assertEqual(selection["proposal_index"], 2)
+        self.assertEqual(selection["proposal"]["title"], "Second")
+        self.assertEqual(selection["proposals"]["limit"], 10)
+
+    def test_capture_proposal_selection_validates_index_and_notes(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-selection-"))
+        capture_dir = root / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        (capture_dir / "empty.md").write_text("", encoding="utf-8")
+
+        def propose(_notes: str, _source: str, _limit: int, _project: str) -> dict[str, object]:
+            return {"proposals": []}
+
+        with self.assertRaisesRegex(ValueError, "proposal index must be 1 or greater"):
+            capture_proposal_selection(root, "empty", index=0, propose_memories=propose)
+        with self.assertRaisesRegex(ValueError, "capture has no notes"):
+            capture_proposal_selection(root, "empty", index=1, propose_memories=propose)
+        with self.assertRaisesRegex(ValueError, "capture not found"):
+            capture_proposal_selection(root, "missing", index=1, propose_memories=propose)
 
     def test_capture_records_redact_snippets_and_filter_project(self):
         root = Path(tempfile.mkdtemp(prefix="link-capture-core-"))

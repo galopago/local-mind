@@ -113,7 +113,6 @@ from link_core.memory import (
     resolve_memory_page as _core_resolve_memory_page,
     set_memory_status as _core_set_memory_status,
     slim_memory as _core_slim_memory,
-    slugify as _core_slugify,
     top_tags as _core_top_tags,
     update_memory_page as _core_update_memory_page,
     write_memory_page as _core_write_memory_page,
@@ -125,7 +124,7 @@ from link_core.backup import (
 )
 from link_core.capture import (
     capture_inbox as _core_capture_inbox,
-    capture_notes_from_markdown as _core_capture_notes_from_markdown,
+    capture_proposal_selection as _core_capture_proposal_selection,
     capture_records as _core_capture_records,
     capture_review_summary as _core_capture_review_summary,
     mcp_capture_commands as _core_mcp_capture_commands,
@@ -497,36 +496,25 @@ def _accept_capture(
     allow_duplicate: bool = False,
     allow_conflict: bool = False,
 ) -> dict[str, object]:
-    try:
-        proposal_index = int(index)
-    except (TypeError, ValueError):
-        raise ValueError("proposal index must be an integer")
-    if proposal_index < 1:
-        raise ValueError("proposal index must be 1 or greater")
-
     root = WIKI_DIR.parent
-    capture_path = _resolve_capture_file(capture)
-    if capture_path is None:
-        raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
-    raw_text = capture_path.read_text(encoding="utf-8", errors="replace")
-    meta, notes = _core_capture_notes_from_markdown(raw_text)
-    if not notes:
-        raise ValueError("capture has no notes")
-
-    rel_path = capture_path.relative_to(root).as_posix()
-    project_name = _core_slugify(
-        _clean_text_input(project) or str(meta.get("project") or "") or _default_project(),
-        fallback="",
+    selection = _core_capture_proposal_selection(
+        root,
+        capture,
+        index=index,
+        project=_clean_text_input(project),
+        default_project=_default_project(),
+        max_capture_len=500,
+        propose_memories=lambda notes, rel_path, proposal_limit, project_name: _propose_memories_from_text(
+            notes,
+            source=rel_path,
+            limit=proposal_limit,
+            project=project_name,
+        ),
     )
-    proposals = _propose_memories_from_text(
-        notes,
-        source=rel_path,
-        limit=max(1, min(max(proposal_index, 10), 50)),
-        project=project_name,
-    )
-    if proposal_index > len(proposals["proposals"]):
-        raise ValueError(f"capture has {len(proposals['proposals'])} proposal(s); index {proposal_index} is unavailable")
-    proposal = proposals["proposals"][proposal_index - 1]
+    rel_path = str(selection["capture"])
+    project_name = str(selection["project"])
+    proposal_index = int(selection["proposal_index"])
+    proposal = selection["proposal"]
     chosen_scope = _clean_text_input(scope).lower() or str(proposal["scope"])
     chosen_project = project_name if chosen_scope == "project" else ""
     result = _write_memory_page(

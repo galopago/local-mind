@@ -165,7 +165,7 @@ from link_core.cli_memory import (
 )
 from link_core.capture import (
     capture_inbox as _core_capture_inbox,
-    capture_notes_from_markdown as _core_capture_notes_from_markdown,
+    capture_proposal_selection as _core_capture_proposal_selection,
     capture_records as _core_capture_records,
     capture_review_summary as _core_capture_review_summary,
     cli_capture_commands as _core_cli_capture_commands,
@@ -922,33 +922,37 @@ def accept_capture(
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
-    capture_path = _resolve_capture_file(root, capture)
-    if capture_path is None:
-        print(f"Capture not found under {root}: {capture}", file=sys.stderr)
-        return 1
-    if index < 1:
-        print("Proposal index must be 1 or greater", file=sys.stderr)
+    try:
+        selection = _core_capture_proposal_selection(
+            root,
+            capture,
+            index=index,
+            project=project,
+            default_project=_default_project(root),
+            propose_memories=lambda notes, rel_path, proposal_limit, project_name: _propose_memories_from_text(
+                wiki_dir,
+                notes,
+                source=rel_path,
+                limit=proposal_limit,
+                project=project_name,
+            ),
+        )
+    except ValueError as exc:
+        message = str(exc)
+        if message.startswith("capture not found:"):
+            message = f"Capture not found under {root}: {capture}"
+        elif message == "capture has no notes":
+            message = f"Capture has no notes: {capture}"
+        elif message.startswith("proposal index"):
+            message = message[:1].upper() + message[1:]
+        elif message.startswith("capture has"):
+            message = message[:1].upper() + message[1:]
+        print(message, file=sys.stderr)
         return 1
 
-    raw_text = capture_path.read_text(encoding="utf-8", errors="replace")
-    meta, notes = _core_capture_notes_from_markdown(raw_text)
-    if not notes:
-        print(f"Capture has no notes: {capture_path}", file=sys.stderr)
-        return 1
-
-    rel_path = capture_path.relative_to(root).as_posix()
-    project_name = project or str(meta.get("project") or "") or _default_project(root)
-    proposals = _propose_memories_from_text(
-        wiki_dir,
-        notes,
-        source=rel_path,
-        limit=max(1, min(max(index, 10), 50)),
-        project=project_name,
-    )
-    if index > len(proposals["proposals"]):
-        print(f"Capture has {len(proposals['proposals'])} proposal(s); index {index} is unavailable", file=sys.stderr)
-        return 1
-    proposal = proposals["proposals"][index - 1]
+    rel_path = str(selection["capture"])
+    project_name = str(selection["project"])
+    proposal = selection["proposal"]
     chosen_scope = scope or str(proposal["scope"])
     chosen_project = project_name if chosen_scope == "project" else ""
     result = _write_memory_page(
@@ -966,7 +970,7 @@ def accept_capture(
     payload = {
         "accepted": bool(result.get("created")),
         "capture": rel_path,
-        "proposal_index": index,
+        "proposal_index": selection["proposal_index"],
         "project": str(result.get("project") or proposal.get("project") or ""),
         "proposal": proposal,
         "result": result,
@@ -976,7 +980,7 @@ def accept_capture(
             wiki_dir,
             _utc_timestamp(),
             "accept-capture",
-            f"Accepted proposal {index} from {rel_path}",
+            f"Accepted proposal {selection['proposal_index']} from {rel_path}",
             [
                 f"Memory: {result['path']}",
                 f"Project: {result.get('project') or 'none'}",
