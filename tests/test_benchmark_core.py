@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.benchmark import benchmark_health  # noqa: E402
+from link_core.benchmark import benchmark_health, render_benchmark_text  # noqa: E402
 
 
 class BenchmarkCoreTests(unittest.TestCase):
@@ -99,6 +99,55 @@ class BenchmarkCoreTests(unittest.TestCase):
         self.assertTrue(any("graph_initial took" in warning for warning in health["warnings"]))
         self.assertTrue(any("graph took" in warning for warning in health["warnings"]))
         self.assertIn("focused neighborhoods", " ".join(health["recommendations"]))
+
+    def test_render_benchmark_text_includes_agent_safe_payloads_and_packet(self):
+        payload = {
+            "target": "/tmp/link",
+            "query": "agent memory",
+            "project": "link",
+            "pages": 12,
+            "memories": 1,
+            "edges": 58,
+            "search_backend": "sqlite-fts",
+            "search_results": 4,
+            "context_items": 3,
+            "found": True,
+            "graph_summary": {"returned_nodes": 5, "returned_edges": 6},
+            "page_list": {"returned_count": 12},
+            "graph_initial": {"mode": "full", "nodes": 12, "total_nodes": 12},
+            "health": {
+                "label": "interactive",
+                "summary": "Ready for interactive local agent memory.",
+                "warnings": [],
+                "recommendations": [],
+            },
+            "timings": {
+                "cache": 0.1,
+                "search": 0.01,
+                "query": 0.02,
+                "graph_summary": 0.03,
+                "page_list": 0.04,
+                "graph_initial": 0.05,
+                "graph": 0.06,
+            },
+            "budget_report": {
+                "context_packet": {
+                    "estimated_chars": 1200,
+                    "estimated_tokens": 300,
+                    "has_more": False,
+                }
+            },
+        }
+
+        text = render_benchmark_text(payload)
+
+        self.assertIn("Link benchmark: /tmp/link", text)
+        self.assertIn("Project: link", text)
+        self.assertIn("Agent-safe payloads: graph summary 5 nodes/6 edges · page list 12 pages", text)
+        self.assertIn("Graph page initial load: full · 12/12 nodes", text)
+        self.assertIn("Verdict: interactive", text)
+        self.assertIn("Packet: 1200 chars · 300 tokens · has_more=False", text)
+        self.assertIn("Result: found", text)
 
 
 if __name__ == "__main__":

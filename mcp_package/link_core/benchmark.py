@@ -56,3 +56,87 @@ def benchmark_health(payload: Mapping[str, object]) -> dict[str, object]:
         "warnings": warnings,
         "recommendations": recommendations,
     }
+
+
+def render_benchmark_text(payload: Mapping[str, object]) -> str:
+    """Render human-readable benchmark output."""
+    lines = [
+        f"Link benchmark: {payload.get('target', '')}",
+        f"Query: {payload.get('query', '')}",
+    ]
+    project = payload.get("project")
+    if project:
+        lines.append(f"Project: {project}")
+    lines.append("")
+    lines.append(
+        f"Scale: {payload.get('pages', 0)} pages · "
+        f"{payload.get('memories', 0)} memories · "
+        f"{payload.get('edges', 0)} edges"
+    )
+    lines.append(f"Search backend: {payload.get('search_backend', 'unknown')}")
+    lines.append(
+        f"Results: {payload.get('search_results', 0)} search results · "
+        f"{payload.get('context_items', 0)} context items"
+    )
+
+    graph_summary = payload.get("graph_summary")
+    page_list = payload.get("page_list")
+    graph_initial = payload.get("graph_initial")
+    if isinstance(graph_summary, Mapping) and isinstance(page_list, Mapping):
+        lines.append(
+            "Agent-safe payloads: "
+            f"graph summary {graph_summary.get('returned_nodes', 0)} nodes/"
+            f"{graph_summary.get('returned_edges', 0)} edges · "
+            f"page list {page_list.get('returned_count', 0)} pages"
+        )
+    if isinstance(graph_initial, Mapping):
+        lines.append(
+            "Graph page initial load: "
+            f"{graph_initial.get('mode', 'unknown')} · "
+            f"{graph_initial.get('nodes', 0)}/{graph_initial.get('total_nodes', 0)} nodes"
+        )
+
+    health = payload.get("health")
+    if isinstance(health, Mapping):
+        lines.append(f"Verdict: {health.get('label', 'unknown')}")
+        if health.get("summary"):
+            lines.append(f"Health: {health.get('summary')}")
+
+    lines.append("")
+    lines.append("Timings")
+    timings = payload.get("timings")
+    if not isinstance(timings, Mapping):
+        timings = {}
+    for key in ("cache", "search", "query", "graph_summary", "page_list", "graph_initial", "graph"):
+        value = timings.get(key, 0)
+        if not isinstance(value, (int, float)):
+            value = 0
+        lines.append(f"- {key}: {value:.4f}s")
+
+    if isinstance(health, Mapping) and health.get("warnings"):
+        lines.append("")
+        lines.append("Warnings")
+        for warning in health["warnings"]:
+            lines.append(f"- {warning}")
+        recommendations = health.get("recommendations")
+        if isinstance(recommendations, list) and recommendations:
+            lines.append("")
+            lines.append("Recommendations")
+            for recommendation in recommendations:
+                lines.append(f"- {recommendation}")
+
+    budget_report = payload.get("budget_report")
+    if isinstance(budget_report, Mapping):
+        packet_report = budget_report.get("context_packet")
+        if isinstance(packet_report, Mapping):
+            lines.append("")
+            lines.append(
+                "Packet: "
+                f"{packet_report.get('estimated_chars', 0)} chars · "
+                f"{packet_report.get('estimated_tokens', 0)} tokens · "
+                f"has_more={packet_report.get('has_more', False)}"
+            )
+
+    lines.append("")
+    lines.append(f"Result: {'found' if payload.get('found') else 'no matching context'}")
+    return "\n".join(lines)

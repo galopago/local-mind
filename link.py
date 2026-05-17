@@ -130,6 +130,7 @@ from link_core.backup import (
 )
 from link_core.benchmark import (
     benchmark_health as _core_benchmark_health,
+    render_benchmark_text as _core_render_benchmark_text,
 )
 from link_core.demo import (
     DEMO_FILES,
@@ -2483,62 +2484,7 @@ def benchmark(
         print(json.dumps(payload, indent=2))
         return 0
 
-    print(f"Link benchmark: {target}")
-    print(f"Query: {query_text}")
-    if project_name:
-        print(f"Project: {project_name}")
-    print("")
-    print(f"Scale: {payload['pages']} pages · {payload['memories']} memories · {payload['edges']} edges")
-    print(f"Search backend: {payload['search_backend']}")
-    graph_summary_info = payload["graph_summary"]
-    page_list_info = payload["page_list"]
-    graph_initial_info = payload["graph_initial"]
-    print(f"Results: {payload['search_results']} search results · {payload['context_items']} context items")
-    if isinstance(graph_summary_info, Mapping) and isinstance(page_list_info, Mapping):
-        print(
-            "Agent-safe payloads: "
-            f"graph summary {graph_summary_info.get('returned_nodes', 0)} nodes/"
-            f"{graph_summary_info.get('returned_edges', 0)} edges · "
-            f"page list {page_list_info.get('returned_count', 0)} pages"
-        )
-    if isinstance(graph_initial_info, Mapping):
-        print(
-            "Graph page initial load: "
-            f"{graph_initial_info.get('mode', 'unknown')} · "
-            f"{graph_initial_info.get('nodes', 0)}/{graph_initial_info.get('total_nodes', 0)} nodes"
-        )
-    health = payload["health"]
-    if isinstance(health, Mapping):
-        print(f"Verdict: {health.get('label', 'unknown')}")
-        if health.get("summary"):
-            print(f"Health: {health.get('summary')}")
-    print("")
-    print("Timings")
-    for key in ("cache", "search", "query", "graph_summary", "page_list", "graph_initial", "graph"):
-        print(f"- {key}: {payload['timings'][key]:.4f}s")
-    if isinstance(health, Mapping) and health.get("warnings"):
-        print("")
-        print("Warnings")
-        for warning in health["warnings"]:
-            print(f"- {warning}")
-        recommendations = health.get("recommendations")
-        if isinstance(recommendations, list) and recommendations:
-            print("")
-            print("Recommendations")
-            for recommendation in recommendations:
-                print(f"- {recommendation}")
-    if isinstance(budget_report, dict):
-        packet_report = budget_report.get("context_packet")
-        if isinstance(packet_report, dict):
-            print("")
-            print(
-                "Packet: "
-                f"{packet_report.get('estimated_chars', 0)} chars · "
-                f"{packet_report.get('estimated_tokens', 0)} tokens · "
-                f"has_more={packet_report.get('has_more', False)}"
-            )
-    print("")
-    print(f"Result: {'found' if payload['found'] else 'no matching context'}")
+    print(_core_render_benchmark_text(payload))
     return 0
 
 
