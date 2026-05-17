@@ -39,9 +39,8 @@ import json
 import re
 import subprocess
 import sys
-import time
 from pathlib import Path
-from typing import Callable, Mapping
+from typing import Callable
 
 
 ROOT = Path(__file__).resolve().parent
@@ -124,7 +123,7 @@ from link_core.backup import (
     list_backups as _core_list_backups,
 )
 from link_core.benchmark import (
-    benchmark_health as _core_benchmark_health,
+    build_benchmark_payload as _core_build_benchmark_payload,
     render_benchmark_text as _core_render_benchmark_text,
 )
 from link_core.demo import (
@@ -223,12 +222,6 @@ from link_core.cli_runtime import (
 from link_core.prompts import (
     starter_prompt_payload as _core_starter_prompt_payload,
 )
-from link_core.web_graph import (
-    GRAPH_INITIAL_SUMMARY_EDGE_LIMIT as _core_graph_initial_summary_edge_limit,
-    GRAPH_INITIAL_SUMMARY_NODE_LIMIT as _core_graph_initial_summary_node_limit,
-    graph_initial_payload as _core_graph_initial_payload,
-    graph_needs_bounded_overview as _core_graph_needs_bounded_overview,
-)
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
 )
@@ -242,11 +235,8 @@ from link_core.wiki import (
     build_backlinks as _core_build_backlinks,
     build_wiki_cache as _core_build_wiki_cache,
     close_wiki_cache as _core_close_wiki_cache,
-    graph_data as _core_graph_data,
     graph_summary as _core_graph_summary,
-    list_pages as _core_list_pages,
     rebuild_index as _core_rebuild_index,
-    search_pages as _core_search_pages,
 )
 del _BUNDLED_CORE
 
@@ -1381,30 +1371,6 @@ def graph_summary(
     return code
 
 
-def _timed(label: str, fn: Callable[[], object]) -> tuple[str, object, float]:
-    start = time.perf_counter()
-    value = fn()
-    return label, value, time.perf_counter() - start
-
-
-def _benchmark_graph_initial_payload(cache: dict[str, object], full_graph: object) -> dict[str, object]:
-    if not isinstance(full_graph, Mapping):
-        return _core_graph_initial_payload({"nodes": [], "edges": []})
-    summary_graph = None
-    if _core_graph_needs_bounded_overview(full_graph):
-        summary = _core_graph_summary(
-            cache,
-            limit=_core_graph_initial_summary_node_limit,
-            depth=1,
-            max_edges=_core_graph_initial_summary_edge_limit,
-        )
-        summary_graph = {
-            "nodes": summary.get("nodes", []),
-            "edges": summary.get("edges", []),
-        }
-    return _core_graph_initial_payload(full_graph, summary_graph=summary_graph)
-
-
 def benchmark(
     target: Path,
     query_text: str = "agent memory",
@@ -1419,81 +1385,14 @@ def benchmark(
         return 1
     query_text = _clean_text_input(query_text, max_len=500)
     project_name = project or _default_project(target)
-    timings: dict[str, float] = {}
-
-    label, cache, elapsed = _timed("cache", lambda: _core_build_wiki_cache(wiki_dir))
-    timings[label] = elapsed
-    label, results, elapsed = _timed("search", lambda: _core_search_pages(query_text, cache, limit=20))
-    timings[label] = elapsed
-    label, packet, elapsed = _timed(
-        "query",
-        lambda: _core_query_link(
-            wiki_dir,
-            query_text,
-            cache,
-            _memory_records(wiki_dir),
-            budget=budget,
-            project=project_name,
-            review_command="review-memory",
-        ),
+    payload = _core_build_benchmark_payload(
+        target,
+        wiki_dir,
+        query_text=query_text,
+        budget=budget,
+        project=project_name,
+        review_command="review-memory",
     )
-    timings[label] = elapsed
-    label, graph_summary_payload, elapsed = _timed(
-        "graph_summary",
-        lambda: _core_graph_summary(cache, topic=query_text, limit=40, depth=1, max_edges=120),
-    )
-    timings[label] = elapsed
-    label, page_list_payload, elapsed = _timed(
-        "page_list",
-        lambda: _core_list_pages(cache, limit=100),
-    )
-    timings[label] = elapsed
-    label, graph, elapsed = _timed("graph", lambda: _core_graph_data(cache))
-    timings[label] = elapsed
-    label, graph_initial_payload, elapsed = _timed(
-        "graph_initial",
-        lambda: _benchmark_graph_initial_payload(cache, graph),
-    )
-    timings[label] = elapsed
-
-    budget_report = packet.get("budget_report", {}) if isinstance(packet, dict) else {}
-    graph_summary_info = graph_summary_payload if isinstance(graph_summary_payload, Mapping) else {}
-    page_list_info = page_list_payload if isinstance(page_list_payload, Mapping) else {}
-    graph_initial_info = graph_initial_payload if isinstance(graph_initial_payload, Mapping) else {}
-    payload = {
-        "target": str(target),
-        "wiki": str(wiki_dir),
-        "query": query_text,
-        "budget": budget,
-        "project": project_name,
-        "pages": len(cache.get("pages", [])),
-        "memories": len(_memory_records(wiki_dir)),
-        "edges": len(graph.get("edges", [])) if isinstance(graph, dict) else 0,
-        "graph_summary": {
-            "returned_nodes": graph_summary_info.get("returned_nodes", 0),
-            "returned_edges": graph_summary_info.get("returned_edges", 0),
-            "truncated": bool(graph_summary_info.get("truncated")),
-        },
-        "page_list": {
-            "returned_count": page_list_info.get("returned_count", 0),
-            "truncated": bool(page_list_info.get("truncated")),
-        },
-        "graph_initial": {
-            "mode": graph_initial_info.get("graph_mode", "unknown"),
-            "nodes": graph_initial_info.get("node_count", 0),
-            "edges": graph_initial_info.get("edge_count", 0),
-            "total_nodes": graph_initial_info.get("total_node_count", 0),
-            "total_edges": graph_initial_info.get("total_edge_count", 0),
-        },
-        "search_backend": str(cache.get("search_backend") or "token-index"),
-        "search_results": len(results) if isinstance(results, list) else 0,
-        "context_items": len(packet.get("context_packet", [])) if isinstance(packet, dict) else 0,
-        "found": bool(packet.get("found")) if isinstance(packet, dict) else False,
-        "timings": {key: round(value, 4) for key, value in timings.items()},
-        "budget_report": budget_report,
-    }
-    payload["health"] = _core_benchmark_health(payload)
-    _core_close_wiki_cache(cache)
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0

@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -6,10 +7,33 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.benchmark import benchmark_health, render_benchmark_text  # noqa: E402
+from link_core.benchmark import build_benchmark_payload, benchmark_health, render_benchmark_text  # noqa: E402
+from link_core.demo import create_demo_workspace  # noqa: E402
 
 
 class BenchmarkCoreTests(unittest.TestCase):
+    def test_build_benchmark_payload_times_demo_wiki(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-benchmark-core-"))
+        target = tmp / "demo"
+        create_demo_workspace(target, source_root=ROOT)
+
+        payload = build_benchmark_payload(
+            target,
+            target / "wiki",
+            query_text="agent memory",
+            budget="small",
+            project="demo",
+        )
+
+        self.assertEqual(payload["target"], str(target))
+        self.assertEqual(payload["project"], "demo")
+        self.assertEqual(payload["pages"], 13)
+        self.assertEqual(payload["memories"], 1)
+        self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
+        self.assertTrue(payload["found"])
+        self.assertIn("health", payload)
+        self.assertIn("cache", payload["timings"])
+
     def test_benchmark_health_passes_fast_sqlite_search(self):
         payload = {
             "pages": 1200,
