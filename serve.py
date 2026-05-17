@@ -1385,22 +1385,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     max_edges=max_edges,
                 ))
         elif path == "/api/memory-profile":
-            limit, error = _parse_search_limit(query.get("limit", ["10"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
+            limit = self._query_limit_or_reply(query, "10")
+            if limit is not None:
                 self._json(_memory_profile(limit=limit, project=_query_text(query, "project", max_len=80)))
         elif path == "/api/memory-dashboard":
-            limit, error = _parse_search_limit(query.get("limit", ["12"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
+            limit = self._query_limit_or_reply(query, "12")
+            if limit is not None:
                 self._json(_memory_dashboard(limit=limit, project=_query_text(query, "project", max_len=80)))
         elif path == "/api/memory-brief":
-            limit, error = _parse_search_limit(query.get("limit", ["6"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
+            limit = self._query_limit_or_reply(query, "6")
+            if limit is not None:
                 self._json(_memory_brief(
                     query=_query_text(query, "q", "query"),
                     limit=limit,
@@ -1417,16 +1411,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     project=_query_text(query, "project", max_len=80),
                 ))
         elif path == "/api/memory-audit":
-            limit, error = _parse_search_limit(query.get("limit", ["10"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
+            limit = self._query_limit_or_reply(query, "10")
+            if limit is not None:
                 self._json(_memory_audit(limit=limit, project=_query_text(query, "project", max_len=80)))
         elif path == "/api/memory-inbox":
-            limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
+            limit = self._query_limit_or_reply(query, "20")
+            if limit is not None:
                 include_archived = query.get("include_archived", ["false"])[0].lower() in {"1", "true", "yes"}
                 self._json(_memory_inbox(
                     limit=limit,
@@ -1434,19 +1424,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     project=_query_text(query, "project", max_len=80),
                 ))
         elif path == "/api/capture-inbox":
-            limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
+            limit = self._query_limit_or_reply(query, "20")
+            if limit is not None:
                 self._json(_capture_inbox(
                     limit=limit,
                     project=_query_text(query, "project", max_len=80),
                 ))
         elif path == "/api/proposal-sources":
-            limit, error = _parse_search_limit(query.get("limit", ["50"])[0])
-            if error:
-                self._json({"error": error, "sources": []}, status=400)
-            else:
+            limit = self._query_limit_or_reply(query, "50", {"sources": []})
+            if limit is not None:
                 self._json(_proposal_sources(limit=min(limit, 100)))
         elif path == "/api/proposal-source":
             source_path = query.get("path", [""])[0]
@@ -1469,9 +1455,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self._json({"found": False, "error": str(exc)}, status=404)
         elif path == "/api/search":
             q = _query_text(query, "q")
-            limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
-            if error:
-                self._json({"error": error, "results": []}, status=400)
+            limit = self._query_limit_or_reply(query, "20", {"results": []})
+            if limit is None:
                 return
             if not q:
                 self._json({"error": "q parameter required", "results": []}, status=400)
@@ -1588,6 +1573,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self._read_json_or_reply({"rebuilt": False}) is None:
             return
         self._json(payload_builder())
+
+    def _query_limit_or_reply(
+        self,
+        query: dict[str, list[str]],
+        default: str,
+        error_payload: dict[str, object] | None = None,
+    ) -> int | None:
+        limit, error = _parse_search_limit(query.get("limit", [default])[0])
+        if error:
+            self._json({**(error_payload or {}), "error": error}, status=400)
+            return None
+        assert limit is not None
+        return limit
 
     def _read_json_body(self) -> tuple[dict | None, str | None, int]:
         content_type = self.headers.get("Content-Type", "")
