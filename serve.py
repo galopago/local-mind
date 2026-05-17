@@ -1392,7 +1392,60 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     depth=depth,
                     max_edges=max_edges,
                 ))
-        elif path == "/api/memory-profile":
+        elif path in {
+            "/api/memory-profile",
+            "/api/memory-dashboard",
+            "/api/memory-brief",
+            "/api/query-link",
+            "/api/memory-audit",
+            "/api/memory-inbox",
+            "/api/capture-inbox",
+        }:
+            self._handle_memory_api_get(path, query)
+        elif path == "/api/proposal-sources":
+            limit = self._query_limit_or_reply(query, "50", {"sources": []})
+            if limit is not None:
+                self._json(_proposal_sources(limit=min(limit, 100)))
+        elif path == "/api/proposal-source":
+            source_path = query.get("path", [""])[0]
+            payload, status = _proposal_source_payload(source_path)
+            self._json(payload, status=status)
+        elif path == "/api/raw-source":
+            self._json({"error": "use POST with JSON body: {\"text\": \"...\"}"}, status=405)
+        elif path == "/api/propose-memories":
+            self._json({"error": "use POST with JSON body: {\"text\": \"...\"}"}, status=405)
+        elif path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:
+            self._json({"error": "use POST with JSON body: {\"memory\": \"...\"}"}, status=405)
+        elif path == "/api/explain-memory":
+            identifier = _query_text(query, "memory", "name", max_len=300)
+            if not identifier:
+                self._json({"found": False, "error": "memory parameter required"}, status=400)
+            else:
+                try:
+                    self._json(_memory_explanation(identifier))
+                except ValueError as exc:
+                    self._json({"found": False, "error": str(exc)}, status=404)
+        elif path == "/api/search":
+            q = _query_text(query, "q")
+            limit = self._query_limit_or_reply(query, "20", {"results": []})
+            if limit is None:
+                return
+            if not q:
+                self._json({"error": "q parameter required", "results": []}, status=400)
+            else:
+                results = _search_pages(q, limit=limit)
+                self._json({"query": q, "count": len(results), "results": results})
+        elif path == "/api/context":
+            topic = _query_text(query, "topic", "q")
+            if not topic:
+                self._json({"error": "topic parameter required"}, status=400)
+            else:
+                self._json(_get_context(topic))
+        else:
+            self._err("page")
+
+    def _handle_memory_api_get(self, path: str, query: dict[str, list[str]]) -> None:
+        if path == "/api/memory-profile":
             limit = self._query_limit_or_reply(query, "10")
             if limit is not None:
                 self._json(_memory_profile(limit=limit, project=_query_text(query, "project", max_len=80)))
@@ -1438,47 +1491,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     limit=limit,
                     project=_query_text(query, "project", max_len=80),
                 ))
-        elif path == "/api/proposal-sources":
-            limit = self._query_limit_or_reply(query, "50", {"sources": []})
-            if limit is not None:
-                self._json(_proposal_sources(limit=min(limit, 100)))
-        elif path == "/api/proposal-source":
-            source_path = query.get("path", [""])[0]
-            payload, status = _proposal_source_payload(source_path)
-            self._json(payload, status=status)
-        elif path == "/api/raw-source":
-            self._json({"error": "use POST with JSON body: {\"text\": \"...\"}"}, status=405)
-        elif path == "/api/propose-memories":
-            self._json({"error": "use POST with JSON body: {\"text\": \"...\"}"}, status=405)
-        elif path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:
-            self._json({"error": "use POST with JSON body: {\"memory\": \"...\"}"}, status=405)
-        elif path == "/api/explain-memory":
-            identifier = _query_text(query, "memory", "name", max_len=300)
-            if not identifier:
-                self._json({"found": False, "error": "memory parameter required"}, status=400)
-            else:
-                try:
-                    self._json(_memory_explanation(identifier))
-                except ValueError as exc:
-                    self._json({"found": False, "error": str(exc)}, status=404)
-        elif path == "/api/search":
-            q = _query_text(query, "q")
-            limit = self._query_limit_or_reply(query, "20", {"results": []})
-            if limit is None:
-                return
-            if not q:
-                self._json({"error": "q parameter required", "results": []}, status=400)
-            else:
-                results = _search_pages(q, limit=limit)
-                self._json({"query": q, "count": len(results), "results": results})
-        elif path == "/api/context":
-            topic = _query_text(query, "topic", "q")
-            if not topic:
-                self._json({"error": "topic parameter required"}, status=400)
-            else:
-                self._json(_get_context(topic))
-        else:
-            self._err("page")
 
     def _ok(self, body: str):
         encoded = body.encode()
