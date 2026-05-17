@@ -5,6 +5,7 @@ import os
 import re
 import shlex
 import subprocess
+import urllib.parse
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
@@ -1364,6 +1365,95 @@ def memory_audit_report(
         "risk_factors": risk_factors,
         "next_actions": [dict(action) for action in next_actions],
     }
+
+
+def memory_audit_next_actions(
+    *,
+    mode: str,
+    inbox: Mapping[str, object],
+    captures: Mapping[str, object],
+    risk_factors: Iterable[Mapping[str, object]] = (),
+    project: str | None = None,
+    root: object = ".",
+) -> list[dict[str, object]]:
+    """Build runtime-specific next actions for a shared memory audit report."""
+    project_name = normalize_project(project)
+    review_recommended = bool(inbox.get("review_count"))
+    capture_recommended = bool(captures.get("count") or captures.get("read_warning_count"))
+    risks = list(risk_factors)
+
+    if mode == "cli":
+        project_arg = f' --project "{project_name}"' if project_name else ""
+        return [
+            {
+                "label": "Review memory inbox",
+                "command": f'python3 link.py memory-inbox "{root}"{project_arg}',
+                "recommended": review_recommended,
+            },
+            {
+                "label": "Review raw captures",
+                "command": f'python3 link.py capture-inbox "{root}"{project_arg}',
+                "recommended": capture_recommended,
+            },
+            {
+                "label": "Run doctor",
+                "command": f'python3 link.py doctor "{root}"',
+                "recommended": not risks,
+            },
+        ]
+
+    if mode == "mcp":
+        project_arg = f', project="{project_name}"' if project_name else ""
+        capture_command = f"capture_inbox({project_arg.lstrip(', ')})" if project_arg else "capture_inbox()"
+        return [
+            {
+                "label": "Review memory inbox",
+                "tool": "memory_inbox",
+                "command": f"memory_inbox(include_archived=true{project_arg})",
+                "recommended": review_recommended,
+            },
+            {
+                "label": "Review raw captures",
+                "tool": "capture_inbox",
+                "command": capture_command,
+                "recommended": capture_recommended,
+            },
+            {
+                "label": "Explain a memory",
+                "tool": "explain_memory",
+                "command": 'explain_memory(identifier="<memory-name>")',
+                "recommended": False,
+            },
+        ]
+
+    if mode == "web":
+        project_query = f"?project={urllib.parse.quote(project_name, safe='')}" if project_name else ""
+        project_arg = f' --project "{project_name}"' if project_name else ""
+        return [
+            {
+                "label": "Review memory inbox",
+                "detail": "Review pending, stale, invalid, or underspecified memories.",
+                "href": f"/inbox{project_query}",
+                "command": f"python3 link.py memory-inbox .{project_arg}",
+                "recommended": review_recommended,
+            },
+            {
+                "label": "Review raw captures",
+                "detail": "Accept, redact, or delete saved proposal-only raw captures.",
+                "href": f"/captures{project_query}",
+                "command": f"python3 link.py capture-inbox .{project_arg}",
+                "recommended": capture_recommended,
+            },
+            {
+                "label": "Run doctor",
+                "detail": "Check graph, source, memory, raw capture, and secret hygiene.",
+                "href": "",
+                "command": "python3 link.py doctor .",
+                "recommended": not risks,
+            },
+        ]
+
+    raise ValueError(f"Unsupported memory audit action mode: {mode}")
 
 
 def add_capture_review_to_brief(

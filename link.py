@@ -106,6 +106,7 @@ from link_core.memory import (
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
     memory_audit_report as _core_memory_audit_report,
+    memory_audit_next_actions as _core_memory_audit_next_actions,
     memory_records as _core_memory_records,
     memory_review_issues as _core_memory_review_issues,
     propose_memories_from_text as _core_propose_memories_from_text,
@@ -1448,46 +1449,19 @@ def profile(target: Path, limit: int = 10, project: str | None = None, json_outp
     return code
 
 
-def _cli_memory_audit_actions(
-    target: Path,
-    inbox: dict[str, object],
-    captures: dict[str, object],
-    risk_factors: list[dict[str, object]],
-    project_name: str,
-) -> list[dict[str, object]]:
-    root = _resolve_link_root(target)
-    project_arg = f' --project "{project_name}"' if project_name else ""
-    return [
-        {
-            "label": "Review memory inbox",
-            "command": f'python3 link.py memory-inbox "{root}"{project_arg}',
-            "recommended": bool(inbox["review_count"]),
-        },
-        {
-            "label": "Review raw captures",
-            "command": f'python3 link.py capture-inbox "{root}"{project_arg}',
-            "recommended": bool(captures["count"] or captures.get("read_warning_count")),
-        },
-        {
-            "label": "Run doctor",
-            "command": f'python3 link.py doctor "{root}"',
-            "recommended": not risk_factors,
-        },
-    ]
-
-
 def _memory_audit_payload(target: Path, wiki_dir: Path, limit: int = 10, project: str | None = None) -> dict[str, object]:
     project_name = project or _default_project(target)
     profile_data = _memory_profile(wiki_dir, limit=limit, project=project_name)
     inbox = _memory_inbox(wiki_dir, limit=limit, include_archived=True, project=project_name)
     captures = _capture_review_summary(target, project=project_name, limit=min(limit, 10))
     payload = _core_memory_audit_report(profile_data, inbox, captures, [], project=project_name)
-    payload["next_actions"] = _cli_memory_audit_actions(
-        target,
-        inbox,
-        captures,
-        payload["risk_factors"],
-        str(payload["project"]),
+    payload["next_actions"] = _core_memory_audit_next_actions(
+        mode="cli",
+        inbox=inbox,
+        captures=captures,
+        risk_factors=payload["risk_factors"],
+        project=str(payload["project"]),
+        root=_resolve_link_root(target),
     )
     return payload
 

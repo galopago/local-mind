@@ -28,6 +28,7 @@ from link_core.memory import (
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
     memory_audit_report as _core_memory_audit_report,
+    memory_audit_next_actions as _core_memory_audit_next_actions,
     memory_records as _core_memory_records,
     memory_review_issues as _core_memory_review_issues,
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
@@ -757,39 +758,6 @@ def _memory_dashboard(limit: int = 12, project: str | None = None) -> dict[str, 
     }
 
 
-def _web_memory_audit_actions(
-    inbox: dict[str, object],
-    captures: dict[str, object],
-    risk_factors: list[dict[str, object]],
-    project_name: str,
-) -> list[dict[str, object]]:
-    project_query = f"?project={urllib.parse.quote(project_name, safe='')}" if project_name else ""
-    project_arg = f' --project "{project_name}"' if project_name else ""
-    return [
-        {
-            "label": "Review memory inbox",
-            "detail": "Review pending, stale, invalid, or underspecified memories.",
-            "href": f"/inbox{project_query}",
-            "command": f"python3 link.py memory-inbox .{project_arg}",
-            "recommended": bool(inbox["review_count"]),
-        },
-        {
-            "label": "Review raw captures",
-            "detail": "Accept, redact, or delete saved proposal-only raw captures.",
-            "href": f"/captures{project_query}",
-            "command": f"python3 link.py capture-inbox .{project_arg}",
-            "recommended": bool(captures["count"] or captures.get("read_warning_count")),
-        },
-        {
-            "label": "Run doctor",
-            "detail": "Check graph, source, memory, raw capture, and secret hygiene.",
-            "href": "",
-            "command": "python3 link.py doctor .",
-            "recommended": not risk_factors,
-        },
-    ]
-
-
 def _memory_audit(limit: int = 10, project: str | None = None) -> dict[str, object]:
     limit = max(1, min(limit, 50))
     project_name = _core_normalize_project(project)
@@ -797,11 +765,12 @@ def _memory_audit(limit: int = 10, project: str | None = None) -> dict[str, obje
     inbox = _memory_inbox(limit=limit, include_archived=True, project=project_name)
     captures = _capture_review_summary(project=project_name, limit=min(limit, 10))
     payload = _core_memory_audit_report(profile, inbox, captures, [], project=project_name)
-    payload["next_actions"] = _web_memory_audit_actions(
-        inbox,
-        captures,
-        payload["risk_factors"],
-        str(payload["project"]),
+    payload["next_actions"] = _core_memory_audit_next_actions(
+        mode="web",
+        inbox=inbox,
+        captures=captures,
+        risk_factors=payload["risk_factors"],
+        project=str(payload["project"]),
     )
     return payload
 

@@ -15,6 +15,7 @@ from link_core.memory import (  # noqa: E402
     forget_memory_page,
     mark_memory_reviewed,
     memory_audit_report,
+    memory_audit_next_actions,
     memory_brief,
     memory_conflict_candidates,
     memory_explanation,
@@ -159,6 +160,47 @@ class MemoryCoreTests(unittest.TestCase):
             ],
         )
         self.assertEqual(audit["next_actions"], actions)
+
+    def test_memory_audit_next_actions_formats_cli_mcp_and_web_modes(self):
+        inbox = {"review_count": 1}
+        captures = {"count": 1, "read_warning_count": 0}
+        risk_factors = [{"code": "memory_review_backlog"}]
+
+        cli_actions = memory_audit_next_actions(
+            mode="cli",
+            inbox=inbox,
+            captures=captures,
+            risk_factors=risk_factors,
+            project="Link Product",
+            root="/tmp/link",
+        )
+        mcp_actions = memory_audit_next_actions(
+            mode="mcp",
+            inbox=inbox,
+            captures=captures,
+            project="Link Product",
+        )
+        web_actions = memory_audit_next_actions(
+            mode="web",
+            inbox=inbox,
+            captures=captures,
+            risk_factors=[],
+            project="Link Product",
+        )
+
+        self.assertEqual(cli_actions[0]["command"], 'python3 link.py memory-inbox "/tmp/link" --project "link-product"')
+        self.assertTrue(cli_actions[1]["recommended"])
+        self.assertFalse(cli_actions[2]["recommended"])
+        self.assertEqual(mcp_actions[0]["tool"], "memory_inbox")
+        self.assertIn('project="link-product"', mcp_actions[0]["command"])
+        self.assertEqual(mcp_actions[1]["tool"], "capture_inbox")
+        self.assertEqual(web_actions[0]["href"], "/inbox?project=link-product")
+        self.assertEqual(web_actions[1]["href"], "/captures?project=link-product")
+        self.assertTrue(web_actions[2]["recommended"])
+
+    def test_memory_audit_next_actions_rejects_unknown_mode(self):
+        with self.assertRaises(ValueError):
+            memory_audit_next_actions(mode="desktop", inbox={}, captures={})
 
     def test_add_capture_review_to_brief_adds_capture_guidance(self):
         payload = {"agent_guidance": ["Use memory first."]}

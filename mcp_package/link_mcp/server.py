@@ -103,6 +103,7 @@ from link_core.memory import (
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
     memory_audit_report as _core_memory_audit_report,
+    memory_audit_next_actions as _core_memory_audit_next_actions,
     memory_records as _core_memory_records,
     normalize_project as _core_normalize_project,
     memory_review_issues as _core_memory_review_issues,
@@ -350,34 +351,6 @@ def _ingest_status() -> dict[str, object]:
     return _core_collect_ingest_status(WIKI_DIR.parent)
 
 
-def _mcp_memory_audit_actions(
-    inbox: dict[str, object],
-    captures: dict[str, object],
-    project_name: str,
-) -> list[dict[str, object]]:
-    project_arg = f', project="{project_name}"' if project_name else ""
-    return [
-        {
-            "label": "Review memory inbox",
-            "tool": "memory_inbox",
-            "command": f"memory_inbox(include_archived=true{project_arg})",
-            "recommended": bool(inbox["review_count"]),
-        },
-        {
-            "label": "Review raw captures",
-            "tool": "capture_inbox",
-            "command": f"capture_inbox({project_arg.lstrip(', ')})" if project_arg else "capture_inbox()",
-            "recommended": bool(captures["count"] or captures.get("read_warning_count")),
-        },
-        {
-            "label": "Explain a memory",
-            "tool": "explain_memory",
-            "command": 'explain_memory(identifier="<memory-name>")',
-            "recommended": False,
-        },
-    ]
-
-
 def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
     parsed_limit = _parse_limit(limit, default=10, max_limit=50)
     project_name = _resolve_project(project)
@@ -388,7 +361,12 @@ def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
         profile,
         inbox,
         captures,
-        _mcp_memory_audit_actions(inbox, captures, project_name),
+        _core_memory_audit_next_actions(
+            mode="mcp",
+            inbox=inbox,
+            captures=captures,
+            project=project_name,
+        ),
         project=project_name,
     )
 
