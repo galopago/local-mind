@@ -37,9 +37,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -178,6 +176,11 @@ from link_core.log import (
     append_log as _core_append_log,
     utc_timestamp as _core_utc_timestamp,
     write_default_log as _core_write_default_log,
+)
+from link_core.mcp_verify import (
+    display_command as _core_display_command,
+    mcp_verify_guidance as _core_mcp_verify_guidance,
+    render_mcp_verify_text as _core_render_mcp_verify_text,
 )
 from link_core.schema import (
     migrate_wiki as _core_migrate_wiki,
@@ -2551,81 +2554,7 @@ def _mcp_config(python_cmd: str, wiki_dir: Path) -> dict[str, object]:
 
 
 def _display_command(parts: list[str]) -> str:
-    if os.name == "nt":
-        return subprocess.list2cmdline(parts)
-    return shlex.join(parts)
-
-
-def _mcp_verify_action(tool: str, label: str, command: list[str]) -> dict[str, object]:
-    return {
-        "tool": tool,
-        "label": label,
-        "command": command,
-        "command_text": _display_command(command),
-    }
-
-
-def _mcp_verify_guidance(
-    *,
-    target: Path,
-    python_cmd: str,
-    import_status: Mapping[str, object],
-    mcp_sdk_ready: bool,
-    version_matches: bool,
-    wiki_exists: bool,
-) -> tuple[list[dict[str, str]], list[dict[str, object]]]:
-    installed = bool(import_status.get("installed"))
-    issues: list[dict[str, str]] = []
-    next_actions: list[dict[str, object]] = []
-
-    if not installed:
-        issues.append({
-            "code": "link_mcp_missing",
-            "message": "link-mcp is not importable from the configured Python.",
-        })
-        next_actions.append(
-            _mcp_verify_action(
-                "install_link_mcp",
-                "Install link-mcp in the configured Python environment",
-                [python_cmd, "-m", "pip", "install", "--upgrade", "link-mcp"],
-            )
-        )
-    else:
-        if not mcp_sdk_ready:
-            issues.append({
-                "code": "mcp_sdk_missing",
-                "message": "link-mcp is installed, but the MCP SDK dependency is missing.",
-            })
-            next_actions.append(
-                _mcp_verify_action(
-                    "reinstall_link_mcp",
-                    f"Reinstall link-mcp dependencies for Link {LINK_VERSION}",
-                    [python_cmd, "-m", "pip", "install", "--upgrade", f"link-mcp=={LINK_VERSION}"],
-                )
-            )
-        if not version_matches:
-            issues.append({"code": "version_mismatch", "message": f"link-mcp must match Link {LINK_VERSION}."})
-            next_actions.append(
-                _mcp_verify_action(
-                    "upgrade_link_mcp",
-                    f"Upgrade link-mcp to Link {LINK_VERSION}",
-                    [python_cmd, "-m", "pip", "install", "--upgrade", f"link-mcp=={LINK_VERSION}"],
-                )
-            )
-    if not wiki_exists:
-        issues.append({
-            "code": "wiki_missing",
-            "message": "The configured Link wiki directory does not exist.",
-        })
-        next_actions.append(
-            _mcp_verify_action(
-                "init_wiki",
-                "Create or repair the local Link wiki",
-                [sys.executable, str(ROOT / "link.py"), "init", str(target)],
-            )
-        )
-
-    return issues, next_actions
+    return _core_display_command(parts)
 
 
 def _resolve_mcp_python(target: Path, wiki_dir: Path, python_cmd: str | None) -> str:
@@ -2661,8 +2590,10 @@ def verify_mcp(
     normalized_import_status = dict(import_status)
     normalized_import_status.setdefault("mcp_sdk", mcp_sdk_ready)
     normalized_import_status.setdefault("error", None)
-    issues, next_actions = _mcp_verify_guidance(
+    issues, next_actions = _core_mcp_verify_guidance(
         target=target,
+        init_command=[sys.executable, str(ROOT / "link.py"), "init", str(target)],
+        expected_version=LINK_VERSION,
         python_cmd=python_cmd,
         import_status=normalized_import_status,
         mcp_sdk_ready=mcp_sdk_ready,
@@ -2671,6 +2602,7 @@ def verify_mcp(
     )
     status = {
         "ready": ready,
+        "target": str(target),
         "python": python_cmd,
         "expected_version": LINK_VERSION,
         "version_matches": version_matches,
@@ -2688,54 +2620,9 @@ def verify_mcp(
         print(json.dumps(status, indent=2))
         return 0 if ready else 1
 
-    print(f"Link MCP verification: {target}")
-    print("")
-    print(f"Python: {python_cmd}")
-    if import_status.get("installed"):
-        print(f"link-mcp: installed ({import_status.get('version')})")
-        if not mcp_sdk_ready:
-            print("MCP SDK: missing")
-            error = import_status.get("error")
-            if error:
-                print(f"Import error: {error}")
-        if not version_matches:
-            print(f"Expected version: {LINK_VERSION}")
-    else:
-        print("link-mcp: missing")
-        error = import_status.get("error")
-        if error:
-            print(f"Import error: {error}")
-    print(f"Wiki: {'found' if wiki_exists else 'missing'} ({wiki_dir})")
-
-    print("")
-    print("MCP config:")
-    print(json.dumps(config, indent=2))
-
-    if ready:
-        print("")
-        print("Result: ready")
-        return 0
-
-    print("")
-    print("Next:")
-    python_pip = [python_cmd, "-m", "pip", "install", "--upgrade"]
-    if not import_status.get("installed"):
-        print(f"  Install: {_display_command([*python_pip, 'link-mcp'])}")
-        print("  macOS/Homebrew fallback:")
-        print("    python3 -m venv ~/.link-mcp-venv")
-        print("    ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp")
-        print("    Then rerun with: python3 link.py verify-mcp . --python ~/.link-mcp-venv/bin/python")
-    elif not mcp_sdk_ready:
-        print(f"  Reinstall link-mcp dependencies for Link {LINK_VERSION}:")
-        print(f"    {_display_command([*python_pip, f'link-mcp=={LINK_VERSION}'])}")
-    elif not version_matches:
-        print(f"  Upgrade link-mcp to match Link {LINK_VERSION}:")
-        print(f"    {_display_command([*python_pip, f'link-mcp=={LINK_VERSION}'])}")
-    if not wiki_exists:
-        print("  Create a wiki with an installer, or try: python3 link.py init")
-    print("")
-    print("Result: needs attention")
-    return 1
+    code, text = _core_render_mcp_verify_text(status)
+    print(text)
+    return code
 
 
 def _copy_runtime_files(target: Path) -> None:
