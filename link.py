@@ -211,6 +211,11 @@ from link_core.cli_query import (
     render_graph_summary_text as _core_render_graph_summary_text,
     render_query_text as _core_render_query_text,
 )
+from link_core.cli_runtime import (
+    render_demo_text as _core_render_demo_text,
+    render_init_text as _core_render_init_text,
+    render_starter_prompts_text as _core_render_starter_prompts_text,
+)
 from link_core.prompts import (
     starter_prompt_payload as _core_starter_prompt_payload,
 )
@@ -2308,18 +2313,9 @@ def init_wiki(target: Path) -> int:
     _copy_runtime_files(target)
     fixes = _apply_doctor_fixes(target)
 
-    print(f"Link wiki ready at {target}")
-    if fixes:
-        print("")
-        print("Initialized:")
-        for item in fixes:
-            print(f"  - {item}")
-    print("")
-    print("Next:")
-    print("  link status --validate")
-    print("  link serve")
-    print("  Drop sources into raw/ and ask your agent: ingest raw/<file> into Link")
-    return 0
+    code, text = _core_render_init_text(target=target, fixes=fixes)
+    print(text)
+    return code
 
 
 def starter_prompts(target: Path, project: str | None = None, json_output: bool = False) -> int:
@@ -2328,19 +2324,9 @@ def starter_prompts(target: Path, project: str | None = None, json_output: bool 
         print(json.dumps(payload, indent=2))
         return 0
 
-    print(f"Link starter prompts: {payload['target']}")
-    if payload["project"]:
-        print(f"Project: {payload['project']}")
-    print("")
-    print("Ask your agent")
-    for item in payload["prompts"]:
-        print(f"- {item['prompt']}")
-        print(f"  When: {item['when']}")
-    print("")
-    print("Local checks")
-    for command in payload["commands"]:
-        print(f"- {command}")
-    return 0
+    code, text = _core_render_starter_prompts_text(payload)
+    print(text)
+    return code
 
 
 def serve_wiki(target: Path, port: int = 3000) -> int:
@@ -2409,23 +2395,24 @@ def create_demo(target: Path, force: bool = False) -> int:
     _core_atomic_write_json(target / "wiki/_backlinks.json", backlinks)
     _core_migrate_wiki(target / "wiki")
 
-    print(f"Link demo created at {target}")
-    print("")
-    print("View it:")
-    print(f"  {_display_command(['python3', 'link.py', 'serve', str(target)])}")
-    print("")
-    print("Try the value loop:")
-    print(f"  {_display_command(['python3', 'link.py', 'query', 'why does Link help agents?', str(target), '--budget', 'small'])}")
-    print(f"  {_display_command(['python3', 'link.py', 'brief', 'working on agent memory', str(target)])}")
-    print(f"  {_display_command(['python3', 'link.py', 'memory-audit', str(target)])}")
-    print("")
-    print("Guide:")
-    print(f"  {target / 'START_HERE.md'}")
-    print("")
-    print("Then open:")
-    print("  http://127.0.0.1:3000")
-    print("  http://127.0.0.1:3000/graph")
-    return 0
+    code, text = _core_render_demo_text(
+        target=target,
+        guide_path=target / "START_HERE.md",
+        serve_command=_display_command(["python3", "link.py", "serve", str(target)]),
+        query_command=_display_command([
+            "python3",
+            "link.py",
+            "query",
+            "why does Link help agents?",
+            str(target),
+            "--budget",
+            "small",
+        ]),
+        brief_command=_display_command(["python3", "link.py", "brief", "working on agent memory", str(target)]),
+        audit_command=_display_command(["python3", "link.py", "memory-audit", str(target)]),
+    )
+    print(text)
+    return code
 
 
 def main(argv: list[str] | None = None) -> int:

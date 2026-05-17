@@ -1,0 +1,65 @@
+"""Text rendering helpers for Link setup-oriented CLI commands."""
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+
+
+def render_init_text(*, target: object, fixes: Sequence[str]) -> tuple[int, str]:
+    lines = [f"Link wiki ready at {target}"]
+    if fixes:
+        lines.extend(["", "Initialized:"])
+        lines.extend(f"  - {item}" for item in fixes)
+    lines.extend([
+        "",
+        "Next:",
+        "  link status --validate",
+        "  link serve",
+        "  Drop sources into raw/ and ask your agent: ingest raw/<file> into Link",
+    ])
+    return 0, "\n".join(lines)
+
+
+def render_starter_prompts_text(payload: Mapping[str, object]) -> tuple[int, str]:
+    lines = [f"Link starter prompts: {payload['target']}"]
+    if payload["project"]:
+        lines.append(f"Project: {payload['project']}")
+    lines.extend(["", "Ask your agent"])
+    prompts = payload.get("prompts", [])
+    if isinstance(prompts, Sequence) and not isinstance(prompts, (str, bytes)):
+        for item in prompts:
+            if isinstance(item, Mapping):
+                lines.append(f"- {item['prompt']}")
+                lines.append(f"  When: {item['when']}")
+    lines.extend(["", "Local checks"])
+    for command in payload.get("commands", []):
+        lines.append(f"- {command}")
+    return 0, "\n".join(lines)
+
+
+def render_demo_text(
+    *,
+    target: object,
+    guide_path: object,
+    serve_command: str,
+    query_command: str,
+    brief_command: str,
+    audit_command: str,
+) -> tuple[int, str]:
+    return 0, "\n".join([
+        f"Link demo created at {target}",
+        "",
+        "View it:",
+        f"  {serve_command}",
+        "",
+        "Try the value loop:",
+        f"  {query_command}",
+        f"  {brief_command}",
+        f"  {audit_command}",
+        "",
+        "Guide:",
+        f"  {guide_path}",
+        "",
+        "Then open:",
+        "  http://127.0.0.1:3000",
+        "  http://127.0.0.1:3000/graph",
+    ])
