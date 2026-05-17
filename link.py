@@ -170,17 +170,17 @@ from link_core.capture import (
     capture_records as _core_capture_records,
     capture_review_summary as _core_capture_review_summary,
     cli_capture_commands as _core_cli_capture_commands,
+    delete_capture_file as _core_delete_capture_file,
     render_accept_capture_text as _core_render_accept_capture_text,
     render_capture_session_text as _core_render_capture_session_text,
     render_capture_inbox_text as _core_render_capture_inbox_text,
     render_delete_capture_text as _core_render_delete_capture_text,
     render_redact_capture_text as _core_render_redact_capture_text,
-    resolve_capture_file as _core_resolve_capture_file,
+    redact_capture_file as _core_redact_capture_file,
     write_session_capture as _core_write_session_capture,
 )
 from link_core.files import (
     atomic_write_json as _core_atomic_write_json,
-    atomic_write_text as _core_atomic_write_text,
 )
 from link_core.ingest import (
     collect_ingest_status as _core_collect_ingest_status,
@@ -202,7 +202,6 @@ from link_core.schema import (
 )
 from link_core.security import (
     clean_text_input as _clean_text_input,
-    redact_secret_values as _redact_secret_values,
 )
 from link_core.query import (
     query_link as _core_query_link,
@@ -850,10 +849,6 @@ def capture_session(
     return 0
 
 
-def _resolve_capture_file(root: Path, capture: str) -> Path | None:
-    return _core_resolve_capture_file(root, capture)
-
-
 def _capture_records(target: Path, limit: int = 20, project: str | None = None) -> list[dict[str, object]]:
     root = _resolve_link_root(target)
     return _core_capture_records(
@@ -1009,32 +1004,28 @@ def redact_capture(
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
-    capture_path = _resolve_capture_file(root, capture)
-    if capture_path is None:
+    try:
+        payload = _core_redact_capture_file(
+            root,
+            capture,
+            replacement=replacement,
+        )
+    except ValueError:
         print(f"Capture not found under {root}: {capture}", file=sys.stderr)
         return 1
 
-    original = capture_path.read_text(encoding="utf-8", errors="replace")
-    redacted, labels, replacement_count = _redact_secret_values(original, replacement=replacement)
-    rel_path = capture_path.relative_to(root).as_posix()
-    if replacement_count:
-        _core_atomic_write_text(capture_path, redacted)
+    if payload["redacted"]:
+        labels = payload.get("labels") if isinstance(payload.get("labels"), list) else []
         _append_log(
             wiki_dir,
             _utc_timestamp(),
             "redact-capture",
-            f"Redacted secret-looking values from {rel_path}",
+            f"Redacted secret-looking values from {payload['path']}",
             [
                 f"Labels: {', '.join(labels)}",
-                f"Replacement count: {replacement_count}",
+                f"Replacement count: {payload['replacement_count']}",
             ],
         )
-    payload = {
-        "redacted": bool(replacement_count),
-        "path": rel_path,
-        "labels": labels,
-        "replacement_count": replacement_count,
-    }
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
@@ -1055,16 +1046,12 @@ def delete_capture(
     if not wiki_dir.exists():
         print(f"Missing wiki directory: {wiki_dir}", file=sys.stderr)
         return 1
-    capture_path = _resolve_capture_file(root, capture)
-    if capture_path is None:
+    try:
+        payload = _core_delete_capture_file(root, capture, confirm=confirm)
+    except ValueError:
         print(f"Capture not found under {root}: {capture}", file=sys.stderr)
         return 1
-    rel_path = capture_path.relative_to(root).as_posix()
-    payload = {
-        "deleted": False,
-        "path": rel_path,
-        "confirmation_required": not confirm,
-    }
+
     if not confirm:
         if json_output:
             print(json.dumps(payload, indent=2))
@@ -1073,16 +1060,13 @@ def delete_capture(
             print(text)
         return 1
 
-    capture_path.unlink()
     _append_log(
         wiki_dir,
         _utc_timestamp(),
         "delete-capture",
-        f"Deleted raw capture {rel_path}",
+        f"Deleted raw capture {payload['path']}",
         ["Deleted file only; capture contents were not logged."],
     )
-    payload["deleted"] = True
-    payload["confirmation_required"] = False
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0

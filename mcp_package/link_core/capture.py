@@ -216,6 +216,66 @@ def capture_proposal_selection(
     }
 
 
+def redact_capture_file(
+    root: Path,
+    capture: str,
+    *,
+    replacement: str = "[redacted-secret]",
+    max_capture_len: int | None = None,
+) -> dict[str, object]:
+    """Redact secret-looking values from a saved raw capture."""
+    root = root.expanduser().resolve()
+    capture_path = resolve_capture_file(root, capture, max_len=max_capture_len)
+    if capture_path is None:
+        label = str(capture or "").strip()
+        if max_capture_len is not None:
+            label = label[:max_capture_len]
+        raise ValueError(f"capture not found: {label}")
+
+    original = capture_path.read_text(encoding="utf-8", errors="replace")
+    redacted, labels, replacement_count = redact_secret_values(original, replacement=replacement)
+    rel_path = capture_path.relative_to(root).as_posix()
+    if replacement_count:
+        atomic_write_text(capture_path, redacted)
+    return {
+        "redacted": bool(replacement_count),
+        "path": rel_path,
+        "labels": labels,
+        "replacement_count": replacement_count,
+    }
+
+
+def delete_capture_file(
+    root: Path,
+    capture: str,
+    *,
+    confirm: bool = False,
+    max_capture_len: int | None = None,
+) -> dict[str, object]:
+    """Delete a saved raw capture only after explicit confirmation."""
+    root = root.expanduser().resolve()
+    capture_path = resolve_capture_file(root, capture, max_len=max_capture_len)
+    if capture_path is None:
+        label = str(capture or "").strip()
+        if max_capture_len is not None:
+            label = label[:max_capture_len]
+        raise ValueError(f"capture not found: {label}")
+
+    rel_path = capture_path.relative_to(root).as_posix()
+    payload = {
+        "deleted": False,
+        "path": rel_path,
+        "confirmation_required": not confirm,
+    }
+    if not confirm:
+        return payload
+
+    capture_path.unlink()
+    payload["deleted"] = True
+    payload["confirmation_required"] = False
+    return payload
+
+
 def cli_capture_commands(rel_path: str) -> dict[str, str]:
     return {
         "accept": f'python3 link.py accept-capture "{rel_path}" . --index 1',

@@ -127,13 +127,13 @@ from link_core.capture import (
     capture_proposal_selection as _core_capture_proposal_selection,
     capture_records as _core_capture_records,
     capture_review_summary as _core_capture_review_summary,
+    delete_capture_file as _core_delete_capture_file,
     mcp_capture_commands as _core_mcp_capture_commands,
-    resolve_capture_file as _core_resolve_capture_file,
+    redact_capture_file as _core_redact_capture_file,
     write_session_capture as _core_write_session_capture,
 )
 from link_core.files import (
     atomic_write_json as _core_atomic_write_json,
-    atomic_write_text as _core_atomic_write_text,
 )
 from link_core.ingest import (
     collect_ingest_status as _core_collect_ingest_status,
@@ -144,7 +144,6 @@ from link_core.log import (
 )
 from link_core.security import (
     clean_text_input as _clean_text_input,
-    redact_secret_values as _redact_secret_values,
 )
 from link_core.query import (
     query_link as _core_query_link,
@@ -447,10 +446,6 @@ def _capture_session(
     }
 
 
-def _resolve_capture_file(capture: str) -> Path | None:
-    return _core_resolve_capture_file(WIKI_DIR.parent, capture, max_len=500)
-
-
 def _capture_records(limit: int = 20, project: str = "") -> list[dict[str, object]]:
     root = WIKI_DIR.parent
     return _core_capture_records(
@@ -551,56 +546,37 @@ def _accept_capture(
 
 def _redact_capture(capture: str, replacement: str = "[redacted-secret]") -> dict[str, object]:
     root = WIKI_DIR.parent
-    capture_path = _resolve_capture_file(capture)
-    if capture_path is None:
-        raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
-    original = capture_path.read_text(encoding="utf-8", errors="replace")
-    redacted, labels, replacement_count = _redact_secret_values(
-        original,
+    payload = _core_redact_capture_file(
+        root,
+        capture,
         replacement=_clean_text_input(replacement, max_len=100) or "[redacted-secret]",
+        max_capture_len=500,
     )
-    rel_path = capture_path.relative_to(root).as_posix()
-    if replacement_count:
-        _core_atomic_write_text(capture_path, redacted)
+    if payload["redacted"]:
+        labels = payload.get("labels") if isinstance(payload.get("labels"), list) else []
         _append_log(
             _utc_timestamp(),
             "redact-capture",
-            f"Redacted secret-looking values from {rel_path}",
+            f"Redacted secret-looking values from {payload['path']}",
             [
                 f"Labels: {', '.join(labels)}",
-                f"Replacement count: {replacement_count}",
+                f"Replacement count: {payload['replacement_count']}",
             ],
         )
-    return {
-        "redacted": bool(replacement_count),
-        "path": rel_path,
-        "labels": labels,
-        "replacement_count": replacement_count,
-    }
+    return payload
 
 
 def _delete_capture(capture: str, confirm: bool = False) -> dict[str, object]:
     root = WIKI_DIR.parent
-    capture_path = _resolve_capture_file(capture)
-    if capture_path is None:
-        raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
-    rel_path = capture_path.relative_to(root).as_posix()
-    payload = {
-        "deleted": False,
-        "path": rel_path,
-        "confirmation_required": not confirm,
-    }
+    payload = _core_delete_capture_file(root, capture, confirm=confirm, max_capture_len=500)
     if not confirm:
         return payload
-    capture_path.unlink()
     _append_log(
         _utc_timestamp(),
         "delete-capture",
-        f"Deleted raw capture {rel_path}",
+        f"Deleted raw capture {payload['path']}",
         ["Deleted file only; capture contents were not logged."],
     )
-    payload["deleted"] = True
-    payload["confirmation_required"] = False
     return payload
 
 

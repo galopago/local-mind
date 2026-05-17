@@ -11,7 +11,9 @@ from mcp_package.link_core.capture import (
     capture_records,
     capture_review_summary,
     capture_title,
+    delete_capture_file,
     mcp_capture_commands,
+    redact_capture_file,
     render_accept_capture_text,
     render_capture_inbox_text,
     render_capture_session_text,
@@ -181,6 +183,64 @@ class CaptureCoreTests(unittest.TestCase):
             capture_proposal_selection(root, "empty", index=1, propose_memories=propose)
         with self.assertRaisesRegex(ValueError, "capture not found"):
             capture_proposal_selection(root, "missing", index=1, propose_memories=propose)
+
+    def test_redact_capture_file_redacts_and_reports_labels(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-redact-"))
+        capture_dir = root / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        fake_key = "sk-" + "a" * 48
+        capture = capture_dir / "session.md"
+        capture.write_text(f"## Notes\n\nSecret: {fake_key}\n", encoding="utf-8")
+
+        payload = redact_capture_file(root, "session", replacement="[gone]")
+
+        self.assertTrue(payload["redacted"])
+        self.assertEqual(payload["path"], "raw/memory-captures/session.md")
+        self.assertEqual(payload["labels"], ["OpenAI API key"])
+        self.assertEqual(payload["replacement_count"], 1)
+        self.assertNotIn(fake_key, capture.read_text(encoding="utf-8"))
+        self.assertIn("[gone]", capture.read_text(encoding="utf-8"))
+
+    def test_redact_capture_file_reports_noop_without_rewriting(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-redact-"))
+        capture_dir = root / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        capture = capture_dir / "session.md"
+        capture.write_text("## Notes\n\nNo secrets here.\n", encoding="utf-8")
+
+        payload = redact_capture_file(root, "session")
+
+        self.assertFalse(payload["redacted"])
+        self.assertEqual(payload["labels"], [])
+        self.assertEqual(payload["replacement_count"], 0)
+        self.assertEqual(capture.read_text(encoding="utf-8"), "## Notes\n\nNo secrets here.\n")
+
+    def test_delete_capture_file_requires_confirmation(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-delete-"))
+        capture_dir = root / "raw" / "memory-captures"
+        capture_dir.mkdir(parents=True)
+        capture = capture_dir / "session.md"
+        capture.write_text("## Notes\n\nDelete me.\n", encoding="utf-8")
+
+        payload = delete_capture_file(root, "session", confirm=False)
+
+        self.assertFalse(payload["deleted"])
+        self.assertTrue(payload["confirmation_required"])
+        self.assertTrue(capture.exists())
+
+        payload = delete_capture_file(root, "session", confirm=True)
+
+        self.assertTrue(payload["deleted"])
+        self.assertFalse(payload["confirmation_required"])
+        self.assertFalse(capture.exists())
+
+    def test_capture_mutation_helpers_reject_missing_capture(self):
+        root = Path(tempfile.mkdtemp(prefix="link-capture-missing-"))
+
+        with self.assertRaisesRegex(ValueError, "capture not found"):
+            redact_capture_file(root, "missing")
+        with self.assertRaisesRegex(ValueError, "capture not found"):
+            delete_capture_file(root, "missing", confirm=True)
 
     def test_capture_records_redact_snippets_and_filter_project(self):
         root = Path(tempfile.mkdtemp(prefix="link-capture-core-"))
