@@ -133,18 +133,8 @@ from link_core.demo import (
     create_demo_workspace as _core_create_demo_workspace,
 )
 from link_core.doctor import (
-    DoctorReport as _CoreDoctorReport,
     apply_doctor_fixes as _core_apply_doctor_fixes,
-    doctor_validation_errors as _core_doctor_validation_errors,
-    find_dead_links as _core_find_dead_links,
-    find_isolated_pages as _core_find_isolated_pages,
-    find_pages_missing_source_sections as _core_find_pages_missing_source_sections,
-    find_pages_missing_summaries as _core_find_pages_missing_summaries,
-    find_source_count_mismatches as _core_find_source_count_mismatches,
-    find_unindexed_pages as _core_find_unindexed_pages,
-    format_validation_error_summary as _core_format_validation_error_summary,
-    join_limited as _core_join_limited,
-    repair_validation_findings as _core_repair_validation_findings,
+    build_doctor_report as _core_build_doctor_report,
     required_paths as _core_required_paths,
     render_doctor_report as _core_render_doctor_report,
 )
@@ -197,8 +187,6 @@ from link_core.frontmatter import (
 )
 from link_core.ingest import (
     collect_ingest_status as _core_collect_ingest_status,
-    normalize_link_index as _core_normalize_link_index,
-    raw_ingest_findings as _core_raw_ingest_findings,
     render_ingest_status_text as _core_render_ingest_status_text,
 )
 from link_core.log import (
@@ -217,8 +205,6 @@ from link_core.schema import (
 )
 from link_core.security import (
     clean_text_input as _clean_text_input,
-    find_sensitive_filenames as _core_find_sensitive_filenames,
-    find_sensitive_values as _core_find_sensitive_values,
     redact_secret_values as _redact_secret_values,
     secret_value_warnings as _secret_value_warnings,
 )
@@ -275,24 +261,6 @@ def _wiki_pages(wiki_dir: Path) -> list[Path]:
         md for md in wiki_dir.rglob("*.md")
         if not md.name.startswith(".")
     )
-
-
-def _load_backlinks(path: Path) -> tuple[dict[str, dict[str, list[str]]] | None, str | None]:
-    if not path.exists():
-        return None, "missing wiki/_backlinks.json"
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        return None, f"invalid wiki/_backlinks.json: {exc}"
-    if "backlinks" in raw or "forward" in raw:
-        backlinks = raw.get("backlinks", {})
-        forward = raw.get("forward", {})
-    else:
-        backlinks = raw
-        forward = {}
-    if not isinstance(backlinks, dict) or not isinstance(forward, dict):
-        return None, "wiki/_backlinks.json must contain object maps"
-    return {"backlinks": backlinks, "forward": forward}, None
 
 
 def _resolve_wiki_dir(target: Path) -> Path:
@@ -564,62 +532,8 @@ def _write_memory_page(
     )
 
 
-def _normalize_link_index(data: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:
-    return _core_normalize_link_index(data)
-
-
-def _find_dead_links(wiki_dir: Path) -> list[str]:
-    return _core_find_dead_links(wiki_dir)
-
-
-def _find_unindexed_pages(wiki_dir: Path) -> list[str]:
-    return _core_find_unindexed_pages(wiki_dir)
-
-
-def _raw_ingest_findings(target: Path) -> dict[str, list[str]]:
-    target = target.expanduser().resolve()
-    status = _collect_ingest_status(target)
-    return _core_raw_ingest_findings(status)
-
-
 def _collect_ingest_status(target: Path) -> dict[str, object]:
     return _core_collect_ingest_status(target, skip_dirs=SKIP_SCAN_DIRS)
-
-
-def _find_pages_missing_summaries(wiki_dir: Path) -> list[str]:
-    return _core_find_pages_missing_summaries(wiki_dir)
-
-
-def _find_pages_missing_source_sections(wiki_dir: Path) -> list[str]:
-    return _core_find_pages_missing_source_sections(wiki_dir)
-
-
-def _find_source_count_mismatches(wiki_dir: Path) -> list[str]:
-    return _core_find_source_count_mismatches(wiki_dir)
-
-
-def _repair_validation_findings(wiki_dir: Path) -> list[str]:
-    return _core_repair_validation_findings(wiki_dir)
-
-
-def _find_isolated_pages(wiki_dir: Path) -> list[str]:
-    return _core_find_isolated_pages(wiki_dir)
-
-
-def _find_sensitive_filenames(target: Path) -> list[str]:
-    return _core_find_sensitive_filenames(
-        target,
-        skip_dirs=SKIP_SCAN_DIRS,
-        patterns=SECRET_NAME_PATTERNS,
-    )
-
-
-def _find_sensitive_values(target: Path) -> tuple[list[str], list[str]]:
-    return _core_find_sensitive_values(
-        target,
-        skip_dirs=SKIP_SCAN_DIRS,
-        skip_suffixes=SKIP_SCAN_SUFFIXES,
-    )
 
 
 def _required_paths(target: Path) -> list[Path]:
@@ -631,127 +545,13 @@ def _apply_doctor_fixes(target: Path) -> list[str]:
 
 
 def doctor(target: Path, fix: bool = False) -> int:
-    target = target.expanduser().resolve()
-    wiki_dir = target / "wiki"
-    raw_dir = target / "raw"
-    report = _CoreDoctorReport(str(target), fix_requested=fix)
-    if fix:
-        report.fixes = _apply_doctor_fixes(target)
-
-    required = _required_paths(target)
-    missing = [str(path.relative_to(target)) for path in required if not path.exists()]
-    if missing:
-        report.add_error("missing required paths: " + ", ".join(missing))
-    else:
-        report.add_ok("OK required wiki structure")
-
-    if wiki_dir.exists():
-        pages = _wiki_pages(wiki_dir)
-        report.add_ok(f"OK markdown pages: {len(pages)}")
-
-        dead_links = _find_dead_links(wiki_dir)
-        if dead_links:
-            report.add_error(_core_join_limited("dead wikilinks: ", dead_links))
-        else:
-            report.add_ok("OK no dead wikilinks")
-
-        unindexed = _find_unindexed_pages(wiki_dir)
-        if unindexed:
-            report.add_warning(_core_join_limited("pages missing from index: ", unindexed))
-        else:
-            report.add_ok("OK index lists wiki pages")
-
-        current, load_error = _load_backlinks(wiki_dir / "_backlinks.json")
-        if load_error:
-            report.add_error(load_error)
-        elif current is not None:
-            expected = _build_backlinks(wiki_dir)
-            if _normalize_link_index(current) != _normalize_link_index(expected):
-                report.add_error("wiki/_backlinks.json is stale; run: python3 link.py rebuild-backlinks .")
-            else:
-                report.add_ok("OK backlinks are current")
-
-        schema = _core_schema_status(wiki_dir)
-        if schema["status"] == "current":
-            report.add_ok(f"OK wiki schema v{schema['version']}")
-        elif schema["status"] in {"missing", "old"}:
-            report.add_warning("wiki schema marker needs migration; run: link migrate")
-        elif schema["status"] == "newer":
-            report.add_error(str(schema["error"]))
-        else:
-            report.add_error(str(schema["error"] or "invalid wiki schema marker"))
-
-        missing_summaries = _find_pages_missing_summaries(wiki_dir)
-        if missing_summaries:
-            report.add_warning(_core_join_limited("pages missing TLDR/query summary: ", missing_summaries))
-        else:
-            report.add_ok("OK wiki pages have summaries")
-
-        missing_sources = _find_pages_missing_source_sections(wiki_dir)
-        if missing_sources:
-            report.add_warning(_core_join_limited("source-backed pages missing Sources section: ", missing_sources))
-        else:
-            report.add_ok("OK source-backed pages cite sources")
-
-        source_count_mismatches = _find_source_count_mismatches(wiki_dir)
-        if source_count_mismatches:
-            report.add_warning(_core_join_limited("source_count metadata mismatch: ", source_count_mismatches))
-        else:
-            report.add_ok("OK source_count metadata matches Sources sections")
-
-        validation = _core_validate_wiki(wiki_dir)
-        validation_errors = _core_doctor_validation_errors(validation)
-        if validation_errors:
-            report.add_error(_core_format_validation_error_summary(validation_errors))
-        else:
-            report.add_ok("OK ingest validation gate")
-
-        isolated = _find_isolated_pages(wiki_dir)
-        if isolated:
-            report.add_warning(_core_join_limited("isolated wiki pages: ", isolated))
-        else:
-            report.add_ok("OK graph has no isolated wiki pages")
-
-        memory_review = _memory_inbox(wiki_dir, limit=8, include_archived=True)
-        if memory_review["review_count"]:
-            names = ", ".join(item["name"] for item in memory_review["items"][:8])
-            report.add_warning(f"memories need review: {names}")
-        else:
-            report.add_ok("OK memories are reviewed")
-
-        captures = _capture_records(target, limit=50)
-        capture_warning_count = sum(1 for capture in captures if capture["warning_count"])
-        if captures:
-            report.add_warning(f"raw memory captures pending review: {len(captures)}")
-        else:
-            report.add_ok("OK no raw memory captures pending review")
-        if capture_warning_count:
-            report.add_warning(f"raw memory captures with secret warnings: {capture_warning_count}")
-
-    raw_ingest_findings = _raw_ingest_findings(target)
-    if raw_ingest_findings["blocked"]:
-        report.add_warning(_core_join_limited("raw files blocked before ingest: ", raw_ingest_findings["blocked"]))
-    if raw_ingest_findings["stale"]:
-        report.add_warning(_core_join_limited("raw files need source refresh: ", raw_ingest_findings["stale"]))
-    if raw_ingest_findings["new"]:
-        report.add_warning(_core_join_limited("raw files not referenced by wiki source pages: ", raw_ingest_findings["new"]))
-    if not any(raw_ingest_findings.values()) and raw_dir.exists():
-        report.add_ok("OK raw files are represented in wiki sources")
-
-    sensitive_names = _find_sensitive_filenames(target)
-    if sensitive_names:
-        report.add_error(_core_join_limited("sensitive-looking filenames present: ", sensitive_names))
-    else:
-        report.add_ok("OK no sensitive-looking filenames")
-
-    sensitive_values, sensitive_read_errors = _find_sensitive_values(target)
-    if sensitive_values:
-        report.add_error(_core_join_limited("sensitive-looking file contents present: ", sensitive_values))
-    else:
-        report.add_ok("OK no sensitive-looking file contents")
-    if sensitive_read_errors:
-        report.add_error(_core_join_limited("could not scan file contents for secrets: ", sensitive_read_errors))
-
+    report = _core_build_doctor_report(
+        target,
+        fix=fix,
+        skip_dirs=SKIP_SCAN_DIRS,
+        secret_name_patterns=SECRET_NAME_PATTERNS,
+        skip_suffixes=SKIP_SCAN_SUFFIXES,
+    )
     print(_core_render_doctor_report(report))
     return 0 if report.healthy else 1
 

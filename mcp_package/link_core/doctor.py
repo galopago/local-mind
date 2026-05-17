@@ -6,10 +6,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from .capture import capture_records
 from .files import atomic_write_json, atomic_write_text
 from .frontmatter import parse_frontmatter
+from .ingest import collect_ingest_status, raw_ingest_findings
 from .log import write_default_log
+from .memory import memory_inbox, memory_records
 from .schema import migrate_wiki
+from .schema import schema_status
+from .security import find_sensitive_filenames, find_sensitive_values
 from .validation import validate_wiki
 from .wiki import WIKILINK_RE, build_backlinks, load_backlinks_index, rebuild_index
 
@@ -366,6 +371,153 @@ def apply_doctor_fixes(target: Path) -> list[str]:
             fixes.append("rebuilt wiki/_backlinks.json")
 
     return fixes
+
+
+def build_doctor_report(
+    target: Path,
+    *,
+    fix: bool = False,
+    skip_dirs: set[str] | None = None,
+    secret_name_patterns: tuple[str, ...] = (),
+    skip_suffixes: set[str] | None = None,
+) -> DoctorReport:
+    """Build the full Link doctor report without rendering it."""
+    target = target.expanduser().resolve()
+    wiki_dir = target / "wiki"
+    raw_dir = target / "raw"
+    skip_dirs = skip_dirs or set()
+    skip_suffixes = skip_suffixes or set()
+    report = DoctorReport(str(target), fix_requested=fix)
+    if fix:
+        report.fixes = apply_doctor_fixes(target)
+
+    required = required_paths(target)
+    missing = [str(path.relative_to(target)) for path in required if not path.exists()]
+    if missing:
+        report.add_error("missing required paths: " + ", ".join(missing))
+    else:
+        report.add_ok("OK required wiki structure")
+
+    if wiki_dir.exists():
+        pages = wiki_pages(wiki_dir)
+        report.add_ok(f"OK markdown pages: {len(pages)}")
+
+        dead_links = find_dead_links(wiki_dir)
+        if dead_links:
+            report.add_error(join_limited("dead wikilinks: ", dead_links))
+        else:
+            report.add_ok("OK no dead wikilinks")
+
+        unindexed = find_unindexed_pages(wiki_dir)
+        if unindexed:
+            report.add_warning(join_limited("pages missing from index: ", unindexed))
+        else:
+            report.add_ok("OK index lists wiki pages")
+
+        current, load_error = load_backlinks_index(
+            wiki_dir / "_backlinks.json",
+            missing_error="missing wiki/_backlinks.json",
+            invalid_prefix="invalid wiki/_backlinks.json",
+        )
+        if load_error:
+            report.add_error(load_error)
+        else:
+            expected = build_backlinks(wiki_dir, body_only=False)
+            if _normalize_link_index(current) != _normalize_link_index(expected):
+                report.add_error("wiki/_backlinks.json is stale; run: python3 link.py rebuild-backlinks .")
+            else:
+                report.add_ok("OK backlinks are current")
+
+        schema = schema_status(wiki_dir)
+        if schema["status"] == "current":
+            report.add_ok(f"OK wiki schema v{schema['version']}")
+        elif schema["status"] in {"missing", "old"}:
+            report.add_warning("wiki schema marker needs migration; run: link migrate")
+        elif schema["status"] == "newer":
+            report.add_error(str(schema["error"]))
+        else:
+            report.add_error(str(schema["error"] or "invalid wiki schema marker"))
+
+        missing_summaries = find_pages_missing_summaries(wiki_dir)
+        if missing_summaries:
+            report.add_warning(join_limited("pages missing TLDR/query summary: ", missing_summaries))
+        else:
+            report.add_ok("OK wiki pages have summaries")
+
+        missing_sources = find_pages_missing_source_sections(wiki_dir)
+        if missing_sources:
+            report.add_warning(join_limited("source-backed pages missing Sources section: ", missing_sources))
+        else:
+            report.add_ok("OK source-backed pages cite sources")
+
+        source_count_mismatches = find_source_count_mismatches(wiki_dir)
+        if source_count_mismatches:
+            report.add_warning(join_limited("source_count metadata mismatch: ", source_count_mismatches))
+        else:
+            report.add_ok("OK source_count metadata matches Sources sections")
+
+        validation = validate_wiki(wiki_dir)
+        validation_errors = doctor_validation_errors(validation)
+        if validation_errors:
+            report.add_error(format_validation_error_summary(validation_errors))
+        else:
+            report.add_ok("OK ingest validation gate")
+
+        isolated = find_isolated_pages(wiki_dir)
+        if isolated:
+            report.add_warning(join_limited("isolated wiki pages: ", isolated))
+        else:
+            report.add_ok("OK graph has no isolated wiki pages")
+
+        memory_review = memory_inbox(memory_records(wiki_dir), limit=8, include_archived=True)
+        if memory_review["review_count"]:
+            names = ", ".join(str(item["name"]) for item in memory_review["items"][:8])
+            report.add_warning(f"memories need review: {names}")
+        else:
+            report.add_ok("OK memories are reviewed")
+
+        captures = capture_records(target, limit=50)
+        capture_warning_count = sum(1 for capture in captures if capture["warning_count"])
+        if captures:
+            report.add_warning(f"raw memory captures pending review: {len(captures)}")
+        else:
+            report.add_ok("OK no raw memory captures pending review")
+        if capture_warning_count:
+            report.add_warning(f"raw memory captures with secret warnings: {capture_warning_count}")
+
+    findings = raw_ingest_findings(collect_ingest_status(target, skip_dirs=skip_dirs))
+    if findings["blocked"]:
+        report.add_warning(join_limited("raw files blocked before ingest: ", findings["blocked"]))
+    if findings["stale"]:
+        report.add_warning(join_limited("raw files need source refresh: ", findings["stale"]))
+    if findings["new"]:
+        report.add_warning(join_limited("raw files not referenced by wiki source pages: ", findings["new"]))
+    if not any(findings.values()) and raw_dir.exists():
+        report.add_ok("OK raw files are represented in wiki sources")
+
+    sensitive_names = find_sensitive_filenames(
+        target,
+        skip_dirs=skip_dirs,
+        patterns=secret_name_patterns,
+    )
+    if sensitive_names:
+        report.add_error(join_limited("sensitive-looking filenames present: ", sensitive_names))
+    else:
+        report.add_ok("OK no sensitive-looking filenames")
+
+    sensitive_values, sensitive_read_errors = find_sensitive_values(
+        target,
+        skip_dirs=skip_dirs,
+        skip_suffixes=skip_suffixes,
+    )
+    if sensitive_values:
+        report.add_error(join_limited("sensitive-looking file contents present: ", sensitive_values))
+    else:
+        report.add_ok("OK no sensitive-looking file contents")
+    if sensitive_read_errors:
+        report.add_error(join_limited("could not scan file contents for secrets: ", sensitive_read_errors))
+
+    return report
 
 
 def render_doctor_report(report: DoctorReport) -> str:

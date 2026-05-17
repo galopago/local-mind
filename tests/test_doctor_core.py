@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "mcp_package"))
 from link_core.doctor import (  # noqa: E402
     DoctorReport,
     apply_doctor_fixes,
+    build_doctor_report,
     doctor_validation_errors,
     find_dead_links,
     find_isolated_pages,
@@ -97,6 +98,22 @@ class DoctorCoreTests(unittest.TestCase):
         self.assertIn("raw", paths)
         self.assertIn("wiki/index.md", paths)
         self.assertIn("wiki/memories", paths)
+
+    def test_build_doctor_report_uses_shared_health_checks(self):
+        root = Path(tempfile.mkdtemp(prefix="link-doctor-report-"))
+        apply_doctor_fixes(root)
+
+        report = build_doctor_report(
+            root,
+            skip_dirs={".git", "__pycache__"},
+            secret_name_patterns=(".env", "*.key"),
+            skip_suffixes={".png", ".pyc"},
+        )
+
+        self.assertTrue(report.healthy)
+        self.assertIn("OK required wiki structure", report.ok)
+        self.assertIn("OK backlinks are current", report.ok)
+        self.assertIn("OK no sensitive-looking filenames", report.ok)
 
     def test_page_health_helpers_find_doctor_findings(self):
         root = Path(tempfile.mkdtemp(prefix="link-doctor-core-"))
