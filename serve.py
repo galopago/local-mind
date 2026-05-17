@@ -1309,7 +1309,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             page = _find_page(urllib.parse.unquote(path[6:]))
             if page: self._ok(_render_page(page))
             else: self._err(urllib.parse.unquote(path[6:]))
-        elif path == "/api/pages":
+        elif path.startswith("/api/"):
+            self._handle_api_get(path, query)
+        else:
+            self._err("page")
+
+    def _handle_api_get(self, path: str, query: dict[str, list[str]]) -> None:
+        if path == "/api/pages":
             self._json(_all_pages())
         elif path == "/api/page-list":
             limit, limit_error = _core_parse_bounded_int(query.get("limit", ["100"])[0], "limit", 100, 1, 1000)
