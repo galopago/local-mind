@@ -11,7 +11,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.files import append_text, atomic_write_json, atomic_write_text  # noqa: E402
+from link_core.files import append_text, append_text_with_rotation, atomic_write_json, atomic_write_text  # noqa: E402
 
 
 class FilesCoreTests(unittest.TestCase):
@@ -76,6 +76,34 @@ class FilesCoreTests(unittest.TestCase):
         for index in range(25):
             self.assertIn(f"entry-{index}\n", text)
         self.assertEqual(list(path.parent.glob(".*.lock")), [])
+
+    def test_append_text_with_rotation_rotates_before_append(self):
+        root = Path(tempfile.mkdtemp(prefix="link-files-core-"))
+        path = root / "wiki/log.md"
+        path.parent.mkdir(parents=True)
+        path.write_text("# Log\n\n" + ("old\n" * 12), encoding="utf-8")
+
+        append_text_with_rotation(path, "new-entry\n", initial_text="# Log\n\n", max_bytes=40, backups=2)
+
+        self.assertEqual(path.read_text(encoding="utf-8"), "# Log\n\nnew-entry\n")
+        self.assertTrue((path.parent / "log.md.1").exists())
+        self.assertIn("old\n", (path.parent / "log.md.1").read_text(encoding="utf-8"))
+        self.assertFalse((path.parent / "log.md.3").exists())
+
+    def test_append_text_with_rotation_honors_backup_limit(self):
+        root = Path(tempfile.mkdtemp(prefix="link-files-core-"))
+        path = root / "wiki/log.md"
+        path.parent.mkdir(parents=True)
+        path.write_text("active\n" * 10, encoding="utf-8")
+        (path.parent / "log.md.1").write_text("first-backup\n", encoding="utf-8")
+        (path.parent / "log.md.2").write_text("oldest-backup\n", encoding="utf-8")
+
+        append_text_with_rotation(path, "fresh\n", max_bytes=1, backups=2)
+
+        self.assertEqual(path.read_text(encoding="utf-8"), "fresh\n")
+        self.assertIn("active\n", (path.parent / "log.md.1").read_text(encoding="utf-8"))
+        self.assertEqual((path.parent / "log.md.2").read_text(encoding="utf-8"), "first-backup\n")
+        self.assertNotIn("oldest-backup", "\n".join(item.read_text(encoding="utf-8") for item in path.parent.glob("log.md*")))
 
 
 if __name__ == "__main__":
