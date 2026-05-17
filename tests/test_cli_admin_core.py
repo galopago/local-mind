@@ -1,0 +1,121 @@
+import unittest
+
+from mcp_package.link_core.cli_admin import (
+    render_backup_created_text,
+    render_backup_list_text,
+    render_migrate_text,
+    render_rebuild_backlinks_text,
+    render_rebuild_index_text,
+    render_status_text,
+    render_validate_text,
+)
+
+
+class CliAdminCoreTests(unittest.TestCase):
+    def test_render_validate_passed(self):
+        code, text = render_validate_text({
+            "passed": True,
+            "findings": [],
+            "error_count": 0,
+            "warning_count": 0,
+        }, wiki_dir="/tmp/link/wiki")
+
+        self.assertEqual(code, 0)
+        self.assertIn("OK wiki pages satisfy the ingest validation gate", text)
+        self.assertIn("Result: passed (0 errors, 0 warnings)", text)
+
+    def test_render_validate_failed(self):
+        code, text = render_validate_text({
+            "passed": False,
+            "findings": [{
+                "severity": "error",
+                "path": "sources/source.md",
+                "code": "missing_summary",
+                "message": "Missing summary.",
+            }],
+            "error_count": 1,
+            "warning_count": 0,
+        }, wiki_dir="/tmp/link/wiki")
+
+        self.assertEqual(code, 1)
+        self.assertIn("ERROR sources/source.md [missing_summary] Missing summary.", text)
+
+    def test_render_migrate_current(self):
+        code, text = render_migrate_text({
+            "ok": True,
+            "previous": {"status": "missing"},
+            "schema": {"status": "current", "version": 1},
+            "changes": ["created schema marker"],
+        }, wiki_dir="/tmp/link/wiki")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Previous schema: missing", text)
+        self.assertIn("Result: current", text)
+
+    def test_render_status_not_ready(self):
+        code, text = render_status_text({
+            "version": "1.1.0",
+            "ready": False,
+            "page_count": 1,
+            "content_page_count": 0,
+            "memory_count": 0,
+            "active_memory_count": 0,
+            "needs_review_count": 0,
+            "search_backend": "sqlite-fts",
+            "schema": {"status": "missing"},
+            "missing": ["wiki/index.md"],
+            "validation": {"checked": False},
+            "warnings": [{"code": "missing_schema", "message": "Schema marker missing."}],
+            "next_actions": [{"tool": "migrate_wiki", "label": "migrate schema", "arguments": {}}],
+        }, wiki_dir="/tmp/link/wiki", version="1.1.0")
+
+        self.assertEqual(code, 1)
+        self.assertIn("Ready: no", text)
+        self.assertIn("Missing: wiki/index.md", text)
+        self.assertIn("migrate_wiki: migrate schema", text)
+
+    def test_render_backup_list(self):
+        code, text = render_backup_list_text({
+            "backup_dir": "/tmp/link/.link-backups",
+            "warnings": [{"backup": "bad.tar.gz", "error": "corrupt"}],
+            "backups": [{"name": "link-20260516.tar.gz", "bytes": 12}],
+        })
+
+        self.assertEqual(code, 0)
+        self.assertIn("Warning: could not read backup bad.tar.gz: corrupt", text)
+        self.assertIn("link-20260516.tar.gz (12 bytes)", text)
+
+    def test_render_backup_created(self):
+        code, text = render_backup_created_text({
+            "path": "/tmp/link/.link-backups/link.tar.gz",
+            "included": ["wiki", "LINK.md"],
+            "file_count": 2,
+            "bytes": 100,
+            "pruned": ["old.tar.gz"],
+        })
+
+        self.assertEqual(code, 0)
+        self.assertIn("Included: wiki, LINK.md", text)
+        self.assertIn("raw/ was excluded", text)
+        self.assertIn("Pruned old backups: old.tar.gz", text)
+
+    def test_render_rebuild_outputs(self):
+        backlinks_code, backlinks_text = render_rebuild_backlinks_text(
+            out_path="/tmp/link/wiki/_backlinks.json",
+            page_count=2,
+            edge_count=3,
+        )
+        index_code, index_text = render_rebuild_index_text({
+            "page_count": 2,
+            "source_count": 1,
+            "memory_count": 1,
+        }, index_path="/tmp/link/wiki/index.md")
+
+        self.assertEqual(backlinks_code, 0)
+        self.assertIn("Edges: 3", backlinks_text)
+        self.assertEqual(index_code, 0)
+        self.assertIn("Next: run python3 link.py rebuild-backlinks before validation", index_text)
+
+
+if __name__ == "__main__":
+    unittest.main()

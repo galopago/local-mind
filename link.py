@@ -144,6 +144,15 @@ from link_core.doctor import (
 from link_core.cli_parser import (
     build_cli_parser as _core_build_cli_parser,
 )
+from link_core.cli_admin import (
+    render_backup_created_text as _core_render_backup_created_text,
+    render_backup_list_text as _core_render_backup_list_text,
+    render_migrate_text as _core_render_migrate_text,
+    render_rebuild_backlinks_text as _core_render_rebuild_backlinks_text,
+    render_rebuild_index_text as _core_render_rebuild_index_text,
+    render_status_text as _core_render_status_text,
+    render_validate_text as _core_render_validate_text,
+)
 from link_core.cli_memory import (
     render_brief_text as _core_render_brief_text,
     render_explain_memory_text as _core_render_explain_memory_text,
@@ -1030,20 +1039,9 @@ def validate(target: Path, strict: bool = False, json_output: bool = False) -> i
         print(json.dumps(payload, indent=2))
         return 0 if payload["passed"] else 1
 
-    print(f"Link validate: {wiki_dir}")
-    print("")
-    if payload["findings"]:
-        for finding in payload["findings"]:
-            label = str(finding["severity"]).upper()
-            print(f"{label} {finding['path']} [{finding['code']}] {finding['message']}")
-    else:
-        print("OK wiki pages satisfy the ingest validation gate")
-    print("")
-    print(
-        f"Result: {'passed' if payload['passed'] else 'failed'} "
-        f"({payload['error_count']} errors, {payload['warning_count']} warnings)"
-    )
-    return 0 if payload["passed"] else 1
+    code, text = _core_render_validate_text(payload, wiki_dir=wiki_dir)
+    print(text)
+    return code
 
 
 def migrate(target: Path, json_output: bool = False) -> int:
@@ -1054,28 +1052,9 @@ def migrate(target: Path, json_output: bool = False) -> int:
         print(json.dumps(payload, indent=2))
         return 0 if payload["ok"] else 1
 
-    print(f"Link migrate: {wiki_dir}")
-    print("")
-    previous = payload["previous"]
-    schema = payload["schema"]
-    print(f"Previous schema: {previous['status']}")
-    print(f"Current schema: {schema['status']} v{schema.get('version')}")
-    changes = payload["changes"]
-    if changes:
-        print("")
-        print("Changes:")
-        for item in changes:
-            print(f"- {item}")
-    else:
-        print("")
-        print("Changes: none")
-    if payload["ok"]:
-        print("")
-        print("Result: current")
-        return 0
-    print("")
-    print(f"Result: failed ({payload['error']})")
-    return 1
+    code, text = _core_render_migrate_text(payload, wiki_dir=wiki_dir)
+    print(text)
+    return code
 
 
 def status(target: Path, include_validation: bool = False, json_output: bool = False) -> int:
@@ -1086,50 +1065,9 @@ def status(target: Path, include_validation: bool = False, json_output: bool = F
         print(json.dumps(payload, indent=2))
         return 0 if payload["ready"] else 1
 
-    print(f"Link status: {wiki_dir}")
-    print("")
-    print(f"Version: {payload.get('version') or LINK_VERSION}")
-    print(f"Ready: {'yes' if payload['ready'] else 'no'}")
-    print(f"Pages: {payload['page_count']}")
-    print(f"Content pages: {payload.get('content_page_count', payload['page_count'])}")
-    print(
-        f"Memories: {payload['memory_count']} total · "
-        f"{payload['active_memory_count']} active · "
-        f"{payload['needs_review_count']} need review"
-    )
-    print(f"Search backend: {payload.get('search_backend', 'unknown')}")
-    schema = payload.get("schema") or {}
-    if isinstance(schema, dict):
-        schema_status = schema.get("status", "unknown")
-        schema_version = schema.get("version")
-        if schema_status == "current":
-            print(f"Schema: current v{schema_version}")
-        else:
-            print(f"Schema: {schema_status}")
-    if payload["missing"]:
-        print("Missing: " + ", ".join(str(item) for item in payload["missing"]))
-    validation = payload["validation"]
-    if validation.get("checked"):
-        print(
-            "Validation: "
-            f"{'passed' if validation.get('passed') else 'failed'} "
-            f"({validation.get('error_count', 0)} errors, {validation.get('warning_count', 0)} warnings)"
-        )
-    else:
-        print("Validation: not checked (use --validate)")
-    warnings = payload.get("warnings") or []
-    if warnings:
-        print("Warnings:")
-        for warning in warnings:
-            detail = f" ({warning.get('detail')})" if warning.get("detail") else ""
-            print(f"- {warning.get('code')}: {warning.get('message')}{detail}")
-    print("")
-    print("Next:")
-    for action in payload["next_actions"]:
-        args = action.get("arguments") or {}
-        suffix = f" {json.dumps(args, ensure_ascii=False)}" if args else ""
-        print(f"- {action['tool']}: {action['label']}{suffix}")
-    return 0 if payload["ready"] else 1
+    code, text = _core_render_status_text(payload, wiki_dir=wiki_dir, version=LINK_VERSION)
+    print(text)
+    return code
 
 
 def backup(
@@ -1146,17 +1084,9 @@ def backup(
         if json_output:
             print(json.dumps(payload, indent=2))
             return 0
-        print(f"Link backups: {payload['backup_dir']}")
-        print("")
-        if not payload["backups"]:
-            print("No backups found.")
-        for warning in payload.get("warnings") or []:
-            print(f"Warning: could not read backup {warning.get('backup')}: {warning.get('error')}")
-        if not payload["backups"]:
-            return 0
-        for item in payload["backups"]:
-            print(f"- {item['name']} ({item['bytes']} bytes)")
-        return 0
+        code, text = _core_render_backup_list_text(payload)
+        print(text)
+        return code
 
     try:
         payload = _core_create_backup(target, label=label, include_raw=include_raw)
@@ -1171,15 +1101,9 @@ def backup(
         print(json.dumps(payload, indent=2))
         return 0
 
-    print(f"Link backup created: {payload['path']}")
-    print(f"Included: {', '.join(payload['included'])}")
-    print(f"Files: {payload['file_count']}")
-    print(f"Size: {payload['bytes']} bytes")
-    if not include_raw:
-        print("Note: raw/ was excluded by default because it may contain sensitive source material.")
-    if payload["pruned"]:
-        print("Pruned old backups: " + ", ".join(payload["pruned"]))
-    return 0
+    code, text = _core_render_backup_created_text(payload, include_raw=include_raw)
+    print(text)
+    return code
 
 
 def ingest_status(target: Path, json_output: bool = False) -> int:
@@ -1208,10 +1132,13 @@ def rebuild_backlinks(target: Path) -> int:
     _core_atomic_write_json(out_path, backlinks)
     page_count = len(_wiki_pages(wiki_dir))
     edge_count = sum(len(targets) for targets in backlinks["forward"].values())
-    print(f"Rebuilt {out_path}")
-    print(f"Pages: {page_count}")
-    print(f"Edges: {edge_count}")
-    return 0
+    code, text = _core_render_rebuild_backlinks_text(
+        out_path=out_path,
+        page_count=page_count,
+        edge_count=edge_count,
+    )
+    print(text)
+    return code
 
 
 def rebuild_index(target: Path) -> int:
@@ -1224,12 +1151,9 @@ def rebuild_index(target: Path) -> int:
     except OSError as exc:
         print(f"Could not rebuild index: {exc}", file=sys.stderr)
         return 1
-    print(f"Rebuilt {wiki_dir / 'index.md'}")
-    print(f"Pages: {result['page_count']}")
-    print(f"Sources: {result['source_count']}")
-    print(f"Memories: {result['memory_count']}")
-    print("Next: run python3 link.py rebuild-backlinks before validation")
-    return 0
+    code, text = _core_render_rebuild_index_text(result, index_path=wiki_dir / "index.md")
+    print(text)
+    return code
 
 
 def remember(
