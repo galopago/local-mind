@@ -1,10 +1,13 @@
 import unittest
 
 from mcp_package.link_core.cli_memory import (
+    render_brief_text,
     render_forget_memory_text,
     render_explain_memory_text,
+    render_memory_audit_text,
     render_memory_inbox_text,
     render_memory_status_text,
+    render_profile_text,
     render_recall_text,
     render_review_memory_text,
     render_remember_text,
@@ -269,6 +272,141 @@ class CliMemoryCoreTests(unittest.TestCase):
         self.assertIn("Action: review-memory", text)
         self.assertIn("Forward links: agent-memory", text)
         self.assertIn("remember | Prefer local memory", text)
+
+    def test_render_brief_text(self):
+        payload = {
+            "profile": {
+                "active_count": 2,
+                "by_type": {"preference": 1},
+                "by_scope": {"user": 1},
+            },
+            "relevant_count": 1,
+            "relevant_memories": [{
+                "title": "Prefer local memory",
+                "memory_type": "preference",
+                "scope": "user",
+                "path": "wiki/memories/prefer-local-memory.md",
+                "tldr": "Local memory preferred.",
+            }],
+            "review": {
+                "count": 1,
+                "items": [{
+                    "title": "Prefer local memory",
+                    "memory_type": "preference",
+                    "scope": "user",
+                    "issues": [{
+                        "severity": "medium",
+                        "code": "pending_review",
+                        "message": "Needs review.",
+                    }],
+                }],
+            },
+            "captures": {
+                "count": 1,
+                "warning_count": 1,
+                "next_action": "review captures",
+                "items": [{
+                    "title": "Session",
+                    "path": "raw/memory-captures/session.md",
+                    "secret_warnings": ["api_key"],
+                }],
+            },
+            "agent_guidance": ["Use query_link for task context."],
+        }
+
+        code, text = render_brief_text(payload, query="local memory", project="link")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link memory brief: local memory", text)
+        self.assertIn("Project: link", text)
+        self.assertIn("Relevant memories", text)
+        self.assertIn("Review queue", text)
+        self.assertIn("Raw captures", text)
+        self.assertIn("Agent guidance", text)
+
+    def test_render_profile_text_empty(self):
+        code, text = render_profile_text({
+            "memory_count": 0,
+            "active_count": 0,
+            "review_count": 0,
+            "by_type": {},
+            "by_scope": {},
+            "by_project": {},
+            "by_status": {},
+            "top_tags": [],
+            "recent": [],
+            "preferences": [],
+            "decisions": [],
+            "projects": [],
+            "archived": [],
+        }, target="/tmp/link")
+
+        self.assertEqual(code, 0)
+        self.assertIn("No memories found.", text)
+        self.assertIn('python3 link.py remember "Memory to keep" .', text)
+
+    def test_render_profile_text_with_sections(self):
+        record = {
+            "title": "Prefer local memory",
+            "memory_type": "preference",
+            "scope": "user",
+            "path": "wiki/memories/prefer-local-memory.md",
+            "tldr": "Local memory preferred.",
+        }
+
+        code, text = render_profile_text({
+            "memory_count": 1,
+            "active_count": 1,
+            "review_count": 1,
+            "by_type": {"preference": 1},
+            "by_scope": {"user": 1},
+            "by_project": {"link": 1},
+            "by_status": {"active": 1},
+            "top_tags": [{"tag": "memory", "count": 1}],
+            "recent": [record],
+            "preferences": [record],
+            "decisions": [],
+            "projects": [],
+            "archived": [],
+        }, target="/tmp/link", project="link")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link memory profile: /tmp/link", text)
+        self.assertIn("Projects: link: 1", text)
+        self.assertIn("Tags: memory (1)", text)
+        self.assertIn("Recent memories", text)
+        self.assertIn("Decisions\n- none", text)
+
+    def test_render_memory_audit_text(self):
+        code, text = render_memory_audit_text({
+            "project": "link",
+            "status": "needs_attention",
+            "profile": {
+                "memory_count": 2,
+                "active_count": 1,
+                "review_count": 1,
+            },
+            "captures": {
+                "count": 1,
+                "warning_count": 1,
+                "read_warning_count": 0,
+            },
+            "risk_factors": [{
+                "code": "pending_review",
+                "message": "A memory needs review.",
+            }],
+            "next_actions": [{
+                "label": "Review memory inbox",
+                "recommended": True,
+                "command": "link memory-inbox",
+            }],
+        }, target="/tmp/link")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link memory audit: /tmp/link", text)
+        self.assertIn("Status: needs_attention", text)
+        self.assertIn("pending_review: A memory needs review.", text)
+        self.assertIn("Review memory inbox (recommended)", text)
 
 
 if __name__ == "__main__":

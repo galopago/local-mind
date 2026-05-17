@@ -145,10 +145,13 @@ from link_core.cli_parser import (
     build_cli_parser as _core_build_cli_parser,
 )
 from link_core.cli_memory import (
+    render_brief_text as _core_render_brief_text,
     render_explain_memory_text as _core_render_explain_memory_text,
     render_forget_memory_text as _core_render_forget_memory_text,
+    render_memory_audit_text as _core_render_memory_audit_text,
     render_memory_inbox_text as _core_render_memory_inbox_text,
     render_memory_status_text as _core_render_memory_status_text,
+    render_profile_text as _core_render_profile_text,
     render_recall_text as _core_render_recall_text,
     render_review_memory_text as _core_render_review_memory_text,
     render_remember_text as _core_render_remember_text,
@@ -1865,25 +1868,6 @@ def explain_memory(target: Path, identifier: str, json_output: bool = False) -> 
     return code
 
 
-def _format_counts(counts: dict[str, int]) -> str:
-    if not counts:
-        return "none"
-    return ", ".join(f"{name}: {count}" for name, count in counts.items())
-
-
-def _print_memory_list(title: str, records: list[dict[str, object]], empty: str = "none") -> None:
-    print(title)
-    if not records:
-        print(f"- {empty}")
-        return
-    for record in records:
-        print(f"- {record['title']} ({record['memory_type']} · {record['scope']})")
-        print(f"  {record['path']}")
-        summary = record.get("tldr") or record.get("snippet")
-        if summary:
-            print(f"  {summary}")
-
-
 def query(
     target: Path,
     query_text: str,
@@ -2150,45 +2134,9 @@ def brief(
         print(json.dumps(payload, indent=2))
         return 0
 
-    title = "Link memory brief"
-    if query:
-        title += f": {query}"
-    print(title)
-    if project_name:
-        print(f"Project: {project_name}")
-    print("")
-    profile_data = payload["profile"]
-    print(
-        f"{profile_data['active_count']} active memories · "
-        f"{payload['relevant_count']} relevant · "
-        f"{payload['review']['count']} need review"
-    )
-    print(f"Types: {_format_counts(profile_data['by_type'])}")
-    print(f"Scopes: {_format_counts(profile_data['by_scope'])}")
-    print("")
-
-    _print_memory_list("Relevant memories", payload["relevant_memories"])
-    if payload["review"]["items"]:
-        print("")
-        print("Review queue")
-        for item in payload["review"]["items"][:3]:
-            print(f"- {item['title']} ({item['memory_type']} · {item['scope']})")
-            first_issue = item["issues"][0]
-            print(f"  [{first_issue['severity']}] {first_issue['code']}: {first_issue['message']}")
-    if payload["captures"]["items"]:
-        print("")
-        print("Raw captures")
-        print(f"{payload['captures']['count']} saved · {payload['captures']['warning_count']} with secret-looking warnings")
-        for capture in payload["captures"]["items"]:
-            print(f"- {capture['title']} ({capture['path']})")
-            if capture["secret_warnings"]:
-                print("  Warnings: " + ", ".join(capture["secret_warnings"]))
-        print(f"  Next: {payload['captures']['next_action']}")
-    print("")
-    print("Agent guidance")
-    for item in payload["agent_guidance"]:
-        print(f"- {item}")
-    return 0
+    code, text = _core_render_brief_text(payload, query=query, project=project_name)
+    print(text)
+    return code
 
 
 def profile(target: Path, limit: int = 10, project: str | None = None, json_output: bool = False) -> int:
@@ -2204,45 +2152,9 @@ def profile(target: Path, limit: int = 10, project: str | None = None, json_outp
         print(json.dumps(profile_data, indent=2))
         return 0
 
-    print(f"Link memory profile: {target}")
-    if project_name:
-        print(f"Project: {project_name}")
-    print("")
-    memory_count = profile_data["memory_count"]
-    active_count = profile_data["active_count"]
-    review_count = profile_data["review_count"]
-    print(f"{memory_count} memor{'y' if memory_count == 1 else 'ies'} · {active_count} active · {review_count} need review")
-    print(f"Types: {_format_counts(profile_data['by_type'])}")
-    print(f"Scopes: {_format_counts(profile_data['by_scope'])}")
-    if profile_data["by_project"]:
-        print(f"Projects: {_format_counts(profile_data['by_project'])}")
-    print(f"Status: {_format_counts(profile_data['by_status'])}")
-    tags = ", ".join(
-        f"{item['tag']} ({item['count']})"
-        for item in profile_data["top_tags"]
-    )
-    if tags:
-        print(f"Tags: {tags}")
-    print("")
-
-    if memory_count == 0:
-        print("No memories found.")
-        print("")
-        print("Next:")
-        print("  Add one: python3 link.py remember \"Memory to keep\" .")
-        return 0
-
-    _print_memory_list("Recent memories", profile_data["recent"])
-    print("")
-    _print_memory_list("Preferences", profile_data["preferences"])
-    print("")
-    _print_memory_list("Decisions", profile_data["decisions"])
-    print("")
-    _print_memory_list("Project context", profile_data["projects"])
-    if profile_data["archived"]:
-        print("")
-        _print_memory_list("Archived memories", profile_data["archived"])
-    return 0
+    code, text = _core_render_profile_text(profile_data, target=target, project=project_name)
+    print(text)
+    return code
 
 
 def _cli_memory_audit_actions(
@@ -2301,34 +2213,9 @@ def memory_audit(target: Path, limit: int = 10, project: str | None = None, json
         print(json.dumps(payload, indent=2))
         return 0
 
-    print(f"Link memory audit: {target}")
-    if payload["project"]:
-        print(f"Project: {payload['project']}")
-    print(f"Status: {payload['status']}")
-    print("")
-    profile_data = payload["profile"]
-    print(
-        f"Memories: {profile_data['memory_count']} total · "
-        f"{profile_data['active_count']} active · "
-        f"{profile_data['review_count']} need review"
-    )
-    print(
-        f"Raw captures: {payload['captures']['count']} saved · "
-        f"{payload['captures']['warning_count']} with secret-looking warnings · "
-        f"{payload['captures'].get('read_warning_count', 0)} read warnings"
-    )
-    if payload["risk_factors"]:
-        print("")
-        print("Needs attention")
-        for factor in payload["risk_factors"]:
-            print(f"- {factor['code']}: {factor['message']}")
-    print("")
-    print("Next actions")
-    for action in payload["next_actions"]:
-        marker = "recommended" if action["recommended"] else "optional"
-        print(f"- {action['label']} ({marker})")
-        print(f"  {action['command']}")
-    return 0
+    code, text = _core_render_memory_audit_text(payload, target=target)
+    print(text)
+    return code
 
 
 def _check_link_mcp_import(python_cmd: str) -> dict[str, object]:

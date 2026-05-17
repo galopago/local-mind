@@ -316,3 +316,166 @@ def render_explain_memory_text(explanation: Mapping[str, object]) -> tuple[int, 
             first_line = next((line for line in str(entry).splitlines() if line.strip().startswith("## ")), "")
             lines.append(f"- {first_line[3:] if first_line.startswith('## ') else first_line or 'log entry'}")
     return 0, "\n".join(lines)
+
+
+def render_memory_list(title: str, records: Sequence[Mapping[str, object]], *, empty: str = "none") -> str:
+    lines = [title]
+    if not records:
+        lines.append(f"- {empty}")
+        return "\n".join(lines)
+    for record in records:
+        lines.append(f"- {record['title']} ({record['memory_type']} · {record['scope']})")
+        lines.append(f"  {record['path']}")
+        summary = record.get("tldr") or record.get("snippet")
+        if summary:
+            lines.append(f"  {summary}")
+    return "\n".join(lines)
+
+
+def render_brief_text(payload: Mapping[str, object], *, query: str = "", project: str | None = None) -> tuple[int, str]:
+    title = "Link memory brief"
+    if query:
+        title += f": {query}"
+    lines = [title]
+    if project:
+        lines.append(f"Project: {project}")
+    lines.append("")
+    profile_data = payload["profile"]
+    review = payload["review"]
+    captures = payload["captures"]
+    if not all(isinstance(value, Mapping) for value in (profile_data, review, captures)):
+        raise ValueError("Invalid memory brief payload")
+    lines.extend([
+        (
+            f"{profile_data['active_count']} active memories · "
+            f"{payload['relevant_count']} relevant · "
+            f"{review['count']} need review"
+        ),
+        f"Types: {format_counts(profile_data['by_type'])}",
+        f"Scopes: {format_counts(profile_data['by_scope'])}",
+        "",
+        render_memory_list("Relevant memories", payload.get("relevant_memories", [])),
+    ])
+    review_items = review.get("items", [])
+    if isinstance(review_items, Sequence) and not isinstance(review_items, (str, bytes)) and review_items:
+        lines.extend(["", "Review queue"])
+        for item in review_items[:3]:
+            if not isinstance(item, Mapping):
+                continue
+            lines.append(f"- {item['title']} ({item['memory_type']} · {item['scope']})")
+            issues = item.get("issues", [])
+            if isinstance(issues, Sequence) and not isinstance(issues, (str, bytes)) and issues:
+                first_issue = issues[0]
+                if isinstance(first_issue, Mapping):
+                    lines.append(f"  [{first_issue['severity']}] {first_issue['code']}: {first_issue['message']}")
+    capture_items = captures.get("items", [])
+    if isinstance(capture_items, Sequence) and not isinstance(capture_items, (str, bytes)) and capture_items:
+        lines.extend([
+            "",
+            "Raw captures",
+            f"{captures['count']} saved · {captures['warning_count']} with secret-looking warnings",
+        ])
+        for capture in capture_items:
+            if not isinstance(capture, Mapping):
+                continue
+            lines.append(f"- {capture['title']} ({capture['path']})")
+            warnings = capture.get("secret_warnings", [])
+            if isinstance(warnings, Sequence) and not isinstance(warnings, (str, bytes)) and warnings:
+                lines.append("  Warnings: " + ", ".join(str(warning) for warning in warnings))
+        lines.append(f"  Next: {captures['next_action']}")
+    lines.extend(["", "Agent guidance"])
+    for item in payload.get("agent_guidance", []):
+        lines.append(f"- {item}")
+    return 0, "\n".join(lines)
+
+
+def render_profile_text(
+    profile_data: Mapping[str, object],
+    *,
+    target: object,
+    project: str | None = None,
+) -> tuple[int, str]:
+    lines = [f"Link memory profile: {target}"]
+    if project:
+        lines.append(f"Project: {project}")
+    lines.append("")
+    memory_count = int(profile_data["memory_count"])
+    active_count = int(profile_data["active_count"])
+    review_count = int(profile_data["review_count"])
+    lines.extend([
+        f"{memory_count} memor{'y' if memory_count == 1 else 'ies'} · {active_count} active · {review_count} need review",
+        f"Types: {format_counts(profile_data['by_type'])}",
+        f"Scopes: {format_counts(profile_data['by_scope'])}",
+    ])
+    if profile_data["by_project"]:
+        lines.append(f"Projects: {format_counts(profile_data['by_project'])}")
+    lines.append(f"Status: {format_counts(profile_data['by_status'])}")
+    tags = ", ".join(
+        f"{item['tag']} ({item['count']})"
+        for item in profile_data["top_tags"]
+        if isinstance(item, Mapping)
+    )
+    if tags:
+        lines.append(f"Tags: {tags}")
+    lines.append("")
+
+    if memory_count == 0:
+        lines.extend([
+            "No memories found.",
+            "",
+            "Next:",
+            "  Add one: python3 link.py remember \"Memory to keep\" .",
+        ])
+        return 0, "\n".join(lines)
+
+    lines.extend([
+        render_memory_list("Recent memories", profile_data["recent"]),
+        "",
+        render_memory_list("Preferences", profile_data["preferences"]),
+        "",
+        render_memory_list("Decisions", profile_data["decisions"]),
+        "",
+        render_memory_list("Project context", profile_data["projects"]),
+    ])
+    if profile_data["archived"]:
+        lines.extend(["", render_memory_list("Archived memories", profile_data["archived"])])
+    return 0, "\n".join(lines)
+
+
+def render_memory_audit_text(payload: Mapping[str, object], *, target: object) -> tuple[int, str]:
+    lines = [f"Link memory audit: {target}"]
+    if payload["project"]:
+        lines.append(f"Project: {payload['project']}")
+    lines.extend([f"Status: {payload['status']}", ""])
+    profile_data = payload["profile"]
+    captures = payload["captures"]
+    if not isinstance(profile_data, Mapping) or not isinstance(captures, Mapping):
+        raise ValueError("Invalid memory audit payload")
+    lines.extend([
+        (
+            f"Memories: {profile_data['memory_count']} total · "
+            f"{profile_data['active_count']} active · "
+            f"{profile_data['review_count']} need review"
+        ),
+        (
+            f"Raw captures: {captures['count']} saved · "
+            f"{captures['warning_count']} with secret-looking warnings · "
+            f"{captures.get('read_warning_count', 0)} read warnings"
+        ),
+    ])
+    risk_factors = payload.get("risk_factors", [])
+    if isinstance(risk_factors, Sequence) and not isinstance(risk_factors, (str, bytes)) and risk_factors:
+        lines.extend(["", "Needs attention"])
+        for factor in risk_factors:
+            if isinstance(factor, Mapping):
+                lines.append(f"- {factor['code']}: {factor['message']}")
+    lines.extend(["", "Next actions"])
+    next_actions = payload.get("next_actions", [])
+    if isinstance(next_actions, Sequence) and not isinstance(next_actions, (str, bytes)):
+        for action in next_actions:
+            if not isinstance(action, Mapping):
+                continue
+            marker = "recommended" if action["recommended"] else "optional"
+            lines.append(f"- {action['label']} ({marker})")
+            lines.append(f"  {action['command']}")
+    return 0, "\n".join(lines)
