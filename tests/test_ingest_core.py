@@ -11,7 +11,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.ingest import collect_ingest_status, render_ingest_status_text, source_matches_by_raw  # noqa: E402
+from link_core.ingest import collect_ingest_status, raw_ingest_findings, render_ingest_status_text, source_matches_by_raw  # noqa: E402
 from link_core.wiki import build_backlinks  # noqa: E402
 
 
@@ -64,6 +64,20 @@ class IngestCoreTests(unittest.TestCase):
         self.assertIn("Ask your agent: ingest raw/new-note.md into Link", text)
         self.assertIn("Suggested workflow: Ingest pending raw sources", text)
         self.assertIn("Memory review: propose memories from raw/new-note.md", text)
+
+    def test_raw_ingest_findings_classifies_pending_items(self):
+        findings = raw_ingest_findings({
+            "pending_raw": [
+                {"raw": "raw/new.md"},
+                {"raw": "raw/stale.md", "stale": True},
+                {"raw": "raw/blocked.md", "secret_warnings": ["OpenAI API key"]},
+                {"raw": "raw/unreadable.md", "scan_error": "permission denied"},
+            ],
+        })
+
+        self.assertEqual(findings["new"], ["raw/new.md"])
+        self.assertEqual(findings["stale"], ["raw/stale.md"])
+        self.assertEqual(findings["blocked"], ["raw/blocked.md", "raw/unreadable.md"])
 
     def test_collect_ingest_status_blocks_secret_looking_raw(self):
         root = Path(tempfile.mkdtemp(prefix="link-ingest-core-"))

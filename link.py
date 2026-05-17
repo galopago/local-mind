@@ -196,6 +196,7 @@ from link_core.frontmatter import (
 from link_core.ingest import (
     collect_ingest_status as _core_collect_ingest_status,
     normalize_link_index as _core_normalize_link_index,
+    raw_ingest_findings as _core_raw_ingest_findings,
     render_ingest_status_text as _core_render_ingest_status_text,
 )
 from link_core.log import (
@@ -576,25 +577,7 @@ def _find_unindexed_pages(wiki_dir: Path) -> list[str]:
 def _raw_ingest_findings(target: Path) -> dict[str, list[str]]:
     target = target.expanduser().resolve()
     status = _collect_ingest_status(target)
-    pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
-    findings = {
-        "new": [],
-        "stale": [],
-        "blocked": [],
-    }
-    for item in pending:
-        if not isinstance(item, dict):
-            continue
-        raw_rel = str(item.get("raw") or "")
-        if not raw_rel:
-            continue
-        if item.get("scan_error") or item.get("secret_warnings"):
-            findings["blocked"].append(raw_rel)
-        elif item.get("stale"):
-            findings["stale"].append(raw_rel)
-        else:
-            findings["new"].append(raw_rel)
-    return {key: sorted(values) for key, values in findings.items()}
+    return _core_raw_ingest_findings(status)
 
 
 def _collect_ingest_status(target: Path) -> dict[str, object]:

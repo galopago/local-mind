@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from pathlib import Path
 
 from .frontmatter import parse_frontmatter
@@ -814,3 +815,26 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     payload["plan"] = build_ingest_plan(payload)
     payload["completion"] = build_ingest_completion(payload)
     return payload
+
+
+def raw_ingest_findings(status: Mapping[str, object]) -> dict[str, list[str]]:
+    """Classify pending raw files for doctor-style health warnings."""
+    pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
+    findings: dict[str, list[str]] = {
+        "new": [],
+        "stale": [],
+        "blocked": [],
+    }
+    for item in pending:
+        if not isinstance(item, Mapping):
+            continue
+        raw_rel = str(item.get("raw") or "")
+        if not raw_rel:
+            continue
+        if item.get("scan_error") or item.get("secret_warnings"):
+            findings["blocked"].append(raw_rel)
+        elif item.get("stale"):
+            findings["stale"].append(raw_rel)
+        else:
+            findings["new"].append(raw_rel)
+    return {key: sorted(values) for key, values in findings.items()}
