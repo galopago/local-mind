@@ -1373,25 +1373,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             strict = query.get("strict", ["false"])[0].lower() in {"1", "true", "yes"}
             payload = _validate_wiki_payload(strict=strict)
             self._json(payload, status=200 if payload.get("passed") else 422)
-        elif path == "/api/graph":
-            self._json(_get_graph_data())
-        elif path == "/api/graph-summary":
-            limit, limit_error = _core_parse_bounded_int(query.get("limit", ["40"])[0], "limit", 40, 1, 250)
-            depth, depth_error = _core_parse_bounded_int(query.get("depth", ["1"])[0], "depth", 1, 0, 3)
-            max_edges, edge_error = _core_parse_bounded_int(query.get("max_edges", ["120"])[0], "max_edges", 120, 0, 1000)
-            error = limit_error or depth_error or edge_error
-            if error:
-                self._json({"error": error}, status=400)
-            else:
-                assert limit is not None
-                assert depth is not None
-                assert max_edges is not None
-                self._json(_get_graph_summary(
-                    topic=_query_text(query, "topic", "q"),
-                    limit=limit,
-                    depth=depth,
-                    max_edges=max_edges,
-                ))
+        elif path in {"/api/graph", "/api/graph-summary", "/api/search", "/api/context"}:
+            self._handle_knowledge_api_get(path, query)
         elif path in {
             "/api/memory-profile",
             "/api/memory-dashboard",
@@ -1425,6 +1408,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self._json(_memory_explanation(identifier))
                 except ValueError as exc:
                     self._json({"found": False, "error": str(exc)}, status=404)
+        else:
+            self._err("page")
+
+    def _handle_knowledge_api_get(self, path: str, query: dict[str, list[str]]) -> None:
+        if path == "/api/graph":
+            self._json(_get_graph_data())
+        elif path == "/api/graph-summary":
+            limit, limit_error = _core_parse_bounded_int(query.get("limit", ["40"])[0], "limit", 40, 1, 250)
+            depth, depth_error = _core_parse_bounded_int(query.get("depth", ["1"])[0], "depth", 1, 0, 3)
+            max_edges, edge_error = _core_parse_bounded_int(query.get("max_edges", ["120"])[0], "max_edges", 120, 0, 1000)
+            error = limit_error or depth_error or edge_error
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                assert limit is not None
+                assert depth is not None
+                assert max_edges is not None
+                self._json(_get_graph_summary(
+                    topic=_query_text(query, "topic", "q"),
+                    limit=limit,
+                    depth=depth,
+                    max_edges=max_edges,
+                ))
         elif path == "/api/search":
             q = _query_text(query, "q")
             limit = self._query_limit_or_reply(query, "20", {"results": []})
@@ -1441,8 +1447,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": "topic parameter required"}, status=400)
             else:
                 self._json(_get_context(topic))
-        else:
-            self._err("page")
 
     def _handle_memory_api_get(self, path: str, query: dict[str, list[str]]) -> None:
         if path == "/api/memory-profile":
