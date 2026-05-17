@@ -11,6 +11,7 @@ import socketserver
 import sys
 import time
 import urllib.parse
+from collections.abc import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -1169,42 +1170,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         if path == "/api/rebuild-index":
-            if not self._require_local_action_header({"rebuilt": False}):
-                return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"rebuilt": False, "error": error}, status=status)
-                return
-            assert payload is not None
-            self._json(_rebuild_index_payload())
+            self._handle_rebuild_post(_rebuild_index_payload)
             return
         if path == "/api/rebuild-backlinks":
-            if not self._require_local_action_header({"rebuilt": False}):
-                return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"rebuilt": False, "error": error}, status=status)
-                return
-            assert payload is not None
-            self._json(_rebuild_backlinks_payload())
+            self._handle_rebuild_post(_rebuild_backlinks_payload)
             return
         if path == "/api/raw-source":
             if not self._require_local_action_header({"created": False}):
                 return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"created": False, "error": error}, status=status)
+            payload = self._read_json_or_reply({"created": False})
+            if payload is None:
                 return
-            assert payload is not None
             result, http_status = _create_raw_source_payload(payload)
             self._json(result, status=http_status)
             return
         if path == "/api/propose-memories":
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"proposed": False, "error": error, "count": 0, "proposals": []}, status=status)
+            payload = self._read_json_or_reply({"proposed": False, "count": 0, "proposals": []})
+            if payload is None:
                 return
-            assert payload is not None
             text = _clean_text_input(payload.get("text"), max_len=MAX_POST_BYTES)
             if not text.strip():
                 self._json({"proposed": False, "error": "text required", "count": 0, "proposals": []}, status=400)
@@ -1225,11 +1208,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path in {"/api/remember-memory", "/api/update-memory"}:
             if not self._require_local_action_header({"saved": False}):
                 return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"saved": False, "error": error}, status=status)
+            payload = self._read_json_or_reply({"saved": False})
+            if payload is None:
                 return
-            assert payload is not None
             try:
                 if path == "/api/remember-memory":
                     result = _remember_memory_from_web(payload)
@@ -1245,11 +1226,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:
             if not self._require_local_action_header():
                 return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"updated": False, "error": error}, status=status)
+            payload = self._read_json_or_reply({"updated": False})
+            if payload is None:
                 return
-            assert payload is not None
             identifier = _clean_text_input(payload.get("memory") or payload.get("identifier"), max_len=300)
             if not identifier:
                 self._json({"updated": False, "error": "memory required"}, status=400)
@@ -1594,6 +1573,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             status=405,
             headers={"Allow": "GET, HEAD, POST"},
         )
+
+    def _read_json_or_reply(self, error_payload: dict[str, object]) -> dict | None:
+        payload, error, status = self._read_json_body()
+        if error:
+            self._json({**error_payload, "error": error}, status=status)
+            return None
+        assert payload is not None
+        return payload
+
+    def _handle_rebuild_post(self, payload_builder: Callable[[], dict[str, object]]) -> None:
+        if not self._require_local_action_header({"rebuilt": False}):
+            return
+        if self._read_json_or_reply({"rebuilt": False}) is None:
+            return
+        self._json(payload_builder())
 
     def _read_json_body(self) -> tuple[dict | None, str | None, int]:
         content_type = self.headers.get("Content-Type", "")
