@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable, Mapping
+from pathlib import Path
+from typing import Any
 
 from .memory import MEMORY_SCOPES, MEMORY_TYPES
 from .version import LINK_VERSION
 
 
 DEFAULT_DEMO_DIR = "link-demo"
+CliHandler = Callable[..., int]
 
 
 def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.ArgumentParser:
@@ -225,3 +229,175 @@ def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.Argum
     verify_mcp_cmd.add_argument("--python", default=None, help="Python executable to verify")
 
     return parser
+
+
+def dispatch_cli_command(args: Any, handlers: Mapping[str, CliHandler]) -> int:
+    """Dispatch parsed Link CLI arguments to runtime-provided handlers."""
+    command = args.command
+    if command == "init":
+        return handlers["init"](Path(args.target))
+    if command == "serve":
+        return handlers["serve"](Path(args.target), port=args.port)
+    if command == "demo":
+        return handlers["demo"](Path(args.target), force=args.force)
+    if command == "prompts":
+        return handlers["prompts"](Path(args.target), project=args.project, json_output=args.json)
+    if command == "status":
+        return handlers["status"](Path(args.target), include_validation=args.validate, json_output=args.json)
+    if command == "backup":
+        return handlers["backup"](
+            Path(args.target),
+            label=args.label,
+            include_raw=args.include_raw,
+            list_only=args.list_only,
+            json_output=args.json,
+        )
+    if command == "doctor":
+        return handlers["doctor"](Path(args.target), fix=args.fix)
+    if command == "migrate":
+        return handlers["migrate"](Path(args.target), json_output=args.json)
+    if command == "validate":
+        return handlers["validate"](Path(args.target), strict=args.strict, json_output=args.json)
+    if command == "ingest-status":
+        return handlers["ingest-status"](Path(args.target), json_output=args.json)
+    if command == "remember":
+        return handlers["remember"](
+            Path(args.target),
+            args.text,
+            title=args.title,
+            memory_type=args.memory_type,
+            scope=args.scope,
+            tags=args.tags,
+            source=args.source,
+            project=args.project,
+            allow_duplicate=args.allow_duplicate,
+            allow_conflict=args.allow_conflict,
+            json_output=args.json,
+        )
+    if command == "propose-memories":
+        return handlers["propose-memories"](
+            Path(args.target),
+            args.source_input,
+            limit=args.limit,
+            project=args.project,
+            json_output=args.json,
+        )
+    if command == "capture-session":
+        return handlers["capture-session"](
+            Path(args.target),
+            args.source_input,
+            title=args.title,
+            limit=args.limit,
+            project=args.project,
+            json_output=args.json,
+        )
+    if command == "capture-inbox":
+        return handlers["capture-inbox"](
+            Path(args.target),
+            limit=args.limit,
+            project=args.project,
+            json_output=args.json,
+        )
+    if command == "accept-capture":
+        return handlers["accept-capture"](
+            Path(args.target),
+            args.capture,
+            index=args.index,
+            title=args.title,
+            memory_type=args.memory_type,
+            scope=args.scope,
+            tags=args.tags,
+            project=args.project,
+            allow_duplicate=args.allow_duplicate,
+            allow_conflict=args.allow_conflict,
+            json_output=args.json,
+        )
+    if command == "redact-capture":
+        return handlers["redact-capture"](
+            Path(args.target),
+            args.capture,
+            replacement=args.replacement,
+            json_output=args.json,
+        )
+    if command == "delete-capture":
+        return handlers["delete-capture"](
+            Path(args.target),
+            args.capture,
+            confirm=args.confirm,
+            json_output=args.json,
+        )
+    if command == "update-memory":
+        return handlers["update-memory"](
+            Path(args.target),
+            args.identifier,
+            args.text,
+            source=args.source,
+            allow_conflict=args.allow_conflict,
+            project=args.project,
+            json_output=args.json,
+        )
+    if command == "recall":
+        return handlers["recall"](
+            Path(args.target),
+            args.query,
+            limit=args.limit,
+            json_output=args.json,
+            include_archived=args.include_archived,
+            project=args.project,
+        )
+    if command in {"query", "query-link"}:
+        return handlers["query"](
+            Path(args.target),
+            args.query,
+            budget=args.budget,
+            project=args.project,
+            json_output=args.json,
+        )
+    if command == "graph-summary":
+        return handlers["graph-summary"](
+            Path(args.target),
+            topic=args.topic,
+            limit=args.limit,
+            depth=args.depth,
+            max_edges=args.max_edges,
+            json_output=args.json,
+        )
+    if command == "benchmark":
+        return handlers["benchmark"](
+            Path(args.target),
+            query_text=args.query,
+            budget=args.budget,
+            project=args.project,
+            json_output=args.json,
+        )
+    if command == "brief":
+        return handlers["brief"](Path(args.target), query=args.query, limit=args.limit, project=args.project, json_output=args.json)
+    if command == "profile":
+        return handlers["profile"](Path(args.target), limit=args.limit, project=args.project, json_output=args.json)
+    if command == "memory-audit":
+        return handlers["memory-audit"](Path(args.target), limit=args.limit, project=args.project, json_output=args.json)
+    if command == "archive-memory":
+        return handlers["archive-memory"](Path(args.target), args.identifier, reason=args.reason, json_output=args.json)
+    if command == "restore-memory":
+        return handlers["restore-memory"](Path(args.target), args.identifier, json_output=args.json)
+    if command == "forget-memory":
+        return handlers["forget-memory"](Path(args.target), args.identifier, confirm=args.confirm, json_output=args.json)
+    if command == "memory-inbox":
+        return handlers["memory-inbox"](
+            Path(args.target),
+            limit=args.limit,
+            include_archived=args.include_archived,
+            project=args.project,
+            json_output=args.json,
+        )
+    if command == "review-memory":
+        return handlers["review-memory"](Path(args.target), args.identifier, note=args.note, json_output=args.json)
+    if command == "explain-memory":
+        return handlers["explain-memory"](Path(args.target), args.identifier, json_output=args.json)
+    if command == "rebuild-index":
+        return handlers["rebuild-index"](Path(args.target))
+    if command == "rebuild-backlinks":
+        return handlers["rebuild-backlinks"](Path(args.target))
+    if command == "verify-mcp":
+        return handlers["verify-mcp"](Path(args.target), json_output=args.json, python_cmd=args.python)
+    raise ValueError(f"unknown command: {command}")

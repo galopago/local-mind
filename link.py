@@ -140,6 +140,7 @@ from link_core.doctor import (
 )
 from link_core.cli_parser import (
     build_cli_parser as _core_build_cli_parser,
+    dispatch_cli_command as _core_dispatch_cli_command,
 )
 from link_core.cli_admin import (
     render_backup_created_text as _core_render_backup_created_text,
@@ -1579,174 +1580,46 @@ def create_demo(target: Path, force: bool = False) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = _core_build_cli_parser(default_demo_dir=DEFAULT_DEMO_DIR)
     args = parser.parse_args(argv)
-    if args.command == "init":
-        return init_wiki(Path(args.target))
-    if args.command == "serve":
-        return serve_wiki(Path(args.target), port=args.port)
-    if args.command == "demo":
-        return create_demo(Path(args.target), force=args.force)
-    if args.command == "prompts":
-        return starter_prompts(Path(args.target), project=args.project, json_output=args.json)
-    if args.command == "status":
-        return status(Path(args.target), include_validation=args.validate, json_output=args.json)
-    if args.command == "backup":
-        return backup(
-            Path(args.target),
-            label=args.label,
-            include_raw=args.include_raw,
-            list_only=args.list_only,
-            json_output=args.json,
-        )
-    if args.command == "doctor":
-        return doctor(Path(args.target), fix=args.fix)
-    if args.command == "migrate":
-        return migrate(Path(args.target), json_output=args.json)
-    if args.command == "validate":
-        return validate(Path(args.target), strict=args.strict, json_output=args.json)
-    if args.command == "ingest-status":
-        return ingest_status(Path(args.target), json_output=args.json)
-    if args.command == "remember":
-        return remember(
-            Path(args.target),
-            args.text,
-            title=args.title,
-            memory_type=args.memory_type,
-            scope=args.scope,
-            tags=args.tags,
-            source=args.source,
-            project=args.project,
-            allow_duplicate=args.allow_duplicate,
-            allow_conflict=args.allow_conflict,
-            json_output=args.json,
-        )
-    if args.command == "propose-memories":
-        return propose_memories(
-            Path(args.target),
-            args.source_input,
-            limit=args.limit,
-            project=args.project,
-            json_output=args.json,
-        )
-    if args.command == "capture-session":
-        return capture_session(
-            Path(args.target),
-            args.source_input,
-            title=args.title,
-            limit=args.limit,
-            project=args.project,
-            json_output=args.json,
-        )
-    if args.command == "capture-inbox":
-        return capture_inbox(
-            Path(args.target),
-            limit=args.limit,
-            project=args.project,
-            json_output=args.json,
-        )
-    if args.command == "accept-capture":
-        return accept_capture(
-            Path(args.target),
-            args.capture,
-            index=args.index,
-            title=args.title,
-            memory_type=args.memory_type,
-            scope=args.scope,
-            tags=args.tags,
-            project=args.project,
-            allow_duplicate=args.allow_duplicate,
-            allow_conflict=args.allow_conflict,
-            json_output=args.json,
-        )
-    if args.command == "redact-capture":
-        return redact_capture(
-            Path(args.target),
-            args.capture,
-            replacement=args.replacement,
-            json_output=args.json,
-        )
-    if args.command == "delete-capture":
-        return delete_capture(
-            Path(args.target),
-            args.capture,
-            confirm=args.confirm,
-            json_output=args.json,
-        )
-    if args.command == "update-memory":
-        return update_memory(
-            Path(args.target),
-            args.identifier,
-            args.text,
-            source=args.source,
-            allow_conflict=args.allow_conflict,
-            project=args.project,
-            json_output=args.json,
-        )
-    if args.command == "recall":
-        return recall(
-            Path(args.target),
-            args.query,
-            limit=args.limit,
-            json_output=args.json,
-            include_archived=args.include_archived,
-            project=args.project,
-        )
-    if args.command in {"query", "query-link"}:
-        return query(
-            Path(args.target),
-            args.query,
-            budget=args.budget,
-            project=args.project,
-            json_output=args.json,
-        )
-    if args.command == "graph-summary":
-        return graph_summary(
-            Path(args.target),
-            topic=args.topic,
-            limit=args.limit,
-            depth=args.depth,
-            max_edges=args.max_edges,
-            json_output=args.json,
-        )
-    if args.command == "benchmark":
-        return benchmark(
-            Path(args.target),
-            query_text=args.query,
-            budget=args.budget,
-            project=args.project,
-            json_output=args.json,
-        )
-    if args.command == "brief":
-        return brief(Path(args.target), query=args.query, limit=args.limit, project=args.project, json_output=args.json)
-    if args.command == "profile":
-        return profile(Path(args.target), limit=args.limit, project=args.project, json_output=args.json)
-    if args.command == "memory-audit":
-        return memory_audit(Path(args.target), limit=args.limit, project=args.project, json_output=args.json)
-    if args.command == "archive-memory":
-        return archive_memory(Path(args.target), args.identifier, reason=args.reason, json_output=args.json)
-    if args.command == "restore-memory":
-        return restore_memory(Path(args.target), args.identifier, json_output=args.json)
-    if args.command == "forget-memory":
-        return forget_memory(Path(args.target), args.identifier, confirm=args.confirm, json_output=args.json)
-    if args.command == "memory-inbox":
-        return memory_inbox(
-            Path(args.target),
-            limit=args.limit,
-            include_archived=args.include_archived,
-            project=args.project,
-            json_output=args.json,
-        )
-    if args.command == "review-memory":
-        return review_memory(Path(args.target), args.identifier, note=args.note, json_output=args.json)
-    if args.command == "explain-memory":
-        return explain_memory(Path(args.target), args.identifier, json_output=args.json)
-    if args.command == "rebuild-index":
-        return rebuild_index(Path(args.target))
-    if args.command == "rebuild-backlinks":
-        return rebuild_backlinks(Path(args.target))
-    if args.command == "verify-mcp":
-        return verify_mcp(Path(args.target), json_output=args.json, python_cmd=args.python)
-    parser.error(f"unknown command: {args.command}")
-    return 2
+    try:
+        return _core_dispatch_cli_command(args, {
+            "init": init_wiki,
+            "serve": serve_wiki,
+            "demo": create_demo,
+            "prompts": starter_prompts,
+            "status": status,
+            "backup": backup,
+            "doctor": doctor,
+            "migrate": migrate,
+            "validate": validate,
+            "ingest-status": ingest_status,
+            "remember": remember,
+            "propose-memories": propose_memories,
+            "capture-session": capture_session,
+            "capture-inbox": capture_inbox,
+            "accept-capture": accept_capture,
+            "redact-capture": redact_capture,
+            "delete-capture": delete_capture,
+            "update-memory": update_memory,
+            "recall": recall,
+            "query": query,
+            "graph-summary": graph_summary,
+            "benchmark": benchmark,
+            "brief": brief,
+            "profile": profile,
+            "memory-audit": memory_audit,
+            "archive-memory": archive_memory,
+            "restore-memory": restore_memory,
+            "forget-memory": forget_memory,
+            "memory-inbox": memory_inbox,
+            "review-memory": review_memory,
+            "explain-memory": explain_memory,
+            "rebuild-index": rebuild_index,
+            "rebuild-backlinks": rebuild_backlinks,
+            "verify-mcp": verify_mcp,
+        })
+    except ValueError as exc:
+        parser.error(str(exc))
+        return 2
 
 
 if __name__ == "__main__":
