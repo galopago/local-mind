@@ -207,6 +207,10 @@ from link_core.security import (
 from link_core.query import (
     query_link as _core_query_link,
 )
+from link_core.cli_query import (
+    render_graph_summary_text as _core_render_graph_summary_text,
+    render_query_text as _core_render_query_text,
+)
 from link_core.prompts import (
     starter_prompt_payload as _core_starter_prompt_payload,
 )
@@ -1886,48 +1890,9 @@ def query(
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
-    if not payload.get("found"):
-        print(f"No Link context found for: {query_text}")
-        if payload.get("error"):
-            print(f"Error: {payload['error']}")
-            return 1
-        return 0
-
-    print(f"Link context packet: {payload['query']}")
-    if payload.get("project"):
-        print(f"Project: {payload['project']}")
-    strategy = payload["strategy"]
-    print(f"Budget: {payload['budget']} · Mode: {strategy['mode']}")
-    print("")
-
-    memory = payload["memory"]
-    print(f"Memory ({memory['count']})")
-    for item in memory["items"]:
-        print(f"- {item['title']} ({item.get('memory_type', 'memory')} · {item.get('scope', '')})")
-        print(f"  {item.get('summary', '')}")
-        recall_info = item.get("recall", {})
-        if isinstance(recall_info, dict) and recall_info.get("state"):
-            print(f"  Recall: {recall_info['state']} · {item['why_selected']}")
-    if not memory["items"]:
-        print("- none")
-
-    wiki = payload["wiki"]
-    print("")
-    print(f"Wiki ({len(wiki['pages'])} pages · primary: {wiki['primary'] or 'none'})")
-    for item in wiki["pages"]:
-        print(f"- [{item['relationship']}] {item['title']} ({item.get('type', '')})")
-        content = " ".join(str(item.get("content", "")).split())
-        if content:
-            print(f"  {content[:240]}{'...' if len(content) > 240 else ''}")
-        print(f"  Why: {item['why_selected']}")
-    if not wiki["pages"]:
-        print("- none")
-
-    print("")
-    print("Agent guidance")
-    for item in payload["agent_guidance"]:
-        print(f"- {item}")
-    return 0
+    code, text = _core_render_query_text(payload, query_text=query_text)
+    print(text)
+    return code
 
 
 def graph_summary(
@@ -1957,36 +1922,9 @@ def graph_summary(
         print(json.dumps(payload, indent=2))
         return 0
 
-    title = "Link graph summary"
-    if topic:
-        title += f": {topic}"
-    print(title)
-    print(f"Mode: {payload['mode']} · Search backend: {payload['search_backend']}")
-    print(
-        "Scale: "
-        f"{payload['node_count']} nodes · {payload['edge_count']} edges · "
-        f"returned {payload['returned_nodes']} nodes/{payload['returned_edges']} edges"
-    )
-    if payload.get("truncated"):
-        print("Scope: bounded for agent context; use follow-up actions only if needed.")
-    print("")
-    print("Nodes")
-    for node in payload["nodes"]:
-        print(f"- {node['title']} ({node['id']} · degree {node['degree']})")
-        if node.get("summary"):
-            print(f"  {node['summary']}")
-        print(f"  Why: {node['why_selected']}")
-    if not payload["nodes"]:
-        print("- none")
-    print("")
-    print("Follow-up")
-    for action in payload["follow_up"]:
-        tool = action.get("tool", "")
-        args = action.get("arguments", {})
-        when = action.get("when", "")
-        suffix = f" — {when}" if when else ""
-        print(f"- {tool} {json.dumps(args, ensure_ascii=False) if args else ''}{suffix}".rstrip())
-    return 0
+    code, text = _core_render_graph_summary_text(payload, topic=topic)
+    print(text)
+    return code
 
 
 def _timed(label: str, fn: Callable[[], object]) -> tuple[str, object, float]:
