@@ -9,6 +9,7 @@ from link_core.web_memory_pages import (  # noqa: E402
     render_brief_page,
     render_captures_page,
     render_inbox_page,
+    render_memory_explanation_page,
     render_memory_audit_page,
     render_memory_dashboard_page,
     render_profile_page,
@@ -169,3 +170,42 @@ def test_render_inbox_page_lists_review_items_and_actions():
     assert "Needs &lt;review&gt;" in html
     assert "/explain-memory?memory=memory-one" in html
     assert "link review-memory memory-one" in html
+
+
+def test_render_memory_explanation_page_shows_trust_context_actions_and_body():
+    payload = {
+        "memory": {
+            "name": "prefer-reviewable-memory",
+            "title": "Prefer <reviewable> memory",
+            "tldr": "User prefers visible memory actions.",
+        },
+        "recall": {"state": "needs_review", "reason": "Pending review"},
+        "review": {
+            "status": "pending",
+            "issue_count": 1,
+            "issues": [{"severity": "warning", "code": "pending", "message": "Needs <review>"}],
+            "primary_action": {"label": "Review", "description": "Confirm it"},
+            "actions": [{"label": "Forget", "command": "link forget-memory prefer-reviewable-memory"}],
+        },
+        "provenance": {
+            "source": "<unit test>",
+            "date_captured": "2026-05-05T00:00:00Z",
+            "path": "wiki/memories/prefer-reviewable-memory.md",
+        },
+        "lifecycle": {"status": "active"},
+        "graph": {"forward": ["agent-memory"], "inbound": [], "wikilinks": ["agent-memory"]},
+        "log_entries": ["2026-05-05 remember <memory>"],
+    }
+
+    html = render_memory_explanation_page(payload, body_html="<p>Trusted body</p>", layout=_layout)
+
+    assert "<h1>Prefer &lt;reviewable&gt; memory</h1>" in html
+    assert "User prefers visible memory actions." in html
+    assert "needs_review" in html
+    assert "Needs &lt;review&gt;" in html
+    assert "Next:</strong> Review" in html
+    assert "link forget-memory prefer-reviewable-memory" in html
+    assert "agent-memory" in html
+    assert "2026-05-05 remember &lt;memory&gt;" in html
+    assert "<p>Trusted body</p>" in html
+    assert "<unit test>" not in html

@@ -69,7 +69,6 @@ from link_core.version import (
 )
 from link_core.web_assets import CSS  # noqa: F401 - kept as serve.CSS for tests and compatibility
 from link_core.web_memory import (
-    render_memory_action_commands as _render_memory_action_commands,
     render_memory_card as _core_render_memory_card,
     render_memory_section as _core_render_memory_section,
 )
@@ -77,6 +76,7 @@ from link_core.web_memory_pages import (
     render_brief_page as _core_render_brief_page,
     render_captures_page as _core_render_captures_page,
     render_inbox_page as _core_render_inbox_page,
+    render_memory_explanation_page as _core_render_memory_explanation_page,
     render_memory_audit_page as _core_render_memory_audit_page,
     render_memory_dashboard_page as _core_render_memory_dashboard_page,
     render_profile_page as _core_render_profile_page,
@@ -1029,62 +1029,11 @@ def _render_explain_memory(identifier: str):
         explanation = _memory_explanation(identifier)
     except ValueError as exc:
         return _layout("Memory Explanation", f'<h1>Memory not found</h1><p>{html.escape(str(exc))}</p>')
-
-    memory = explanation["memory"]
-    recall_info = explanation["recall"]
-    review = explanation["review"]
-    provenance = explanation["provenance"]
-    lifecycle = explanation["lifecycle"]
-    graph = explanation["graph"]
-    summary = memory.get("tldr") or memory.get("snippet") or ""
-    issues = "".join(
-        f'<li><span class="severity">{html.escape(str(issue["severity"]))}</span> '
-        f'{html.escape(str(issue["code"]))}: {html.escape(str(issue["message"]))}</li>'
-        for issue in review["issues"]
+    return _core_render_memory_explanation_page(
+        explanation,
+        body_html=_md_to_html(str(explanation.get("body") or "")),
+        layout=_layout,
     )
-    issue_html = (
-        f'<h2>Review Issues</h2><ul class="memory-issues">{issues}</ul>'
-        if issues else "<h2>Review Issues</h2><p>No detected issues.</p>"
-    )
-    primary = review.get("primary_action") or {}
-    primary_html = ""
-    if primary:
-        primary_html = (
-            f'<p class="summary"><strong>Next:</strong> {html.escape(str(primary.get("label") or ""))} '
-            f'- {html.escape(str(primary.get("description") or ""))}</p>'
-        )
-    action_html = f'<h2>Actions</h2>{primary_html}{_render_memory_action_commands(review.get("actions") or [])}'
-    graph_html = (
-        f'<h2>Graph</h2>'
-        f'<p><strong>Forward:</strong> {html.escape(", ".join(graph["forward"]) or "none")}</p>'
-        f'<p><strong>Inbound:</strong> {html.escape(", ".join(graph["inbound"]) or "none")}</p>'
-        f'<p><strong>Wikilinks:</strong> {html.escape(", ".join(graph["wikilinks"]) or "none")}</p>'
-    )
-    logs = "".join(
-        f'<pre class="log-entry">{html.escape(entry)}</pre>'
-        for entry in explanation["log_entries"][-5:]
-    )
-    log_html = f"<h2>Log Entries</h2>{logs}" if logs else "<h2>Log Entries</h2><p>No matching log entries.</p>"
-    body_html = _md_to_html(str(explanation.get("body") or ""))
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / explain memory</div>'
-        f'<h1>{html.escape(str(memory["title"]))}</h1>'
-        f'<p class="summary">{html.escape(str(summary))}</p>'
-        f'<div class="trust-grid">'
-        f'<div><strong>Recall</strong>{html.escape(str(recall_info["state"]))}<br><small>{html.escape(str(recall_info["reason"]))}</small></div>'
-        f'<div><strong>Review</strong>{html.escape(str(review["status"]))} · {review["issue_count"]} issues</div>'
-        f'<div><strong>Status</strong>{html.escape(str(lifecycle["status"]))}</div>'
-        f'<div><strong>Source</strong>{html.escape(str(provenance["source"] or "missing"))}</div>'
-        f'<div><strong>Captured</strong>{html.escape(str(provenance["date_captured"] or "missing"))}</div>'
-        f'<div><strong>Path</strong>{html.escape(str(provenance["path"]))}</div>'
-        f'</div>'
-        f'{issue_html}'
-        f'{action_html}'
-        f'{graph_html}'
-        f'{log_html}'
-        f'<h2>Memory Body</h2>{body_html}'
-    )
-    return _layout(f"Explain: {memory['title']}", body)
 
 
 def _render_graph():

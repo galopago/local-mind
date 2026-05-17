@@ -253,6 +253,69 @@ def render_inbox_page(
     return layout("Memory Review Inbox", body)
 
 
+def render_memory_explanation_page(
+    explanation: Mapping[str, object],
+    *,
+    body_html: str,
+    layout: PageLayout,
+) -> str:
+    memory = _mapping(explanation.get("memory"))
+    recall_info = _mapping(explanation.get("recall"))
+    review = _mapping(explanation.get("review"))
+    provenance = _mapping(explanation.get("provenance"))
+    lifecycle = _mapping(explanation.get("lifecycle"))
+    graph = _mapping(explanation.get("graph"))
+    title = str(memory.get("title") or memory.get("name") or "Memory")
+    summary = memory.get("tldr") or memory.get("snippet") or ""
+    issues = "".join(
+        f'<li><span class="severity">{html.escape(str(issue.get("severity") or ""))}</span> '
+        f'{html.escape(str(issue.get("code") or ""))}: {html.escape(str(issue.get("message") or ""))}</li>'
+        for issue in _dict_list(review.get("issues"))
+    )
+    issue_html = (
+        f'<h2>Review Issues</h2><ul class="memory-issues">{issues}</ul>'
+        if issues else "<h2>Review Issues</h2><p>No detected issues.</p>"
+    )
+    primary = _mapping(review.get("primary_action"))
+    primary_html = ""
+    if primary:
+        primary_html = (
+            f'<p class="summary"><strong>Next:</strong> {html.escape(str(primary.get("label") or ""))} '
+            f'- {html.escape(str(primary.get("description") or ""))}</p>'
+        )
+    action_html = f'<h2>Actions</h2>{primary_html}{render_memory_action_commands(_dict_list(review.get("actions")))}'
+    graph_html = (
+        '<h2>Graph</h2>'
+        f'<p><strong>Forward:</strong> {html.escape(", ".join(str(item) for item in _list(graph.get("forward"))) or "none")}</p>'
+        f'<p><strong>Inbound:</strong> {html.escape(", ".join(str(item) for item in _list(graph.get("inbound"))) or "none")}</p>'
+        f'<p><strong>Wikilinks:</strong> {html.escape(", ".join(str(item) for item in _list(graph.get("wikilinks"))) or "none")}</p>'
+    )
+    logs = "".join(
+        f'<pre class="log-entry">{html.escape(str(entry))}</pre>'
+        for entry in _list(explanation.get("log_entries"))[-5:]
+    )
+    log_html = f"<h2>Log Entries</h2>{logs}" if logs else "<h2>Log Entries</h2><p>No matching log entries.</p>"
+    body = (
+        '<div class="breadcrumb"><a href="/">Link</a> / explain memory</div>'
+        f'<h1>{html.escape(title)}</h1>'
+        f'<p class="summary">{html.escape(str(summary))}</p>'
+        '<div class="trust-grid">'
+        f'<div><strong>Recall</strong>{html.escape(str(recall_info.get("state") or ""))}<br><small>{html.escape(str(recall_info.get("reason") or ""))}</small></div>'
+        f'<div><strong>Review</strong>{html.escape(str(review.get("status") or ""))} · {html.escape(str(review.get("issue_count", 0)))} issues</div>'
+        f'<div><strong>Status</strong>{html.escape(str(lifecycle.get("status") or ""))}</div>'
+        f'<div><strong>Source</strong>{html.escape(str(provenance.get("source") or "missing"))}</div>'
+        f'<div><strong>Captured</strong>{html.escape(str(provenance.get("date_captured") or "missing"))}</div>'
+        f'<div><strong>Path</strong>{html.escape(str(provenance.get("path") or ""))}</div>'
+        '</div>'
+        f'{issue_html}'
+        f'{action_html}'
+        f'{graph_html}'
+        f'{log_html}'
+        f'<h2>Memory Body</h2>{body_html}'
+    )
+    return layout(f"Explain: {title}", body)
+
+
 def _render_inbox_item(item: Mapping[str, object], *, page_href: PageHref) -> str:
     name = str(item.get("name") or "")
     summary = item.get("tldr") or item.get("snippet") or ""
@@ -319,6 +382,10 @@ def _project_line(project: str) -> str:
 
 def _mapping(value: object) -> Mapping[str, object]:
     return value if isinstance(value, Mapping) else {}
+
+
+def _list(value: object) -> list[object]:
+    return list(value) if isinstance(value, list) else []
 
 
 def _sequence(value: object) -> list[object]:
