@@ -18,7 +18,10 @@ from link_core.doctor import (  # noqa: E402
     find_unindexed_pages,
     format_validation_error_summary,
     join_limited,
+    repair_source_page_validation_shape,
+    repair_validation_findings,
     render_doctor_report,
+    raw_source_refs,
     source_section_links,
 )
 
@@ -113,6 +116,51 @@ class DoctorCoreTests(unittest.TestCase):
         links = source_section_links("Intro [[outside]]\n\n## Sources\n\n- [[inside]]\n\n## Next\n\n[[later]]")
 
         self.assertEqual(links, {"inside"})
+
+    def test_raw_source_refs_finds_inline_and_code_refs(self):
+        refs = raw_source_refs("Captured from `raw/one.md` and raw/two.md.")
+
+        self.assertEqual(refs, ["raw/one.md", "raw/two.md"])
+
+    def test_repair_source_page_validation_shape(self):
+        root = Path(tempfile.mkdtemp(prefix="link-doctor-repair-"))
+        page = root / "source.md"
+        page.write_text(
+            "---\ntype: source\ntitle: Agent Memory Session\n---\n\n"
+            "# Agent Memory Session\n\n"
+            "Captured from raw/agent-memory-session.md.\n",
+            encoding="utf-8",
+        )
+
+        changed = repair_source_page_validation_shape(page, [
+            {"code": "missing_summary", "message": "Page should include a TLDR or Query summary."},
+            {"code": "missing_required_section", "message": "Missing required section: ## Summary"},
+            {"code": "missing_required_section", "message": "Missing required section: ## Raw Source"},
+        ])
+
+        text = page.read_text(encoding="utf-8")
+        self.assertTrue(changed)
+        self.assertIn("> **TLDR:** Agent Memory Session source notes.", text)
+        self.assertIn("## Summary", text)
+        self.assertIn("## Raw Source", text)
+        self.assertIn("`raw/agent-memory-session.md`", text)
+
+    def test_repair_validation_findings_repairs_source_pages_only(self):
+        root = Path(tempfile.mkdtemp(prefix="link-doctor-repair-findings-"))
+        wiki = root / "wiki"
+        (wiki / "sources").mkdir(parents=True)
+        (wiki / "sources" / "session.md").write_text(
+            "---\ntype: source\ntitle: Session\n---\n\n"
+            "# Session\n\nCaptured from raw/session.md.\n",
+            encoding="utf-8",
+        )
+
+        fixes = repair_validation_findings(wiki)
+
+        self.assertEqual(fixes, ["repaired validation shape for wiki/sources/session.md"])
+        repaired = (wiki / "sources" / "session.md").read_text(encoding="utf-8")
+        self.assertIn("## Summary", repaired)
+        self.assertIn("## Raw Source", repaired)
 
 
 if __name__ == "__main__":
