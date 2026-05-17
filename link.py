@@ -159,6 +159,7 @@ from link_core.cli_memory import (
     render_memory_inbox_text as _core_render_memory_inbox_text,
     render_memory_status_text as _core_render_memory_status_text,
     render_profile_text as _core_render_profile_text,
+    render_propose_memories_text as _core_render_propose_memories_text,
     render_recall_text as _core_render_recall_text,
     render_review_memory_text as _core_render_review_memory_text,
     render_remember_text as _core_render_remember_text,
@@ -753,32 +754,9 @@ def propose_memories(
         print(json.dumps(result, indent=2))
         return 0
 
-    print("Memory proposals")
-    print(f"Source: {result['source']}")
-    if result.get("project"):
-        print(f"Project: {result['project']}")
-    print(f"Count: {result['count']}")
-    if not result["proposals"]:
-        print("No durable memory candidates found.")
-        return 0
-    for index, proposal in enumerate(result["proposals"], start=1):
-        print("")
-        print(f"{index}. {proposal['title']} [{proposal['confidence']}]")
-        print(f"   Type: {proposal['memory_type']} | Scope: {proposal['scope']}")
-        if proposal.get("project"):
-            print(f"   Project: {proposal['project']}")
-        print(f"   Action: {proposal['suggested_action']}")
-        print(f"   Memory: {proposal['memory']}")
-        primary_action = proposal.get("primary_action") if isinstance(proposal.get("primary_action"), dict) else {}
-        if primary_action.get("command"):
-            print(f"   Command: {primary_action['command']}")
-        if proposal["duplicate_candidates"]:
-            first = proposal["duplicate_candidates"][0]
-            print(f"   Duplicate candidate: {first['title']} ({first['path']})")
-    print("")
-    print("Next:")
-    print("  Use remember for new memories, or update-memory for duplicate candidates.")
-    return 0
+    code, text = _core_render_propose_memories_text(result)
+    print(text)
+    return code
 
 
 def capture_session(

@@ -8,6 +8,7 @@ from mcp_package.link_core.cli_memory import (
     render_memory_inbox_text,
     render_memory_status_text,
     render_profile_text,
+    render_propose_memories_text,
     render_recall_text,
     render_review_memory_text,
     render_remember_text,
@@ -84,6 +85,46 @@ class CliMemoryCoreTests(unittest.TestCase):
         self.assertIn("Memory updated", text)
         self.assertIn("Review: reviewed -> pending", text)
         self.assertIn('python3 link.py review-memory "prefer-release-branches" .', text)
+
+    def test_render_propose_memories_text(self):
+        code, text = render_propose_memories_text({
+            "source": "raw/session.md",
+            "project": "link",
+            "count": 1,
+            "proposals": [{
+                "title": "Prefer release branches",
+                "confidence": "high",
+                "memory_type": "preference",
+                "scope": "project",
+                "project": "link",
+                "suggested_action": "update-memory",
+                "memory": "The user prefers release branches.",
+                "primary_action": {"command": "python3 link.py update-memory prefer-release-branches"},
+                "duplicate_candidates": [{
+                    "title": "Prefer release branches",
+                    "path": "wiki/memories/prefer-release-branches.md",
+                }],
+            }],
+        })
+
+        self.assertEqual(code, 0)
+        self.assertIn("Memory proposals", text)
+        self.assertIn("Source: raw/session.md", text)
+        self.assertIn("Project: link", text)
+        self.assertIn("1. Prefer release branches [high]", text)
+        self.assertIn("Command: python3 link.py update-memory", text)
+        self.assertIn("Duplicate candidate: Prefer release branches", text)
+        self.assertIn("Use remember for new memories", text)
+
+    def test_render_propose_memories_text_empty(self):
+        code, text = render_propose_memories_text({
+            "source": "inline",
+            "count": 0,
+            "proposals": [],
+        })
+
+        self.assertEqual(code, 0)
+        self.assertIn("No durable memory candidates found.", text)
 
     def test_render_recall_empty(self):
         code, text = render_recall_text(query="release branches", results=[], project="link")

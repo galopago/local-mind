@@ -122,6 +122,50 @@ def render_update_memory_text(result: Mapping[str, object]) -> tuple[int, str]:
     ])
 
 
+def render_propose_memories_text(result: Mapping[str, object]) -> tuple[int, str]:
+    proposals = result.get("proposals")
+    if not isinstance(proposals, Sequence) or isinstance(proposals, (str, bytes)):
+        proposals = []
+
+    lines = [
+        "Memory proposals",
+        f"Source: {result.get('source')}",
+    ]
+    if result.get("project"):
+        lines.append(f"Project: {result.get('project')}")
+    lines.append(f"Count: {result.get('count', 0)}")
+    if not proposals:
+        lines.append("No durable memory candidates found.")
+        return 0, "\n".join(lines)
+
+    for index, proposal in enumerate(proposals, start=1):
+        if not isinstance(proposal, Mapping):
+            continue
+        lines.extend([
+            "",
+            f"{index}. {proposal.get('title')} [{proposal.get('confidence')}]",
+            f"   Type: {proposal.get('memory_type')} | Scope: {proposal.get('scope')}",
+        ])
+        if proposal.get("project"):
+            lines.append(f"   Project: {proposal.get('project')}")
+        lines.append(f"   Action: {proposal.get('suggested_action')}")
+        lines.append(f"   Memory: {proposal.get('memory')}")
+        primary_action = proposal.get("primary_action")
+        if isinstance(primary_action, Mapping) and primary_action.get("command"):
+            lines.append(f"   Command: {primary_action['command']}")
+        duplicate_candidates = proposal.get("duplicate_candidates")
+        if isinstance(duplicate_candidates, Sequence) and not isinstance(duplicate_candidates, (str, bytes)) and duplicate_candidates:
+            first = duplicate_candidates[0]
+            if isinstance(first, Mapping):
+                lines.append(f"   Duplicate candidate: {first.get('title')} ({first.get('path')})")
+    lines.extend([
+        "",
+        "Next:",
+        "  Use remember for new memories, or update-memory for duplicate candidates.",
+    ])
+    return 0, "\n".join(lines)
+
+
 def render_recall_text(
     *,
     query: str,
