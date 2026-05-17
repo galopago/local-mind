@@ -1168,7 +1168,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not self._require_mutation_rate_limit():
             return
         parsed = urllib.parse.urlparse(self.path)
-        path = parsed.path
+        self._handle_api_post(parsed.path)
+
+    def _handle_api_post(self, path: str) -> None:
         if path == "/api/rebuild-index":
             self._handle_rebuild_post(_rebuild_index_payload)
             return
