@@ -167,6 +167,7 @@ from link_core.frontmatter import (
 from link_core.ingest import (
     collect_ingest_status as _core_collect_ingest_status,
     normalize_link_index as _core_normalize_link_index,
+    render_ingest_status_text as _core_render_ingest_status_text,
 )
 from link_core.log import (
     append_log as _core_append_log,
@@ -1159,129 +1160,8 @@ def ingest_status(target: Path, json_output: bool = False) -> int:
         print(json.dumps(status, indent=2))
         return 0 if status["has_raw_dir"] and status["has_wiki_dir"] else 1
 
-    print(f"Link ingest status: {target}")
-    print("")
-    if not status["has_raw_dir"]:
-        print("Missing raw/ directory")
-    if not status["has_wiki_dir"]:
-        print("Missing wiki/ directory")
-    if not status["has_raw_dir"] or not status["has_wiki_dir"]:
-        print("")
-        print("Next:")
-        print("  Run an installer or initialize this directory: link init")
-        return 1
-
-    print(f"Raw files: {status['raw_count']}")
-    print(f"Source pages: {status['source_page_count']}")
-    if int(status.get("source_read_warning_count") or 0):
-        print(f"Source page read warnings: {status['source_read_warning_count']}")
-    print(f"Represented in wiki/sources: {status['represented_count']}")
-    print(f"Pending ingest: {status['pending_count']}")
-    if int(status.get("stale_count") or 0):
-        print(f"Stale represented raw: {status['stale_count']}")
-    print(f"Backlinks: {status['backlinks_status']} ({status['backlinks_message']})")
-    safety = status.get("safety") if isinstance(status.get("safety"), dict) else {}
-    if safety:
-        print(f"Safety: {safety.get('status')} ({safety.get('summary')})")
-    guidance = status["guidance"]
-    if isinstance(guidance, dict):
-        print(f"Guidance: {guidance['summary']}")
-
-    pending_raw = status["pending_raw"]
-    if pending_raw:
-        print("")
-        print("Pending raw files:")
-        for item in pending_raw[:20]:
-            warnings = item.get("secret_warnings") if isinstance(item.get("secret_warnings"), list) else []
-            scan_error = str(item.get("scan_error") or "")
-            if scan_error:
-                print(f"- {item['raw']} [fix access before ingest: {scan_error}]")
-            elif warnings:
-                labels = ", ".join(str(label) for label in warnings)
-                print(f"- {item['raw']} [redact before ingest: {labels}]")
-            elif item.get("stale"):
-                reason = str(item.get("stale_reason") or "raw changed after wiki source page")
-                print(f"- {item['raw']} [refresh source page: {reason}]")
-            else:
-                print(f"- {item['raw']}")
-        if len(pending_raw) > 20:
-            print(f"- ... {len(pending_raw) - 20} more")
-    source_warnings = status.get("source_read_warnings") if isinstance(status.get("source_read_warnings"), list) else []
-    if source_warnings:
-        print("")
-        print("Source page warnings:")
-        for item in source_warnings[:20]:
-            if isinstance(item, dict):
-                print(f"- {item.get('page')} [fix access: {item.get('error')}]")
-
-    print("")
-    print("Next:")
-    if isinstance(guidance, dict):
-        agent_prompt = guidance.get("agent_prompt")
-        if agent_prompt:
-            print(f"  Ask your agent: {agent_prompt}")
-        for command in guidance.get("commands", []):
-            print(f"  Run: {command}")
-        notes = guidance.get("notes") or []
-        for note in notes[:2]:
-            print(f"  Note: {note}")
-
-    plan = status.get("plan") if isinstance(status.get("plan"), dict) else {}
-    steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
-    batch = plan.get("batch") if isinstance(plan.get("batch"), list) else []
-    post_checks = plan.get("post_checks") if isinstance(plan.get("post_checks"), list) else []
-    if plan:
-        print("")
-        print(f"Suggested workflow: {plan.get('title')}")
-        summary = plan.get("summary")
-        if summary:
-            print(f"  {summary}")
-        memory_prompt = plan.get("memory_prompt")
-        if memory_prompt:
-            print(f"  Memory review: {memory_prompt}")
-        for index, step in enumerate(steps[:6], start=1):
-            print(f"  {index}. {step}")
-        if batch:
-            print("  Batch:")
-            for item in batch[:5]:
-                subject = item.get("raw") or item.get("page") or ""
-                target_page = item.get("target_source_page") or item.get("suggested_source_page") or item.get("error") or ""
-                print(f"  - {subject} -> {target_page}")
-        if post_checks:
-            print("  Post-ingest checks:")
-            for check in post_checks[:6]:
-                print(f"  - {check}")
-
-    completion = status.get("completion") if isinstance(status.get("completion"), dict) else {}
-    completion_items = completion.get("items") if isinstance(completion.get("items"), list) else []
-    if completion_items:
-        print("")
-        print(f"Ingest completion: {completion.get('summary')}")
-        for item in completion_items[:8]:
-            pages = item.get("source_pages") if isinstance(item.get("source_pages"), list) else []
-            page_labels = []
-            for page in pages:
-                if isinstance(page, dict):
-                    label = page.get("path") or page.get("name")
-                    if label:
-                        page_labels.append(str(label))
-            target_pages = ", ".join(page_labels) if page_labels else "source page missing"
-            print(f"  - {item.get('raw')} -> {target_pages}")
-            memory_prompt = item.get("memory_prompt")
-            if memory_prompt:
-                print(f"    Memory review: {memory_prompt}")
-            query_prompt = item.get("query_prompt")
-            if query_prompt:
-                print(f"    Retrieval check: {query_prompt}")
-        if completion.get("has_more"):
-            represented_count = int(completion.get("represented_count") or 0)
-            shown_count = int(completion.get("shown_count") or 0)
-            print(f"  ... {represented_count - shown_count} more represented raw source(s)")
-        next_prompt = completion.get("next_prompt")
-        if next_prompt:
-            print(f"  Next check: {next_prompt}")
-
-    return 0
+    print(_core_render_ingest_status_text(str(target), status))
+    return 0 if status["has_raw_dir"] and status["has_wiki_dir"] else 1
 
 
 def rebuild_backlinks(target: Path) -> int:
