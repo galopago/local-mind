@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from .memory import memory_records
+from .operations import pending_operations
 from .schema import schema_status
 from .validation import validate_wiki
 from .wiki import build_wiki_cache, close_wiki_cache
@@ -52,6 +53,46 @@ def link_status(
     warnings: list[dict[str, str]] = []
     search_backend = "unavailable"
     if wiki_dir.exists():
+        stale_operations: list[Mapping[str, object]] = []
+        fresh_operations: list[Mapping[str, object]] = []
+        try:
+            for operation in pending_operations(wiki_dir):
+                if operation.get("stale"):
+                    stale_operations.append(operation)
+                else:
+                    fresh_operations.append(operation)
+            if stale_operations:
+                warnings.append({
+                    "code": "stale_operations",
+                    "message": f"{len(stale_operations)} incomplete Link operation(s) need review.",
+                    "detail": str([
+                        {
+                            "operation": item.get("operation"),
+                            "description": item.get("description"),
+                            "marker": item.get("marker"),
+                        }
+                        for item in stale_operations[:5]
+                    ]),
+                })
+            elif fresh_operations:
+                warnings.append({
+                    "code": "pending_operations",
+                    "message": f"{len(fresh_operations)} Link operation(s) are currently in progress.",
+                    "detail": str([
+                        {
+                            "operation": item.get("operation"),
+                            "description": item.get("description"),
+                            "marker": item.get("marker"),
+                        }
+                        for item in fresh_operations[:5]
+                    ]),
+                })
+        except Exception as exc:
+            warnings.append(_warning(
+                "operation_journal_unavailable",
+                "Could not inspect Link operation markers.",
+                exc,
+            ))
         wiki_cache: Mapping[str, Any] | None = None
         owns_cache = False
         try:
@@ -127,9 +168,10 @@ def link_status(
         if str(page.get("path") or "") not in {"wiki/index.md", "wiki/log.md"}
     )
     cache_degraded = any(warning.get("code") in {"cache_unavailable", "cache_read_warnings"} for warning in warnings)
+    stale_operation_degraded = any(warning.get("code") == "stale_operations" for warning in warnings)
     ready = not missing and bool(pages) and not cache_degraded and (
         not include_validation or bool(validation_summary.get("passed"))
-    )
+    ) and not stale_operation_degraded
     schema = schema_status(wiki_dir)
 
     next_actions: list[dict[str, object]] = []
@@ -148,6 +190,9 @@ def link_status(
         if error_codes - {"stale_backlinks", "invalid_backlinks"}:
             next_actions.append(_action("repair validation findings", "doctor", {"fix": True}))
         next_actions.append(_action("rerun validation gate", "validate_wiki"))
+    if stale_operation_degraded:
+        next_actions.append(_action("inspect interrupted Link operation markers", "doctor"))
+        next_actions.append(_action("validate wiki after interrupted operation", "validate_wiki"))
     if ready and content_page_count:
         next_actions.append(_action("answer with compact local context", "query_link", {"query": "<user task>"}))
         next_actions.append(_action("prime agent memory before work", "memory_brief", {"query": "<user task>"}))

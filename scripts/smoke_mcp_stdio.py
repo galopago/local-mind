@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
 EXPECTED_TOOLS = {
     "link_status",
     "starter_prompts",
@@ -52,10 +54,17 @@ async def _run_smoke(wiki_dir: Path, python: str) -> None:
     from mcp import ClientSession
     from mcp.client.stdio import StdioServerParameters, stdio_client
 
+    env = os.environ.copy()
+    local_package = str(ROOT / "mcp_package")
+    env["PYTHONPATH"] = (
+        local_package
+        if not env.get("PYTHONPATH")
+        else local_package + os.pathsep + str(env["PYTHONPATH"])
+    )
     server = StdioServerParameters(
         command=python,
         args=["-m", "link_mcp", "--wiki", str(wiki_dir)],
-        env=os.environ.copy(),
+        env=env,
     )
     async with stdio_client(server) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as session:

@@ -31,6 +31,7 @@ from link_core.memory import (  # noqa: E402
     update_memory_page,
     write_memory_page,
 )
+from link_core.operations import pending_operations  # noqa: E402
 
 
 class MemoryCoreTests(unittest.TestCase):
@@ -823,6 +824,7 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertNotIn("[[prefer-focused-commits]]", (wiki / "index.md").read_text(encoding="utf-8"))
         self.assertEqual(logged[-1][1], "forget-memory")
         self.assertNotIn("User prefers focused commits", "\n".join(logged[-1][3]))
+        self.assertEqual(pending_operations(wiki), [])
 
     def test_write_memory_page_creates_index_log_and_blocks_duplicates(self):
         root = Path(tempfile.mkdtemp(prefix="link-memory-write-"))
@@ -862,6 +864,7 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertIn("[[prefer-release-branches]]", index_text)
         self.assertEqual(logged[-1][1], "remember")
         self.assertIn("Created: memories/prefer-release-branches.md", logged[-1][3])
+        self.assertEqual(pending_operations(wiki), [])
 
         duplicate = write_memory_page(
             wiki,

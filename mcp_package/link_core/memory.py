@@ -19,6 +19,7 @@ from .frontmatter import (
     update_frontmatter_fields,
     yaml_list,
 )
+from .operations import operation_journal
 from .wiki import (
     WIKILINK_RE,
     build_backlinks,
@@ -817,17 +818,24 @@ def set_memory_status(
 
     changed = current_status != status
     if changed:
-        text = page_path.read_text(encoding="utf-8", errors="replace")
-        atomic_write_text(page_path, update_frontmatter_fields(text, updates, remove=remove))
-        if log_writer:
-            log_lines = [
-                f"Updated: memories/{page_path.name}",
-                f"Previous status: {current_status}",
-                f"New status: {status}",
-            ]
-            if clean_reason:
-                log_lines.append(f"Reason: {clean_reason}")
-            log_writer(timestamp, operation, str(record["title"]), log_lines)
+        with operation_journal(
+            wiki_dir,
+            operation,
+            str(record["title"]),
+            timestamp=timestamp,
+            paths=[f"wiki/memories/{page_path.name}", "wiki/log.md"],
+        ):
+            text = page_path.read_text(encoding="utf-8", errors="replace")
+            atomic_write_text(page_path, update_frontmatter_fields(text, updates, remove=remove))
+            if log_writer:
+                log_lines = [
+                    f"Updated: memories/{page_path.name}",
+                    f"Previous status: {current_status}",
+                    f"New status: {status}",
+                ]
+                if clean_reason:
+                    log_lines.append(f"Reason: {clean_reason}")
+                log_writer(timestamp, operation, str(record["title"]), log_lines)
 
     return {
         "updated": changed,
@@ -869,25 +877,32 @@ def forget_memory_page(
     if not confirm:
         return payload
 
-    page_path.unlink()
-    index_updated = remove_memory_from_index(wiki_dir / "index.md", page_path.stem)
-    backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+    with operation_journal(
+        wiki_dir,
+        "forget-memory",
+        str(record["title"]),
+        timestamp=timestamp,
+        paths=[f"wiki/memories/{page_path.name}", "wiki/index.md", "wiki/_backlinks.json", "wiki/log.md"],
+    ):
+        page_path.unlink()
+        index_updated = remove_memory_from_index(wiki_dir / "index.md", page_path.stem)
+        backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+        if log_writer:
+            log_writer(
+                timestamp,
+                "forget-memory",
+                f"Forgot memory {payload['path']}",
+                [
+                    f"Title: {payload['title']}",
+                    "Deleted memory page only; memory body was not logged.",
+                ],
+            )
     payload.update({
         "forgotten": True,
         "confirmation_required": False,
         "index_updated": index_updated,
         "backlinks_rebuilt": bool(backlinks_rebuilt),
     })
-    if log_writer:
-        log_writer(
-            timestamp,
-            "forget-memory",
-            f"Forgot memory {payload['path']}",
-            [
-                f"Title: {payload['title']}",
-                "Deleted memory page only; memory body was not logged.",
-            ],
-        )
     return payload
 
 
@@ -915,17 +930,24 @@ def mark_memory_reviewed(
         updates["review_note"] = f'"{frontmatter_string(clean_note)}"'
     changed = previous_review_status != "reviewed" or bool(clean_note)
     if changed:
-        text = page_path.read_text(encoding="utf-8", errors="replace")
-        atomic_write_text(page_path, update_frontmatter_fields(text, updates))
-        if log_writer:
-            log_lines = [
-                f"Reviewed: memories/{page_path.name}",
-                f"Previous review status: {previous_review_status}",
-                "New review status: reviewed",
-            ]
-            if clean_note:
-                log_lines.append(f"Note: {clean_note}")
-            log_writer(timestamp, "review-memory", str(record["title"]), log_lines)
+        with operation_journal(
+            wiki_dir,
+            "review-memory",
+            str(record["title"]),
+            timestamp=timestamp,
+            paths=[f"wiki/memories/{page_path.name}", "wiki/log.md"],
+        ):
+            text = page_path.read_text(encoding="utf-8", errors="replace")
+            atomic_write_text(page_path, update_frontmatter_fields(text, updates))
+            if log_writer:
+                log_lines = [
+                    f"Reviewed: memories/{page_path.name}",
+                    f"Previous review status: {previous_review_status}",
+                    "New review status: reviewed",
+                ]
+                if clean_note:
+                    log_lines.append(f"Note: {clean_note}")
+                log_writer(timestamp, "review-memory", str(record["title"]), log_lines)
 
     _, updated_record, _ = resolve_memory_page(wiki_dir, str(record["name"]))
     updated_record = updated_record or record
@@ -1000,21 +1022,28 @@ def update_memory_page(
         "review_status": "pending",
     }
     updated_text = update_frontmatter_fields(original, updates, remove={"reviewed_at", "review_note"})
-    atomic_write_text(page_path, replace_markdown_body(updated_text, updated_body))
-    if log_writer:
-        log_writer(
-            timestamp,
-            "update-memory",
-            str(record["title"]),
-            [
-                f"Updated: memories/{page_path.name}",
-                f"Previous review status: {previous_review_status}",
-                "New review status: pending",
-                f"Update count: {next_update_count}",
-                f"Source: {clean_source}",
-            ],
-        )
-    backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+    with operation_journal(
+        wiki_dir,
+        "update-memory",
+        str(record["title"]),
+        timestamp=timestamp,
+        paths=[f"wiki/memories/{page_path.name}", "wiki/_backlinks.json", "wiki/log.md"],
+    ):
+        atomic_write_text(page_path, replace_markdown_body(updated_text, updated_body))
+        if log_writer:
+            log_writer(
+                timestamp,
+                "update-memory",
+                str(record["title"]),
+                [
+                    f"Updated: memories/{page_path.name}",
+                    f"Previous review status: {previous_review_status}",
+                    "New review status: pending",
+                    f"Update count: {next_update_count}",
+                    f"Source: {clean_source}",
+                ],
+            )
+        backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
 
     _, updated_record, _ = resolve_memory_page(wiki_dir, str(record["name"]))
     updated_record = updated_record or record
@@ -1148,20 +1177,27 @@ tags: {yaml_list(tag_values)}
 
 {clean_source}
 """
-    atomic_write_text(page_path, page)
-    update_memory_index(wiki_dir / "index.md", page_name, memory_title_value, summary, memory_type, scope)
-    if log_writer:
-        log_writer(
-            timestamp,
-            "remember",
-            memory_title_value,
-            [
-                f"Created: memories/{page_path.name}",
-                f"Type: {memory_type}",
-                f"Scope: {scope}",
-            ],
-        )
-    backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+    with operation_journal(
+        wiki_dir,
+        "remember",
+        memory_title_value,
+        timestamp=timestamp,
+        paths=[f"wiki/memories/{page_path.name}", "wiki/index.md", "wiki/_backlinks.json", "wiki/log.md"],
+    ):
+        atomic_write_text(page_path, page)
+        update_memory_index(wiki_dir / "index.md", page_name, memory_title_value, summary, memory_type, scope)
+        if log_writer:
+            log_writer(
+                timestamp,
+                "remember",
+                memory_title_value,
+                [
+                    f"Created: memories/{page_path.name}",
+                    f"Type: {memory_type}",
+                    f"Scope: {scope}",
+                ],
+            )
+        backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
     return {
         "created": True,
         "name": page_name,

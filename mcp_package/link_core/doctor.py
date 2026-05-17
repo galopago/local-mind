@@ -12,6 +12,7 @@ from .frontmatter import parse_frontmatter
 from .ingest import collect_ingest_status, raw_ingest_findings
 from .log import write_default_log
 from .memory import memory_inbox, memory_records
+from .operations import pending_operations
 from .schema import migrate_wiki
 from .schema import schema_status
 from .security import find_sensitive_filenames, find_sensitive_values
@@ -437,6 +438,24 @@ def build_doctor_report(
             report.add_error(str(schema["error"]))
         else:
             report.add_error(str(schema["error"] or "invalid wiki schema marker"))
+
+        operations = pending_operations(wiki_dir)
+        stale_operations = [item for item in operations if item.get("stale")]
+        active_operations = [item for item in operations if not item.get("stale")]
+        if stale_operations:
+            details = [
+                f"{item.get('operation')} ({item.get('marker')})"
+                for item in stale_operations[:8]
+            ]
+            report.add_error("incomplete Link operations need review: " + ", ".join(details))
+        elif active_operations:
+            details = [
+                f"{item.get('operation')} ({item.get('marker')})"
+                for item in active_operations[:8]
+            ]
+            report.add_warning("Link operation in progress: " + ", ".join(details))
+        else:
+            report.add_ok("OK no interrupted Link operations")
 
         missing_summaries = find_pages_missing_summaries(wiki_dir)
         if missing_summaries:

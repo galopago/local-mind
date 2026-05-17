@@ -27,6 +27,7 @@ from link_core.doctor import (  # noqa: E402
     raw_source_refs,
     source_section_links,
 )
+from link_core.operations import begin_operation  # noqa: E402
 
 
 class DoctorCoreTests(unittest.TestCase):
@@ -113,7 +114,18 @@ class DoctorCoreTests(unittest.TestCase):
         self.assertTrue(report.healthy)
         self.assertIn("OK required wiki structure", report.ok)
         self.assertIn("OK backlinks are current", report.ok)
+        self.assertIn("OK no interrupted Link operations", report.ok)
         self.assertIn("OK no sensitive-looking filenames", report.ok)
+
+    def test_build_doctor_report_fails_on_stale_operation_marker(self):
+        root = Path(tempfile.mkdtemp(prefix="link-doctor-report-"))
+        apply_doctor_fixes(root)
+        begin_operation(root / "wiki", "remember", "Saved memory", timestamp="2000-01-01T00:00:00Z")
+
+        report = build_doctor_report(root)
+
+        self.assertFalse(report.healthy)
+        self.assertTrue(any("incomplete Link operations need review" in error for error in report.errors))
 
     def test_page_health_helpers_find_doctor_findings(self):
         root = Path(tempfile.mkdtemp(prefix="link-doctor-core-"))
