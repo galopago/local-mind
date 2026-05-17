@@ -154,6 +154,8 @@ from link_core.capture import (
     capture_review_summary as _core_capture_review_summary,
     capture_title as _core_capture_title,
     cli_capture_commands as _core_cli_capture_commands,
+    render_accept_capture_text as _core_render_accept_capture_text,
+    render_capture_inbox_text as _core_render_capture_inbox_text,
     resolve_capture_file as _core_resolve_capture_file,
 )
 from link_core.files import (
@@ -1499,43 +1501,11 @@ def capture_inbox(
         project=project,
         commands_for=_core_cli_capture_commands,
     )
-    project_name = str(payload["project"])
-    captures = payload["captures"]
-    warning_count = int(payload["warning_count"])
-    read_warning_count = int(payload.get("read_warning_count") or 0)
-    read_warnings = payload.get("read_warnings") if isinstance(payload.get("read_warnings"), list) else []
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
 
-    print("Raw capture inbox")
-    if project_name:
-        print(f"Project: {project_name}")
-    print(
-        f"{len(captures)} readable capture{'s' if len(captures) != 1 else ''} · "
-        f"{warning_count} with secret-looking warnings · {read_warning_count} read warnings"
-    )
-    if read_warnings:
-        print("")
-        print("Capture read warnings:")
-        for warning in read_warnings[:20]:
-            print(f"   {warning.get('capture')}: {warning.get('error')}")
-    if not captures:
-        print("")
-        print("No readable saved raw captures.")
-        return 0
-    for index, capture in enumerate(captures, start=1):
-        print("")
-        print(f"{index}. {capture['title']}")
-        print(f"   Path: {capture['path']}")
-        if capture["project"]:
-            print(f"   Project: {capture['project']}")
-        if capture["secret_warnings"]:
-            print("   Secret-looking values: " + ", ".join(capture["secret_warnings"]))
-        print(f"   Accept: {capture['commands']['accept']}")
-        if capture["secret_warnings"]:
-            print(f"   Redact: {capture['commands']['redact']}")
-        print(f"   Delete: {capture['commands']['delete']}")
+    print(_core_render_capture_inbox_text(payload))
     return 0
 
 
@@ -1637,28 +1607,9 @@ def accept_capture(
         print(json.dumps(payload, indent=2))
         return 0 if payload["accepted"] else 1
 
-    if not payload["accepted"]:
-        duplicate_candidates = result.get("duplicate_candidates") or result.get("candidates")
-        if duplicate_candidates:
-            first = duplicate_candidates[0]
-            print(f"Duplicate candidate: {first['title']} ({first['path']})")
-        elif result.get("conflict_candidates"):
-            first = result["conflict_candidates"][0]
-            print(f"Conflict candidate: {first['title']} ({first['path']})")
-        else:
-            print("Capture proposal was not accepted.")
-        return 1
-
-    print("Capture proposal accepted")
-    print(f"Capture: {rel_path}")
-    print(f"Proposal: {index}")
-    print(f"Memory: {result['path']}")
-    if result.get("project"):
-        print(f"Project: {result['project']}")
-    print("")
-    print("Next:")
-    print(f"  python3 link.py review-memory \"{result['name']}\" .")
-    return 0
+    code, text = _core_render_accept_capture_text(payload)
+    print(text)
+    return code
 
 
 def redact_capture(

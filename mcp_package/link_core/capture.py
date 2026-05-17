@@ -185,6 +185,76 @@ def capture_inbox(
     }
 
 
+def render_capture_inbox_text(payload: dict[str, object]) -> str:
+    """Render human-readable raw capture inbox output."""
+    project_name = str(payload.get("project") or "")
+    captures = payload.get("captures") if isinstance(payload.get("captures"), list) else []
+    warning_count = int(payload.get("warning_count") or 0)
+    read_warning_count = int(payload.get("read_warning_count") or 0)
+    read_warnings = payload.get("read_warnings") if isinstance(payload.get("read_warnings"), list) else []
+
+    lines = ["Raw capture inbox"]
+    if project_name:
+        lines.append(f"Project: {project_name}")
+    lines.append(
+        f"{len(captures)} readable capture{'s' if len(captures) != 1 else ''} · "
+        f"{warning_count} with secret-looking warnings · {read_warning_count} read warnings"
+    )
+    if read_warnings:
+        lines.extend(["", "Capture read warnings:"])
+        for warning in read_warnings[:20]:
+            if isinstance(warning, dict):
+                lines.append(f"   {warning.get('capture')}: {warning.get('error')}")
+    if not captures:
+        lines.extend(["", "No readable saved raw captures."])
+        return "\n".join(lines)
+    for index, capture in enumerate(captures, start=1):
+        if not isinstance(capture, dict):
+            continue
+        commands = capture.get("commands") if isinstance(capture.get("commands"), dict) else {}
+        secret_warnings = capture.get("secret_warnings") if isinstance(capture.get("secret_warnings"), list) else []
+        lines.extend(["", f"{index}. {capture.get('title')}"])
+        lines.append(f"   Path: {capture.get('path')}")
+        if capture.get("project"):
+            lines.append(f"   Project: {capture.get('project')}")
+        if secret_warnings:
+            lines.append("   Secret-looking values: " + ", ".join(str(label) for label in secret_warnings))
+        lines.append(f"   Accept: {commands.get('accept')}")
+        if secret_warnings:
+            lines.append(f"   Redact: {commands.get('redact')}")
+        lines.append(f"   Delete: {commands.get('delete')}")
+    return "\n".join(lines)
+
+
+def render_accept_capture_text(payload: dict[str, object]) -> tuple[int, str]:
+    """Render accept-capture text and return the corresponding exit code."""
+    if not payload.get("accepted"):
+        result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+        duplicate_candidates = result.get("duplicate_candidates") or result.get("candidates")
+        if isinstance(duplicate_candidates, list) and duplicate_candidates:
+            first = duplicate_candidates[0]
+            if isinstance(first, dict):
+                return 1, f"Duplicate candidate: {first.get('title')} ({first.get('path')})"
+        conflict_candidates = result.get("conflict_candidates")
+        if isinstance(conflict_candidates, list) and conflict_candidates:
+            first = conflict_candidates[0]
+            if isinstance(first, dict):
+                return 1, f"Conflict candidate: {first.get('title')} ({first.get('path')})"
+        return 1, "Capture proposal was not accepted."
+
+    result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+    lines = [
+        "Capture proposal accepted",
+        f"Capture: {payload.get('capture')}",
+        f"Proposal: {payload.get('proposal_index')}",
+        f"Memory: {result.get('path')}",
+    ]
+    if result.get("project"):
+        lines.append(f"Project: {result.get('project')}")
+    lines.extend(["", "Next:", f"  python3 link.py review-memory \"{result.get('name')}\" ."])
+    return 0, "\n".join(lines)
+
+
 def capture_review_summary(
     root: Path,
     limit: int = 3,

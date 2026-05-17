@@ -11,6 +11,8 @@ from mcp_package.link_core.capture import (
     capture_review_summary,
     capture_title,
     mcp_capture_commands,
+    render_accept_capture_text,
+    render_capture_inbox_text,
     resolve_capture_file,
 )
 
@@ -173,6 +175,68 @@ class CaptureCoreTests(unittest.TestCase):
         )
         self.assertEqual(summary["count"], 1)
         self.assertEqual(summary["read_warning_count"], 1)
+
+    def test_render_capture_inbox_text_lists_actions_and_warnings(self):
+        payload = {
+            "project": "alpha",
+            "warning_count": 1,
+            "read_warning_count": 1,
+            "read_warnings": [{"capture": "raw/memory-captures/locked.md", "error": "permission denied"}],
+            "captures": [
+                {
+                    "title": "Alpha capture",
+                    "path": "raw/memory-captures/alpha.md",
+                    "project": "alpha",
+                    "secret_warnings": ["OpenAI API key"],
+                    "commands": {
+                        "accept": "python3 link.py accept-capture alpha . --index 1",
+                        "redact": "python3 link.py redact-capture alpha .",
+                        "delete": "python3 link.py delete-capture alpha . --confirm",
+                    },
+                }
+            ],
+        }
+
+        text = render_capture_inbox_text(payload)
+
+        self.assertIn("Raw capture inbox", text)
+        self.assertIn("Project: alpha", text)
+        self.assertIn("1 readable capture · 1 with secret-looking warnings · 1 read warnings", text)
+        self.assertIn("raw/memory-captures/locked.md: permission denied", text)
+        self.assertIn("1. Alpha capture", text)
+        self.assertIn("Secret-looking values: OpenAI API key", text)
+        self.assertIn("Accept: python3 link.py accept-capture", text)
+        self.assertIn("Redact: python3 link.py redact-capture", text)
+
+    def test_render_accept_capture_text_reports_success_and_rejection(self):
+        code, text = render_accept_capture_text({
+            "accepted": True,
+            "capture": "raw/memory-captures/alpha.md",
+            "proposal_index": 1,
+            "result": {
+                "path": "wiki/memories/prefer-local-memory.md",
+                "name": "prefer-local-memory",
+                "project": "link",
+            },
+        })
+
+        self.assertEqual(code, 0)
+        self.assertIn("Capture proposal accepted", text)
+        self.assertIn("Memory: wiki/memories/prefer-local-memory.md", text)
+        self.assertIn('python3 link.py review-memory "prefer-local-memory" .', text)
+
+        code, text = render_accept_capture_text({
+            "accepted": False,
+            "result": {
+                "duplicate_candidates": [{
+                    "title": "Prefer local memory",
+                    "path": "wiki/memories/prefer-local-memory.md",
+                }]
+            },
+        })
+
+        self.assertEqual(code, 1)
+        self.assertIn("Duplicate candidate: Prefer local memory", text)
 
 
 if __name__ == "__main__":
