@@ -94,6 +94,8 @@ from link_core.web_graph import (
     graph_initial_payload as _core_graph_initial_payload,
     graph_legend_items as _core_graph_legend_items,
     graph_needs_bounded_overview as _core_graph_needs_bounded_overview,
+    render_graph_empty_body as _core_render_graph_empty_body,
+    render_graph_page_body as _core_render_graph_page_body,
 )
 from link_core.web_home import (
     plural_type_label as _core_plural_type_label,
@@ -1062,14 +1064,7 @@ def _render_graph():
     edges_json = _json_for_script(visible_edges)
 
     if node_count == 0:
-        body = (
-            f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
-            f'<h1>Knowledge Graph</h1>'
-            f'<div class="graph-empty">'
-            f'<strong>No graph pages yet.</strong><br>'
-            f'Add sources to <code>raw/</code>, ingest them, then rebuild backlinks.'
-            f'</div>'
-        )
+        body = _core_render_graph_empty_body()
         return _layout("Knowledge Graph", body)
 
     cat_colors = _core_graph_category_colors
@@ -1987,52 +1982,16 @@ def _render_graph():
 }})();
 </script>"""
 
-    legend_items = _core_graph_legend_items(cat_colors)
-    load_full_button = ""
-    if graph_mode != "full":
-        load_full_button = (
-            f'<button id="graph-load-full" type="button">'
-            f'Load graph data ({total_node_count} nodes)</button>'
-        )
-
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
-        f'<h1>Knowledge Graph</h1>'
-        f'<p class="meta">For large wikis, use fullscreen, zoom, pan, and sparse labels. '
-        f'The graph is for exploring neighborhoods, not reading every label at once.'
-        f'{html.escape(graph_note)}</p>'
-        f'<section id="graph-frame" class="graph-frame">'
-        f'<div class="graph-toolbar" aria-label="Graph controls">'
-        f'<button id="graph-reset" type="button">Reset</button>'
-        f'<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
-        f'<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
-        f'<button id="graph-fullscreen" type="button" aria-pressed="false">Fullscreen</button>'
-        f'{load_full_button}'
-        f'<label class="graph-control">Find'
-        f'<input id="graph-search" type="search" placeholder="node title"></label>'
-        f'<label class="graph-control">Type'
-        f'<select id="graph-category">{category_options}</select></label>'
-        f'<label class="graph-control">Neighborhood'
-        f'<select id="graph-depth"><option value="all">all</option><option value="1">1 hop</option>'
-        f'<option value="2">2 hops</option><option value="3">3 hops</option></select></label>'
-        f'<span id="graph-status" class="graph-status" aria-live="polite">'
-        f'{node_count}/{total_node_count} nodes · {edge_count}/{total_edge_count} edges</span>'
-        f'</div>'
-        f'<div class="graph-shell">'
-        f'<canvas id="graph-canvas" tabindex="0" role="img" '
-        f'aria-label="Knowledge graph with {node_count} nodes and {edge_count} edges"></canvas>'
-        f'<aside id="graph-inspector" class="graph-inspector" aria-live="polite">'
-        f'<strong id="graph-inspector-title">Select a node</strong>'
-        f'<p id="graph-inspector-meta">Click a node to inspect it. Drag a node to place it. '
-        f'Double-click a node, or use Open page, to navigate.</p>'
-        f'<div id="graph-inspector-links" class="graph-inspector-links"></div>'
-        f'<button id="graph-focus" type="button" disabled>Focus neighborhood</button>'
-        f'<button id="graph-open" type="button" disabled>Open page</button>'
-        f'</aside>'
-        f'</div>'
-        f'<div class="graph-legend">{legend_items}</div>'
-        f'</section>'
-        f'{graph_js}'
+    body = _core_render_graph_page_body(
+        graph_js=graph_js,
+        node_count=node_count,
+        edge_count=edge_count,
+        total_node_count=total_node_count,
+        total_edge_count=total_edge_count,
+        graph_mode=graph_mode,
+        graph_note=graph_note,
+        category_options=category_options,
+        legend_items=_core_graph_legend_items(cat_colors),
     )
     return _layout("Knowledge Graph", body, page_class="graph-page")
 

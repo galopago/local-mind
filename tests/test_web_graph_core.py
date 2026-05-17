@@ -12,6 +12,8 @@ from link_core.web_graph import (  # noqa: E402
     graph_initial_payload,
     graph_legend_items,
     graph_needs_bounded_overview,
+    render_graph_empty_body,
+    render_graph_page_body,
 )
 
 
@@ -71,6 +73,58 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertNotIn(">root<", options)
         self.assertIn("&lt;bad&gt;", legend)
         self.assertIn("&quot;red&quot;", legend)
+
+    def test_render_graph_empty_body(self):
+        html = render_graph_empty_body()
+
+        self.assertIn("Knowledge Graph", html)
+        self.assertIn("No graph pages yet.", html)
+        self.assertNotIn('id="graph-canvas"', html)
+
+    def test_render_graph_page_body_includes_controls_and_escapes_note(self):
+        html = render_graph_page_body(
+            graph_js="<script>var resetButton = true;</script>",
+            node_count=3,
+            edge_count=2,
+            total_node_count=10,
+            total_edge_count=20,
+            graph_mode="summary",
+            graph_note=' <fast & "bounded">',
+            category_options='<option value="concepts">concepts</option>',
+            legend_items="<span></span>concepts",
+        )
+
+        self.assertIn('id="graph-reset"', html)
+        self.assertIn('id="graph-labels"', html)
+        self.assertIn('id="graph-motion"', html)
+        self.assertIn('id="graph-fullscreen"', html)
+        self.assertIn("Load graph data (10 nodes)", html)
+        self.assertIn('id="graph-search"', html)
+        self.assertIn('id="graph-category"', html)
+        self.assertIn('<option value="concepts">concepts</option>', html)
+        self.assertIn('id="graph-depth"', html)
+        self.assertIn('id="graph-status"', html)
+        self.assertIn("3/10 nodes · 2/20 edges", html)
+        self.assertIn('role="img"', html)
+        self.assertIn("Focus neighborhood", html)
+        self.assertIn("Open page", html)
+        self.assertIn("&lt;fast &amp; &quot;bounded&quot;&gt;", html)
+        self.assertIn("<script>var resetButton = true;</script>", html)
+
+    def test_render_graph_page_body_omits_load_button_for_full_graph(self):
+        html = render_graph_page_body(
+            graph_js="<script></script>",
+            node_count=3,
+            edge_count=2,
+            total_node_count=3,
+            total_edge_count=2,
+            graph_mode="full",
+            graph_note="",
+            category_options="",
+            legend_items="",
+        )
+
+        self.assertNotIn("Load graph data", html)
 
 
 if __name__ == "__main__":

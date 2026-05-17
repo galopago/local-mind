@@ -101,3 +101,76 @@ def graph_legend_items(colors: Mapping[str, str] = GRAPH_CATEGORY_COLORS) -> str
         for category, color in colors.items()
         if category != "root"
     )
+
+
+def render_graph_empty_body() -> str:
+    """Render the graph page empty state."""
+    return (
+        '<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
+        "<h1>Knowledge Graph</h1>"
+        '<div class="graph-empty">'
+        "<strong>No graph pages yet.</strong><br>"
+        "Add sources to <code>raw/</code>, ingest them, then rebuild backlinks."
+        "</div>"
+    )
+
+
+def render_graph_page_body(
+    *,
+    graph_js: str,
+    node_count: int,
+    edge_count: int,
+    total_node_count: int,
+    total_edge_count: int,
+    graph_mode: str,
+    graph_note: str,
+    category_options: str,
+    legend_items: str,
+) -> str:
+    """Render the graph page shell around the browser simulation script."""
+    load_full_button = ""
+    if graph_mode != "full":
+        load_full_button = (
+            '<button id="graph-load-full" type="button">'
+            f"Load graph data ({total_node_count} nodes)</button>"
+        )
+
+    return (
+        '<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
+        "<h1>Knowledge Graph</h1>"
+        '<p class="meta">For large wikis, use fullscreen, zoom, pan, and sparse labels. '
+        "The graph is for exploring neighborhoods, not reading every label at once."
+        f"{html.escape(graph_note)}</p>"
+        '<section id="graph-frame" class="graph-frame">'
+        '<div class="graph-toolbar" aria-label="Graph controls">'
+        '<button id="graph-reset" type="button">Reset</button>'
+        '<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
+        '<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
+        '<button id="graph-fullscreen" type="button" aria-pressed="false">Fullscreen</button>'
+        f"{load_full_button}"
+        '<label class="graph-control">Find'
+        '<input id="graph-search" type="search" placeholder="node title"></label>'
+        '<label class="graph-control">Type'
+        f'<select id="graph-category">{category_options}</select></label>'
+        '<label class="graph-control">Neighborhood'
+        '<select id="graph-depth"><option value="all">all</option><option value="1">1 hop</option>'
+        '<option value="2">2 hops</option><option value="3">3 hops</option></select></label>'
+        '<span id="graph-status" class="graph-status" aria-live="polite">'
+        f"{node_count}/{total_node_count} nodes · {edge_count}/{total_edge_count} edges</span>"
+        "</div>"
+        '<div class="graph-shell">'
+        '<canvas id="graph-canvas" tabindex="0" role="img" '
+        f'aria-label="Knowledge graph with {node_count} nodes and {edge_count} edges"></canvas>'
+        '<aside id="graph-inspector" class="graph-inspector" aria-live="polite">'
+        '<strong id="graph-inspector-title">Select a node</strong>'
+        '<p id="graph-inspector-meta">Click a node to inspect it. Drag a node to place it. '
+        "Double-click a node, or use Open page, to navigate.</p>"
+        '<div id="graph-inspector-links" class="graph-inspector-links"></div>'
+        '<button id="graph-focus" type="button" disabled>Focus neighborhood</button>'
+        '<button id="graph-open" type="button" disabled>Open page</button>'
+        "</aside>"
+        "</div>"
+        f'<div class="graph-legend">{legend_items}</div>'
+        "</section>"
+        f"{graph_js}"
+    )
