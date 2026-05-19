@@ -14,6 +14,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 - Makes Link easier to install and try as a real product: Homebrew tap support, GitHub Pages docs, cleaner README/product positioning, and visual walkthrough assets.
 - Tightens external-user workflows across CLI, MCP, and the local web UI so copied commands work from any terminal directory and agents get explicit Link targets.
+- Adds clearer local health and recovery surfaces with `/health`, `link operations`, interrupted-write inspection, and bounded log rotation.
 - Improves confidence after the refactor with full user-level acceptance coverage across demo, init, memory lifecycle, capture lifecycle, MCP stdio, HTTP APIs, graph, and large-wiki paths.
 - Keeps large local wikis interactive with bounded graph payloads, SQLite FTS search validation, large-wiki smoke coverage, and benchmark/readiness reporting.
 
@@ -23,10 +24,14 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added public Homebrew install instructions to README and the product docs.
 - Added GitHub Pages product documentation under `docs/`, including focused UI, MCP, CLI, API, security, and contribution pages.
 - Added product-facing demo visuals for UI, CLI, and MCP flows so new users can understand Link before installing it.
+- Added a local `/health` page for readiness, validation, interrupted operations, warnings, repair actions, and copyable repair commands.
+- Added `link operations`, `/api/operations`, and operation markers so interrupted or failed local writes can be inspected before manual cleanup.
+- Added bounded `wiki/log.md` rotation so active wikis do not accumulate an indefinitely growing operation log.
 - Added external-user acceptance coverage for CLI, MCP stdio, HTTP routes, web mutation APIs, graph rendering, and large-wiki behavior.
 
 ### Changed
 
+- Simplified the README architecture section and diagram so the source/wiki/memory/query model is easier to scan.
 - Updated generated CLI guidance in memory, capture, web, and MCP payloads to include explicit Link root targets instead of relying on `.`.
 - Updated capture inbox, memory inbox, profile, lifecycle, and proposal commands so users can paste commands from any working directory.
 - Updated local web audit and capture commands to point at the served Link root.
