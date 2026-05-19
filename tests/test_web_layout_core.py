@@ -14,6 +14,7 @@ class WebLayoutCoreTests(unittest.TestCase):
         html = render_header_html()
 
         self.assertIn('<a href="/ingest">ingest</a>', html)
+        self.assertIn('<a href="/health">health</a>', html)
         self.assertIn('<a href="/brief">brief</a>', html)
         self.assertIn('<a href="/propose">propose</a>', html)
         self.assertIn('<a href="/graph">graph</a>', html)

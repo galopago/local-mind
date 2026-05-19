@@ -67,6 +67,7 @@ def render_header_html() -> str:
   </div>
   <nav>
     <a href="/">home</a>
+    <a href="/health">health</a>
     <a href="/prompts">prompts</a>
     <a href="/ingest">ingest</a>
     <a href="/brief">brief</a>

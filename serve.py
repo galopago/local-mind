@@ -105,6 +105,9 @@ from link_core.web_home import (
     plural_type_label as _core_plural_type_label,
     render_home_page as _core_render_home_page,
 )
+from link_core.web_health import (
+    render_health_page as _core_render_health_page,
+)
 from link_core.web_ingest import (
     render_ingest_page as _core_render_ingest_page,
 )
@@ -143,6 +146,9 @@ from link_core.web_search import (
 )
 from link_core.status import (
     link_status as _core_link_status,
+)
+from link_core.operations import (
+    operation_report as _core_operation_report,
 )
 from link_core.capture import (
     capture_inbox as _core_capture_inbox,
@@ -1123,6 +1129,20 @@ def _link_status_payload(include_validation: bool = False) -> dict[str, object]:
     return payload
 
 
+def _operations_payload() -> dict[str, object]:
+    payload = _core_operation_report(WIKI_DIR)
+    payload["api_version"] = API_VERSION
+    return payload
+
+
+def _render_health():
+    return _core_render_health_page(
+        _link_status_payload(include_validation=True),
+        _operations_payload(),
+        layout=_layout,
+    )
+
+
 # ---------------------------------------------------------------------------
 # HTTP handler
 # ---------------------------------------------------------------------------
@@ -1274,6 +1294,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._err("file")
         elif path in ("/", ""):
             self._ok(_render_home())
+        elif path == "/health":
+            self._ok(_render_health())
         elif path == "/ingest":
             self._ok(_render_ingest())
         elif path == "/brief":
@@ -1339,6 +1361,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/status":
             include_validation = query.get("validate", ["false"])[0].lower() in {"1", "true", "yes"}
             self._json(_link_status_payload(include_validation=include_validation))
+        elif path == "/api/operations":
+            self._json(_operations_payload())
         elif path == "/api/prompts":
             self._json(_starter_prompts_payload(project=_query_text(query, "project", max_len=80)))
         elif path == "/api/ingest-status":
