@@ -180,6 +180,8 @@ def validate_local_browser_source_headers(
 
 def safe_resolve(path: Path) -> Path | None:
     """Resolve a path, returning None for malformed filesystem inputs."""
+    if "\0" in str(path):
+        return None
     try:
         return path.resolve()
     except (OSError, ValueError):

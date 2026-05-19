@@ -76,16 +76,23 @@ def mcp_config(python_cmd: str, wiki_dir: Path) -> dict[str, object]:
     }
 
 
+def expand_command_prefix(command: str) -> str:
+    """Expand a leading home shortcut without normalizing command path syntax."""
+    if command == "~" or command.startswith("~/") or command.startswith("~\\"):
+        return str(Path(command).expanduser())
+    return command
+
+
 def resolve_mcp_python(target: Path, wiki_dir: Path, python_cmd: str | None, *, default_python: str) -> str:
     if python_cmd:
-        return str(Path(python_cmd).expanduser())
+        return expand_command_prefix(python_cmd)
 
     root = wiki_dir.parent if wiki_dir.name == "wiki" else target
     marker = root / ".link-mcp-python"
     if marker.exists():
         configured = marker.read_text(encoding="utf-8", errors="replace").strip()
         if configured:
-            return str(Path(configured).expanduser())
+            return expand_command_prefix(configured)
 
     return default_python
 

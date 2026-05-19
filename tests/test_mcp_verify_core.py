@@ -6,6 +6,7 @@ from pathlib import Path
 from mcp_package.link_core.mcp_verify import (
     build_mcp_verify_status,
     display_command,
+    expand_command_prefix,
     mcp_verify_guidance,
     resolve_mcp_python,
     render_mcp_verify_text,
@@ -75,6 +76,11 @@ class McpVerifyCoreTests(unittest.TestCase):
         text = display_command(["/tmp/Link Python/bin/python", "-m", "pip"])
 
         self.assertIn("'/tmp/Link Python/bin/python'", text)
+
+    def test_expand_command_prefix_preserves_command_path_syntax(self):
+        self.assertEqual(expand_command_prefix("/tmp/python"), "/tmp/python")
+        self.assertEqual(expand_command_prefix("python"), "python")
+        self.assertIn("link-python", expand_command_prefix("~/link-python"))
 
     def test_resolve_mcp_python_uses_marker(self):
         root = Path(tempfile.mkdtemp(prefix="link-mcp-verify-"))
