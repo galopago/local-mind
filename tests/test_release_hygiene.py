@@ -132,14 +132,16 @@ class ReleaseHygieneTests(unittest.TestCase):
             },
         )
 
-        self.assertIn(f"agent contract missing 'link_status' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'starter_prompts' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'ingest_status' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'get_graph_summary' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'backup_wiki' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'validate_wiki' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'memory_brief' in {bad}", findings)
-        self.assertIn(f"agent contract file missing: {tmp / 'missing.md'}", findings)
+        bad_path = bad.as_posix()
+        missing_path = (tmp / "missing.md").as_posix()
+        self.assertIn(f"agent contract missing 'link_status' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'starter_prompts' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'ingest_status' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'get_graph_summary' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'backup_wiki' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'validate_wiki' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'memory_brief' in {bad_path}", findings)
+        self.assertIn(f"agent contract file missing: {missing_path}", findings)
 
     def test_tracked_path_hygiene_blocks_build_artifacts_and_secret_names(self):
         findings: list[str] = []

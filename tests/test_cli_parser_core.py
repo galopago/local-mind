@@ -52,7 +52,7 @@ class CliParserCoreTests(unittest.TestCase):
         code = dispatch_cli_command(args, {"query": query_handler})
 
         self.assertEqual(code, 7)
-        self.assertEqual(str(calls[0][0]), "/tmp/link")
+        self.assertEqual(calls[0][0], Path("/tmp/link"))
         self.assertEqual(calls[0][1], "agent memory")
         self.assertEqual(calls[0][2]["budget"], "small")
         self.assertTrue(calls[0][2]["json_output"])
@@ -83,7 +83,7 @@ class CliParserCoreTests(unittest.TestCase):
         code = dispatch_cli_command(args, {"accept-capture": accept_handler})
 
         self.assertEqual(code, 3)
-        self.assertEqual(str(calls[0][0]), "/tmp/link")
+        self.assertEqual(calls[0][0], Path("/tmp/link"))
         self.assertEqual(calls[0][1], "raw/memory-captures/session.md")
         self.assertEqual(calls[0][2]["index"], 2)
         self.assertEqual(calls[0][2]["memory_type"], "decision")

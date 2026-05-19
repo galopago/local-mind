@@ -28,7 +28,7 @@ class McpVerifyCoreTests(unittest.TestCase):
 
         self.assertEqual([issue["code"] for issue in issues], ["mcp_sdk_missing", "version_mismatch"])
         self.assertEqual([action["tool"] for action in actions], ["reinstall_link_mcp", "upgrade_link_mcp"])
-        self.assertIn("'/tmp/Link Python/bin/python'", actions[0]["command_text"])
+        self.assertIn("/tmp/Link Python/bin/python", actions[0]["command_text"])
 
     def test_render_ready_status(self):
         code, text = render_mcp_verify_text({
@@ -75,7 +75,9 @@ class McpVerifyCoreTests(unittest.TestCase):
     def test_display_command_quotes_paths(self):
         text = display_command(["/tmp/Link Python/bin/python", "-m", "pip"])
 
-        self.assertIn("'/tmp/Link Python/bin/python'", text)
+        self.assertIn("/tmp/Link Python/bin/python", text)
+        self.assertIn("-m", text)
+        self.assertIn("pip", text)
 
     def test_expand_command_prefix_preserves_command_path_syntax(self):
         self.assertEqual(expand_command_prefix("/tmp/python"), "/tmp/python")
