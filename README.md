@@ -56,6 +56,15 @@ link demo
 link serve link-demo
 ```
 
+Windows or source checkout:
+
+```powershell
+git clone https://github.com/gowtham0992/link.git
+cd link
+py link.py demo
+py link.py serve link-demo
+```
+
 Or from source:
 
 ```bash
@@ -141,6 +150,10 @@ bash integrations/antigravity/install.sh
 Installers create or update `~/link`, install or upgrade `link-mcp`, write
 lightweight agent instructions, and preserve existing wiki data on reinstall.
 Use `--project` when a repo needs separate project memory.
+
+The shell installers are intended for macOS/Linux-style agent config paths.
+On Windows, use the source commands above plus the MCP-only config below until
+your agent has a Windows-specific installer.
 
 Then ask your agent:
 

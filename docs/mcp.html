@@ -74,6 +74,9 @@ bash integrations/antigravity/install.sh</code></pre>
         <p>On macOS/Homebrew Python, if pip reports <code>externally-managed-environment</code>, use a dedicated venv:</p>
         <pre><code>python3 -m venv ~/.link-mcp-venv
 ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp</code></pre>
+        <p>On Windows, use a project or user venv and point your MCP client at that venv's Python:</p>
+        <pre><code>py -m venv .link-mcp-venv
+.\.link-mcp-venv\Scripts\python -m pip install --upgrade pip link-mcp</code></pre>
         <pre><code>{
   "mcpServers": {
     "link": {

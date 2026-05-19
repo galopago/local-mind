@@ -47,6 +47,13 @@ python3 -m venv ~/.link-mcp-venv
 ~/.link-mcp-venv/bin/python -m pip install --upgrade pip link-mcp
 ```
 
+On Windows, use a venv and configure your MCP client with that Python:
+
+```powershell
+py -m venv .link-mcp-venv
+.\.link-mcp-venv\Scripts\python -m pip install --upgrade pip link-mcp
+```
+
 Then add the server to your MCP client config. Use an absolute wiki path:
 
 ```json
