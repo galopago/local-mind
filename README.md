@@ -205,7 +205,7 @@ Link separates source-backed knowledge from durable agent memory:
 4. Queries retrieve compact MCP context from both the wiki and memory layer.
 
 <p align="center">
-  <img src="docs/assets/link-architecture.svg" alt="Link architecture: raw sources become wiki knowledge, explicit remembers become reviewed memory, and agents retrieve compact MCP context" width="820">
+  <img src="docs/assets/link-memory-flow.svg" alt="Link architecture: raw sources become wiki knowledge, explicit remembers become reviewed memory, and agents retrieve compact MCP context" width="820">
 </p>
 
 The storage model is plain and inspectable:
