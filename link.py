@@ -7,6 +7,7 @@ Usage:
   python link.py demo [target]
   python link.py prompts [target]
   python link.py status [target]
+  python link.py operations [target]
   python link.py backup [target]
   python link.py doctor [target]
   python link.py migrate [target]
@@ -197,6 +198,10 @@ from link_core.mcp_verify import (
     check_link_mcp_import as _core_check_link_mcp_import,
     display_command as _core_display_command,
     render_mcp_verify_text as _core_render_mcp_verify_text,
+)
+from link_core.operations import (
+    operation_report as _core_operation_report,
+    render_operations_text as _core_render_operations_text,
 )
 from link_core.schema import (
     migrate_wiki as _core_migrate_wiki,
@@ -593,6 +598,18 @@ def status(target: Path, include_validation: bool = False, json_output: bool = F
         return 0 if payload["ready"] else 1
 
     code, text = _core_render_status_text(payload, wiki_dir=wiki_dir, version=LINK_VERSION)
+    print(text)
+    return code
+
+
+def operations(target: Path, limit: int = 20, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    payload = _core_operation_report(wiki_dir, limit=limit)
+    code, text = _core_render_operations_text(payload)
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return code
     print(text)
     return code
 
@@ -1540,6 +1557,7 @@ def main(argv: list[str] | None = None) -> int:
             "demo": create_demo,
             "prompts": starter_prompts,
             "status": status,
+            "operations": operations,
             "backup": backup,
             "doctor": doctor,
             "migrate": migrate,

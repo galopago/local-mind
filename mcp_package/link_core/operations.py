@@ -138,3 +138,134 @@ def pending_operations(
         payload["stale"] = age_seconds is None or age_seconds >= stale_after_seconds or payload.get("status") == "failed"
         operations.append(payload)
     return operations
+
+
+def _format_age(age_seconds: object) -> str:
+    if not isinstance(age_seconds, (int, float)):
+        return "unknown age"
+    seconds = max(0, int(age_seconds))
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    if hours < 48:
+        return f"{hours}h"
+    return f"{hours // 24}d"
+
+
+def operation_report(
+    wiki_dir: Path,
+    *,
+    stale_after_seconds: int = DEFAULT_STALE_AFTER_SECONDS,
+    now: float | None = None,
+    limit: int = 20,
+) -> dict[str, object]:
+    """Return a user-facing summary of interrupted or active Link write operations."""
+    wiki_dir = wiki_dir.expanduser().resolve()
+    operations = pending_operations(
+        wiki_dir,
+        stale_after_seconds=stale_after_seconds,
+        now=now,
+        limit=limit,
+    )
+    stale_count = sum(1 for item in operations if item.get("stale"))
+    failed_count = sum(1 for item in operations if str(item.get("status") or "") == "failed")
+    active_count = len(operations) - stale_count
+    next_actions: list[dict[str, object]] = []
+    if stale_count:
+        next_actions.extend([
+            {
+                "label": "inspect operation marker files before deleting them",
+                "command": "link operations",
+            },
+            {
+                "label": "validate wiki structure after reviewing interrupted writes",
+                "command": "link validate",
+            },
+            {
+                "label": "repair generated indexes if validation reports stale graph data",
+                "command": "link doctor --fix",
+            },
+        ])
+    elif active_count:
+        next_actions.append({
+            "label": "wait for the active Link write to finish, then rerun this command",
+            "command": "link operations",
+        })
+    else:
+        next_actions.append({
+            "label": "continue using Link normally",
+            "command": "link status --validate",
+        })
+    return {
+        "wiki": str(wiki_dir),
+        "operation_count": len(operations),
+        "stale_count": stale_count,
+        "failed_count": failed_count,
+        "active_count": active_count,
+        "limit": limit,
+        "operations": operations,
+        "next_actions": next_actions,
+    }
+
+
+def render_operations_text(payload: dict[str, object]) -> tuple[int, str]:
+    """Render operation markers for the CLI."""
+    operations = [
+        item for item in payload.get("operations", [])
+        if isinstance(item, dict)
+    ]
+    stale_count = int(payload.get("stale_count") or 0)
+    lines = [f"Link operations: {payload.get('wiki')}", ""]
+    if not operations:
+        lines.append("No pending, failed, or interrupted Link operations.")
+    else:
+        count = len(operations)
+        lines.append(f"{count} operation marker{'s' if count != 1 else ''}:")
+        for item in operations:
+            operation = str(item.get("operation") or "unknown")
+            status = str(item.get("status") or "unknown")
+            marker = str(item.get("marker") or "unknown")
+            age = _format_age(item.get("age_seconds"))
+            state = "stale" if item.get("stale") else "active"
+            lines.append(f"- {operation} | {status} | {state} | {marker} | age {age}")
+            description = str(item.get("description") or "").strip()
+            if description:
+                lines.append(f"  Description: {description}")
+            started_at = str(item.get("started_at") or "").strip()
+            if started_at:
+                lines.append(f"  Started: {started_at}")
+            error = str(item.get("error") or "").strip()
+            if error:
+                lines.append(f"  Error: {error}")
+            paths = [
+                str(path)
+                for path in item.get("paths", [])
+                if isinstance(path, str) and path.strip()
+            ]
+            if paths:
+                lines.append(f"  Touched: {', '.join(paths[:8])}")
+            path = str(item.get("path") or "").strip()
+            if path:
+                lines.append(f"  Marker: {path}")
+    actions = [
+        item for item in payload.get("next_actions", [])
+        if isinstance(item, dict)
+    ]
+    if actions:
+        lines.append("")
+        lines.append("Next:")
+        for action in actions:
+            label = str(action.get("label") or "").strip()
+            command = str(action.get("command") or "").strip()
+            if label and command:
+                lines.append(f"- {label}: {command}")
+            elif label:
+                lines.append(f"- {label}")
+            elif command:
+                lines.append(f"- {command}")
+    lines.append("")
+    lines.append("Result: needs attention" if stale_count else "Result: clear")
+    return (1 if stale_count else 0), "\n".join(lines)

@@ -18,6 +18,8 @@ link_cli = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(link_cli)
 
+from link_core.operations import begin_operation  # noqa: E402
+
 
 def create_demo_quiet(target: Path, force: bool = False) -> None:
     with redirect_stdout(StringIO()):
@@ -504,6 +506,35 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["content_page_count"], 0)
         self.assertEqual(payload["next_actions"][0]["tool"], "ingest_status")
         self.assertEqual(payload["next_actions"][1]["tool"], "starter_prompts")
+
+    def test_operations_reports_interrupted_write_markers(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-operations-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        begin_operation(
+            target / "wiki",
+            "remember",
+            "Save memory",
+            timestamp="2026-05-17T00:00:00Z",
+            paths=["wiki/memories/prefer-local.md"],
+        )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.operations(target, limit=5)
+
+        self.assertEqual(code, 1)
+        self.assertIn("Link operations:", out.getvalue())
+        self.assertIn("remember | pending | stale", out.getvalue())
+        self.assertIn("link validate", out.getvalue())
+
+        json_out = StringIO()
+        with redirect_stdout(json_out):
+            json_code = link_cli.operations(target, limit=5, json_output=True)
+        payload = json.loads(json_out.getvalue())
+        self.assertEqual(json_code, 1)
+        self.assertEqual(payload["stale_count"], 1)
+        self.assertEqual(payload["operations"][0]["operation"], "remember")
 
     def test_status_prints_readiness_warnings(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))

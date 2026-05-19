@@ -39,6 +39,7 @@
         <a href="#ready">Is Link ready?</a>
         <a href="#mcp">MCP is not visible</a>
         <a href="#ingest">Ingest is blocked</a>
+        <a href="#operations">Interrupted writes</a>
         <a href="#graph">Graph is stale</a>
         <a href="#demo">Demo looks stale</a>
         <a href="#slow">The wiki feels slow</a>
@@ -59,6 +60,12 @@ python3 -m pip index versions link-mcp</code></pre>
         <h2 id="ingest">Ingest Is Blocked</h2>
         <pre><code>link ingest-status</code></pre>
         <p>Blocked ingest usually means a raw source has secret-looking values, cannot be read safely, or source representation counts may be incomplete. Redact or fix the local file, then ask the agent to ingest again.</p>
+
+        <h2 id="operations">Interrupted Writes</h2>
+        <pre><code>link operations
+link validate
+link doctor --fix</code></pre>
+        <p>If a memory write was interrupted, Link leaves a marker under <code>wiki/.link-operations/</code>. Inspect it before deleting anything manually, then validate the wiki and repair generated indexes if needed.</p>
 
         <h2 id="graph">Graph Is Stale</h2>
         <pre><code>link rebuild-index
