@@ -428,6 +428,7 @@ def _memory_inbox(limit: int = 20, include_archived: bool = False, project: str 
         include_archived=include_archived,
         review_command="review-memory",
         project=project,
+        command_target=WIKI_DIR.parent,
     )
 
 
@@ -486,6 +487,7 @@ def _memory_explanation(identifier: str) -> dict[str, object]:
         identifier,
         records=_memory_records(),
         review_command="review-memory",
+        command_target=WIKI_DIR.parent,
     )
 
 
@@ -621,7 +623,7 @@ def _capture_records(limit: int = 12, project: str | None = None) -> list[dict[s
         root,
         limit=limit,
         project=project,
-        commands_for=_core_cli_capture_commands,
+        commands_for=lambda rel_path: _core_cli_capture_commands(rel_path, root),
     )
 
 
@@ -630,7 +632,7 @@ def _capture_inbox(limit: int = 20, project: str | None = None) -> dict[str, obj
         WIKI_DIR.parent,
         limit=limit,
         project=project,
-        commands_for=_core_cli_capture_commands,
+        commands_for=lambda rel_path: _core_cli_capture_commands(rel_path, WIKI_DIR.parent),
     )
 
 
@@ -640,12 +642,12 @@ def _capture_review_summary(project: str | None = None, limit: int = 3) -> dict[
         WIKI_DIR.parent,
         limit=limit,
         project=project_name,
-        commands_for=_core_cli_capture_commands,
+        commands_for=lambda rel_path: _core_cli_capture_commands(rel_path, WIKI_DIR.parent),
     )
     project_query = f"?project={urllib.parse.quote(project_name, safe='')}" if project_name else ""
     project_arg = f' --project "{project_name}"' if project_name else ""
     summary["href"] = f"/captures{project_query}"
-    summary["command"] = f"python3 link.py capture-inbox .{project_arg}"
+    summary["command"] = f'python3 link.py capture-inbox "{WIKI_DIR.parent}"{project_arg}'
     return summary
 
 
@@ -655,6 +657,7 @@ def _memory_brief(query: str = "", limit: int = 6, project: str | None = None) -
     payload = _core_memory_brief(
         _memory_records(), query=query, limit=limit,
         review_command="review-memory", project=project_name,
+        command_target=WIKI_DIR.parent,
     )
     return _core_add_capture_review_to_brief(
         payload,
@@ -728,6 +731,7 @@ def _memory_audit(limit: int = 10, project: str | None = None) -> dict[str, obje
         captures=captures,
         risk_factors=payload["risk_factors"],
         project=str(payload["project"]),
+        root=WIKI_DIR.parent,
     )
     return payload
 

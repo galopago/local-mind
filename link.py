@@ -291,12 +291,14 @@ def _memory_inbox(
     include_archived: bool = False,
     project: str | None = None,
 ) -> dict[str, object]:
+    root = wiki_dir.parent
     return _core_memory_inbox(
         _memory_records(wiki_dir),
         limit=limit,
         include_archived=include_archived,
         review_command="review-memory",
         project=project,
+        command_target=root,
     )
 
 
@@ -307,6 +309,7 @@ def _memory_explanation(wiki_dir: Path, identifier: str) -> dict[str, object]:
         records=_memory_records(wiki_dir),
         review_command="review-memory",
         backlinks_body_only=False,
+        command_target=wiki_dir.parent,
     )
 
 
@@ -353,6 +356,7 @@ def _memory_brief(wiki_dir: Path, query: str = "", limit: int = 6, project: str 
         limit=limit,
         review_command="review-memory",
         project=project,
+        command_target=wiki_dir.parent,
     )
 
 
@@ -735,7 +739,11 @@ def remember(
         print(f"Could not remember: {exc}", file=sys.stderr)
         return 1
 
-    return _emit_json_or_text(result, json_output, _core_render_remember_text)
+    return _emit_json_or_text(
+        result,
+        json_output,
+        lambda payload: _core_render_remember_text(payload, target=target),
+    )
 
 
 def _read_proposal_input(target: Path, value: str) -> tuple[str, str]:
@@ -863,7 +871,7 @@ def _capture_records(target: Path, limit: int = 20, project: str | None = None) 
         root,
         limit=limit,
         project=project,
-        commands_for=_core_cli_capture_commands,
+        commands_for=lambda rel_path: _core_cli_capture_commands(rel_path, root),
     )
 
 
@@ -883,7 +891,7 @@ def capture_inbox(
         root,
         limit=limit,
         project=project,
-        commands_for=_core_cli_capture_commands,
+        commands_for=lambda rel_path: _core_cli_capture_commands(rel_path, root),
     )
     if json_output:
         print(json.dumps(payload, indent=2))
@@ -899,7 +907,7 @@ def _capture_review_summary(target: Path, project: str | None = None, limit: int
         root,
         limit=limit,
         project=project,
-        commands_for=_core_cli_capture_commands,
+        commands_for=lambda rel_path: _core_cli_capture_commands(rel_path, root),
     )
     summary["next_action"] = f'python3 link.py capture-inbox "{root}"'
     if summary["project"]:
@@ -992,7 +1000,7 @@ def accept_capture(
         print(json.dumps(payload, indent=2))
         return 0 if payload["accepted"] else 1
 
-    code, text = _core_render_accept_capture_text(payload)
+    code, text = _core_render_accept_capture_text(payload, target=target)
     print(text)
     return code
 
@@ -1061,7 +1069,7 @@ def delete_capture(
         if json_output:
             print(json.dumps(payload, indent=2))
         else:
-            _, text = _core_render_delete_capture_text(payload)
+            _, text = _core_render_delete_capture_text(payload, target=target)
             print(text)
         return 1
 
@@ -1075,7 +1083,7 @@ def delete_capture(
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
-    code, text = _core_render_delete_capture_text(payload)
+    code, text = _core_render_delete_capture_text(payload, target=target)
     print(text)
     return code
 
@@ -1105,7 +1113,11 @@ def update_memory(
         print(f"Could not update memory: {exc}", file=sys.stderr)
         return 1
 
-    return _emit_json_or_text(result, json_output, _core_render_update_memory_text)
+    return _emit_json_or_text(
+        result,
+        json_output,
+        lambda payload: _core_render_update_memory_text(payload, target=target),
+    )
 
 
 def recall(
@@ -1145,6 +1157,7 @@ def recall(
         results=results,
         include_archived=include_archived,
         project=project_name,
+        target=target,
     )
     print(text)
     return code
@@ -1160,7 +1173,7 @@ def archive_memory(target: Path, identifier: str, reason: str | None = None, jso
     return _emit_json_or_text(
         result,
         json_output,
-        lambda payload: _core_render_memory_status_text(payload, action="archive"),
+        lambda payload: _core_render_memory_status_text(payload, action="archive", target=target),
     )
 
 
@@ -1174,7 +1187,7 @@ def restore_memory(target: Path, identifier: str, json_output: bool = False) -> 
     return _emit_json_or_text(
         result,
         json_output,
-        lambda payload: _core_render_memory_status_text(payload, action="restore"),
+        lambda payload: _core_render_memory_status_text(payload, action="restore", target=target),
     )
 
 
@@ -1209,7 +1222,7 @@ def forget_memory(target: Path, identifier: str, confirm: bool = False, json_out
         print(json.dumps(result, indent=2))
         return 0 if result.get("forgotten") else 1
 
-    code, text = _core_render_forget_memory_text(result, identifier=identifier)
+    code, text = _core_render_forget_memory_text(result, identifier=identifier, target=target)
     if not result.get("found"):
         print(text, file=sys.stderr)
     else:

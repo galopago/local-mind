@@ -30,7 +30,8 @@ class CliMemoryCoreTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Memory saved", text)
         self.assertIn("Project: link", text)
-        self.assertIn('python3 link.py recall "Prefer release branches" .', text)
+        self.assertIn("python3 link.py recall", text)
+        self.assertIn("Prefer release branches", text)
 
     def test_render_remember_duplicate(self):
         code, text = render_remember_text({
@@ -49,7 +50,7 @@ class CliMemoryCoreTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Similar memory already exists", text)
         self.assertIn("Existing candidates:", text)
-        self.assertIn('python3 link.py explain-memory "prefer-release-branches" .', text)
+        self.assertIn("python3 link.py explain-memory prefer-release-branches", text)
 
     def test_render_remember_conflict(self):
         code, text = render_remember_text({
@@ -84,7 +85,7 @@ class CliMemoryCoreTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Memory updated", text)
         self.assertIn("Review: reviewed -> pending", text)
-        self.assertIn('python3 link.py review-memory "prefer-release-branches" .', text)
+        self.assertIn("python3 link.py review-memory prefer-release-branches", text)
 
     def test_render_propose_memories_text(self):
         code, text = render_propose_memories_text({
@@ -166,7 +167,7 @@ class CliMemoryCoreTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("Memory archived", text)
-        self.assertIn('Restore: python3 link.py restore-memory "prefer-local-memory" .', text)
+        self.assertIn("Restore: python3 link.py restore-memory prefer-local-memory", text)
 
     def test_render_memory_status_restore(self):
         code, text = render_memory_status_text({
@@ -384,7 +385,8 @@ class CliMemoryCoreTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("No memories found.", text)
-        self.assertIn('python3 link.py remember "Memory to keep" .', text)
+        self.assertIn("python3 link.py remember", text)
+        self.assertIn("/tmp/link", text)
 
     def test_render_profile_text_with_sections(self):
         record = {

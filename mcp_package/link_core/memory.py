@@ -380,6 +380,7 @@ def memory_action_hints(
     record: Mapping[str, object],
     issues: Iterable[Mapping[str, str]] | None = None,
     review_command: str = "review-memory",
+    command_target: str | Path = ".",
 ) -> list[dict[str, object]]:
     """Return ordered actions for resolving or auditing one memory."""
     name = str(record.get("name") or "")
@@ -404,7 +405,7 @@ def memory_action_hints(
             kind="restore",
             label="Restore",
             description="Restore this archived memory to active recall if it is valid again.",
-            command=f'python3 link.py restore-memory "{name}" .',
+            command=_shell_words("python3", "link.py", "restore-memory", name, command_target),
             tool="restore_memory",
             arguments={"identifier": name},
             priority="high",
@@ -413,7 +414,7 @@ def memory_action_hints(
             kind="explain",
             label="Explain",
             description="Inspect why this memory exists before restoring it.",
-            command=f'python3 link.py explain-memory "{name}" .',
+            command=_shell_words("python3", "link.py", "explain-memory", name, command_target),
             tool="explain_memory",
             arguments={"identifier": name},
             priority="medium",
@@ -422,7 +423,7 @@ def memory_action_hints(
             kind="forget",
             label="Forget",
             description="Permanently delete only after explicit user confirmation.",
-            command=f'python3 link.py forget-memory "{name}" . --confirm',
+            command=_shell_words("python3", "link.py", "forget-memory", name, command_target, "--confirm"),
             tool="forget_memory",
             arguments={"identifier": name, "confirm": True},
             priority="low",
@@ -444,7 +445,7 @@ def memory_action_hints(
             kind="update",
             label="Update",
             description="Merge corrected memory text and reset review to pending.",
-            command=f'python3 link.py update-memory "{name}" "new detail" .',
+            command=_shell_words("python3", "link.py", "update-memory", name, "new detail", command_target),
             tool="update_memory",
             arguments={"identifier": name, "memory": "new detail"},
             priority="high",
@@ -454,7 +455,7 @@ def memory_action_hints(
             kind="archive",
             label="Archive",
             description="Archive this stale memory so default recall ignores it.",
-            command=f'python3 link.py archive-memory "{name}" . --reason "stale"',
+            command=_shell_words("python3", "link.py", "archive-memory", name, command_target, "--reason", "stale"),
             tool="archive_memory",
             arguments={"identifier": name, "reason": "stale"},
             priority="high",
@@ -466,7 +467,7 @@ def memory_action_hints(
             kind="review",
             label="Review",
             description="Mark this memory reviewed after the user confirms it is accurate.",
-            command=f'python3 link.py {review_cli} "{name}" .',
+            command=_shell_words("python3", "link.py", review_cli, name, command_target),
             tool=review_tool,
             arguments={"identifier": name},
             priority="high",
@@ -476,7 +477,7 @@ def memory_action_hints(
         kind="explain",
         label="Explain",
         description="Audit provenance, graph links, lifecycle, and review state.",
-        command=f'python3 link.py explain-memory "{name}" .',
+        command=_shell_words("python3", "link.py", "explain-memory", name, command_target),
         tool="explain_memory",
         arguments={"identifier": name},
         priority="medium",
@@ -486,7 +487,7 @@ def memory_action_hints(
             kind="update",
             label="Update",
             description="Merge a corrected detail into this memory.",
-            command=f'python3 link.py update-memory "{name}" "new detail" .',
+            command=_shell_words("python3", "link.py", "update-memory", name, "new detail", command_target),
             tool="update_memory",
             arguments={"identifier": name, "memory": "new detail"},
             priority="medium",
@@ -496,7 +497,7 @@ def memory_action_hints(
             kind="archive",
             label="Archive",
             description="Hide this memory from default recall without deleting the Markdown file.",
-            command=f'python3 link.py archive-memory "{name}" . --reason "why"',
+            command=_shell_words("python3", "link.py", "archive-memory", name, command_target, "--reason", "why"),
             tool="archive_memory",
             arguments={"identifier": name, "reason": "why"},
             priority="medium",
@@ -505,7 +506,7 @@ def memory_action_hints(
         kind="forget",
         label="Forget",
         description="Permanently delete only after explicit user confirmation.",
-        command=f'python3 link.py forget-memory "{name}" . --confirm',
+        command=_shell_words("python3", "link.py", "forget-memory", name, command_target, "--confirm"),
         tool="forget_memory",
         arguments={"identifier": name, "confirm": True},
         priority="low",
@@ -590,6 +591,7 @@ def memory_explanation(
     records: Iterable[Mapping[str, object]] | None = None,
     review_command: str = "review-memory",
     backlinks_body_only: bool = True,
+    command_target: str | Path = ".",
 ) -> dict[str, object]:
     record_list = [dict(record) for record in records] if records is not None else memory_records(wiki_dir)
     page_path, resolved_record, error = resolve_memory_page(wiki_dir, identifier, records=record_list)
@@ -607,7 +609,12 @@ def memory_explanation(
     text = page_path.read_text(encoding="utf-8", errors="replace")
     _, body = parse_frontmatter(text)
     issues = memory_review_issues(record, review_command=review_command)
-    actions = memory_action_hints(record, issues=issues, review_command=review_command)
+    actions = memory_action_hints(
+        record,
+        issues=issues,
+        review_command=review_command,
+        command_target=command_target,
+    )
     backlinks, backlinks_error = load_backlinks_index(wiki_dir / "_backlinks.json")
     if backlinks_error:
         backlinks = build_backlinks(wiki_dir, body_only=backlinks_body_only)
@@ -1220,6 +1227,7 @@ def memory_inbox(
     include_archived: bool = False,
     review_command: str = "review-memory",
     project: str | None = None,
+    command_target: str | Path = ".",
 ) -> dict[str, object]:
     limit = max(1, min(limit, 50))
     project_name = normalize_project(project)
@@ -1236,7 +1244,12 @@ def memory_inbox(
         item = slim_memory(record)
         item["issues"] = issues
         item["issue_count"] = len(issues)
-        item["actions"] = memory_action_hints(record, issues=issues, review_command=review_command)
+        item["actions"] = memory_action_hints(
+            record,
+            issues=issues,
+            review_command=review_command,
+            command_target=command_target,
+        )
         item["primary_action"] = primary_memory_action(item["actions"])
         item["highest_severity"] = min(
             (issue["severity"] for issue in issues),
@@ -1470,21 +1483,21 @@ def memory_audit_next_actions(
                 "label": "Review memory inbox",
                 "detail": "Review pending, stale, invalid, or underspecified memories.",
                 "href": f"/inbox{project_query}",
-                "command": f"python3 link.py memory-inbox .{project_arg}",
+                "command": f'python3 link.py memory-inbox "{root}"{project_arg}',
                 "recommended": review_recommended,
             },
             {
                 "label": "Review raw captures",
                 "detail": "Accept, redact, or delete saved proposal-only raw captures.",
                 "href": f"/captures{project_query}",
-                "command": f"python3 link.py capture-inbox .{project_arg}",
+                "command": f'python3 link.py capture-inbox "{root}"{project_arg}',
                 "recommended": capture_recommended,
             },
             {
                 "label": "Run doctor",
                 "detail": "Check graph, source, memory, raw capture, and secret hygiene.",
                 "href": "",
-                "command": "python3 link.py doctor .",
+                "command": f'python3 link.py doctor "{root}"',
                 "recommended": not risks,
             },
         ]
@@ -1523,6 +1536,7 @@ def memory_brief(
     limit: int = 6,
     review_command: str = "review-memory",
     project: str | None = None,
+    command_target: str | Path = ".",
 ) -> dict[str, object]:
     """Return the compact memory payload an agent should read before work."""
     limit = max(1, min(limit, 20))
@@ -1534,7 +1548,12 @@ def memory_brief(
         if memory_visible_for_project(record, project_name)
     ]
     profile = memory_profile(record_list, limit=limit, review_command=review_command, project=project_name)
-    inbox = memory_inbox(record_list, limit=limit, review_command=review_command)
+    inbox = memory_inbox(
+        record_list,
+        limit=limit,
+        review_command=review_command,
+        command_target=command_target,
+    )
 
     if q:
         relevant = recall_memories(record_list, q, limit=limit, project=project_name)

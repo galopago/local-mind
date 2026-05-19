@@ -1,7 +1,19 @@
 """Text rendering helpers for Link memory CLI commands."""
 from __future__ import annotations
 
+import os
+import shlex
+import subprocess
 from collections.abc import Mapping, Sequence
+
+
+def _shell_words(*parts: object) -> str:
+    words = [str(part) for part in parts if str(part) != ""]
+    if not words:
+        return ""
+    if os.name == "nt":
+        return subprocess.list2cmdline(words)
+    return shlex.join(words)
 
 
 def _candidate_lines(candidates: object, *, include_reasons: bool = False) -> list[str]:
@@ -38,7 +50,7 @@ def format_counts(counts: Mapping[str, int]) -> str:
     return ", ".join(f"{name}: {count}" for name, count in counts.items())
 
 
-def render_remember_text(result: Mapping[str, object]) -> tuple[int, str]:
+def render_remember_text(result: Mapping[str, object], *, target: object = ".") -> tuple[int, str]:
     if not result.get("created"):
         if result.get("conflict"):
             lines = [
@@ -54,7 +66,7 @@ def render_remember_text(result: Mapping[str, object]) -> tuple[int, str]:
             ]
             first = _first_candidate_name(result.get("conflict_candidates", []))
             if first:
-                lines.append(f"  python3 link.py explain-memory \"{first}\" .")
+                lines.append(f"  {_shell_words('python3', 'link.py', 'explain-memory', first, target)}")
             lines.append("  Update/archive the old memory, or use --allow-conflict only if both should coexist.")
             return 0, "\n".join(lines)
 
@@ -71,7 +83,7 @@ def render_remember_text(result: Mapping[str, object]) -> tuple[int, str]:
         ]
         first = _first_candidate_name(result.get("candidates", []))
         if first:
-            lines.append(f"  python3 link.py explain-memory \"{first}\" .")
+            lines.append(f"  {_shell_words('python3', 'link.py', 'explain-memory', first, target)}")
         lines.append("  Use --allow-duplicate only if this should be a separate memory.")
         return 0, "\n".join(lines)
 
@@ -87,12 +99,12 @@ def render_remember_text(result: Mapping[str, object]) -> tuple[int, str]:
     lines.extend([
         "",
         "Next:",
-        f"  python3 link.py recall \"{result['title']}\" .",
+        f"  {_shell_words('python3', 'link.py', 'recall', result['title'], target)}",
     ])
     return 0, "\n".join(lines)
 
 
-def render_update_memory_text(result: Mapping[str, object]) -> tuple[int, str]:
+def render_update_memory_text(result: Mapping[str, object], *, target: object = ".") -> tuple[int, str]:
     if not result.get("updated") and result.get("conflict"):
         lines = [
             "Possible conflicting memory found",
@@ -105,7 +117,7 @@ def render_update_memory_text(result: Mapping[str, object]) -> tuple[int, str]:
         ]
         first = _first_candidate_name(result.get("conflict_candidates", []))
         if first:
-            lines.append(f"  python3 link.py explain-memory \"{first}\" .")
+            lines.append(f"  {_shell_words('python3', 'link.py', 'explain-memory', first, target)}")
         lines.append("  Update/archive the conflicting memory, or use --allow-conflict only if both should coexist.")
         return 0, "\n".join(lines)
 
@@ -117,8 +129,8 @@ def render_update_memory_text(result: Mapping[str, object]) -> tuple[int, str]:
         f"Review: {result['previous_review_status']} -> {result['review_status']}",
         "",
         "Next:",
-        f"  python3 link.py explain-memory \"{result['name']}\" .",
-        f"  python3 link.py review-memory \"{result['name']}\" .",
+        f"  {_shell_words('python3', 'link.py', 'explain-memory', result['name'], target)}",
+        f"  {_shell_words('python3', 'link.py', 'review-memory', result['name'], target)}",
     ])
 
 
@@ -172,6 +184,7 @@ def render_recall_text(
     results: Sequence[Mapping[str, object]],
     include_archived: bool = False,
     project: str | None = None,
+    target: object = ".",
 ) -> tuple[int, str]:
     lines = [f"Link memory recall: {query}"]
     if project:
@@ -184,7 +197,7 @@ def render_recall_text(
             "No matching memories found.",
             "",
             "Next:",
-            "  Add one: python3 link.py remember \"Memory to keep\" .",
+            f"  Add one: {_shell_words('python3', 'link.py', 'remember', 'Memory to keep', target)}",
         ])
         return 0, "\n".join(lines)
 
@@ -201,13 +214,13 @@ def render_recall_text(
     return 0, "\n".join(lines)
 
 
-def render_memory_status_text(result: Mapping[str, object], *, action: str) -> tuple[int, str]:
+def render_memory_status_text(result: Mapping[str, object], *, action: str, target: object = ".") -> tuple[int, str]:
     if action == "archive":
         headline = "Memory archived" if result["updated"] else "Memory already archived"
         next_lines = [
             "",
             "Next:",
-            f"  Restore: python3 link.py restore-memory \"{result['name']}\" .",
+            f"  Restore: {_shell_words('python3', 'link.py', 'restore-memory', result['name'], target)}",
         ]
     elif action == "restore":
         headline = "Memory restored" if result["updated"] else "Memory already active"
@@ -225,13 +238,13 @@ def render_memory_status_text(result: Mapping[str, object], *, action: str) -> t
     ])
 
 
-def render_forget_memory_text(result: Mapping[str, object], *, identifier: str) -> tuple[int, str]:
+def render_forget_memory_text(result: Mapping[str, object], *, identifier: str, target: object = ".") -> tuple[int, str]:
     if not result.get("found"):
         return 1, f"Memory not found: {identifier}"
     if result.get("confirmation_required"):
         return 1, "\n".join([
             "Confirmation required.",
-            f"Run: python3 link.py forget-memory \"{result['name']}\" . --confirm",
+            f"Run: {_shell_words('python3', 'link.py', 'forget-memory', result['name'], target, '--confirm')}",
         ])
     return 0, "\n".join([
         "Memory forgotten",
@@ -468,7 +481,7 @@ def render_profile_text(
             "No memories found.",
             "",
             "Next:",
-            "  Add one: python3 link.py remember \"Memory to keep\" .",
+            f"  Add one: {_shell_words('python3', 'link.py', 'remember', 'Memory to keep', target)}",
         ])
         return 0, "\n".join(lines)
 

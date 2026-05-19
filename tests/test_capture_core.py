@@ -422,7 +422,7 @@ class CaptureCoreTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Capture proposal accepted", text)
         self.assertIn("Memory: wiki/memories/prefer-local-memory.md", text)
-        self.assertIn('python3 link.py review-memory "prefer-local-memory" .', text)
+        self.assertIn("python3 link.py review-memory prefer-local-memory", text)
 
         code, text = render_accept_capture_text({
             "accepted": False,

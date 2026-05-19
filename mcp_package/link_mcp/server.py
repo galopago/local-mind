@@ -280,6 +280,7 @@ def _memory_inbox(limit: int = 20, include_archived: bool = False, project: str 
         include_archived=include_archived,
         review_command="review_memory",
         project=project,
+        command_target=WIKI_DIR.parent,
     )
 
 
@@ -289,6 +290,7 @@ def _memory_explanation(identifier: str) -> dict[str, object]:
         identifier,
         records=_memory_records(),
         review_command="review_memory",
+        command_target=WIKI_DIR.parent,
     )
 
 
@@ -322,6 +324,7 @@ def _memory_brief(query: str = "", limit: int = 6, project: str = "") -> dict[st
     payload = _core_memory_brief(
         _memory_records(), query=_clean_text_input(query, max_len=500),
         limit=limit, review_command="review_memory", project=project_name,
+        command_target=WIKI_DIR.parent,
     )
     return _core_add_capture_review_to_brief(payload, _capture_review_summary(project=project_name))
 

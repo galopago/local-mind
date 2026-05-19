@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import re
+import os
+import shlex
+import subprocess
 from pathlib import Path
 from collections.abc import Callable, Mapping
 
@@ -14,6 +17,15 @@ from .security import redact_secret_values, secret_value_warnings
 
 CaptureCommands = Callable[[str], dict[str, str]]
 CaptureProposalBuilder = Callable[[str, str, int, str], dict[str, object]]
+
+
+def _shell_words(*parts: object) -> str:
+    words = [str(part) for part in parts if str(part) != ""]
+    if not words:
+        return ""
+    if os.name == "nt":
+        return subprocess.list2cmdline(words)
+    return shlex.join(words)
 
 
 def capture_title(
@@ -316,11 +328,11 @@ def delete_capture_file(
     return payload
 
 
-def cli_capture_commands(rel_path: str) -> dict[str, str]:
+def cli_capture_commands(rel_path: str, command_target: str | Path = ".") -> dict[str, str]:
     return {
-        "accept": f'python3 link.py accept-capture "{rel_path}" . --index 1',
-        "redact": f'python3 link.py redact-capture "{rel_path}" .',
-        "delete": f'python3 link.py delete-capture "{rel_path}" . --confirm',
+        "accept": _shell_words("python3", "link.py", "accept-capture", rel_path, command_target, "--index", "1"),
+        "redact": _shell_words("python3", "link.py", "redact-capture", rel_path, command_target),
+        "delete": _shell_words("python3", "link.py", "delete-capture", rel_path, command_target, "--confirm"),
     }
 
 
@@ -448,7 +460,7 @@ def render_capture_inbox_text(payload: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def render_accept_capture_text(payload: dict[str, object]) -> tuple[int, str]:
+def render_accept_capture_text(payload: dict[str, object], *, target: object = ".") -> tuple[int, str]:
     """Render accept-capture text and return the corresponding exit code."""
     if not payload.get("accepted"):
         result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
@@ -473,7 +485,7 @@ def render_accept_capture_text(payload: dict[str, object]) -> tuple[int, str]:
     ]
     if result.get("project"):
         lines.append(f"Project: {result.get('project')}")
-    lines.extend(["", "Next:", f"  python3 link.py review-memory \"{result.get('name')}\" ."])
+    lines.extend(["", "Next:", f"  {_shell_words('python3', 'link.py', 'review-memory', result.get('name'), target)}"])
     return 0, "\n".join(lines)
 
 
@@ -493,13 +505,13 @@ def render_redact_capture_text(payload: dict[str, object]) -> str:
     ])
 
 
-def render_delete_capture_text(payload: dict[str, object]) -> tuple[int, str]:
+def render_delete_capture_text(payload: dict[str, object], *, target: object = ".") -> tuple[int, str]:
     """Render delete-capture CLI output and return the corresponding exit code."""
     path = str(payload.get("path") or "")
     if payload.get("confirmation_required"):
         return 1, "\n".join([
             "Confirmation required.",
-            f"Run: python3 link.py delete-capture \"{path}\" . --confirm",
+            f"Run: {_shell_words('python3', 'link.py', 'delete-capture', path, target, '--confirm')}",
         ])
     if payload.get("deleted"):
         return 0, "\n".join([
