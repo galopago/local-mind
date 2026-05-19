@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">Link architecture</title>
+  <desc id="desc">Raw local sources become wiki pages, explicit remember requests become reviewed memory, and agents retrieve compact MCP context.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#16130f"/>
+    </marker>
+    <style>
+      .bg { fill: #fff7cf; }
+      .panel { fill: #fffdf3; stroke: #16130f; stroke-width: 3; }
+      .raw { fill: #ddf7ee; }
+      .wiki { fill: #e8edff; }
+      .memory { fill: #ffe4df; }
+      .agent { fill: #ffd94a; }
+      .ink { fill: #16130f; }
+      .muted { fill: #5c5548; }
+      .arrow { fill: none; stroke: #16130f; stroke-width: 4; stroke-linecap: round; marker-end: url(#arrow); }
+      text { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #16130f; letter-spacing: 0; }
+      .title { font-size: 24px; font-weight: 800; }
+      .body { font-size: 17px; font-weight: 600; }
+      .small { font-size: 14px; font-weight: 700; }
+      .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1200" height="420" rx="18"/>
+  <text class="title" x="60" y="58">Link keeps agent memory local and inspectable</text>
+  <text class="body muted" x="60" y="88">Sources become wiki knowledge. Explicit remembers become reviewed memory. Queries use both.</text>
+
+  <g transform="translate(60 130)">
+    <rect class="panel raw" width="210" height="145" rx="14"/>
+    <text class="title" x="26" y="42">1. Capture</text>
+    <text class="body" x="26" y="78">Drop files into</text>
+    <text class="mono body" x="26" y="108">raw/</text>
+    <text class="small muted" x="26" y="132">notes, transcripts, docs</text>
+  </g>
+
+  <path class="arrow" d="M292 202H370"/>
+
+  <g transform="translate(390 130)">
+    <rect class="panel wiki" width="210" height="145" rx="14"/>
+    <text class="title" x="26" y="42">2. Structure</text>
+    <text class="body" x="26" y="78">Compile into</text>
+    <text class="mono body" x="26" y="108">wiki/</text>
+    <text class="small muted" x="26" y="132">sources, concepts, graph</text>
+  </g>
+
+  <path class="arrow" d="M622 202H700"/>
+
+  <g transform="translate(720 130)">
+    <rect class="panel memory" width="210" height="145" rx="14"/>
+    <text class="title" x="26" y="42">3. Remember</text>
+    <text class="body" x="26" y="78">Save only explicit</text>
+    <text class="mono body" x="26" y="108">remember</text>
+    <text class="small muted" x="26" y="132">review, archive, forget</text>
+  </g>
+
+  <path class="arrow" d="M952 202H1030"/>
+
+  <g transform="translate(990 130)">
+    <rect class="panel agent" width="150" height="145" rx="14"/>
+    <text class="title" x="22" y="42">4. Query</text>
+    <text class="mono small" x="22" y="78">query_link</text>
+    <text class="mono small" x="22" y="104">memory_brief</text>
+    <text class="small muted" x="22" y="132">compact context</text>
+  </g>
+
+  <g transform="translate(170 326)">
+    <rect class="panel" width="860" height="54" rx="12"/>
+    <text class="body" x="28" y="35">Plain local files:</text>
+    <text class="mono small" x="190" y="35">raw/</text>
+    <text class="mono small" x="305" y="35">wiki/sources/</text>
+    <text class="mono small" x="500" y="35">wiki/memories/</text>
+    <text class="mono small" x="720" y="35">_backlinks.json</text>
+  </g>
+</svg>

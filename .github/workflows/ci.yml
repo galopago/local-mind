@@ -63,6 +63,44 @@ jobs:
         if: matrix.python-version == '3.12'
         run: python scripts/smoke_http_viewer.py
 
+  windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Python
+        run: python -m compileall -q link.py serve.py scripts mcp_package
+
+      - name: Install MCP package for verification
+        run: python -m pip install ./mcp_package
+
+      - name: Run portability tests
+        run: python -m unittest tests.test_mcp_verify_core tests.test_web_http_core tests.test_release_hygiene tests.test_cli_parser_core tests.test_cli_runtime_core
+
+      - name: Demo value-loop smoke test
+        shell: pwsh
+        run: |
+          $demo = Join-Path $env:RUNNER_TEMP "link-demo-ci"
+          python link.py demo $demo --force
+          python link.py query "why does Link help agents?" $demo --budget small
+          python link.py brief "working on agent memory" $demo
+          python link.py benchmark "agent memory" $demo
+          python link.py status --validate $demo
+
+      - name: Release hygiene
+        run: python scripts/check_release_hygiene.py
+
+      - name: MCP verification smoke test
+        shell: pwsh
+        run: |
+          $demo = Join-Path $env:RUNNER_TEMP "link-demo-ci"
+          $env:PYTHONPATH = "mcp_package"
+          python link.py verify-mcp $demo --python python
+
   installer-syntax:
     runs-on: ubuntu-latest
     steps:

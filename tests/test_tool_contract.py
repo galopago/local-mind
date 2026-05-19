@@ -26,8 +26,10 @@ class ToolContractTests(unittest.TestCase):
         tmp = Path(tempfile.mkdtemp(prefix="link-tool-contract-"))
         try:
             (tmp / "mcp_package/link_mcp").mkdir(parents=True)
+            (tmp / "mcp_package/link_core").mkdir(parents=True)
             (tmp / "mcp_package").mkdir(exist_ok=True)
             shutil.copy2(ROOT / "link.py", tmp / "link.py")
+            shutil.copy2(ROOT / "mcp_package/link_core/cli_parser.py", tmp / "mcp_package/link_core/cli_parser.py")
             shutil.copy2(ROOT / "mcp_package/link_mcp/server.py", tmp / "mcp_package/link_mcp/server.py")
 
             (tmp / "docs").mkdir()

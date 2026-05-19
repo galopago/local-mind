@@ -1,8 +1,94 @@
 """Bundled first-run demo wiki content for Link."""
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
+from .files import atomic_write_json, atomic_write_text
+from .schema import migrate_wiki
+from .wiki import build_backlinks
+
 
 DEMO_MARKER = ".link-demo"
+DEMO_DIRECTORIES = (
+    "raw",
+    "wiki/sources",
+    "wiki/concepts",
+    "wiki/entities",
+    "wiki/memories",
+    "wiki/comparisons",
+    "wiki/explorations",
+)
+RUNTIME_FILES = ("serve.py", "link.py", "LINK.md", ".linkignore")
+BRAND_FILES = ("logo.png", "logo.svg")
+
+
+class DemoError(RuntimeError):
+    """Raised when a demo workspace cannot be created safely."""
+
+
+def copy_runtime_files(source_root: Path, target: Path) -> None:
+    """Copy the runtime files needed by a standalone Link wiki directory."""
+    target.mkdir(parents=True, exist_ok=True)
+    for name in RUNTIME_FILES:
+        src = source_root / name
+        dst = target / name
+        if src.exists() and src.resolve() != dst.resolve():
+            shutil.copy2(src, dst)
+    core_src = source_root / "mcp_package" / "link_core"
+    if not core_src.exists():
+        core_src = source_root / "link_core"
+    if core_src.exists():
+        core_target = target / "link_core"
+        core_target.mkdir(exist_ok=True)
+        for src in core_src.glob("*.py"):
+            dst = core_target / src.name
+            if src.resolve() != dst.resolve():
+                shutil.copy2(src, dst)
+    for name in BRAND_FILES:
+        src = source_root / name
+        dst = target / name
+        if src.exists() and src.resolve() != dst.resolve():
+            shutil.copy2(src, dst)
+
+
+def create_demo_workspace(target: Path, *, source_root: Path, force: bool = False) -> dict[str, object]:
+    """Create a pre-ingested demo workspace and return basic creation metadata."""
+    target = target.expanduser().resolve()
+    if target.exists() and any(target.iterdir()):
+        marker = target / DEMO_MARKER
+        if not force:
+            raise DemoError(f"{target} already exists. Re-run with --force to replace a Link demo directory.")
+        if not marker.exists():
+            raise DemoError(f"{target} does not look like a Link demo directory; refusing to overwrite it.")
+        shutil.rmtree(target)
+
+    target.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(target / DEMO_MARKER, "Link demo directory\n")
+    copy_runtime_files(source_root, target)
+
+    for directory in DEMO_DIRECTORIES:
+        path = target / directory
+        path.mkdir(parents=True, exist_ok=True)
+        (path / ".gitkeep").touch()
+
+    for rel, content in DEMO_FILES.items():
+        path = target / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(path, content.strip() + "\n")
+
+    wiki_dir = target / "wiki"
+    backlinks = build_backlinks(wiki_dir, body_only=False)
+    atomic_write_json(wiki_dir / "_backlinks.json", backlinks)
+    migration = migrate_wiki(wiki_dir)
+    return {
+        "target": str(target),
+        "wiki": str(wiki_dir),
+        "file_count": len(DEMO_FILES),
+        "migration": migration,
+    }
+
+
 DEMO_FILES: dict[str, str] = {
     "START_HERE.md": """# Link Demo: Start Here
 

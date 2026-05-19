@@ -2,6 +2,7 @@ import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
+from pathlib import PureWindowsPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -131,14 +132,16 @@ class ReleaseHygieneTests(unittest.TestCase):
             },
         )
 
-        self.assertIn(f"agent contract missing 'link_status' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'starter_prompts' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'ingest_status' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'get_graph_summary' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'backup_wiki' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'validate_wiki' in {bad}", findings)
-        self.assertIn(f"agent contract missing 'memory_brief' in {bad}", findings)
-        self.assertIn(f"agent contract file missing: {tmp / 'missing.md'}", findings)
+        bad_path = bad.as_posix()
+        missing_path = (tmp / "missing.md").as_posix()
+        self.assertIn(f"agent contract missing 'link_status' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'starter_prompts' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'ingest_status' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'get_graph_summary' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'backup_wiki' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'validate_wiki' in {bad_path}", findings)
+        self.assertIn(f"agent contract missing 'memory_brief' in {bad_path}", findings)
+        self.assertIn(f"agent contract file missing: {missing_path}", findings)
 
     def test_tracked_path_hygiene_blocks_build_artifacts_and_secret_names(self):
         findings: list[str] = []
@@ -158,6 +161,20 @@ class ReleaseHygieneTests(unittest.TestCase):
             findings,
         )
         self.assertIn("sensitive-looking tracked filename: .pypirc", findings)
+
+    def test_release_hygiene_formats_windows_paths_as_posix(self):
+        findings: list[str] = []
+
+        release_hygiene.check_tracked_path_hygiene(findings, PureWindowsPath("mcp_package/dist/link_mcp.whl"))
+        release_hygiene.check_outbound_network_hygiene(
+            findings,
+            PureWindowsPath("mcp_package/link_core/socket_client.py"),
+            "import socket\n",
+        )
+
+        self.assertIn("build artifact should not be tracked: mcp_package/dist/link_mcp.whl", findings)
+        self.assertIn("outbound network code in mcp_package/link_core/socket_client.py: socket import", findings)
+        self.assertNotIn("\\", "\n".join(findings))
 
     def test_outbound_network_hygiene_blocks_runtime_http_clients(self):
         findings: list[str] = []

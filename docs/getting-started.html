@@ -55,6 +55,11 @@ link serve link-demo</code></pre>
 cd link
 python3 link.py demo
 python3 link.py serve link-demo</code></pre>
+        <p>On Windows from source, use the Python launcher:</p>
+        <pre><code>git clone https://github.com/gowtham0992/link.git
+cd link
+py link.py demo
+py link.py serve link-demo</code></pre>
         <div class="callout">
           <strong>Judge the generated demo</strong>
           The repo's root <code>wiki/</code> is only a scaffold for local development and personal testing. Generated content in <code>wiki/</code>, <code>raw/</code>, and <code>link-demo/</code> is ignored by git so private memory is not published by accident.
@@ -76,6 +81,7 @@ bash integrations/copilot/install.sh
 bash integrations/vscode/install.sh
 bash integrations/antigravity/install.sh</code></pre>
         <p>Use <code>--project</code> for a repo-local Link install. Project-scoped memory then stays separate from other project memory while still allowing broad user memory to be recalled.</p>
+        <p>The shell installers target macOS/Linux-style agent config paths. On Windows, run Link from source and use the MCP-only setup in the MCP guide until a Windows-specific installer exists.</p>
 
         <h2 id="source">3. Add One Source</h2>
         <p>Open the local viewer and use <strong>ingest -> Add Raw Source</strong>, or write a first note directly:</p>
@@ -127,6 +133,7 @@ link status --validate
 link ingest-status
 link validate
 link memory-audit
+link operations
 link verify-mcp</code></pre>
         <p><code>link verify-mcp</code> should report <code>Result: ready</code>. Then ask your MCP-enabled agent:</p>
         <pre><code>query Link for first Link memory</code></pre>

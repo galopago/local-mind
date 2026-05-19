@@ -5,6 +5,7 @@ import os
 import re
 import shlex
 import subprocess
+import urllib.parse
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from .frontmatter import (
     update_frontmatter_fields,
     yaml_list,
 )
+from .operations import operation_journal
 from .wiki import (
     WIKILINK_RE,
     build_backlinks,
@@ -378,6 +380,7 @@ def memory_action_hints(
     record: Mapping[str, object],
     issues: Iterable[Mapping[str, str]] | None = None,
     review_command: str = "review-memory",
+    command_target: str | Path = ".",
 ) -> list[dict[str, object]]:
     """Return ordered actions for resolving or auditing one memory."""
     name = str(record.get("name") or "")
@@ -402,7 +405,7 @@ def memory_action_hints(
             kind="restore",
             label="Restore",
             description="Restore this archived memory to active recall if it is valid again.",
-            command=f'python3 link.py restore-memory "{name}" .',
+            command=_shell_words("python3", "link.py", "restore-memory", name, command_target),
             tool="restore_memory",
             arguments={"identifier": name},
             priority="high",
@@ -411,7 +414,7 @@ def memory_action_hints(
             kind="explain",
             label="Explain",
             description="Inspect why this memory exists before restoring it.",
-            command=f'python3 link.py explain-memory "{name}" .',
+            command=_shell_words("python3", "link.py", "explain-memory", name, command_target),
             tool="explain_memory",
             arguments={"identifier": name},
             priority="medium",
@@ -420,7 +423,7 @@ def memory_action_hints(
             kind="forget",
             label="Forget",
             description="Permanently delete only after explicit user confirmation.",
-            command=f'python3 link.py forget-memory "{name}" . --confirm',
+            command=_shell_words("python3", "link.py", "forget-memory", name, command_target, "--confirm"),
             tool="forget_memory",
             arguments={"identifier": name, "confirm": True},
             priority="low",
@@ -442,7 +445,7 @@ def memory_action_hints(
             kind="update",
             label="Update",
             description="Merge corrected memory text and reset review to pending.",
-            command=f'python3 link.py update-memory "{name}" "new detail" .',
+            command=_shell_words("python3", "link.py", "update-memory", name, "new detail", command_target),
             tool="update_memory",
             arguments={"identifier": name, "memory": "new detail"},
             priority="high",
@@ -452,7 +455,7 @@ def memory_action_hints(
             kind="archive",
             label="Archive",
             description="Archive this stale memory so default recall ignores it.",
-            command=f'python3 link.py archive-memory "{name}" . --reason "stale"',
+            command=_shell_words("python3", "link.py", "archive-memory", name, command_target, "--reason", "stale"),
             tool="archive_memory",
             arguments={"identifier": name, "reason": "stale"},
             priority="high",
@@ -464,7 +467,7 @@ def memory_action_hints(
             kind="review",
             label="Review",
             description="Mark this memory reviewed after the user confirms it is accurate.",
-            command=f'python3 link.py {review_cli} "{name}" .',
+            command=_shell_words("python3", "link.py", review_cli, name, command_target),
             tool=review_tool,
             arguments={"identifier": name},
             priority="high",
@@ -474,7 +477,7 @@ def memory_action_hints(
         kind="explain",
         label="Explain",
         description="Audit provenance, graph links, lifecycle, and review state.",
-        command=f'python3 link.py explain-memory "{name}" .',
+        command=_shell_words("python3", "link.py", "explain-memory", name, command_target),
         tool="explain_memory",
         arguments={"identifier": name},
         priority="medium",
@@ -484,7 +487,7 @@ def memory_action_hints(
             kind="update",
             label="Update",
             description="Merge a corrected detail into this memory.",
-            command=f'python3 link.py update-memory "{name}" "new detail" .',
+            command=_shell_words("python3", "link.py", "update-memory", name, "new detail", command_target),
             tool="update_memory",
             arguments={"identifier": name, "memory": "new detail"},
             priority="medium",
@@ -494,7 +497,7 @@ def memory_action_hints(
             kind="archive",
             label="Archive",
             description="Hide this memory from default recall without deleting the Markdown file.",
-            command=f'python3 link.py archive-memory "{name}" . --reason "why"',
+            command=_shell_words("python3", "link.py", "archive-memory", name, command_target, "--reason", "why"),
             tool="archive_memory",
             arguments={"identifier": name, "reason": "why"},
             priority="medium",
@@ -503,7 +506,7 @@ def memory_action_hints(
         kind="forget",
         label="Forget",
         description="Permanently delete only after explicit user confirmation.",
-        command=f'python3 link.py forget-memory "{name}" . --confirm',
+        command=_shell_words("python3", "link.py", "forget-memory", name, command_target, "--confirm"),
         tool="forget_memory",
         arguments={"identifier": name, "confirm": True},
         priority="low",
@@ -588,6 +591,7 @@ def memory_explanation(
     records: Iterable[Mapping[str, object]] | None = None,
     review_command: str = "review-memory",
     backlinks_body_only: bool = True,
+    command_target: str | Path = ".",
 ) -> dict[str, object]:
     record_list = [dict(record) for record in records] if records is not None else memory_records(wiki_dir)
     page_path, resolved_record, error = resolve_memory_page(wiki_dir, identifier, records=record_list)
@@ -605,7 +609,12 @@ def memory_explanation(
     text = page_path.read_text(encoding="utf-8", errors="replace")
     _, body = parse_frontmatter(text)
     issues = memory_review_issues(record, review_command=review_command)
-    actions = memory_action_hints(record, issues=issues, review_command=review_command)
+    actions = memory_action_hints(
+        record,
+        issues=issues,
+        review_command=review_command,
+        command_target=command_target,
+    )
     backlinks, backlinks_error = load_backlinks_index(wiki_dir / "_backlinks.json")
     if backlinks_error:
         backlinks = build_backlinks(wiki_dir, body_only=backlinks_body_only)
@@ -816,17 +825,24 @@ def set_memory_status(
 
     changed = current_status != status
     if changed:
-        text = page_path.read_text(encoding="utf-8", errors="replace")
-        atomic_write_text(page_path, update_frontmatter_fields(text, updates, remove=remove))
-        if log_writer:
-            log_lines = [
-                f"Updated: memories/{page_path.name}",
-                f"Previous status: {current_status}",
-                f"New status: {status}",
-            ]
-            if clean_reason:
-                log_lines.append(f"Reason: {clean_reason}")
-            log_writer(timestamp, operation, str(record["title"]), log_lines)
+        with operation_journal(
+            wiki_dir,
+            operation,
+            str(record["title"]),
+            timestamp=timestamp,
+            paths=[f"wiki/memories/{page_path.name}", "wiki/log.md"],
+        ):
+            text = page_path.read_text(encoding="utf-8", errors="replace")
+            atomic_write_text(page_path, update_frontmatter_fields(text, updates, remove=remove))
+            if log_writer:
+                log_lines = [
+                    f"Updated: memories/{page_path.name}",
+                    f"Previous status: {current_status}",
+                    f"New status: {status}",
+                ]
+                if clean_reason:
+                    log_lines.append(f"Reason: {clean_reason}")
+                log_writer(timestamp, operation, str(record["title"]), log_lines)
 
     return {
         "updated": changed,
@@ -868,25 +884,32 @@ def forget_memory_page(
     if not confirm:
         return payload
 
-    page_path.unlink()
-    index_updated = remove_memory_from_index(wiki_dir / "index.md", page_path.stem)
-    backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+    with operation_journal(
+        wiki_dir,
+        "forget-memory",
+        str(record["title"]),
+        timestamp=timestamp,
+        paths=[f"wiki/memories/{page_path.name}", "wiki/index.md", "wiki/_backlinks.json", "wiki/log.md"],
+    ):
+        page_path.unlink()
+        index_updated = remove_memory_from_index(wiki_dir / "index.md", page_path.stem)
+        backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+        if log_writer:
+            log_writer(
+                timestamp,
+                "forget-memory",
+                f"Forgot memory {payload['path']}",
+                [
+                    f"Title: {payload['title']}",
+                    "Deleted memory page only; memory body was not logged.",
+                ],
+            )
     payload.update({
         "forgotten": True,
         "confirmation_required": False,
         "index_updated": index_updated,
         "backlinks_rebuilt": bool(backlinks_rebuilt),
     })
-    if log_writer:
-        log_writer(
-            timestamp,
-            "forget-memory",
-            f"Forgot memory {payload['path']}",
-            [
-                f"Title: {payload['title']}",
-                "Deleted memory page only; memory body was not logged.",
-            ],
-        )
     return payload
 
 
@@ -914,17 +937,24 @@ def mark_memory_reviewed(
         updates["review_note"] = f'"{frontmatter_string(clean_note)}"'
     changed = previous_review_status != "reviewed" or bool(clean_note)
     if changed:
-        text = page_path.read_text(encoding="utf-8", errors="replace")
-        atomic_write_text(page_path, update_frontmatter_fields(text, updates))
-        if log_writer:
-            log_lines = [
-                f"Reviewed: memories/{page_path.name}",
-                f"Previous review status: {previous_review_status}",
-                "New review status: reviewed",
-            ]
-            if clean_note:
-                log_lines.append(f"Note: {clean_note}")
-            log_writer(timestamp, "review-memory", str(record["title"]), log_lines)
+        with operation_journal(
+            wiki_dir,
+            "review-memory",
+            str(record["title"]),
+            timestamp=timestamp,
+            paths=[f"wiki/memories/{page_path.name}", "wiki/log.md"],
+        ):
+            text = page_path.read_text(encoding="utf-8", errors="replace")
+            atomic_write_text(page_path, update_frontmatter_fields(text, updates))
+            if log_writer:
+                log_lines = [
+                    f"Reviewed: memories/{page_path.name}",
+                    f"Previous review status: {previous_review_status}",
+                    "New review status: reviewed",
+                ]
+                if clean_note:
+                    log_lines.append(f"Note: {clean_note}")
+                log_writer(timestamp, "review-memory", str(record["title"]), log_lines)
 
     _, updated_record, _ = resolve_memory_page(wiki_dir, str(record["name"]))
     updated_record = updated_record or record
@@ -999,21 +1029,28 @@ def update_memory_page(
         "review_status": "pending",
     }
     updated_text = update_frontmatter_fields(original, updates, remove={"reviewed_at", "review_note"})
-    atomic_write_text(page_path, replace_markdown_body(updated_text, updated_body))
-    if log_writer:
-        log_writer(
-            timestamp,
-            "update-memory",
-            str(record["title"]),
-            [
-                f"Updated: memories/{page_path.name}",
-                f"Previous review status: {previous_review_status}",
-                "New review status: pending",
-                f"Update count: {next_update_count}",
-                f"Source: {clean_source}",
-            ],
-        )
-    backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+    with operation_journal(
+        wiki_dir,
+        "update-memory",
+        str(record["title"]),
+        timestamp=timestamp,
+        paths=[f"wiki/memories/{page_path.name}", "wiki/_backlinks.json", "wiki/log.md"],
+    ):
+        atomic_write_text(page_path, replace_markdown_body(updated_text, updated_body))
+        if log_writer:
+            log_writer(
+                timestamp,
+                "update-memory",
+                str(record["title"]),
+                [
+                    f"Updated: memories/{page_path.name}",
+                    f"Previous review status: {previous_review_status}",
+                    "New review status: pending",
+                    f"Update count: {next_update_count}",
+                    f"Source: {clean_source}",
+                ],
+            )
+        backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
 
     _, updated_record, _ = resolve_memory_page(wiki_dir, str(record["name"]))
     updated_record = updated_record or record
@@ -1147,20 +1184,27 @@ tags: {yaml_list(tag_values)}
 
 {clean_source}
 """
-    atomic_write_text(page_path, page)
-    update_memory_index(wiki_dir / "index.md", page_name, memory_title_value, summary, memory_type, scope)
-    if log_writer:
-        log_writer(
-            timestamp,
-            "remember",
-            memory_title_value,
-            [
-                f"Created: memories/{page_path.name}",
-                f"Type: {memory_type}",
-                f"Scope: {scope}",
-            ],
-        )
-    backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
+    with operation_journal(
+        wiki_dir,
+        "remember",
+        memory_title_value,
+        timestamp=timestamp,
+        paths=[f"wiki/memories/{page_path.name}", "wiki/index.md", "wiki/_backlinks.json", "wiki/log.md"],
+    ):
+        atomic_write_text(page_path, page)
+        update_memory_index(wiki_dir / "index.md", page_name, memory_title_value, summary, memory_type, scope)
+        if log_writer:
+            log_writer(
+                timestamp,
+                "remember",
+                memory_title_value,
+                [
+                    f"Created: memories/{page_path.name}",
+                    f"Type: {memory_type}",
+                    f"Scope: {scope}",
+                ],
+            )
+        backlinks_rebuilt = rebuild_backlinks() if rebuild_backlinks else False
     return {
         "created": True,
         "name": page_name,
@@ -1183,6 +1227,7 @@ def memory_inbox(
     include_archived: bool = False,
     review_command: str = "review-memory",
     project: str | None = None,
+    command_target: str | Path = ".",
 ) -> dict[str, object]:
     limit = max(1, min(limit, 50))
     project_name = normalize_project(project)
@@ -1199,7 +1244,12 @@ def memory_inbox(
         item = slim_memory(record)
         item["issues"] = issues
         item["issue_count"] = len(issues)
-        item["actions"] = memory_action_hints(record, issues=issues, review_command=review_command)
+        item["actions"] = memory_action_hints(
+            record,
+            issues=issues,
+            review_command=review_command,
+            command_target=command_target,
+        )
         item["primary_action"] = primary_memory_action(item["actions"])
         item["highest_severity"] = min(
             (issue["severity"] for issue in issues),
@@ -1366,6 +1416,95 @@ def memory_audit_report(
     }
 
 
+def memory_audit_next_actions(
+    *,
+    mode: str,
+    inbox: Mapping[str, object],
+    captures: Mapping[str, object],
+    risk_factors: Iterable[Mapping[str, object]] = (),
+    project: str | None = None,
+    root: object = ".",
+) -> list[dict[str, object]]:
+    """Build runtime-specific next actions for a shared memory audit report."""
+    project_name = normalize_project(project)
+    review_recommended = bool(inbox.get("review_count"))
+    capture_recommended = bool(captures.get("count") or captures.get("read_warning_count"))
+    risks = list(risk_factors)
+
+    if mode == "cli":
+        project_arg = f' --project "{project_name}"' if project_name else ""
+        return [
+            {
+                "label": "Review memory inbox",
+                "command": f'python3 link.py memory-inbox "{root}"{project_arg}',
+                "recommended": review_recommended,
+            },
+            {
+                "label": "Review raw captures",
+                "command": f'python3 link.py capture-inbox "{root}"{project_arg}',
+                "recommended": capture_recommended,
+            },
+            {
+                "label": "Run doctor",
+                "command": f'python3 link.py doctor "{root}"',
+                "recommended": not risks,
+            },
+        ]
+
+    if mode == "mcp":
+        project_arg = f', project="{project_name}"' if project_name else ""
+        capture_command = f"capture_inbox({project_arg.lstrip(', ')})" if project_arg else "capture_inbox()"
+        return [
+            {
+                "label": "Review memory inbox",
+                "tool": "memory_inbox",
+                "command": f"memory_inbox(include_archived=true{project_arg})",
+                "recommended": review_recommended,
+            },
+            {
+                "label": "Review raw captures",
+                "tool": "capture_inbox",
+                "command": capture_command,
+                "recommended": capture_recommended,
+            },
+            {
+                "label": "Explain a memory",
+                "tool": "explain_memory",
+                "command": 'explain_memory(identifier="<memory-name>")',
+                "recommended": False,
+            },
+        ]
+
+    if mode == "web":
+        project_query = f"?project={urllib.parse.quote(project_name, safe='')}" if project_name else ""
+        project_arg = f' --project "{project_name}"' if project_name else ""
+        return [
+            {
+                "label": "Review memory inbox",
+                "detail": "Review pending, stale, invalid, or underspecified memories.",
+                "href": f"/inbox{project_query}",
+                "command": f'python3 link.py memory-inbox "{root}"{project_arg}',
+                "recommended": review_recommended,
+            },
+            {
+                "label": "Review raw captures",
+                "detail": "Accept, redact, or delete saved proposal-only raw captures.",
+                "href": f"/captures{project_query}",
+                "command": f'python3 link.py capture-inbox "{root}"{project_arg}',
+                "recommended": capture_recommended,
+            },
+            {
+                "label": "Run doctor",
+                "detail": "Check graph, source, memory, raw capture, and secret hygiene.",
+                "href": "",
+                "command": f'python3 link.py doctor "{root}"',
+                "recommended": not risks,
+            },
+        ]
+
+    raise ValueError(f"Unsupported memory audit action mode: {mode}")
+
+
 def add_capture_review_to_brief(
     payload: Mapping[str, object],
     captures: Mapping[str, object],
@@ -1397,6 +1536,7 @@ def memory_brief(
     limit: int = 6,
     review_command: str = "review-memory",
     project: str | None = None,
+    command_target: str | Path = ".",
 ) -> dict[str, object]:
     """Return the compact memory payload an agent should read before work."""
     limit = max(1, min(limit, 20))
@@ -1408,7 +1548,12 @@ def memory_brief(
         if memory_visible_for_project(record, project_name)
     ]
     profile = memory_profile(record_list, limit=limit, review_command=review_command, project=project_name)
-    inbox = memory_inbox(record_list, limit=limit, review_command=review_command)
+    inbox = memory_inbox(
+        record_list,
+        limit=limit,
+        review_command=review_command,
+        command_target=command_target,
+    )
 
     if q:
         relevant = recall_memories(record_list, q, limit=limit, project=project_name)
@@ -1789,7 +1934,7 @@ def _shell_words(*parts: object) -> str:
     return shlex.join(words)
 
 
-def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
+def memory_proposal_action(proposal: Mapping[str, object], *, command_target: str | Path = ".") -> dict[str, object]:
     """Return the safest next action for a memory proposal."""
     memory = str(proposal.get("memory") or "")
     title = str(proposal.get("title") or proposal_title(memory, str(proposal.get("memory_type") or "note")))
@@ -1805,7 +1950,16 @@ def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
     if duplicate_list:
         first = duplicate_list[0] if isinstance(duplicate_list[0], Mapping) else {}
         identifier = str(first.get("name") or first.get("title") or "")
-        command_parts: list[object] = ["python3", "link.py", "update-memory", identifier, memory, ".", "--source", source]
+        command_parts: list[object] = [
+            "python3",
+            "link.py",
+            "update-memory",
+            identifier,
+            memory,
+            command_target,
+            "--source",
+            source,
+        ]
         if project:
             command_parts.extend(["--project", project])
         command = _shell_words(*command_parts)
@@ -1831,7 +1985,7 @@ def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
             kind="review_conflict",
             label="Review conflict",
             description="A likely conflicting memory exists; inspect it before saving or archiving anything.",
-            command=_shell_words("python3", "link.py", "explain-memory", identifier, "."),
+            command=_shell_words("python3", "link.py", "explain-memory", identifier, command_target),
             tool="explain_memory",
             arguments={"identifier": identifier},
             priority="high",
@@ -1844,7 +1998,7 @@ def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
         "link.py",
         "remember",
         memory,
-        ".",
+        command_target,
         "--title",
         title,
         "--type",
@@ -1954,6 +2108,7 @@ def propose_memories_from_text(
     limit: int = 10,
     writes_memory: bool = False,
     project: str | None = None,
+    command_target: str | Path = ".",
 ) -> dict[str, object]:
     record_list = [dict(record) for record in records]
     project_name = normalize_project(project)
@@ -2014,7 +2169,7 @@ def propose_memories_from_text(
             "conflict_candidates": conflict_candidates,
             "suggested_action": suggested_action,
         }
-        proposal["primary_action"] = memory_proposal_action(proposal)
+        proposal["primary_action"] = memory_proposal_action(proposal, command_target=command_target)
         proposals.append(proposal)
         if len(proposals) >= limit:
             break

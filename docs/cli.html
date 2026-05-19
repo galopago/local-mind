@@ -28,7 +28,7 @@
     <div class="hero-inner">
       <span class="eyebrow">Command reference</span>
       <h1>Local commands for daily memory work.</h1>
-      <p>Install the CLI with <code>brew install gowtham0992/link/link</code> on macOS, or use <code>link &lt;command&gt;</code> after a global agent installer run. From a source checkout, use <code>python3 link.py &lt;command&gt;</code>.</p>
+      <p>Install the CLI with <code>brew install gowtham0992/link/link</code> on macOS, or use <code>link &lt;command&gt;</code> after a global agent installer run. From a source checkout, use <code>python3 link.py &lt;command&gt;</code> on macOS/Linux or <code>py link.py &lt;command&gt;</code> on Windows.</p>
     </div>
   </header>
 
@@ -81,6 +81,7 @@ link delete-capture raw/memory-captures/&lt;capture&gt;.md --confirm</code></pre
 link doctor --fix
 link status --validate
 link memory-audit
+link operations
 link benchmark "agent memory"
 link rebuild-index
 link rebuild-backlinks
@@ -94,6 +95,7 @@ link init [dir]
 link serve [dir] [--port 3000]
 link prompts [dir] [--project slug]
 link status [--validate]
+link operations [--limit 20]
 link backup [--label name] [--include-raw]
 link ingest-status
 link remember "text" [--project slug]

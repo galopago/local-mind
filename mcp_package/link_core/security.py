@@ -1,6 +1,7 @@
 """Local security hygiene helpers for Link."""
 from __future__ import annotations
 
+import fnmatch
 import re
 from pathlib import Path
 
@@ -80,3 +81,72 @@ def redact_secret_values(text: str, replacement: str = "[redacted-secret]") -> t
             labels.append(label)
             total += count
     return redacted, labels, total
+
+
+def find_sensitive_filenames(
+    target: Path,
+    *,
+    skip_dirs: set[str],
+    patterns: tuple[str, ...],
+) -> list[str]:
+    """Find secret-looking filenames under a Link root."""
+    root = target.expanduser().resolve()
+    matches: list[str] = []
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        for path in current.iterdir():
+            if path.is_dir():
+                if path.name not in skip_dirs:
+                    stack.append(path)
+                continue
+            if not path.is_file():
+                continue
+            if any(fnmatch.fnmatch(path.name, pattern) for pattern in patterns):
+                matches.append(str(path.relative_to(root)))
+    return sorted(matches)
+
+
+def iter_scannable_files(
+    target: Path,
+    *,
+    skip_dirs: set[str],
+    skip_suffixes: set[str],
+) -> list[Path]:
+    """Return text-like files worth scanning for secret-looking values."""
+    root = target.expanduser().resolve()
+    files: list[Path] = []
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        for path in current.iterdir():
+            if path.is_dir():
+                if path.name not in skip_dirs:
+                    stack.append(path)
+                continue
+            if not path.is_file() or path.suffix.lower() in skip_suffixes:
+                continue
+            files.append(path)
+    return sorted(files)
+
+
+def find_sensitive_values(
+    target: Path,
+    *,
+    skip_dirs: set[str],
+    skip_suffixes: set[str],
+) -> tuple[list[str], list[str]]:
+    """Find secret-looking file contents and read errors under a Link root."""
+    root = target.expanduser().resolve()
+    matches: list[str] = []
+    read_errors: list[str] = []
+    for path in iter_scannable_files(root, skip_dirs=skip_dirs, skip_suffixes=skip_suffixes):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            read_errors.append(f"{path.relative_to(root)} ({exc})")
+            continue
+        warnings = secret_value_warnings(text)
+        if warnings:
+            matches.append(f"{path.relative_to(root)} ({warnings[0]})")
+    return sorted(matches), sorted(read_errors)

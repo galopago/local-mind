@@ -139,11 +139,23 @@ def run_smoke(work_dir: Path, python: str) -> None:
         require("Knowledge Graph" in graph_html, "graph page did not render")
         require("graph-canvas" in graph_html, "graph page did not include the canvas")
 
+        status, _, body = request(base_url, "/health")
+        health_html = body.decode("utf-8", errors="replace")
+        require(status == 200, "health page did not return 200")
+        require("Health" in health_html, "health page did not render")
+        require("Repair Commands" in health_html, "health page did not show repair commands")
+        require("link operations" in health_html, "health page did not include operation inspection guidance")
+
         status, headers, status_payload = request_json(base_url, "/api/status?validate=true")
         require(status == 200, "status API did not return 200")
         require(status_payload.get("ready") is True, "status API did not report ready")
         require(status_payload.get("validation", {}).get("passed") is True, "status API validation did not pass")
         require(headers.get("Content-Type") == "application/json", "status API content type changed")
+
+        status, _, operations = request_json(base_url, "/api/operations")
+        require(status == 200, "operations API did not return 200")
+        require(operations.get("operation_count") == 0, "demo should not have interrupted operation markers")
+        require(operations.get("api_version") == "1", "operations API missing version")
 
         query = urllib.parse.quote("agent memory")
         status, _, summary = request_json(base_url, f"/api/graph-summary?q={query}&limit=5")

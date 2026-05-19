@@ -6,10 +6,36 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ## [Unreleased]
 
+- Nothing yet.
+
+## [1.2.0] - 2026-05-19
+
+### Highlights
+
+- Makes Link easier to install and try as a real product: Homebrew tap support, GitHub Pages docs, cleaner README/product positioning, and visual walkthrough assets.
+- Tightens external-user workflows across CLI, MCP, and the local web UI so copied commands work from any terminal directory and agents get explicit Link targets.
+- Improves confidence after the refactor with full user-level acceptance coverage across demo, init, memory lifecycle, capture lifecycle, MCP stdio, HTTP APIs, graph, and large-wiki paths.
+- Keeps large local wikis interactive with bounded graph payloads, SQLite FTS search validation, large-wiki smoke coverage, and benchmark/readiness reporting.
+
 ### Added
 
 - Added tap-ready Homebrew Formula packaging and maintainer instructions for publishing `gowtham0992/homebrew-link`.
 - Added public Homebrew install instructions to README and the product docs.
+- Added GitHub Pages product documentation under `docs/`, including focused UI, MCP, CLI, API, security, and contribution pages.
+- Added product-facing demo visuals for UI, CLI, and MCP flows so new users can understand Link before installing it.
+- Added external-user acceptance coverage for CLI, MCP stdio, HTTP routes, web mutation APIs, graph rendering, and large-wiki behavior.
+
+### Changed
+
+- Updated generated CLI guidance in memory, capture, web, and MCP payloads to include explicit Link root targets instead of relying on `.`.
+- Updated capture inbox, memory inbox, profile, lifecycle, and proposal commands so users can paste commands from any working directory.
+- Updated local web audit and capture commands to point at the served Link root.
+
+### Fixed
+
+- Fixed proposal approval commands that could save memories into the caller's current directory when copied from CLI or web output.
+- Fixed capture accept/delete/review follow-up commands that assumed the terminal was already inside the Link root.
+- Fixed memory review/update/archive/restore/forget follow-up commands that assumed the terminal was already inside the Link root.
 
 ## [1.1.0] - 2026-05-08
 

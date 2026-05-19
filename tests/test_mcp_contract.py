@@ -295,6 +295,14 @@ class McpContractTests(unittest.TestCase):
         self.assertTrue(payload["truncated"])
         self.assertEqual(payload["follow_up"][0]["tool"], "get_pages")
 
+    def test_get_pages_normalizes_messy_pagination_args(self):
+        payload = json.loads(self.server.get_pages(limit="bad", offset="-20", include_all="true"))
+
+        self.assertGreater(payload["returned_count"], 2)
+        self.assertIsNone(payload["limit"])
+        self.assertEqual(payload["offset"], 0)
+        self.assertFalse(payload["truncated"])
+
     def test_get_backlinks_contract(self):
         payload = json.loads(self.server.get_backlinks("agent-memory"))
 
@@ -313,6 +321,14 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["returned_inbound"], 3)
         self.assertTrue(payload["truncated"])
         self.assertEqual(payload["follow_up"][0]["tool"], "get_backlinks")
+
+    def test_get_backlinks_normalizes_messy_pagination_args(self):
+        payload = json.loads(self.server.get_backlinks("agent-memory", limit="bad", offset="-5", include_all="yes"))
+
+        self.assertIsNone(payload["limit"])
+        self.assertEqual(payload["offset"], 0)
+        self.assertEqual(payload["returned_inbound"], payload["inbound_count"])
+        self.assertFalse(payload["truncated"])
 
     def test_get_backlinks_rejects_empty_page_name(self):
         payload = json.loads(self.server.get_backlinks(""))

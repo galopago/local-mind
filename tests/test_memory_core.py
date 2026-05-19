@@ -15,6 +15,7 @@ from link_core.memory import (  # noqa: E402
     forget_memory_page,
     mark_memory_reviewed,
     memory_audit_report,
+    memory_audit_next_actions,
     memory_brief,
     memory_conflict_candidates,
     memory_explanation,
@@ -30,6 +31,7 @@ from link_core.memory import (  # noqa: E402
     update_memory_page,
     write_memory_page,
 )
+from link_core.operations import pending_operations  # noqa: E402
 
 
 class MemoryCoreTests(unittest.TestCase):
@@ -159,6 +161,47 @@ class MemoryCoreTests(unittest.TestCase):
             ],
         )
         self.assertEqual(audit["next_actions"], actions)
+
+    def test_memory_audit_next_actions_formats_cli_mcp_and_web_modes(self):
+        inbox = {"review_count": 1}
+        captures = {"count": 1, "read_warning_count": 0}
+        risk_factors = [{"code": "memory_review_backlog"}]
+
+        cli_actions = memory_audit_next_actions(
+            mode="cli",
+            inbox=inbox,
+            captures=captures,
+            risk_factors=risk_factors,
+            project="Link Product",
+            root="/tmp/link",
+        )
+        mcp_actions = memory_audit_next_actions(
+            mode="mcp",
+            inbox=inbox,
+            captures=captures,
+            project="Link Product",
+        )
+        web_actions = memory_audit_next_actions(
+            mode="web",
+            inbox=inbox,
+            captures=captures,
+            risk_factors=[],
+            project="Link Product",
+        )
+
+        self.assertEqual(cli_actions[0]["command"], 'python3 link.py memory-inbox "/tmp/link" --project "link-product"')
+        self.assertTrue(cli_actions[1]["recommended"])
+        self.assertFalse(cli_actions[2]["recommended"])
+        self.assertEqual(mcp_actions[0]["tool"], "memory_inbox")
+        self.assertIn('project="link-product"', mcp_actions[0]["command"])
+        self.assertEqual(mcp_actions[1]["tool"], "capture_inbox")
+        self.assertEqual(web_actions[0]["href"], "/inbox?project=link-product")
+        self.assertEqual(web_actions[1]["href"], "/captures?project=link-product")
+        self.assertTrue(web_actions[2]["recommended"])
+
+    def test_memory_audit_next_actions_rejects_unknown_mode(self):
+        with self.assertRaises(ValueError):
+            memory_audit_next_actions(mode="desktop", inbox={}, captures={})
 
     def test_add_capture_review_to_brief_adds_capture_guidance(self):
         payload = {"agent_guidance": ["Use memory first."]}
@@ -402,6 +445,19 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(payload["project"], "link")
         self.assertEqual(action["arguments"]["project"], "link")
         self.assertIn("--project link", action["command"])
+
+    def test_memory_proposal_command_uses_explicit_target(self):
+        payload = propose_memories_from_text(
+            "I prefer local agent memory for release work.",
+            [],
+            source="unit test",
+            command_target="/tmp/link demo",
+        )
+        action = payload["proposals"][0]["primary_action"]
+
+        self.assertEqual(action["kind"], "remember")
+        self.assertIn("link demo", action["command"])
+        self.assertNotIn(" remember . ", action["command"])
 
     def test_memory_conflict_candidates_catch_branch_policy_changes(self):
         records = [
@@ -781,6 +837,7 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertNotIn("[[prefer-focused-commits]]", (wiki / "index.md").read_text(encoding="utf-8"))
         self.assertEqual(logged[-1][1], "forget-memory")
         self.assertNotIn("User prefers focused commits", "\n".join(logged[-1][3]))
+        self.assertEqual(pending_operations(wiki), [])
 
     def test_write_memory_page_creates_index_log_and_blocks_duplicates(self):
         root = Path(tempfile.mkdtemp(prefix="link-memory-write-"))
@@ -820,6 +877,7 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertIn("[[prefer-release-branches]]", index_text)
         self.assertEqual(logged[-1][1], "remember")
         self.assertIn("Created: memories/prefer-release-branches.md", logged[-1][3])
+        self.assertEqual(pending_operations(wiki), [])
 
         duplicate = write_memory_page(
             wiki,

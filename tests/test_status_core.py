@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
 from link_core import status as status_core  # noqa: E402
+from link_core.operations import begin_operation  # noqa: E402
 from link_core.status import link_status  # noqa: E402
 from link_core.schema import write_schema  # noqa: E402
 from link_core.wiki import build_backlinks, build_wiki_cache  # noqa: E402
@@ -126,6 +127,17 @@ class StatusCoreTests(unittest.TestCase):
 
         self.assertFalse(payload["ready"])
         self.assertEqual(payload["warnings"][0]["code"], "cache_read_warnings")
+
+    def test_link_status_blocks_ready_on_stale_operation_marker(self):
+        wiki = self.make_wiki()
+        begin_operation(wiki, "remember", "Saved memory", timestamp="2000-01-01T00:00:00Z")
+
+        payload = link_status(wiki)
+
+        self.assertFalse(payload["ready"])
+        self.assertIn("stale_operations", [warning["code"] for warning in payload["warnings"]])
+        self.assertEqual(payload["next_actions"][0]["tool"], "doctor")
+        self.assertEqual(payload["next_actions"][1]["tool"], "validate_wiki")
 
     def test_link_status_points_validation_shape_errors_to_doctor_fix(self):
         wiki = self.make_wiki()

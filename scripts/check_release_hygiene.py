@@ -224,25 +224,26 @@ def check_agent_contract(
     requirements: dict[Path, tuple[str, ...]] = AGENT_CONTRACT_REQUIREMENTS,
 ) -> None:
     for path, required_terms in requirements.items():
+        rel = path.as_posix()
         if not path.exists():
-            findings.append(f"agent contract file missing: {path}")
+            findings.append(f"agent contract file missing: {rel}")
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         for term in required_terms:
             if term not in text:
-                findings.append(f"agent contract missing {term!r} in {path}")
+                findings.append(f"agent contract missing {term!r} in {rel}")
 
 
 def check_tracked_path_hygiene(findings: list[str], path: Path) -> bool:
     """Check release-blocking tracked path patterns. Return true when caller should skip content scan."""
     rel = path.as_posix()
     if any(fnmatch.fnmatch(rel, pattern) for pattern in BUILD_ARTIFACT_PATTERNS):
-        findings.append(f"build artifact should not be tracked: {path}")
+        findings.append(f"build artifact should not be tracked: {rel}")
         return True
 
     name = path.name
     if any(fnmatch.fnmatch(name, pattern) for pattern in SECRET_NAME_PATTERNS):
-        findings.append(f"sensitive-looking tracked filename: {path}")
+        findings.append(f"sensitive-looking tracked filename: {rel}")
         return True
 
     return False
@@ -250,13 +251,14 @@ def check_tracked_path_hygiene(findings: list[str], path: Path) -> bool:
 
 def check_outbound_network_hygiene(findings: list[str], path: Path, text: str) -> None:
     """Block accidental outbound network code in Link's local-first runtime."""
+    rel = path.as_posix()
     if path.suffix.lower() not in OUTBOUND_NETWORK_CODE_SUFFIXES:
         return
     if path in OUTBOUND_NETWORK_ALLOWLIST:
         return
     for label, pattern in OUTBOUND_NETWORK_PATTERNS:
         if pattern.search(text):
-            findings.append(f"outbound network code in {path}: {label}")
+            findings.append(f"outbound network code in {rel}: {label}")
             return
 
 
@@ -276,12 +278,12 @@ def main() -> int:
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
-            findings.append(f"could not read tracked file {path}: {exc}")
+            findings.append(f"could not read tracked file {path.as_posix()}: {exc}")
             continue
 
         for label, pattern in SECRET_VALUE_PATTERNS:
             if pattern.search(text):
-                findings.append(f"sensitive-looking content in {path}: {label}")
+                findings.append(f"sensitive-looking content in {path.as_posix()}: {label}")
                 break
         check_outbound_network_hygiene(findings, path, text)
 

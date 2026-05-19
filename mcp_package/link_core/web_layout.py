@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Sequence
 
 from .web_assets import (
     COPY_BUTTON_JS,
@@ -66,6 +67,7 @@ def render_header_html() -> str:
   </div>
   <nav>
     <a href="/">home</a>
+    <a href="/health">health</a>
     <a href="/prompts">prompts</a>
     <a href="/ingest">ingest</a>
     <a href="/brief">brief</a>
@@ -84,6 +86,16 @@ def render_header_html() -> str:
 
 def render_footer_html() -> str:
     return '<footer>Link — local agent memory · <a href="https://github.com/gowtham0992/link">github</a></footer>'
+
+
+def render_stat_grid(items: Sequence[tuple[object, str]]) -> str:
+    """Render Link's compact stat grid."""
+    stats = "".join(
+        f'<div class="stat"><span class="num">{html.escape(str(value))}</span>'
+        f'<span class="label">{html.escape(label)}</span></div>'
+        for value, label in items
+    )
+    return f'<div class="home-stats">{stats}</div>'
 
 
 def render_layout(title: str, body: str, page_class: str = "") -> str:

@@ -56,6 +56,15 @@ link demo
 link serve link-demo
 ```
 
+Windows or source checkout:
+
+```powershell
+git clone https://github.com/gowtham0992/link.git
+cd link
+py link.py demo
+py link.py serve link-demo
+```
+
 Or from source:
 
 ```bash
@@ -142,6 +151,10 @@ Installers create or update `~/link`, install or upgrade `link-mcp`, write
 lightweight agent instructions, and preserve existing wiki data on reinstall.
 Use `--project` when a repo needs separate project memory.
 
+The shell installers are intended for macOS/Linux-style agent config paths.
+On Windows, use the source commands above plus the MCP-only config below until
+your agent has a Windows-specific installer.
+
 Then ask your agent:
 
 ```text
@@ -184,13 +197,16 @@ Full setup: [MCP guide](https://gowtham0992.github.io/link/mcp.html).
 
 ## How Link Works
 
-Link has one simple rule:
+Link separates source-backed knowledge from durable agent memory:
 
-```text
-Sources become wiki knowledge.
-Explicit "remember" becomes agent memory.
-Queries use both.
-```
+1. Drop raw notes, transcripts, articles, and project context into `raw/`.
+2. Agents compile those sources into inspectable pages under `wiki/`.
+3. Explicit "remember" requests become reviewable memory pages.
+4. Queries retrieve compact MCP context from both the wiki and memory layer.
+
+<p align="center">
+  <img src="docs/assets/link-memory-flow.svg" alt="Link architecture: raw sources become wiki knowledge, explicit remembers become reviewed memory, and agents retrieve compact MCP context" width="820">
+</p>
 
 The storage model is plain and inspectable:
 

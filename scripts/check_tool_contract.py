@@ -27,6 +27,7 @@ EXPECTED_CLI_COMMANDS = {
     "memory-audit",
     "memory-inbox",
     "migrate",
+    "operations",
     "profile",
     "prompts",
     "propose-memories",
@@ -107,8 +108,8 @@ def _literal_string_list(node: ast.AST) -> list[str]:
     return values
 
 
-def cli_commands(path: Path = ROOT / "link.py") -> set[str]:
-    """Return argparse subcommands and aliases declared by link.py."""
+def cli_commands(path: Path = ROOT / "mcp_package/link_core/cli_parser.py") -> set[str]:
+    """Return argparse subcommands and aliases declared by Link's CLI parser."""
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     commands: set[str] = set()
     for node in ast.walk(tree):
@@ -172,13 +173,14 @@ def _missing_cli_reference(path: Path = ROOT / CLI_DOC_PATH) -> list[str]:
 def check_tool_contract(root: Path = ROOT) -> list[str]:
     findings: list[str] = []
 
-    actual_cli = cli_commands(root / "link.py")
+    cli_parser_path = root / "mcp_package/link_core/cli_parser.py"
+    actual_cli = cli_commands(cli_parser_path)
     missing_cli = sorted(EXPECTED_CLI_COMMANDS - actual_cli)
     extra_cli = sorted(actual_cli - EXPECTED_CLI_COMMANDS)
     if missing_cli:
-        findings.append(f"link.py is missing CLI commands: {', '.join(missing_cli)}")
+        findings.append(f"{cli_parser_path.relative_to(root)} is missing CLI commands: {', '.join(missing_cli)}")
     if extra_cli:
-        findings.append(f"link.py has undocumented CLI commands: {', '.join(extra_cli)}")
+        findings.append(f"{cli_parser_path.relative_to(root)} has undocumented CLI commands: {', '.join(extra_cli)}")
 
     actual_mcp = mcp_tools(root / "mcp_package/link_mcp/server.py")
     missing_mcp = sorted(EXPECTED_MCP_TOOLS - actual_mcp)

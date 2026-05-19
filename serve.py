@@ -11,6 +11,7 @@ import socketserver
 import sys
 import time
 import urllib.parse
+from collections.abc import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -28,6 +29,7 @@ from link_core.memory import (
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
     memory_audit_report as _core_memory_audit_report,
+    memory_audit_next_actions as _core_memory_audit_next_actions,
     memory_records as _core_memory_records,
     memory_review_issues as _core_memory_review_issues,
     memory_duplicate_candidates as _core_memory_duplicate_candidates,
@@ -52,14 +54,8 @@ from link_core.log import (
 from link_core.markdown import (
     markdown_to_html as _core_markdown_to_html,
 )
-from link_core.raw import (
-    RawSourceError as _RawSourceError,
-    create_raw_source as _core_create_raw_source,
-)
 from link_core.security import (
     clean_text_input as _clean_text_input,
-    redact_secret_values as _redact_secret_values,
-    secret_file_scan as _secret_file_scan,
 )
 from link_core.query import (
     query_link as _core_query_link,
@@ -75,13 +71,18 @@ from link_core.version import (
 )
 from link_core.web_assets import CSS  # noqa: F401 - kept as serve.CSS for tests and compatibility
 from link_core.web_memory import (
-    render_capture_card as _core_render_capture_card,
-    render_capture_section as _core_render_capture_section,
-    render_memory_action_button as _core_render_memory_action_button,
-    render_memory_action_commands as _core_render_memory_action_commands,
+    memory_dashboard_next_actions as _core_memory_dashboard_next_actions,
     render_memory_card as _core_render_memory_card,
-    render_memory_next_actions as _core_render_memory_next_actions,
     render_memory_section as _core_render_memory_section,
+)
+from link_core.web_memory_pages import (
+    render_brief_page as _core_render_brief_page,
+    render_captures_page as _core_render_captures_page,
+    render_inbox_page as _core_render_inbox_page,
+    render_memory_explanation_page as _core_render_memory_explanation_page,
+    render_memory_audit_page as _core_render_memory_audit_page,
+    render_memory_dashboard_page as _core_render_memory_dashboard_page,
+    render_profile_page as _core_render_profile_page,
 )
 from link_core.web_layout import (
     render_footer_html as _core_render_footer_html,
@@ -96,6 +97,19 @@ from link_core.web_graph import (
     graph_initial_payload as _core_graph_initial_payload,
     graph_legend_items as _core_graph_legend_items,
     graph_needs_bounded_overview as _core_graph_needs_bounded_overview,
+    render_graph_empty_body as _core_render_graph_empty_body,
+    render_graph_page_body as _core_render_graph_page_body,
+    render_graph_script as _core_render_graph_script,
+)
+from link_core.web_home import (
+    plural_type_label as _core_plural_type_label,
+    render_home_page as _core_render_home_page,
+)
+from link_core.web_health import (
+    render_health_page as _core_render_health_page,
+)
+from link_core.web_ingest import (
+    render_ingest_page as _core_render_ingest_page,
 )
 from link_core.web_http import (
     CONTENT_SECURITY_POLICY as _core_content_security_policy,
@@ -112,8 +126,29 @@ from link_core.web_http import (
     validate_local_browser_source_headers as _core_validate_local_browser_source_headers,
     validate_local_host_header as _core_validate_local_host_header,
 )
+from link_core.web_proposals import (
+    create_raw_source_payload as _core_create_raw_source_payload,
+    proposal_source_payload as _core_proposal_source_payload,
+    proposal_sources as _core_proposal_sources,
+)
+from link_core.web_propose import (
+    render_propose_page as _core_render_propose_page,
+)
+from link_core.web_prompts import (
+    render_prompts_page as _core_render_prompts_page,
+)
+from link_core.web_pages import (
+    render_all_pages as _core_render_all_pages,
+    render_wiki_page as _core_render_wiki_page,
+)
+from link_core.web_search import (
+    render_search_page as _core_render_search_page,
+)
 from link_core.status import (
     link_status as _core_link_status,
+)
+from link_core.operations import (
+    operation_report as _core_operation_report,
 )
 from link_core.capture import (
     capture_inbox as _core_capture_inbox,
@@ -354,10 +389,7 @@ def _page_href(name: str) -> str:
 
 
 def _plural_type_label(page_type: str) -> str:
-    irregular = {"entity": "entities", "memory": "memories"}
-    if page_type in irregular:
-        return irregular[page_type]
-    return page_type if page_type.endswith("s") else page_type + "s"
+    return _core_plural_type_label(page_type)
 
 
 def _memory_records() -> list[dict[str, object]]:
@@ -396,6 +428,7 @@ def _memory_inbox(limit: int = 20, include_archived: bool = False, project: str 
         include_archived=include_archived,
         review_command="review-memory",
         project=project,
+        command_target=WIKI_DIR.parent,
     )
 
 
@@ -444,6 +477,7 @@ def _propose_memories_from_text(
         limit=limit,
         writes_memory=False,
         project=project,
+        command_target=WIKI_DIR.parent,
     )
 
 
@@ -453,6 +487,7 @@ def _memory_explanation(identifier: str) -> dict[str, object]:
         identifier,
         records=_memory_records(),
         review_command="review-memory",
+        command_target=WIKI_DIR.parent,
     )
 
 
@@ -572,66 +607,14 @@ def _memory_dashboard_next_actions(
     capture_count: int = 0,
     capture_warning_count: int = 0,
 ) -> list[dict[str, str]]:
-    actions: list[dict[str, str]] = []
-    if capture_warning_count:
-        actions.append({
-            "label": "Redact capture warnings",
-            "detail": f"{capture_warning_count} raw capture{'s' if capture_warning_count != 1 else ''} contain secret-looking values.",
-            "href": "/captures",
-            "command": "python3 link.py redact-capture raw/memory-captures/<capture>.md .",
-            "priority": "high",
-        })
-    if review_count:
-        memory_label = "memory" if review_count == 1 else "memories"
-        verb = "needs" if review_count == 1 else "need"
-        actions.append({
-            "label": "Review pending memories",
-            "detail": f"{review_count} {memory_label} {verb} confirmation or metadata cleanup.",
-            "href": "/inbox",
-            "command": "python3 link.py memory-inbox .",
-            "priority": "high",
-        })
-    if updated_count:
-        actions.append({
-            "label": "Audit recent memory updates",
-            "detail": f"{updated_count} memory update{'s' if updated_count != 1 else ''} should be checked for accuracy.",
-            "href": "/memory",
-            "command": "python3 link.py profile .",
-            "priority": "medium",
-        })
-    if archived_count:
-        actions.append({
-            "label": "Inspect archived memory",
-            "detail": f"{archived_count} archived memory page{'s' if archived_count != 1 else ''} remain inspectable but hidden from default recall.",
-            "href": "/profile",
-            "command": "python3 link.py profile .",
-            "priority": "low",
-        })
-    if capture_count and not capture_warning_count:
-        actions.append({
-            "label": "Review raw captures",
-            "detail": f"{capture_count} saved raw capture{'s' if capture_count != 1 else ''} can be accepted, redacted, or deleted.",
-            "href": "/captures",
-            "command": "python3 link.py accept-capture raw/memory-captures/<capture>.md . --index 1",
-            "priority": "medium",
-        })
-    if not memory_count:
-        actions.append({
-            "label": "Create the first memory",
-            "detail": "Save an explicit preference, decision, project fact, or note for local agents.",
-            "href": "",
-            "command": 'python3 link.py remember "User prefers ..." . --type preference --scope user',
-            "priority": "high",
-        })
-    if not actions:
-        actions.append({
-            "label": "Memory is recall-ready",
-            "detail": "No pending review items or recent updates need attention.",
-            "href": "/profile",
-            "command": "python3 link.py profile .",
-            "priority": "info",
-        })
-    return actions[:3]
+    return _core_memory_dashboard_next_actions(
+        memory_count=memory_count,
+        review_count=review_count,
+        updated_count=updated_count,
+        archived_count=archived_count,
+        capture_count=capture_count,
+        capture_warning_count=capture_warning_count,
+    )
 
 
 def _capture_records(limit: int = 12, project: str | None = None) -> list[dict[str, object]]:
@@ -640,7 +623,7 @@ def _capture_records(limit: int = 12, project: str | None = None) -> list[dict[s
         root,
         limit=limit,
         project=project,
-        commands_for=_core_cli_capture_commands,
+        commands_for=lambda rel_path: _core_cli_capture_commands(rel_path, root),
     )
 
 
@@ -649,7 +632,7 @@ def _capture_inbox(limit: int = 20, project: str | None = None) -> dict[str, obj
         WIKI_DIR.parent,
         limit=limit,
         project=project,
-        commands_for=_core_cli_capture_commands,
+        commands_for=lambda rel_path: _core_cli_capture_commands(rel_path, WIKI_DIR.parent),
     )
 
 
@@ -659,12 +642,12 @@ def _capture_review_summary(project: str | None = None, limit: int = 3) -> dict[
         WIKI_DIR.parent,
         limit=limit,
         project=project_name,
-        commands_for=_core_cli_capture_commands,
+        commands_for=lambda rel_path: _core_cli_capture_commands(rel_path, WIKI_DIR.parent),
     )
     project_query = f"?project={urllib.parse.quote(project_name, safe='')}" if project_name else ""
     project_arg = f' --project "{project_name}"' if project_name else ""
     summary["href"] = f"/captures{project_query}"
-    summary["command"] = f"python3 link.py capture-inbox .{project_arg}"
+    summary["command"] = f'python3 link.py capture-inbox "{WIKI_DIR.parent}"{project_arg}'
     return summary
 
 
@@ -674,6 +657,7 @@ def _memory_brief(query: str = "", limit: int = 6, project: str | None = None) -
     payload = _core_memory_brief(
         _memory_records(), query=query, limit=limit,
         review_command="review-memory", project=project_name,
+        command_target=WIKI_DIR.parent,
     )
     return _core_add_capture_review_to_brief(
         payload,
@@ -734,39 +718,6 @@ def _memory_dashboard(limit: int = 12, project: str | None = None) -> dict[str, 
     }
 
 
-def _web_memory_audit_actions(
-    inbox: dict[str, object],
-    captures: dict[str, object],
-    risk_factors: list[dict[str, object]],
-    project_name: str,
-) -> list[dict[str, object]]:
-    project_query = f"?project={urllib.parse.quote(project_name, safe='')}" if project_name else ""
-    project_arg = f' --project "{project_name}"' if project_name else ""
-    return [
-        {
-            "label": "Review memory inbox",
-            "detail": "Review pending, stale, invalid, or underspecified memories.",
-            "href": f"/inbox{project_query}",
-            "command": f"python3 link.py memory-inbox .{project_arg}",
-            "recommended": bool(inbox["review_count"]),
-        },
-        {
-            "label": "Review raw captures",
-            "detail": "Accept, redact, or delete saved proposal-only raw captures.",
-            "href": f"/captures{project_query}",
-            "command": f"python3 link.py capture-inbox .{project_arg}",
-            "recommended": bool(captures["count"] or captures.get("read_warning_count")),
-        },
-        {
-            "label": "Run doctor",
-            "detail": "Check graph, source, memory, raw capture, and secret hygiene.",
-            "href": "",
-            "command": "python3 link.py doctor .",
-            "recommended": not risk_factors,
-        },
-    ]
-
-
 def _memory_audit(limit: int = 10, project: str | None = None) -> dict[str, object]:
     limit = max(1, min(limit, 50))
     project_name = _core_normalize_project(project)
@@ -774,11 +725,13 @@ def _memory_audit(limit: int = 10, project: str | None = None) -> dict[str, obje
     inbox = _memory_inbox(limit=limit, include_archived=True, project=project_name)
     captures = _capture_review_summary(project=project_name, limit=min(limit, 10))
     payload = _core_memory_audit_report(profile, inbox, captures, [], project=project_name)
-    payload["next_actions"] = _web_memory_audit_actions(
-        inbox,
-        captures,
-        payload["risk_factors"],
-        str(payload["project"]),
+    payload["next_actions"] = _core_memory_audit_next_actions(
+        mode="web",
+        inbox=inbox,
+        captures=captures,
+        risk_factors=payload["risk_factors"],
+        project=str(payload["project"]),
+        root=WIKI_DIR.parent,
     )
     return payload
 
@@ -817,183 +770,31 @@ def _resolve_raw_static_path(url_fragment: str) -> tuple[Path | None, str | None
     return _core_resolve_raw_static_path(RAW_DIR, url_fragment, RAW_STATIC_TYPES)
 
 
-def _proposal_source_title(text: str, fallback: str) -> str:
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("# "):
-            return stripped[2:].strip()[:100] or fallback
-        if stripped:
-            return stripped[:100]
-    return fallback
-
-
-def _proposal_source_snippet(text: str) -> str:
-    lines = [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip() and not line.strip().startswith("---")
-    ]
-    return " ".join(lines[:3])[:260]
-
-
-def _proposal_source_preview(path: Path) -> tuple[str, str]:
-    try:
-        with path.open("r", encoding="utf-8", errors="replace") as handle:
-            return handle.read(MAX_PROPOSAL_SOURCE_BYTES + 1), ""
-    except OSError as exc:
-        return "", str(exc)
-
-
-def _resolve_proposal_source_path(source_path: str) -> Path | None:
-    raw_text = str(source_path or "").strip()
-    if len(raw_text) > 1000:
-        return None
-    decoded = urllib.parse.unquote(raw_text).strip().lstrip("/")
-    if decoded.startswith("raw/"):
-        decoded = decoded[4:]
-    if not decoded:
-        return None
-    resolved = _safe_resolve(RAW_DIR / decoded)
-    raw_root = RAW_DIR.resolve()
-    if not resolved or not _is_relative_to(resolved, raw_root):
-        return None
-    if any(part.startswith(".") for part in resolved.relative_to(raw_root).parts):
-        return None
-    if not resolved.is_file() or resolved.suffix.lower() not in PROPOSAL_SOURCE_SUFFIXES:
-        return None
-    return resolved
-
-
-def _proposal_source_record(path: Path, include_text: bool = False) -> dict[str, object]:
-    raw_root = RAW_DIR.resolve()
-    rel = path.relative_to(raw_root).as_posix()
-    try:
-        size = path.stat().st_size
-    except OSError as exc:
-        return {
-            "path": f"raw/{rel}",
-            "source": f"raw/{rel}",
-            "title": rel,
-            "size": 0,
-            "snippet": "",
-            "secret_warnings": [],
-            "warning_count": 0,
-            "loadable": False,
-            "truncated": False,
-            "action": "unavailable",
-            "action_label": "Unavailable",
-            "error": str(exc),
-        }
-    text, read_error = _proposal_source_preview(path)
-    scan = _secret_file_scan(path)
-    labels = list(scan.get("labels") or [])
-    scan_error = str(scan.get("error") or "")
-    read_error = read_error or scan_error
-    redacted, _, _ = _redact_secret_values(text) if labels else (text, [], 0)
-    truncated = size > MAX_PROPOSAL_SOURCE_BYTES
-    if read_error:
-        action = "unavailable"
-        action_label = "Fix access"
-    elif labels:
-        action = "redact"
-        action_label = "Redact first"
-    elif truncated:
-        action = "split"
-        action_label = "Split file"
-    else:
-        action = "load"
-        action_label = "Use in form"
-    record: dict[str, object] = {
-        "path": f"raw/{rel}",
-        "source": f"raw/{rel}",
-        "title": _proposal_source_title(redacted, rel),
-        "size": size,
-        "snippet": _proposal_source_snippet(redacted),
-        "secret_warnings": labels,
-        "warning_count": len(labels),
-        "loadable": action == "load",
-        "truncated": truncated,
-        "action": action,
-        "action_label": action_label,
-    }
-    if read_error:
-        record["error"] = read_error
-    if include_text and record["loadable"]:
-        record["text"] = text[:MAX_PROPOSAL_SOURCE_BYTES]
-    return record
-
-
 def _proposal_sources(limit: int = 50) -> dict[str, object]:
-    if not RAW_DIR.exists():
-        return {"count": 0, "sources": [], "raw_dir": str(RAW_DIR), "warning_count": 0}
-    raw_root = RAW_DIR.resolve()
-    sources: list[dict[str, object]] = []
-    for path in sorted(RAW_DIR.rglob("*")):
-        resolved = _safe_resolve(path)
-        if not resolved or not _is_relative_to(resolved, raw_root):
-            continue
-        if not resolved.is_file() or resolved.suffix.lower() not in PROPOSAL_SOURCE_SUFFIXES:
-            continue
-        if any(part.startswith(".") for part in resolved.relative_to(raw_root).parts):
-            continue
-        sources.append(_proposal_source_record(resolved))
-        if len(sources) >= limit:
-            break
-    warning_count = sum(int(source.get("warning_count") or 0) for source in sources)
-    return {
-        "count": len(sources),
-        "sources": sources,
-        "raw_dir": str(RAW_DIR),
-        "warning_count": warning_count,
-    }
+    return _core_proposal_sources(
+        RAW_DIR,
+        suffixes=PROPOSAL_SOURCE_SUFFIXES,
+        max_bytes=MAX_PROPOSAL_SOURCE_BYTES,
+        limit=limit,
+    )
 
 
 def _proposal_source_payload(source_path: str) -> tuple[dict[str, object], int]:
-    path = _resolve_proposal_source_path(source_path)
-    if not path:
-        return {"found": False, "error": "source path not found or unsupported"}, 404
-    record = _proposal_source_record(path, include_text=True)
-    if record.get("warning_count"):
-        record["found"] = True
-        record["error"] = "source contains secret-looking values; redact before loading"
-        return record, 409
-    if not record.get("loadable"):
-        record["found"] = True
-        if record.get("action") == "unavailable":
-            record["error"] = record.get("error") or "source could not be read"
-            return record, 423
-        record["error"] = "source is too large to load into the proposal form"
-        return record, 413
-    record["found"] = True
-    return record, 200
+    return _core_proposal_source_payload(
+        RAW_DIR,
+        source_path,
+        suffixes=PROPOSAL_SOURCE_SUFFIXES,
+        max_bytes=MAX_PROPOSAL_SOURCE_BYTES,
+    )
 
 
 def _create_raw_source_payload(payload: dict[str, object]) -> tuple[dict[str, object], int]:
-    try:
-        result = _core_create_raw_source(
-            WIKI_DIR.parent,
-            title=payload.get("title", ""),
-            filename=payload.get("filename", ""),
-            text=payload.get("text", ""),
-            max_bytes=MAX_RAW_SOURCE_BYTES,
-        )
-    except _RawSourceError as exc:
-        return {
-            "created": False,
-            "error": str(exc),
-            "secret_warnings": exc.labels,
-        }, exc.status
-    _append_log(
-        _utc_timestamp(),
-        "add-raw-source",
-        f"Added {result['path']} from local web UI",
-        [
-            f"Raw source: {result['path']}",
-            f"Size bytes: {result['size_bytes']}",
-            "Secret warnings: none",
-        ],
+    return _core_create_raw_source_payload(
+        WIKI_DIR.parent,
+        WIKI_DIR,
+        payload,
+        max_bytes=MAX_RAW_SOURCE_BYTES,
     )
-    return result, 201
 
 
 # ---------------------------------------------------------------------------
@@ -1025,61 +826,12 @@ def _layout(title, body, page_class: str = ""):
 # ---------------------------------------------------------------------------
 
 def _render_home():
-    pages = _get_all_pages()
-    counts = {}
-    for p in pages:
-        t = p["type"] or "other"
-        counts[t] = counts.get(t, 0) + 1
-
-    stats_items = f'<div class="stat"><span class="num">{len(pages)}</span><span class="label">pages</span></div>'
-    for t in ["memory", "source", "concept", "entity", "comparison", "exploration"]:
-        if counts.get(t, 0) > 0:
-            label = _plural_type_label(t)
-            stats_items += f'<div class="stat"><span class="num">{counts[t]}</span><span class="label">{label}</span></div>'
-    stats = f'<div class="home-stats">{stats_items}</div>'
-
-    cats = {}
-    for p in pages:
-        if p["category"] == "root": continue
-        cats.setdefault(p["category"], []).append(p)
-
-    sections = ""
-    for cat in sorted(cats.keys()):
-        items = "".join(
-            f'<li><a href="{_page_href(p["name"])}">{html.escape(p["title"])}</a>'
-            f'<span class="type">{p["type"]}</span></li>'
-            for p in sorted(cats[cat], key=lambda x: x["title"])
-        )
-        sections += f'<h2>{html.escape(cat)}</h2><ul class="page-list">{items}</ul>'
-
-    if not cats:
-        sections = "<p>Wiki is empty. Drop sources into <code>raw/</code> and tell your agent to ingest them.</p>"
-
-    lanes = (
-        '<div class="product-lanes" aria-label="How Link stores context">'
-        '<section class="product-lane"><h2>1. Sources become wiki knowledge</h2>'
-        '<p>Drop files into <code>raw/</code> and say <code>ingest raw/file.md into Link</code>. '
-        'Link creates source-backed pages, concepts, backlinks, index entries, and logs.</p></section>'
-        '<section class="product-lane"><h2>2. Remember saves agent memory</h2>'
-        '<p>Say <code>remember that ...</code> when a preference, decision, or project fact should affect future agents. '
-        'Ingest alone does not silently personalize recall.</p></section>'
-        '<section class="product-lane"><h2>3. Query uses both safely</h2>'
-        '<p>Ask <code>query Link for ...</code> or open a memory brief. Link combines reviewed memory, wiki pages, and graph context.</p></section>'
-        '</div>'
+    return _core_render_home_page(
+        _get_all_pages(),
+        starter_prompts=_starter_prompts_payload(),
+        page_href=_page_href,
+        layout=_layout,
     )
-    prompt_codes = ""
-    for item in _starter_prompts_payload().get("prompts", []):
-        if isinstance(item, dict):
-            prompt_codes += f'<code>{html.escape(str(item.get("prompt") or ""))}</code>'
-    prompts = (
-        '<section class="prompt-strip" aria-label="First Link prompts">'
-        '<h2>Try These Prompts</h2>'
-        '<p>Ask from Codex, Claude, Cursor, Kiro, or any agent with Link installed. <a href="/prompts">Open starter prompts</a>.</p>'
-        '<div class="prompt-grid">'
-        f'{prompt_codes}</div></section>'
-    )
-
-    return _layout("Link", f"<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>{lanes}{prompts}{stats}{sections}")
 
 
 def _starter_prompts_payload(project: str | None = None) -> dict[str, object]:
@@ -1087,35 +839,7 @@ def _starter_prompts_payload(project: str | None = None) -> dict[str, object]:
 
 
 def _render_prompts(project: str | None = None):
-    payload = _starter_prompts_payload(project=project)
-    prompt_rows = ""
-    for item in payload.get("prompts", []):
-        if not isinstance(item, dict):
-            continue
-        prompt_rows += (
-            f'<article class="proposal-card">'
-            f'<h3>{html.escape(str(item.get("label") or "Prompt"))}</h3>'
-            f'<code class="proposal-command">{html.escape(str(item.get("prompt") or ""))}</code>'
-            f'<p class="summary">{html.escape(str(item.get("when") or ""))}</p>'
-            f'</article>'
-        )
-    command_rows = "".join(
-        f'<li><code>{html.escape(str(command))}</code></li>'
-        for command in payload.get("commands", [])
-    )
-    project_line = (
-        f'<p class="summary">Project examples are scoped to <code>{html.escape(str(payload["project"]))}</code>.</p>'
-        if payload.get("project")
-        else '<p class="summary">These prompts work for a personal Link wiki. Add <code>?project=slug</code> for project wording.</p>'
-    )
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / prompts</div>'
-        f'<h1>Starter Prompts</h1>'
-        f'{project_line}'
-        f'<section><h2>Ask Your Agent</h2><div class="proposal-results">{prompt_rows}</div></section>'
-        f'<section><h2>Local Checks</h2><ul class="page-list">{command_rows}</ul></section>'
-    )
-    return _layout("Starter Prompts", body)
+    return _core_render_prompts_page(_starter_prompts_payload(project=project), layout=_layout)
 
 
 def _render_page(page_path):
@@ -1130,24 +854,7 @@ def _render_page(page_path):
 
     rel = page_path.relative_to(WIKI_DIR)
     cat = rel.parts[0] if len(rel.parts) > 1 else ""
-    crumb = f'<div class="breadcrumb"><a href="/">Link</a>'
-    if cat:
-        crumb += f' / {html.escape(cat)}'
-    crumb += f' / {html.escape(title)}</div>'
-
-    parts = []
-    if meta.get("type"): parts.append(f'<span class="badge">{html.escape(str(meta["type"]))}</span>')
-    if meta.get("maturity"): parts.append(html.escape(str(meta["maturity"])))
-    if meta.get("source_count"): parts.append(f'{meta["source_count"]} sources')
-    if meta.get("date_updated"): parts.append(f'updated {meta["date_updated"]}')
-    aliases = meta.get("aliases", [])
-    if isinstance(aliases, list) and aliases:
-        parts.append("also: " + ", ".join(html.escape(a) for a in aliases))
-    elif isinstance(aliases, str) and aliases:
-        parts.append(f"also: {html.escape(aliases)}")
-    meta_line = f'<div class="meta">{" · ".join(parts)}</div>' if parts else ""
-
-    return _layout(title, crumb + meta_line + body_html)
+    return _core_render_wiki_page(str(title), category=cat, meta=meta, body_html=body_html, layout=_layout)
 
 
 def _render_all(query: dict[str, list[str]] | None = None):
@@ -1166,36 +873,15 @@ def _render_all(query: dict[str, list[str]] | None = None):
     assert offset is not None
     sorted_pages = sorted(pages, key=lambda x: x["title"])
     window = sorted_pages[offset:offset + limit]
-    items = "".join(
-        f'<li><a href="{_page_href(p["name"])}">{html.escape(p["title"])}</a>'
-        f'<span class="type">{p["type"] or p["category"]}</span></li>'
-        for p in window
+    return _core_render_all_pages(
+        window,
+        total=total,
+        limit=limit,
+        offset=offset,
+        page_href=_page_href,
+        layout=_layout,
+        error=error or "",
     )
-    next_offset = offset + limit
-    prev_offset = max(0, offset - limit)
-    controls = ""
-    if total > limit or offset:
-        start = 0 if total == 0 else offset + 1
-        end = min(offset + limit, total)
-        prev_href = html.escape(f"/all?limit={limit}&offset={prev_offset}", quote=True)
-        next_href = html.escape(f"/all?limit={limit}&offset={next_offset}", quote=True)
-        prev_link = (
-            f'<a class="button-link" href="{prev_href}">Previous</a>'
-            if offset > 0
-            else '<span class="button-link disabled">Previous</span>'
-        )
-        next_link = (
-            f'<a class="button-link" href="{next_href}">Next</a>'
-            if next_offset < total
-            else '<span class="button-link disabled">Next</span>'
-        )
-        controls = (
-            f'<div class="pager"><span>Showing {start}-{end} of {total}</span>'
-            f'{prev_link}{next_link}</div>'
-        )
-    warning = f'<p class="error">{html.escape(error)}</p>' if error else ""
-    return _layout("All Pages", f'<div class="breadcrumb"><a href="/">Link</a> / all pages</div>'
-                   f"<h1>All Pages ({total})</h1>{warning}{controls}<ul class='page-list'>{items}</ul>{controls}")
 
 
 def _render_memory_card(record: dict[str, object], include_issues: bool = False) -> str:
@@ -1205,14 +891,6 @@ def _render_memory_card(record: dict[str, object], include_issues: bool = False)
         action_hints=_memory_action_hints,
         include_issues=include_issues,
     )
-
-
-def _render_memory_action_commands(actions: list[dict[str, object]] | tuple[dict[str, object], ...]) -> str:
-    return _core_render_memory_action_commands(actions)
-
-
-def _render_memory_action_button(action: dict[str, object]) -> str:
-    return _core_render_memory_action_button(action)
 
 
 def _render_memory_section(title: str, records: list[dict[str, object]], empty: str, href: str = "", include_issues: bool = False) -> str:
@@ -1227,662 +905,56 @@ def _render_memory_section(title: str, records: list[dict[str, object]], empty: 
     )
 
 
-def _render_capture_card(capture: dict[str, object]) -> str:
-    return _core_render_capture_card(capture)
-
-
-def _render_capture_section(captures: list[dict[str, object]]) -> str:
-    return _core_render_capture_section(captures)
-
-
-def _render_memory_next_actions(actions: list[dict[str, str]]) -> str:
-    return _core_render_memory_next_actions(actions)
-
-
 def _render_brief(query: str = "", project: str | None = None):
-    brief = _memory_brief(query=query, limit=8, project=project)
-    profile = brief["profile"]
-    captures = brief["captures"]
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{profile["active_count"]}</span><span class="label">active</span></div>'
-        f'<div class="stat"><span class="num">{brief["relevant_count"]}</span><span class="label">relevant</span></div>'
-        f'<div class="stat"><span class="num">{brief["review"]["count"]}</span><span class="label">review</span></div>'
-        f'<div class="stat"><span class="num">{captures["count"]}</span><span class="label">captures</span></div>'
-        f'</div>'
+    return _core_render_brief_page(
+        _memory_brief(query=query, limit=8, project=project),
+        query,
+        page_href=_page_href,
+        action_hints=_memory_action_hints,
+        layout=_layout,
     )
-    guidance = "".join(
-        f"<li>{html.escape(str(item))}</li>"
-        for item in brief["agent_guidance"]
-    )
-    query_value = html.escape(str(query), quote=True)
-    project_field = (
-        f'<input type="hidden" name="project" value="{html.escape(str(brief["project"]), quote=True)}">'
-        if brief["project"] else ""
-    )
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / brief</div>'
-        f'<h1>Memory Brief</h1>'
-        f'<div class="memory-profile">'
-        f'<p class="summary">Startup context for local agents before answering, coding, or planning.</p>'
-        f'<form class="brief-form" action="/brief" method="get">'
-        f'<input type="text" name="q" value="{query_value}" placeholder="task or question">'
-        f'{project_field}<button type="submit">Brief</button></form>'
-        f'{"<p><strong>Project:</strong> " + html.escape(str(brief["project"])) + "</p>" if brief["project"] else ""}'
-        f'{stats}'
-        f'<h2>Agent Guidance</h2><ul>{guidance}</ul>'
-        f'{_render_memory_section("Relevant memories", brief["relevant_memories"], "No relevant memories yet.")}'
-        f'{_render_memory_section("Review queue", brief["review"]["items"], "No memory review items.", href="/inbox", include_issues=True)}'
-        f'{_render_capture_section(captures["items"])}'
-        f'</div>'
-    )
-    return _layout("Memory Brief", body)
 
 
 def _render_memory_dashboard(project: str | None = None):
-    dashboard = _memory_dashboard(limit=8, project=project)
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{dashboard["memory_count"]}</span><span class="label">memories</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["active_count"]}</span><span class="label">active</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["review_count"]}</span><span class="label">review</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["updated_count"]}</span><span class="label">updated</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["capture_count"]}</span><span class="label">captures</span></div>'
-        f'<div class="stat"><span class="num">{dashboard["archived_count"]}</span><span class="label">archived</span></div>'
-        f'</div>'
+    return _core_render_memory_dashboard_page(
+        _memory_dashboard(limit=8, project=project),
+        page_href=_page_href,
+        action_hints=_memory_action_hints,
+        layout=_layout,
     )
-    counts = ""
-    if dashboard["by_type"]:
-        counts += "<p><strong>Types:</strong> " + ", ".join(
-            f"{html.escape(name)}: {count}" for name, count in dashboard["by_type"].items()
-        ) + "</p>"
-    if dashboard["by_scope"]:
-        counts += "<p><strong>Scopes:</strong> " + ", ".join(
-            f"{html.escape(name)}: {count}" for name, count in dashboard["by_scope"].items()
-        ) + "</p>"
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / memory</div>'
-        f'<h1>Memory Dashboard</h1>'
-        f'<div class="memory-dashboard">'
-        f'<p class="summary">Read-only command center for what local agents can remember, what needs review, and what changed recently.</p>'
-        f'{"<p><strong>Project:</strong> " + html.escape(str(dashboard["project"])) + "</p>" if dashboard["project"] else ""}'
-        f'{stats}'
-        f'{_render_memory_next_actions(dashboard["next_actions"])}'
-        f'{counts}'
-        f'{_render_memory_section("Review needed", dashboard["review"], "No memories need review.", href="/inbox", include_issues=True)}'
-        f'{_render_capture_section(dashboard["captures"])}'
-        f'{_render_memory_section("Recent updates", dashboard["recent_updates"], "No memory updates yet.")}'
-        f'{_render_memory_section("Active memories", dashboard["active"], "No active memories yet.", href="/profile")}'
-        f'{_render_memory_section("Archived memories", dashboard["archived"], "No archived memories.")}'
-        f'</div>'
-    )
-    return _layout("Memory Dashboard", body)
 
 
 def _render_profile(project: str | None = None):
-    profile = _memory_profile(limit=12, project=project)
-    memory_count = profile["memory_count"]
-    active_count = profile["active_count"]
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{memory_count}</span><span class="label">memories</span></div>'
-        f'<div class="stat"><span class="num">{active_count}</span><span class="label">active</span></div>'
-        f'<div class="stat"><span class="num">{profile["review_count"]}</span><span class="label">review</span></div>'
-        f'</div>'
-    )
-
-    def counts_line(title: str, counts: dict[str, int]) -> str:
-        if not counts:
-            return ""
-        parts = ", ".join(f"{html.escape(name)}: {count}" for name, count in counts.items())
-        return f"<p><strong>{html.escape(title)}:</strong> {parts}</p>"
-
-    def section(title: str, records: list[dict[str, object]], empty: str = "none") -> str:
-        if not records:
-            return f"<h2>{html.escape(title)}</h2><p>{html.escape(empty)}</p>"
-        items = ""
-        for record in records:
-            summary = record.get("tldr") or record.get("snippet") or ""
-            meta = f'{record.get("memory_type", "")} · {record.get("scope", "")}'
-            items += (
-                f'<li><a href="{_page_href(str(record["name"]))}">{html.escape(str(record["title"]))}</a>'
-                f'<div class="memory-meta">{html.escape(meta)}</div>'
-                f'<div class="memory-meta"><a href="/explain-memory?memory={urllib.parse.quote(str(record["name"]), safe="")}">explain</a></div>'
-                f'{f"<small>{html.escape(str(summary))}</small>" if summary else ""}</li>'
-            )
-        return f"<h2>{html.escape(title)}</h2><ul class='page-list'>{items}</ul>"
-
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / profile</div>'
-        f'<h1>Memory Profile</h1>'
-        f'<div class="memory-profile">'
-        f'<p class="summary">What Link currently remembers about the user, projects, decisions, and preferences.</p>'
-        f'{"<p><strong>Project:</strong> " + html.escape(str(profile["project"])) + "</p>" if profile["project"] else ""}'
-        f'{stats}'
-        f'{counts_line("Types", profile["by_type"])}'
-        f'{counts_line("Scopes", profile["by_scope"])}'
-        f'{counts_line("Status", profile["by_status"])}'
-        f'{section("Recent memories", profile["recent"])}'
-        f'{section("Preferences", profile["preferences"])}'
-        f'{section("Decisions", profile["decisions"])}'
-        f'{section("Project context", profile["projects"])}'
-        f'{section("Archived memories", profile["archived"]) if profile["archived"] else ""}'
-        f'</div>'
-    )
-    return _layout("Memory Profile", body)
+    return _core_render_profile_page(_memory_profile(limit=12, project=project), page_href=_page_href, layout=_layout)
 
 
 def _render_memory_audit(project: str | None = None):
-    audit = _memory_audit(limit=10, project=project)
-    profile = audit["profile"]
-    captures = audit["captures"]
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{profile["memory_count"]}</span><span class="label">memories</span></div>'
-        f'<div class="stat"><span class="num">{profile["active_count"]}</span><span class="label">active</span></div>'
-        f'<div class="stat"><span class="num">{profile["review_count"]}</span><span class="label">review</span></div>'
-        f'<div class="stat"><span class="num">{captures["count"]}</span><span class="label">captures</span></div>'
-        f'<div class="stat"><span class="num">{captures["warning_count"]}</span><span class="label">warnings</span></div>'
-        f'<div class="stat"><span class="num">{captures.get("read_warning_count", 0)}</span><span class="label">read warnings</span></div>'
-        f'</div>'
+    return _core_render_memory_audit_page(
+        _memory_audit(limit=10, project=project),
+        page_href=_page_href,
+        action_hints=_memory_action_hints,
+        layout=_layout,
     )
-    risk_html = ""
-    if audit["risk_factors"]:
-        risk_html = "<h2>Needs attention</h2><ul class='memory-issues'>" + "".join(
-            f'<li><span class="severity">review</span> {html.escape(str(item["code"]))}: '
-            f'{html.escape(str(item["message"]))}</li>'
-            for item in audit["risk_factors"]
-        ) + "</ul>"
-    else:
-        risk_html = "<h2>Needs attention</h2><p>No memory audit risks detected.</p>"
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / audit</div>'
-        f'<h1>Memory Audit</h1>'
-        f'<div class="memory-profile">'
-        f'<p class="summary">Read-only health report for local agent memory, review backlog, raw captures, and safe next actions.</p>'
-        f'{"<p><strong>Project:</strong> " + html.escape(str(audit["project"])) + "</p>" if audit["project"] else ""}'
-        f'<p><strong>Status:</strong> {html.escape(str(audit["status"]))}</p>'
-        f'{stats}'
-        f'{risk_html}'
-        f'{_render_memory_next_actions(audit["next_actions"])}'
-        f'{_render_memory_section("Memory inbox sample", audit["inbox"]["items"], "No memory review items.", href="/inbox", include_issues=True)}'
-        f'{_render_capture_section(captures["items"])}'
-        f'</div>'
-    )
-    return _layout("Memory Audit", body)
 
 
 def _render_captures(project: str | None = None):
-    inbox = _capture_inbox(limit=50, project=project)
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{inbox["count"]}</span><span class="label">captures</span></div>'
-        f'<div class="stat"><span class="num">{inbox["warning_count"]}</span><span class="label">warnings</span></div>'
-        f'<div class="stat"><span class="num">{inbox.get("read_warning_count", 0)}</span><span class="label">read warnings</span></div>'
-        f'</div>'
-    )
-    warning_html = ""
-    if inbox["warning_count"]:
-        warning_html = (
-            f'<div class="memory-next"><strong>Needs redaction</strong>'
-            f'<p>{inbox["warning_count"]} raw capture'
-            f'{"s contain" if inbox["warning_count"] != 1 else " contains"} secret-looking values.</p>'
-            f'<code>python3 link.py redact-capture raw/memory-captures/&lt;capture&gt;.md .</code></div>'
-        )
-    read_warning_html = ""
-    read_warnings = inbox.get("read_warnings") if isinstance(inbox.get("read_warnings"), list) else []
-    if read_warnings:
-        rows = "".join(
-            f'<li><code>{html.escape(str(item.get("capture") or ""))}</code> '
-            f'{html.escape(str(item.get("error") or "unreadable"))}</li>'
-            for item in read_warnings[:50]
-        )
-        read_warning_html = (
-            '<div class="memory-next"><strong>Fix capture access</strong>'
-            '<p>Some raw captures could not be read and are not listed for approval.</p>'
-            f'<ul>{rows}</ul></div>'
-        )
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / captures</div>'
-        f'<h1>Raw Capture Inbox</h1>'
-        f'<div class="memory-profile">'
-        f'<p class="summary">Saved proposal-only session notes waiting for human review before they become durable memory.</p>'
-        f'{"<p><strong>Project:</strong> " + html.escape(str(inbox["project"])) + "</p>" if inbox["project"] else ""}'
-        f'{stats}'
-        f'{warning_html}'
-        f'{read_warning_html}'
-        f'{_render_capture_section(inbox["captures"])}'
-        f'</div>'
-    )
-    return _layout("Raw Capture Inbox", body)
+    return _core_render_captures_page(_capture_inbox(limit=50, project=project), layout=_layout)
 
 
 def _render_propose(project: str | None = None, source: str | None = None):
-    project_value = html.escape(_clean_text_input(project, max_len=80), quote=True)
-    source_value = html.escape(_clean_text_input(source, max_len=500), quote=True)
-    proposal_path = (
-        f'<section class="ingest-path" aria-label="Memory proposal path">'
-        f'<article class="ingest-step"><span class="step-num">1</span>'
-        f'<h3>Load source</h3><p>Paste notes or load a safe local raw file. The source stays local.</p>'
-        f'<code>raw/file.md</code></article>'
-        f'<article class="ingest-step"><span class="step-num">2</span>'
-        f'<h3>Propose</h3><p>Link returns candidates only. This step never writes durable memory.</p>'
-        f'<code>Propose</code></article>'
-        f'<article class="ingest-step"><span class="step-num">3</span>'
-        f'<h3>Approve explicitly</h3><p>Copy the approval prompt into your agent chat only for memories you want kept.</p>'
-        f'<code>remember that ...</code></article>'
-        f'<article class="ingest-step"><span class="step-num">4</span>'
-        f'<h3>Review later</h3><p>Use the inbox and explain views to review, archive, update, or forget memories.</p>'
-        f'<code>link memory-inbox</code></article>'
-        f'</section>'
-    )
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / propose</div>'
-        f'<h1>Propose Memories</h1>'
-        f'<p class="summary">Paste source notes, session notes, or a raw excerpt. Link returns memory candidates without writing anything.</p>'
-        f'<div class="memory-next"><strong>Trust rule</strong>'
-        f'<p>Source-backed wiki knowledge and durable agent memory are separate. Save only preferences, decisions, or project facts you approve.</p></div>'
-        f'<section><h2>Review Gate</h2><div class="proposal-checklist">'
-        f'<strong>Before saving memory</strong>'
-        f'<span>Keep ordinary facts in wiki pages; save only durable preferences, decisions, project context, or user facts.</span>'
-        f'<span>Check source label, scope, project, duplicate candidates, and conflict warnings.</span>'
-        f'<span>Use direct approval only when the proposal is clean; otherwise copy the approval prompt into your agent chat.</span>'
-        f'</div></section>'
-        f'{proposal_path}'
-        f'<section><div class="section-heading"><h2>Local Raw Sources</h2><a href="/captures">captures</a></div>'
-        f'<div class="proposal-source-list" data-proposal-sources aria-live="polite"></div></section>'
-        f'<form class="proposal-form" data-proposal-form data-initial-source="{source_value}">'
-        f'<label>Source or session notes'
-        f'<textarea name="text" placeholder="Paste notes here. Example: I prefer short release notes. We decided to keep Link local-first."></textarea>'
-        f'</label>'
-        f'<div class="proposal-controls">'
-        f'<label>Source label<input name="source" value="web proposal" autocomplete="off"></label>'
-        f'<label>Project<input name="project" value="{project_value}" placeholder="optional" autocomplete="off"></label>'
-        f'<label>Limit<input name="limit" type="number" min="1" max="20" value="10"></label>'
-        f'<button type="submit">Propose</button>'
-        f'</div>'
-        f'<div class="proposal-status" data-proposal-status aria-live="polite"></div>'
-        f'</form>'
-        f'<section class="proposal-results" data-proposal-results aria-live="polite"></section>'
-    )
-    return _layout("Propose Memories", body)
-
-
-def _copy_button(text: object, label: str = "Copy") -> str:
-    value = str(text or "")
-    if not value:
-        return ""
-    return (
-        f'<button type="button" class="copy-button" '
-        f'data-copy-text="{html.escape(value, quote=True)}">{html.escape(label)}</button>'
+    return _core_render_propose_page(
+        _clean_text_input(project, max_len=80),
+        _clean_text_input(source, max_len=500),
+        layout=_layout,
     )
 
 
 def _render_ingest():
-    status = _ingest_status()
-    guidance = status.get("guidance") if isinstance(status.get("guidance"), dict) else {}
-    agent_prompt = str(guidance.get("agent_prompt") or "")
-    commands = guidance.get("commands") if isinstance(guidance.get("commands"), list) else []
-    notes = guidance.get("notes") if isinstance(guidance.get("notes"), list) else []
-    plan = status.get("plan") if isinstance(status.get("plan"), dict) else {}
-    pending = status.get("pending_raw") if isinstance(status.get("pending_raw"), list) else []
-    represented = status.get("represented_raw") if isinstance(status.get("represented_raw"), list) else []
-    safety = status.get("safety") if isinstance(status.get("safety"), dict) else {}
-    completion = status.get("completion") if isinstance(status.get("completion"), dict) else {}
-    plan_batch = plan.get("batch") if isinstance(plan.get("batch"), list) else []
-    plan_first = plan_batch[0] if plan_batch and isinstance(plan_batch[0], dict) else {}
-    first_raw = str(plan_first.get("raw") or "")
-    if not first_raw:
-        first_raw = str(pending[0].get("raw") or "raw/<file>") if pending else "raw/<file>"
-    ingest_prompt = agent_prompt or f"ingest {first_raw} into Link"
-    memory_prompt = str(plan.get("memory_prompt") or f"propose memories from {first_raw}")
-    propose_href = "/propose?source=" + urllib.parse.quote(first_raw) if pending else "/propose"
-    state = str(guidance.get("state") or plan.get("state") or "unknown")
-
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{int(status.get("raw_count") or 0)}</span><span class="label">raw</span></div>'
-        f'<div class="stat"><span class="num">{int(status.get("represented_count") or 0)}</span><span class="label">represented</span></div>'
-        f'<div class="stat"><span class="num">{int(status.get("pending_count") or 0)}</span><span class="label">pending</span></div>'
-        f'<div class="stat"><span class="num">{int(status.get("stale_count") or 0)}</span><span class="label">stale</span></div>'
-        f'<div class="stat"><span class="num">{html.escape(str(status.get("backlinks_status") or "unknown"))}</span><span class="label">graph</span></div>'
-        f'<div class="stat"><span class="num">{html.escape(str(safety.get("status") or "unknown"))}</span><span class="label">safety</span></div>'
-        f'</div>'
-    )
-    safety_html = ""
-    if safety:
-        labels = safety.get("labels") if isinstance(safety.get("labels"), list) else []
-        labels_text = ", ".join(html.escape(str(label)) for label in labels)
-        labels_html = f"<p>Warnings: {labels_text}</p>" if labels_text else ""
-        safety_html = (
-            f'<div class="memory-next"><strong>Raw safety: {html.escape(str(safety.get("status") or "unknown"))}</strong>'
-            f'<p>{html.escape(str(safety.get("summary") or ""))}</p>{labels_html}</div>'
-        )
-    action_rows = ""
-    if agent_prompt:
-        action_rows += (
-            f'<div class="memory-action-row"><span class="memory-action-head"><strong>Ask your agent</strong></span>'
-            f'{_copy_button(agent_prompt, "Copy prompt")}<code>{html.escape(agent_prompt)}</code></div>'
-        )
-    for command in commands:
-        action_rows += (
-            f'<div class="memory-action-row"><span class="memory-action-head"><strong>Run</strong></span>'
-            f'{_copy_button(command, "Copy command")}<code>{html.escape(str(command))}</code></div>'
-        )
-    actions = f'<div class="memory-actions">{action_rows}</div>' if action_rows else ""
-    if agent_prompt:
-        next_detail = "Copy this into your agent chat. The agent should ingest the raw source, rebuild indexes, and validate before reporting done."
-        next_code = agent_prompt
-        next_extra = (
-            f'<p>If the source contains preferences, decisions, or project facts, '
-            f'<a href="{html.escape(propose_href, quote=True)}">open memory proposals first</a>.</p>'
-        )
-    elif state == "blocked_secrets":
-        next_detail = "Redact secret-looking values in the flagged raw source before asking any agent to ingest it."
-        next_code = f"edit {first_raw}"
-        next_extra = ""
-    elif state == "blocked_raw_access":
-        next_detail = "Fix raw file access before asking any agent to ingest it. Link could not inspect the source for safety."
-        next_code = f"inspect {first_raw}"
-        next_extra = ""
-    elif state == "blocked_source_access":
-        next_detail = "Fix source page access before relying on ingest state. Link could not inspect represented source pages."
-        next_code = "link ingest-status"
-        next_extra = ""
-    elif state == "stale_graph":
-        next_detail = "Repair the graph index before relying on search, context, or the graph view."
-        next_code = "link rebuild-backlinks && link validate"
-        next_extra = ""
-    elif state == "empty":
-        next_detail = "Add a note, article, transcript, or project file to raw/, then refresh this page."
-        next_code = "cp notes.md raw/ && link ingest-status"
-        next_extra = ""
-    elif state == "ready":
-        next_detail = "No ingest is pending. Ask Link for context, or add another source when there is new material."
-        next_code = 'link brief "current task"'
-        next_extra = ""
-    else:
-        next_detail = "Initialize or repair the Link folder before ingesting sources."
-        next_code = "link init && link status --validate"
-        next_extra = ""
-    if state == "blocked_secrets":
-        ingest_prompt = f"redact secret-looking values in {first_raw} before ingest"
-        optional_memory_html = '<code>redact before memory proposals</code>'
-    elif state == "blocked_raw_access":
-        ingest_prompt = f"fix raw source access for {first_raw} before ingest"
-        optional_memory_html = '<code>fix access before memory proposals</code>'
-    elif state == "blocked_source_access":
-        ingest_prompt = "fix source page access before ingest"
-        optional_memory_html = '<code>fix source access first</code>'
-    else:
-        optional_memory_html = (
-            f'<a href="{html.escape(propose_href, quote=True)}"><code>{html.escape(memory_prompt)}</code></a>'
-        )
-    next_html = (
-        f'<div class="memory-next"><strong>Next step</strong>'
-        f'<p>{html.escape(next_detail)}</p>'
-        f'<code>{html.escape(next_code)}</code>'
-        f'{_copy_button(next_code, "Copy next step")}'
-        f'{next_extra}</div>'
-    )
-    guide_html = (
-        f'<section class="ingest-path" aria-label="Ingest path">'
-        f'<article class="ingest-step"><span class="step-num">1</span>'
-        f'<h3>Add source</h3><p>Put notes, articles, transcripts, or project files in <code>raw/</code>.</p>'
-        f'<code>{html.escape(first_raw)}</code></article>'
-        f'<article class="ingest-step"><span class="step-num">2</span>'
-        f'<h3>Ask agent</h3><p>Have your agent convert the source into source-backed wiki pages.</p>'
-        f'<code>{html.escape(ingest_prompt)}</code></article>'
-        f'<article class="ingest-step"><span class="step-num">3</span>'
-        f'<h3>Validate</h3><p>Check page shape, links, and graph freshness before relying on the result.</p>'
-        f'<code>link validate</code></article>'
-        f'<article class="ingest-step"><span class="step-num">4</span>'
-        f'<h3>Optional memory</h3><p>Only save preferences, decisions, or project facts after approval.</p>'
-        f'{optional_memory_html}</article>'
-        f'</section>'
-    )
-
-    pending_html = ""
-    if pending:
-        rows = ""
-        for item in pending[:50]:
-            raw_path = str(item.get("raw") or "")
-            propose_href = "/propose?source=" + urllib.parse.quote(raw_path)
-            secret_warnings = item.get("secret_warnings") if isinstance(item.get("secret_warnings"), list) else []
-            if secret_warnings:
-                meta = (
-                    f'{int(item.get("size_bytes") or 0)} bytes · secret warning: '
-                    f'{", ".join(html.escape(str(label)) for label in secret_warnings)} · redact before ingest'
-                )
-            elif item.get("scan_error"):
-                meta = (
-                    f'{int(item.get("size_bytes") or 0)} bytes · '
-                    f'could not inspect: {html.escape(str(item.get("scan_error") or ""))} · fix access before ingest'
-                )
-            elif item.get("stale"):
-                target_pages = item.get("source_page_paths") if isinstance(item.get("source_page_paths"), list) else []
-                target_label = ", ".join(html.escape(str(page)) for page in target_pages if page)
-                target_text = f" · refresh {target_label}" if target_label else " · refresh existing source page"
-                meta = (
-                    f'{int(item.get("size_bytes") or 0)} bytes · '
-                    f'{html.escape(str(item.get("stale_reason") or "raw changed after wiki source page"))}'
-                    f'{target_text}'
-                )
-            else:
-                meta = (
-                    f'{int(item.get("size_bytes") or 0)} bytes · '
-                    f'<a href="{html.escape(propose_href, quote=True)}">propose memories</a>'
-                )
-            rows += f'<li><code>{html.escape(raw_path)}</code><span class="type">{meta}</span></li>'
-        if len(pending) > 50:
-            rows += f'<li>... {len(pending) - 50} more</li>'
-        pending_html = f'<div class="section-heading"><h2>Pending Raw Files</h2><a href="/propose">propose memories</a></div><ul class="page-list">{rows}</ul>'
-    elif not represented:
-        pending_html = '<p>No raw source files found yet.</p>'
-
-    notes_html = ""
-    if notes:
-        notes_html = "<ul>" + "".join(f"<li>{html.escape(str(note))}</li>" for note in notes) + "</ul>"
-
-    source_warning_html = ""
-    source_warnings = status.get("source_read_warnings") if isinstance(status.get("source_read_warnings"), list) else []
-    if source_warnings:
-        rows = ""
-        for item in source_warnings[:50]:
-            if not isinstance(item, dict):
-                continue
-            rows += (
-                f'<li><code>{html.escape(str(item.get("page") or ""))}</code>'
-                f'<span class="type">could not inspect: {html.escape(str(item.get("error") or ""))}</span></li>'
-            )
-        source_warning_html = f'<h2>Source Page Warnings</h2><ul class="page-list">{rows}</ul>'
-
-    plan_html = ""
-    if plan:
-        steps = plan.get("steps") if isinstance(plan.get("steps"), list) else []
-        batch = plan.get("batch") if isinstance(plan.get("batch"), list) else []
-        post_checks = plan.get("post_checks") if isinstance(plan.get("post_checks"), list) else []
-        step_html = "".join(f"<li>{html.escape(str(step))}</li>" for step in steps[:6])
-        batch_html = ""
-        if batch:
-            rows = ""
-            for item in batch[:5]:
-                rows += (
-                    f'<li><code>{html.escape(str(item.get("raw") or ""))}</code>'
-                    f'<span class="type">{html.escape(str(item.get("target_source_page") or item.get("suggested_source_page") or ""))}</span></li>'
-                )
-            batch_html = f'<h3>Batch</h3><ul class="page-list">{rows}</ul>'
-        checks_html = ""
-        if post_checks:
-            rows = "".join(
-                f'<li><code>{html.escape(str(check))}</code>'
-                f'<span class="type">run before reporting done {_copy_button(check)}</span></li>'
-                for check in post_checks[:6]
-            )
-            checks_html = f'<h3>Post-ingest checks</h3><ul class="page-list">{rows}</ul>'
-        plan_html = (
-            f'<section><h2>{html.escape(str(plan.get("title") or "Suggested Workflow"))}</h2>'
-            f'<p class="summary">{html.escape(str(plan.get("summary") or ""))}</p>'
-            f'<ol>{step_html}</ol>{batch_html}{checks_html}</section>'
-        )
-
-    completion_html = ""
-    completion_items = completion.get("items") if isinstance(completion.get("items"), list) else []
-    if completion_items:
-        cards = ""
-        for item in completion_items:
-            raw_path = str(item.get("raw") or "")
-            pages = item.get("source_pages") if isinstance(item.get("source_pages"), list) else []
-            page_links = ""
-            for page in pages:
-                if not isinstance(page, dict):
-                    continue
-                page_name = str(page.get("name") or "")
-                page_title = str(page.get("title") or page_name)
-                if not page_name:
-                    continue
-                page_links += (
-                    f'<a href="{html.escape(_page_href(page_name), quote=True)}" '
-                    f'title="{html.escape(str(page.get("path") or ""), quote=True)}">{html.escape(page_title)}</a>'
-                )
-            if not page_links:
-                page_links = '<span class="type">source page not found</span>'
-            memory_prompt_value = str(item.get("memory_prompt") or "")
-            query_prompt_value = str(item.get("query_prompt") or "")
-            propose_link = "/propose?source=" + urllib.parse.quote(raw_path) if raw_path else "/propose"
-            warnings = item.get("secret_warnings") if isinstance(item.get("secret_warnings"), list) else []
-            warning_html = ""
-            if warnings:
-                warning_html = (
-                    f'<p class="proposal-warning">Raw warnings: '
-                    f'{", ".join(html.escape(str(label)) for label in warnings)}</p>'
-                )
-            cards += (
-                f'<article class="ingest-completion-card">'
-                f'<h3>{html.escape(raw_path)}</h3>'
-                f'<p>{int(item.get("size_bytes") or 0)} bytes represented by:</p>'
-                f'<div class="ingest-completion-pages">{page_links}</div>'
-                f'{warning_html}'
-                f'<div class="ingest-completion-actions">'
-                f'<a href="{html.escape(propose_link, quote=True)}">propose memories</a>'
-                f'{_copy_button(memory_prompt_value, "Copy memory prompt")}'
-                f'{_copy_button(query_prompt_value, "Copy query prompt")}'
-                f'</div>'
-                f'</article>'
-            )
-        more_html = ""
-        if completion.get("has_more"):
-            more_html = f'<p class="summary">Showing {int(completion.get("shown_count") or 0)} of {int(completion.get("represented_count") or 0)} represented sources.</p>'
-        next_prompt = str(completion.get("next_prompt") or "")
-        next_html_for_completion = ""
-        if next_prompt:
-            next_html_for_completion = (
-                f'<div class="memory-next"><strong>After ingest</strong>'
-                f'<p>Use this to confirm the new context is retrievable before moving on.</p>'
-                f'<code>{html.escape(next_prompt)}</code>{_copy_button(next_prompt, "Copy prompt")}</div>'
-            )
-        completion_html = (
-            f'<section><div class="section-heading"><h2>{html.escape(str(completion.get("title") or "Ingest Completion"))}</h2>'
-            f'<a href="/all">all pages</a></div>'
-            f'<p class="summary">{html.escape(str(completion.get("summary") or ""))}</p>'
-            f'<div class="ingest-completion-grid">{cards}</div>{more_html}{next_html_for_completion}</section>'
-        )
-
-    raw_form = (
-        f'<section><div class="section-heading"><h2>Add Raw Source</h2><a href="/propose">memory proposals</a></div>'
-        f'<p class="summary">Paste a note, article excerpt, transcript, or project context. Link saves it under '
-        f'<code>raw/</code> locally, blocks secret-looking values, and gives you the exact ingest prompt.</p>'
-        f'<form class="raw-source-form" data-raw-source-form>'
-        f'<div class="raw-source-controls">'
-        f'<label>Title<input name="title" autocomplete="off" placeholder="Release notes, meeting transcript, project context"></label>'
-        f'<label>Filename optional<input name="filename" autocomplete="off" placeholder="release-notes.md"></label>'
-        f'</div>'
-        f'<label>Source text<textarea name="text" placeholder="Paste the source text to preserve locally before ingest."></textarea></label>'
-        f'<div class="raw-source-actions"><button type="submit">Save to raw/</button>'
-        f'<span>Nothing becomes durable memory until you approve memory proposals.</span></div>'
-        f'<div class="raw-source-status" data-raw-source-status aria-live="polite"></div>'
-        f'</form></section>'
-    )
-
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / ingest</div>'
-        f'<h1>Ingest</h1>'
-        f'<p class="summary">{html.escape(str(guidance.get("summary") or "Check raw source ingest state."))}</p>'
-        f'{raw_form}'
-        f'{stats}'
-        f'{safety_html}'
-        f'{source_warning_html}'
-        f'{next_html}'
-        f'{guide_html}'
-        f'{actions}'
-        f'{plan_html}'
-        f'{completion_html}'
-        f'{pending_html}'
-        f'{notes_html}'
-    )
-    return _layout("Ingest", body)
+    return _core_render_ingest_page(_ingest_status(), page_href=_page_href, layout=_layout)
 
 
 def _render_inbox(project: str | None = None):
-    inbox = _memory_inbox(limit=50, project=project)
-    review_count = inbox["review_count"]
-    stats = (
-        f'<div class="home-stats">'
-        f'<div class="stat"><span class="num">{review_count}</span><span class="label">review</span></div>'
-        f'</div>'
-    )
-    if inbox["counts_by_severity"]:
-        severity = ", ".join(
-            f"{html.escape(name)}: {count}"
-            for name, count in inbox["counts_by_severity"].items()
-        )
-        severity_html = f"<p><strong>Severity:</strong> {severity}</p>"
-    else:
-        severity_html = ""
-
-    if not inbox["items"]:
-        content = "<p>Inbox is clear.</p>"
-    else:
-        items = ""
-        for item in inbox["items"]:
-            summary = item.get("tldr") or item.get("snippet") or ""
-            meta = f'{item.get("memory_type", "")} · {item.get("scope", "")} · {item.get("status", "")}'
-            issues = "".join(
-                f'<li><span class="severity">{html.escape(str(issue["severity"]))}</span> '
-                f'{html.escape(str(issue["code"]))}: {html.escape(str(issue["message"]))}</li>'
-                for issue in item["issues"]
-            )
-            primary = item.get("primary_action") or {}
-            primary_html = ""
-            if primary:
-                primary_html = (
-                    f'<p class="summary"><strong>Next:</strong> {html.escape(str(primary.get("label") or ""))} '
-                    f'- {html.escape(str(primary.get("description") or ""))}</p>'
-                )
-            actions_html = _render_memory_action_commands(item.get("actions") or [])
-            items += (
-                f'<li><a href="{_page_href(str(item["name"]))}">{html.escape(str(item["title"]))}</a>'
-                f'<div class="memory-meta">{html.escape(meta)}</div>'
-                f'<div class="memory-meta"><a href="/explain-memory?memory={urllib.parse.quote(str(item["name"]), safe="")}">explain</a></div>'
-                f'{f"<small>{html.escape(str(summary))}</small>" if summary else ""}'
-                f'<ul class="memory-issues">{issues}</ul>'
-                f'{primary_html}'
-                f'{actions_html}</li>'
-            )
-        content = f"<ul class='page-list'>{items}</ul>"
-
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / inbox</div>'
-        f'<h1>Memory Review Inbox</h1>'
-        f'<div class="memory-profile">'
-        f'<p class="summary">Memories that need confirmation, stronger metadata, or cleanup.</p>'
-        f'{"<p><strong>Project:</strong> " + html.escape(str(inbox["project"])) + "</p>" if inbox["project"] else ""}'
-        f'{stats}'
-        f'{severity_html}'
-        f'{content}'
-        f'</div>'
-    )
-    return _layout("Memory Review Inbox", body)
+    return _core_render_inbox_page(_memory_inbox(limit=50, project=project), page_href=_page_href, layout=_layout)
 
 
 def _render_explain_memory(identifier: str):
@@ -1890,62 +962,11 @@ def _render_explain_memory(identifier: str):
         explanation = _memory_explanation(identifier)
     except ValueError as exc:
         return _layout("Memory Explanation", f'<h1>Memory not found</h1><p>{html.escape(str(exc))}</p>')
-
-    memory = explanation["memory"]
-    recall_info = explanation["recall"]
-    review = explanation["review"]
-    provenance = explanation["provenance"]
-    lifecycle = explanation["lifecycle"]
-    graph = explanation["graph"]
-    summary = memory.get("tldr") or memory.get("snippet") or ""
-    issues = "".join(
-        f'<li><span class="severity">{html.escape(str(issue["severity"]))}</span> '
-        f'{html.escape(str(issue["code"]))}: {html.escape(str(issue["message"]))}</li>'
-        for issue in review["issues"]
+    return _core_render_memory_explanation_page(
+        explanation,
+        body_html=_md_to_html(str(explanation.get("body") or "")),
+        layout=_layout,
     )
-    issue_html = (
-        f'<h2>Review Issues</h2><ul class="memory-issues">{issues}</ul>'
-        if issues else "<h2>Review Issues</h2><p>No detected issues.</p>"
-    )
-    primary = review.get("primary_action") or {}
-    primary_html = ""
-    if primary:
-        primary_html = (
-            f'<p class="summary"><strong>Next:</strong> {html.escape(str(primary.get("label") or ""))} '
-            f'- {html.escape(str(primary.get("description") or ""))}</p>'
-        )
-    action_html = f'<h2>Actions</h2>{primary_html}{_render_memory_action_commands(review.get("actions") or [])}'
-    graph_html = (
-        f'<h2>Graph</h2>'
-        f'<p><strong>Forward:</strong> {html.escape(", ".join(graph["forward"]) or "none")}</p>'
-        f'<p><strong>Inbound:</strong> {html.escape(", ".join(graph["inbound"]) or "none")}</p>'
-        f'<p><strong>Wikilinks:</strong> {html.escape(", ".join(graph["wikilinks"]) or "none")}</p>'
-    )
-    logs = "".join(
-        f'<pre class="log-entry">{html.escape(entry)}</pre>'
-        for entry in explanation["log_entries"][-5:]
-    )
-    log_html = f"<h2>Log Entries</h2>{logs}" if logs else "<h2>Log Entries</h2><p>No matching log entries.</p>"
-    body_html = _md_to_html(str(explanation.get("body") or ""))
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / explain memory</div>'
-        f'<h1>{html.escape(str(memory["title"]))}</h1>'
-        f'<p class="summary">{html.escape(str(summary))}</p>'
-        f'<div class="trust-grid">'
-        f'<div><strong>Recall</strong>{html.escape(str(recall_info["state"]))}<br><small>{html.escape(str(recall_info["reason"]))}</small></div>'
-        f'<div><strong>Review</strong>{html.escape(str(review["status"]))} · {review["issue_count"]} issues</div>'
-        f'<div><strong>Status</strong>{html.escape(str(lifecycle["status"]))}</div>'
-        f'<div><strong>Source</strong>{html.escape(str(provenance["source"] or "missing"))}</div>'
-        f'<div><strong>Captured</strong>{html.escape(str(provenance["date_captured"] or "missing"))}</div>'
-        f'<div><strong>Path</strong>{html.escape(str(provenance["path"]))}</div>'
-        f'</div>'
-        f'{issue_html}'
-        f'{action_html}'
-        f'{graph_html}'
-        f'{log_html}'
-        f'<h2>Memory Body</h2>{body_html}'
-    )
-    return _layout(f"Explain: {memory['title']}", body)
 
 
 def _render_graph():
@@ -1974,1010 +995,45 @@ def _render_graph():
     edges_json = _json_for_script(visible_edges)
 
     if node_count == 0:
-        body = (
-            f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
-            f'<h1>Knowledge Graph</h1>'
-            f'<div class="graph-empty">'
-            f'<strong>No graph pages yet.</strong><br>'
-            f'Add sources to <code>raw/</code>, ingest them, then rebuild backlinks.'
-            f'</div>'
-        )
+        body = _core_render_graph_empty_body()
         return _layout("Knowledge Graph", body)
 
     cat_colors = _core_graph_category_colors
     category_options = _core_graph_category_options(visible_nodes)
 
-    graph_js = f"""
-<script>
-(function() {{
-  var nodes = {nodes_json};
-  var edges = {edges_json};
-  var catColors = {_json_for_script(cat_colors)};
+    graph_js = _core_render_graph_script(
+        nodes_json=nodes_json,
+        edges_json=edges_json,
+        cat_colors_json=_json_for_script(cat_colors),
+        graph_mode_json=_json_for_script(graph_mode),
+        total_node_count=total_node_count,
+        total_edge_count=total_edge_count,
+    )
 
-  var canvas = document.getElementById('graph-canvas');
-  var ctx = canvas.getContext('2d');
-  var tooltip = document.getElementById('graph-tooltip');
-  var resetButton = document.getElementById('graph-reset');
-  var labelsButton = document.getElementById('graph-labels');
-  var motionButton = document.getElementById('graph-motion');
-  var fullscreenButton = document.getElementById('graph-fullscreen');
-  var loadFullButton = document.getElementById('graph-load-full');
-  var searchInput = document.getElementById('graph-search');
-  var categoryFilter = document.getElementById('graph-category');
-  var depthFilter = document.getElementById('graph-depth');
-  var frameEl = document.getElementById('graph-frame');
-  var status = document.getElementById('graph-status');
-  var inspector = document.getElementById('graph-inspector');
-  var inspectorTitle = document.getElementById('graph-inspector-title');
-  var inspectorMeta = document.getElementById('graph-inspector-meta');
-  var inspectorLinks = document.getElementById('graph-inspector-links');
-  var inspectorOpen = document.getElementById('graph-open');
-  var inspectorFocus = document.getElementById('graph-focus');
-  var W, H;
-
-  // Compact neural-map sizing: concepts lead, sources recede.
-  var NODE_R = 6;
-  var LABEL_FONT = '11px -apple-system, sans-serif';
-  var LARGE_GRAPH_LIMIT = 350;
-  var LARGE_LABEL_LIMIT = 160;
-  var FAST_RENDER_NODE_LIMIT = 450;
-  var FAST_RENDER_EDGE_LIMIT = 1200;
-  var OVERVIEW_NODE_LIMIT = 650;
-  var SEARCH_LABEL_LIMIT = 60;
-  var initialGraphMode = {_json_for_script(graph_mode)};
-  var totalNodeCount = {total_node_count};
-  var totalEdgeCount = {total_edge_count};
-  var fullGraphLoaded = initialGraphMode === 'full';
-  var fullGraphLoading = false;
-  var nodeById = {{}};
-
-  function stableNoise(id, salt) {{
-    var h = salt * 2166136261;
-    for (var i = 0; i < id.length; i++) {{
-      h ^= id.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }}
-    return ((h >>> 0) % 1000) / 1000;
-  }}
-
-  // Start in a loose two-lobe silhouette. Physics keeps it organic after load.
-  var pos = {{}}, vel = {{}}, pinned = {{}};
-  function seedNodePosition(n, i, total) {{
-    var lobe = i % 2 === 0 ? -1 : 1;
-    var a = i * 2.399963 + stableNoise(n.id, 7) * 0.7;
-    var r = 50 + Math.sqrt((i + 1) / Math.max(total, 1)) * 155;
-    var categoryDrop = n.category === 'sources' ? 58 : (n.category === 'memories' ? -34 : (n.category === 'entities' ? 24 : -6));
-    pos[n.id] = {{
-      x: lobe * 78 + Math.cos(a) * r * 0.78,
-      y: Math.sin(a) * r * 0.58 + categoryDrop
-    }};
-    vel[n.id] = {{ x: 0, y: 0 }};
-  }}
-
-  function seedMissingPositions() {{
-    nodes.forEach(function(n, i) {{
-      if (!pos[n.id]) seedNodePosition(n, i, nodes.length);
-      if (!vel[n.id]) vel[n.id] = {{ x: 0, y: 0 }};
-    }});
-  }}
-
-  function reseedVisiblePositions() {{
-    var currentNodes = visibleNodes();
-    currentNodes.forEach(function(n, i) {{
-      if (!pinned[n.id]) seedNodePosition(n, i, currentNodes.length);
-    }});
-  }}
-
-  // Adjacency
-  var adj = {{}}, degree = {{}};
-  function rebuildGraphIndexes() {{
-    nodeById = {{}};
-    adj = {{}};
-    degree = {{}};
-    nodes.forEach(function(n) {{
-      nodeById[n.id] = n;
-      adj[n.id] = [];
-      degree[n.id] = 0;
-    }});
-    edges.forEach(function(e) {{
-      if (adj[e.source]) {{ adj[e.source].push(e.target); degree[e.source]++; }}
-      if (adj[e.target]) {{ adj[e.target].push(e.source); degree[e.target]++; }}
-    }});
-  }}
-
-  rebuildGraphIndexes();
-  seedMissingPositions();
-  var lockedOverviewIds = null;
-  if (initialGraphMode !== 'full') {{
-    lockedOverviewIds = {{}};
-    nodes.forEach(function(n) {{ lockedOverviewIds[n.id] = true; }});
-  }}
-
-  var dragging = null, dragOffX = 0, dragOffY = 0, hoverNode = null, selectedNode = null;
-  var panX = 0, panY = 0, panStartX = 0, panStartY = 0, panning = false, didPan = false;
-  var downX = 0, downY = 0, didDrag = false, suppressClick = false;
-  var zoom = 1;
-  var frame = 0;
-  var showAllLabels = false;
-  var motionPaused = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || nodes.length > LARGE_GRAPH_LIMIT;
-  var SETTLE = 200; // frames of physics
-  var searchTerm = '';
-  var cachedSearchTerm = '';
-  var cachedSearchMatches = 0;
-  var categoryValue = 'all';
-  var depthValue = 'all';
-  var visibleCache = null;
-  var renderQueued = false;
-  var animationRunning = false;
-
-  function resize() {{
-    W = canvas.clientWidth; H = canvas.clientHeight;
-    canvas.width = W * devicePixelRatio; canvas.height = H * devicePixelRatio;
-    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-  }}
-
-  function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
-  function pageHref(id) {{ return '/page/' + encodeURIComponent(id); }}
-  function invalidateFilters() {{ visibleCache = null; }}
-  function invalidateSearchCache() {{ cachedSearchTerm = ''; cachedSearchMatches = 0; }}
-  function escapeHtml(value) {{
-    return String(value).replace(/[&<>"']/g, function(ch) {{
-      return {{ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }}[ch];
-    }});
-  }}
-  function syncCategoryOptions() {{
-    if (!categoryFilter) return;
-    var categories = [];
-    nodes.forEach(function(n) {{
-      if (n.category && n.category !== 'root' && categories.indexOf(n.category) === -1) categories.push(n.category);
-    }});
-    categories.sort();
-    categoryFilter.innerHTML = '<option value="all">all types</option>' + categories.map(function(category) {{
-      return '<option value="' + escapeHtml(category) + '">' + escapeHtml(category) + '</option>';
-    }}).join('');
-    if (categories.indexOf(categoryValue) === -1) categoryValue = 'all';
-    categoryFilter.value = categoryValue;
-  }}
-  function nodeSearchText(n) {{
-    return (n.title + ' ' + n.id + ' ' + n.category).toLowerCase();
-  }}
-  function searchMatches(n) {{
-    return searchTerm && nodeSearchText(n).indexOf(searchTerm) !== -1;
-  }}
-  function totalSearchMatches() {{
-    if (!searchTerm) return 0;
-    if (cachedSearchTerm === searchTerm) return cachedSearchMatches;
-    cachedSearchTerm = searchTerm;
-    cachedSearchMatches = nodes.filter(searchMatches).length;
-    return cachedSearchMatches;
-  }}
-  function depthMap() {{
-    if (!selectedNode || depthValue === 'all') return null;
-    var maxDepth = parseInt(depthValue, 10);
-    if (!Number.isFinite(maxDepth)) return null;
-    var seen = {{}};
-    var queue = [selectedNode.id];
-    seen[selectedNode.id] = 0;
-    while (queue.length) {{
-      var current = queue.shift();
-      var nextDepth = seen[current] + 1;
-      if (nextDepth > maxDepth) continue;
-      (adj[current] || []).forEach(function(next) {{
-        if (seen[next] === undefined) {{
-          seen[next] = nextDepth;
-          queue.push(next);
-        }}
-      }});
-    }}
-    return seen;
-  }}
-  function capEligibleNodes(eligible) {{
-    if (eligible.length <= OVERVIEW_NODE_LIMIT) return eligible;
-    if (fullGraphLoaded && lockedOverviewIds && !searchTerm && categoryValue === 'all' && depthValue === 'all' && !selectedNode) {{
-      var locked = eligible.filter(function(n) {{ return lockedOverviewIds[n.id]; }});
-      if (locked.length) return locked;
-    }}
-    var keep = {{}};
-    var keepCount = 0;
-    function markKeep(n) {{
-      if (n && !keep[n.id]) {{
-        keep[n.id] = true;
-        keepCount++;
-      }}
-    }}
-    var highSignalLimit = Math.floor(OVERVIEW_NODE_LIMIT * 0.65);
-    var sampleLimit = Math.max(0, OVERVIEW_NODE_LIMIT - highSignalLimit);
-    eligible
-      .slice()
-      .sort(function(a, b) {{
-        var degreeDiff = (degree[b.id] || 0) - (degree[a.id] || 0);
-        if (degreeDiff) return degreeDiff;
-        return String(a.title || a.id).localeCompare(String(b.title || b.id));
-      }})
-      .slice(0, highSignalLimit)
-      .forEach(markKeep);
-    for (var i = 0; i < sampleLimit; i++) {{
-      var sampled = eligible[Math.floor((i + 0.5) * eligible.length / Math.max(sampleLimit, 1))];
-      markKeep(sampled);
-    }}
-    var fillIndex = 0;
-    while (keepCount < OVERVIEW_NODE_LIMIT && fillIndex < eligible.length) {{
-      markKeep(eligible[fillIndex]);
-      fillIndex++;
-    }}
-    eligible.forEach(function(n) {{
-      if (searchMatches(n)) markKeep(n);
-      if (selectedNode && (n.id === selectedNode.id || isNeighbor(selectedNode.id, n.id))) markKeep(n);
-    }});
-    return eligible.filter(function(n) {{ return keep[n.id]; }});
-  }}
-  function visibleIds() {{
-    if (visibleCache) return visibleCache;
-    var byDepth = depthMap();
-    var ids = {{}};
-    var eligible = [];
-    nodes.forEach(function(n) {{
-      var categoryOk = categoryValue === 'all' || n.category === categoryValue;
-      var depthOk = !byDepth || byDepth[n.id] !== undefined;
-      var keepSelected = selectedNode && selectedNode.id === n.id;
-      if ((categoryOk || keepSelected) && depthOk) eligible.push(n);
-    }});
-    capEligibleNodes(eligible).forEach(function(n) {{
-      ids[n.id] = true;
-    }});
-    visibleCache = ids;
-    return ids;
-  }}
-  function visibleNodes() {{
-    var ids = visibleIds();
-    return nodes.filter(function(n) {{ return ids[n.id]; }});
-  }}
-  function visibleEdges() {{
-    var ids = visibleIds();
-    return edges.filter(function(e) {{ return ids[e.source] && ids[e.target]; }});
-  }}
-  function graphTooLargeForMotion() {{
-    return visibleNodes().length > LARGE_GRAPH_LIMIT;
-  }}
-  function graphTooLargeForDefaultLabels() {{
-    return visibleNodes().length > LARGE_LABEL_LIMIT;
-  }}
-  function graphNeedsFastRender(currentNodes, currentEdges) {{
-    return currentNodes.length > FAST_RENDER_NODE_LIMIT || currentEdges.length > FAST_RENDER_EDGE_LIMIT;
-  }}
-  function syncLabelsButton() {{
-    if (!labelsButton) return;
-    labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
-    labelsButton.textContent = showAllLabels ? 'Hide labels' : (graphTooLargeForDefaultLabels() ? 'Show labels' : 'Labels');
-  }}
-  function nodeRadius(n) {{
-    if (n.category === 'sources') return 4.5;
-    if (n.category === 'memories') return 6.4;
-    if (n.category === 'entities') return 6.8;
-    return NODE_R;
-  }}
-  function isNeighbor(a, b) {{
-    return (adj[a] || []).indexOf(b) !== -1;
-  }}
-  function isActiveNode(n) {{
-    return !hoverNode || n.id === hoverNode.id || isNeighbor(hoverNode.id, n.id);
-  }}
-  function pinnedCount() {{
-    var count = 0;
-    Object.keys(pinned).forEach(function(id) {{ if (pinned[id]) count++; }});
-    return count;
-  }}
-  function updateStatus() {{
-    if (!status) return;
-    syncDepthControl();
-    var currentNodes = visibleNodes();
-    var currentEdges = visibleEdges();
-    var parts = [
-      currentNodes.length + '/' + totalNodeCount + ' nodes',
-      currentEdges.length + '/' + totalEdgeCount + ' edges',
-      Math.round(zoom * 100) + '%'
-    ];
-    if (!fullGraphLoaded) parts.push('fast overview');
-    if (categoryValue !== 'all') parts.push(categoryValue);
-    if (depthValue !== 'all') parts.push('depth ' + depthValue);
-    if (graphTooLargeForMotion()) parts.push('motion capped');
-    if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');
-    if (graphNeedsFastRender(currentNodes, currentEdges)) parts.push('fast render');
-    if (nodes.length > OVERVIEW_NODE_LIMIT && currentNodes.length < nodes.length) parts.push('overview capped');
-    if (fullGraphLoaded && initialGraphMode !== 'full') parts.push('data loaded');
-    if (fullGraphLoading) parts.push('loading graph data');
-    if (showAllLabels) parts.push('labels all');
-    if (searchTerm) {{
-      var matches = totalSearchMatches();
-      parts.push(matches + ' match' + (matches === 1 ? '' : 'es'));
-      if (matches > SEARCH_LABEL_LIMIT) parts.push('match labels capped');
-    }}
-    var locked = pinnedCount();
-    if (locked) parts.push(locked + ' placed');
-    if (selectedNode) parts.push('selected ' + selectedNode.id);
-    status.textContent = parts.join(' · ');
-    syncLabelsButton();
-  }}
-
-  function syncDepthControl() {{
-    if (!depthFilter) return;
-    if (!selectedNode && depthValue !== 'all') {{
-      depthValue = 'all';
-      depthFilter.value = 'all';
-      invalidateFilters();
-    }}
-    depthFilter.disabled = !selectedNode;
-    depthFilter.title = selectedNode ? 'Limit graph to the selected node neighborhood.' : 'Select a node before filtering by neighborhood.';
-  }}
-
-  function updateInspector() {{
-    if (!inspector || !inspectorTitle || !inspectorMeta || !inspectorLinks || !inspectorOpen || !inspectorFocus) return;
-    inspectorLinks.textContent = '';
-    if (!selectedNode) {{
-      inspectorTitle.textContent = 'Select a node';
-      inspectorMeta.textContent = 'Click a node to inspect it. Drag a node to place it. Double-click a node, or use Open page, to navigate.';
-      inspectorOpen.disabled = true;
-      inspectorFocus.disabled = true;
-      return;
-    }}
-    var neighbors = (adj[selectedNode.id] || []).slice().sort(function(a, b) {{
-      return (nodeById[a] ? nodeById[a].title : a).localeCompare(nodeById[b] ? nodeById[b].title : b);
-    }});
-    inspectorTitle.textContent = selectedNode.title;
-    inspectorMeta.textContent = selectedNode.category + ' · ' + neighbors.length + ' linked page' + (neighbors.length === 1 ? '' : 's');
-    inspectorOpen.disabled = false;
-    inspectorFocus.disabled = false;
-    neighbors.slice(0, 10).forEach(function(id) {{
-      var target = nodeById[id];
-      var link = document.createElement('a');
-      link.href = pageHref(id);
-      link.textContent = target ? target.title : id;
-      inspectorLinks.appendChild(link);
-    }});
-    if (neighbors.length > 10) {{
-      var more = document.createElement('span');
-      more.textContent = '+' + (neighbors.length - 10) + ' more';
-      inspectorLinks.appendChild(more);
-    }}
-  }}
-
-  function selectNode(node) {{
-    selectedNode = node;
-    hoverNode = node;
-    invalidateFilters();
-    syncDepthControl();
-    updateInspector();
-    updateStatus();
-    drawSoon();
-  }}
-
-  function openNode(node) {{
-    if (node) window.location.href = pageHref(node.id);
-  }}
-
-  function toScreen(x, y) {{
-    return {{ x: (x + panX) * zoom + W/2, y: (y + panY) * zoom + H/2 }};
-  }}
-  function toWorld(sx, sy) {{
-    return {{ x: (sx - W/2) / zoom - panX, y: (sy - H/2) / zoom - panY }};
-  }}
-
-  function simulate() {{
-    var simNodes = visibleNodes();
-    if (simNodes.length > LARGE_GRAPH_LIMIT) return;
-    var simIds = visibleIds();
-    // Tuned for a brain-like neural map: broad lobes, readable spacing, gentle drift.
-    var springLen = 135, springK = 0.032, repel = 13500, gravity = 0.005, damp = 0.84;
-    simNodes.forEach(function(n) {{
-      if (pinned[n.id]) return;
-      var fx = 0, fy = 0;
-      var p = pos[n.id];
-      // Repulsion between all pairs
-      simNodes.forEach(function(m) {{
-        if (m.id === n.id) return;
-        var q = pos[m.id];
-        var dx = p.x - q.x, dy = p.y - q.y;
-        var d2 = Math.max(dx*dx + dy*dy, 100);
-        var f = repel / d2;
-        fx += f * dx / Math.sqrt(d2);
-        fy += f * dy / Math.sqrt(d2);
-      }});
-      // Spring attraction along edges (toward natural length)
-      (adj[n.id] || []).forEach(function(mid) {{
-        if (!simIds[mid]) return;
-        var q = pos[mid];
-        var dx = q.x - p.x, dy = q.y - p.y;
-        var d = Math.sqrt(dx*dx + dy*dy) + 0.01;
-        var f = springK * (d - springLen);
-        fx += f * dx / d; fy += f * dy / d;
-      }});
-      // Weak center gravity plus a two-lobe bias so the map feels organic.
-      fx -= p.x * gravity; fy -= p.y * gravity;
-      var lobeX = p.x < 0 ? -95 : 95;
-      fx += (lobeX - p.x) * 0.0018;
-      fy += ((n.category === 'sources' ? 40 : -8) - p.y) * 0.0012;
-      vel[n.id].x = (vel[n.id].x + fx * 0.016) * damp;
-      vel[n.id].y = (vel[n.id].y + fy * 0.016) * damp;
-      pos[n.id].x += vel[n.id].x;
-      pos[n.id].y += vel[n.id].y;
-    }});
-  }}
-
-  // Auto-fit: after physics settles, zoom/pan so all nodes are visible and centered
-  function autoFit() {{
-    var currentNodes = visibleNodes();
-    if (currentNodes.length === 0) return;
-    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    currentNodes.forEach(function(n) {{
-      minX = Math.min(minX, pos[n.id].x); maxX = Math.max(maxX, pos[n.id].x);
-      minY = Math.min(minY, pos[n.id].y); maxY = Math.max(maxY, pos[n.id].y);
-    }});
-    var pad = 60;
-    var gw = maxX - minX + pad*2, gh = maxY - minY + pad*2;
-    zoom = Math.min(W / gw, H / gh, 2);
-    panX = -(minX + maxX) / 2;
-    panY = -(minY + maxY) / 2;
-    updateStatus();
-  }}
-
-  var fitted = false;
-
-  function strokeEdgeBatch(edgeList, strokeStyle, lineWidth) {{
-    if (!edgeList.length) return;
-    ctx.beginPath();
-    edgeList.forEach(function(e) {{
-      var a = toScreen(pos[e.source].x, pos[e.source].y);
-      var b = toScreen(pos[e.target].x, pos[e.target].y);
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-    }});
-    ctx.strokeStyle = strokeStyle;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
-  }}
-
-  function draw() {{
-    ctx.clearRect(0, 0, W, H);
-    var time = frame * 0.018;
-    var currentNodes = visibleNodes();
-    var currentEdges = visibleEdges();
-    var animateFlow = !motionPaused && !graphTooLargeForMotion();
-    var largeLabelSet = currentNodes.length > LARGE_LABEL_LIMIT;
-    var fastRender = graphNeedsFastRender(currentNodes, currentEdges);
-
-    if (fastRender) {{
-      if (hoverNode) {{
-        var activeEdges = [];
-        var inactiveEdges = [];
-        currentEdges.forEach(function(e) {{
-          if (e.source === hoverNode.id || e.target === hoverNode.id) activeEdges.push(e);
-          else inactiveEdges.push(e);
-        }});
-        strokeEdgeBatch(inactiveEdges, 'rgba(139,148,158,0.035)', 0.45);
-        strokeEdgeBatch(activeEdges, 'rgba(88,166,255,0.42)', 1.1);
-      }} else {{
-        strokeEdgeBatch(currentEdges, 'rgba(88,166,255,0.07)', 0.45);
-      }}
-    }} else {{
-      // Detailed edges for smaller or focused graph neighborhoods.
-      currentEdges.forEach(function(e) {{
-        var a = toScreen(pos[e.source].x, pos[e.source].y);
-        var b = toScreen(pos[e.target].x, pos[e.target].y);
-        var activeEdge = !hoverNode || e.source === hoverNode.id || e.target === hoverNode.id;
-        var alpha = hoverNode ? (activeEdge ? 0.42 : 0.035) : 0.14;
-
-        // Glow layer
-        ctx.save();
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-        ctx.strokeStyle = 'rgba(88,166,255,' + (alpha * 0.55) + ')';
-        ctx.lineWidth = 3;
-        ctx.filter = 'blur(2px)';
-        ctx.stroke();
-        ctx.restore();
-
-        // Sharp line
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-        ctx.strokeStyle = 'rgba(139,148,158,' + alpha + ')';
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-
-        // Flow particle
-        if (activeEdge && animateFlow) {{
-          var flowT = ((time * 0.5 + (a.x + b.y) * 0.001) % 2) / 2;
-          var px = a.x + (b.x - a.x) * flowT;
-          var py = a.y + (b.y - a.y) * flowT;
-          var pa = Math.sin(flowT * Math.PI) * (hoverNode ? 0.6 : 0.32);
-          ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI*2);
-          ctx.fillStyle = 'rgba(45,212,191,' + pa + ')';
-          ctx.fill();
-        }}
-      }});
-    }}
-
-    // Nodes
-    currentNodes.forEach(function(n) {{
-      var s = toScreen(pos[n.id].x, pos[n.id].y);
-      var r = nodeRadius(n) * Math.max(0.65, Math.min(1.2, zoom));
-      var color = nodeColor(n);
-      var pulse = fastRender ? 1 : Math.sin(time * 1.2 + (pos[n.id].x + pos[n.id].y) * 0.01) * 0.12 + 0.88;
-      var activeNode = isActiveNode(n);
-      var selected = selectedNode && selectedNode.id === n.id;
-      var matched = searchMatches(n);
-      ctx.save();
-      ctx.globalAlpha = (hoverNode && !activeNode) || (searchTerm && !matched) ? 0.28 : 1;
-
-      if (!fastRender || selected || matched || (hoverNode && activeNode)) {{
-        // Radial glow stays off in large overview mode except for focused nodes.
-        var glowR = r * 3.5 * pulse;
-        var grad = ctx.createRadialGradient(s.x, s.y, r * 0.3, s.x, s.y, glowR);
-        grad.addColorStop(0, color + '30');
-        grad.addColorStop(1, color + '00');
-        ctx.beginPath(); ctx.arc(s.x, s.y, glowR, 0, Math.PI*2);
-        ctx.fillStyle = grad; ctx.fill();
-      }}
-
-      // Node body
-      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
-      ctx.fillStyle = fastRender ? color + '28' : color + '40'; ctx.fill();
-
-      // Node border
-      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
-      ctx.strokeStyle = selected || matched ? '#ffffff' : color; ctx.lineWidth = selected || matched ? 2.4 : (fastRender ? 0.75 : 1.5);
-      ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1;
-
-      // Inner bright core
-      if (!fastRender || selected || matched || (hoverNode && activeNode)) {{
-        ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.35, 0, Math.PI*2);
-        ctx.fillStyle = color + 'cc'; ctx.fill();
-      }}
-
-      // Labels stay sparse until a node is hovered.
-      var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
-      var defaultSparseLabel = !largeLabelSet && n.category !== 'sources' && degree[n.id] >= 2;
-      var showMatchLabel = matched && totalSearchMatches() <= SEARCH_LABEL_LIMIT;
-      var showLabel = showAllLabels || selected || showMatchLabel || (hoverNode ? activeNode : defaultSparseLabel);
-      if (showLabel) {{
-        ctx.font = LABEL_FONT;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
-        ctx.fillStyle = '#dce7f2';
-        var labelWidth = ctx.measureText(label).width;
-        var labelX = Math.max(labelWidth / 2 + 4, Math.min(W - labelWidth / 2 - 4, s.x));
-        ctx.fillText(label, labelX, s.y + r + 5);
-        ctx.shadowBlur = 0;
-      }}
-      ctx.restore();
-    }});
-  }}
-
-  function shouldRunContinuously() {{
-    return !motionPaused && !graphTooLargeForMotion();
-  }}
-
-  function drawSoon() {{
-    if (renderQueued) return;
-    renderQueued = true;
-    requestAnimationFrame(function() {{
-      renderQueued = false;
-      draw();
-    }});
-  }}
-
-  function startLoop() {{
-    if (animationRunning) return;
-    animationRunning = true;
-    requestAnimationFrame(loop);
-  }}
-
-  function loop() {{
-    if (!shouldRunContinuously()) {{
-      animationRunning = false;
-      drawSoon();
-      return;
-    }}
-    if (frame < SETTLE) {{
-      simulate();
-      // Auto-fit once physics has mostly settled
-      if (frame === SETTLE - 1) {{ autoFit(); fitted = true; }}
-    }}
-    frame++;
-    draw();
-    requestAnimationFrame(loop);
-  }}
-
-  function hitTest(sx, sy) {{
-    var w = toWorld(sx, sy);
-    var currentNodes = visibleNodes();
-    for (var i = currentNodes.length - 1; i >= 0; i--) {{
-      var n = currentNodes[i];
-      var p = pos[n.id];
-      var r = nodeRadius(n) + 6; // slightly larger hit area
-      var dx = w.x - p.x, dy = w.y - p.y;
-      if (dx*dx + dy*dy <= r*r) return n;
-    }}
-    return null;
-  }}
-
-  function movedPastThreshold(sx, sy) {{
-    var dx = sx - downX, dy = sy - downY;
-    return dx * dx + dy * dy > 9;
-  }}
-
-  function resetView() {{
-    pinned = {{}};
-    selectedNode = null;
-    hoverNode = null;
-    searchTerm = '';
-    invalidateSearchCache();
-    categoryValue = 'all';
-    depthValue = 'all';
-    if (searchInput) searchInput.value = '';
-    if (categoryFilter) categoryFilter.value = 'all';
-    if (depthFilter) depthFilter.value = 'all';
-    invalidateFilters();
-    reseedVisiblePositions();
-    frame = SETTLE;
-    autoFit();
-    updateInspector();
-    updateStatus();
-    drawSoon();
-  }}
-
-  function setMotionPaused(next) {{
-    motionPaused = next || graphTooLargeForMotion();
-    if (motionButton) {{
-      motionButton.setAttribute('aria-pressed', motionPaused ? 'true' : 'false');
-      motionButton.textContent = graphTooLargeForMotion() ? 'Motion capped' : (motionPaused ? 'Motion paused' : 'Motion on');
-    }}
-    updateStatus();
-    if (shouldRunContinuously()) startLoop();
-    else drawSoon();
-  }}
-
-  function setFullscreen(next) {{
-    if (!frameEl || !fullscreenButton) return;
-    frameEl.classList.toggle('is-fullscreen', next);
-    fullscreenButton.setAttribute('aria-pressed', next ? 'true' : 'false');
-    fullscreenButton.textContent = next ? 'Exit fullscreen' : 'Fullscreen';
-    window.setTimeout(function() {{
-      resize();
-      autoFit();
-      updateStatus();
-      drawSoon();
-    }}, 0);
-  }}
-
-  function applyGraphPayload(payload) {{
-    var nextNodes = (payload.nodes || []).filter(function(n) {{ return n.category !== 'root'; }});
-    var ids = {{}};
-    nextNodes.forEach(function(n) {{ ids[n.id] = true; }});
-    var nextEdges = (payload.edges || []).filter(function(e) {{ return ids[e.source] && ids[e.target]; }});
-    nodes = nextNodes;
-    edges = nextEdges;
-    totalNodeCount = nodes.length;
-    totalEdgeCount = edges.length;
-    fullGraphLoaded = true;
-    fullGraphLoading = false;
-    pinned = {{}};
-    selectedNode = null;
-    hoverNode = null;
-    depthValue = 'all';
-    if (depthFilter) depthFilter.value = 'all';
-    rebuildGraphIndexes();
-    syncCategoryOptions();
-    invalidateSearchCache();
-    invalidateFilters();
-    if (!lockedOverviewIds) reseedVisiblePositions();
-    frame = SETTLE;
-    autoFit();
-    updateInspector();
-    setMotionPaused(true);
-    if (loadFullButton) {{
-      loadFullButton.disabled = true;
-      loadFullButton.textContent = 'Graph data loaded';
-    }}
-  }}
-
-  function loadFullGraph() {{
-    if (fullGraphLoaded || fullGraphLoading) return;
-    fullGraphLoading = true;
-    if (loadFullButton) {{
-      loadFullButton.disabled = true;
-      loadFullButton.textContent = 'Loading graph data...';
-    }}
-    updateStatus();
-    fetch('/api/graph')
-      .then(function(response) {{
-        if (!response.ok) throw new Error('graph load failed');
-        return response.json();
-      }})
-      .then(function(payload) {{
-        applyGraphPayload(payload);
-        updateStatus();
-        drawSoon();
-      }})
-      .catch(function() {{
-        fullGraphLoading = false;
-        if (loadFullButton) {{
-          loadFullButton.disabled = false;
-          loadFullButton.textContent = 'Retry graph data';
-        }}
-        if (status) status.textContent = 'Full graph load failed; local API did not return graph data.';
-      }});
-  }}
-
-  canvas.addEventListener('mousedown', function(e) {{
-    var rect = canvas.getBoundingClientRect();
-    var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
-    downX = sx; downY = sy; didDrag = false; didPan = false; suppressClick = false;
-    var hit = hitTest(sx, sy);
-    if (hit) {{
-      dragging = hit; pinned[hit.id] = true;
-      canvas.style.cursor = 'grabbing';
-      var w = toWorld(sx, sy);
-      dragOffX = pos[hit.id].x - w.x; dragOffY = pos[hit.id].y - w.y;
-    }} else {{
-      panning = true; didPan = false;
-      canvas.style.cursor = 'grabbing';
-      panStartX = sx - panX * zoom; panStartY = sy - panY * zoom;
-    }}
-  }});
-
-  canvas.addEventListener('mousemove', function(e) {{
-    var rect = canvas.getBoundingClientRect();
-    var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
-    if (dragging) {{
-      if (movedPastThreshold(sx, sy)) didDrag = true;
-      var w = toWorld(sx, sy);
-      pos[dragging.id].x = w.x + dragOffX; pos[dragging.id].y = w.y + dragOffY;
-      updateStatus();
-      drawSoon();
-    }} else if (panning) {{
-      panX = (sx - panStartX) / zoom; panY = (sy - panStartY) / zoom;
-      if (movedPastThreshold(sx, sy)) didPan = true;
-      updateStatus();
-      drawSoon();
-    }} else {{
-      var hit = hitTest(sx, sy);
-      hoverNode = hit;
-      if (hit) {{
-        tooltip.style.display = 'block';
-        tooltip.style.left = (e.clientX + 14) + 'px';
-        tooltip.style.top = (e.clientY - 10) + 'px';
-        tooltip.textContent = hit.title + ' · ' + hit.category;
-        canvas.style.cursor = 'pointer';
-      }} else {{
-        tooltip.style.display = 'none';
-        canvas.style.cursor = 'grab';
-      }}
-      drawSoon();
-    }}
-  }});
-
-  canvas.addEventListener('mouseup', function() {{
-    if (dragging) {{
-      pinned[dragging.id] = didDrag;
-      dragging = null;
-      suppressClick = didDrag;
-      updateStatus();
-      drawSoon();
-    }}
-    if (panning) {{ suppressClick = didPan; }}
-    panning = false;
-    canvas.style.cursor = hoverNode ? 'pointer' : 'grab';
-  }});
-
-  canvas.addEventListener('mouseleave', function() {{
-    hoverNode = null;
-    if (tooltip) tooltip.style.display = 'none';
-    drawSoon();
-  }});
-
-  canvas.addEventListener('click', function(e) {{
-    if (suppressClick) {{ suppressClick = false; return; }}
-    var rect = canvas.getBoundingClientRect();
-    var hit = hitTest(e.clientX - rect.left, e.clientY - rect.top);
-    if (hit) selectNode(hit);
-  }});
-
-  canvas.addEventListener('dblclick', function(e) {{
-    e.preventDefault();
-    var rect = canvas.getBoundingClientRect();
-    var hit = hitTest(e.clientX - rect.left, e.clientY - rect.top);
-    if (hit) openNode(hit);
-  }});
-
-  canvas.addEventListener('wheel', function(e) {{
-    e.preventDefault();
-    var rect = canvas.getBoundingClientRect();
-    var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
-    var before = toWorld(sx, sy);
-    var factor = e.deltaY < 0 ? 1.12 : 0.9;
-    zoom = Math.max(0.15, Math.min(6, zoom * factor));
-    var after = toWorld(sx, sy);
-    panX += after.x - before.x;
-    panY += after.y - before.y;
-    updateStatus();
-    drawSoon();
-  }}, {{ passive: false }});
-
-  canvas.addEventListener('keydown', function(e) {{
-    if (e.key === '+' || e.key === '=') {{ zoom = Math.min(6, zoom * 1.12); updateStatus(); drawSoon(); e.preventDefault(); }}
-    if (e.key === '-' || e.key === '_') {{ zoom = Math.max(0.15, zoom * 0.9); updateStatus(); drawSoon(); e.preventDefault(); }}
-    if (e.key === '0') {{ resetView(); e.preventDefault(); }}
-    if (e.key === 'Enter' && hoverNode) {{ openNode(hoverNode); e.preventDefault(); }}
-    if (e.key === 'Escape') {{
-      if (frameEl && frameEl.classList.contains('is-fullscreen')) {{
-        setFullscreen(false);
-      }} else {{
-        selectedNode = null; invalidateFilters(); updateInspector(); updateStatus(); drawSoon();
-      }}
-      e.preventDefault();
-    }}
-    if (e.key === 'l' || e.key === 'L') {{
-      showAllLabels = !showAllLabels;
-      syncLabelsButton();
-      updateStatus();
-      drawSoon();
-      e.preventDefault();
-    }}
-  }});
-
-  if (resetButton) resetButton.addEventListener('click', resetView);
-  if (labelsButton) labelsButton.addEventListener('click', function() {{
-    showAllLabels = !showAllLabels;
-    syncLabelsButton();
-    updateStatus();
-    drawSoon();
-  }});
-  if (motionButton) motionButton.addEventListener('click', function() {{
-    setMotionPaused(!motionPaused);
-  }});
-  if (fullscreenButton) fullscreenButton.addEventListener('click', function() {{
-    setFullscreen(!frameEl.classList.contains('is-fullscreen'));
-  }});
-  if (loadFullButton) loadFullButton.addEventListener('click', loadFullGraph);
-  if (inspectorOpen) inspectorOpen.addEventListener('click', function() {{ openNode(selectedNode); }});
-  if (inspectorFocus) inspectorFocus.addEventListener('click', function() {{
-    if (!selectedNode) return;
-    depthValue = '1';
-    if (depthFilter) depthFilter.value = '1';
-    invalidateFilters();
-    reseedVisiblePositions();
-    setMotionPaused(motionPaused);
-    autoFit();
-    updateStatus();
-    drawSoon();
-  }});
-  if (searchInput) {{
-    searchInput.addEventListener('input', function() {{
-      searchTerm = searchInput.value.trim().toLowerCase();
-      invalidateSearchCache();
-      invalidateFilters();
-      if (searchTerm && !fullGraphLoaded) loadFullGraph();
-      reseedVisiblePositions();
-      autoFit();
-      updateStatus();
-      drawSoon();
-    }});
-    searchInput.addEventListener('keydown', function(e) {{
-      if (e.key !== 'Enter') return;
-      var match = visibleNodes().find(searchMatches);
-      if (match) selectNode(match);
-      e.preventDefault();
-    }});
-  }}
-  if (categoryFilter) categoryFilter.addEventListener('change', function() {{
-    categoryValue = categoryFilter.value || 'all';
-    invalidateFilters();
-    reseedVisiblePositions();
-    setMotionPaused(motionPaused);
-    autoFit();
-    updateStatus();
-    drawSoon();
-  }});
-  if (depthFilter) depthFilter.addEventListener('change', function() {{
-    depthValue = depthFilter.value || 'all';
-    invalidateFilters();
-    reseedVisiblePositions();
-    setMotionPaused(motionPaused);
-    autoFit();
-    updateStatus();
-    drawSoon();
-  }});
-
-  window.addEventListener('resize', function() {{ resize(); if (fitted) autoFit(); updateStatus(); drawSoon(); }});
-  resize();
-  if (motionPaused) {{ reseedVisiblePositions(); autoFit(); fitted = true; frame = SETTLE; }}
-  setMotionPaused(motionPaused);
-  syncCategoryOptions();
-  syncLabelsButton();
-  updateInspector();
-  updateStatus();
-  if (shouldRunContinuously()) startLoop();
-  else drawSoon();
-}})();
-</script>"""
-
-    legend_items = _core_graph_legend_items(cat_colors)
-    load_full_button = ""
-    if graph_mode != "full":
-        load_full_button = (
-            f'<button id="graph-load-full" type="button">'
-            f'Load graph data ({total_node_count} nodes)</button>'
-        )
-
-    body = (
-        f'<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
-        f'<h1>Knowledge Graph</h1>'
-        f'<p class="meta">For large wikis, use fullscreen, zoom, pan, and sparse labels. '
-        f'The graph is for exploring neighborhoods, not reading every label at once.'
-        f'{html.escape(graph_note)}</p>'
-        f'<section id="graph-frame" class="graph-frame">'
-        f'<div class="graph-toolbar" aria-label="Graph controls">'
-        f'<button id="graph-reset" type="button">Reset</button>'
-        f'<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
-        f'<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
-        f'<button id="graph-fullscreen" type="button" aria-pressed="false">Fullscreen</button>'
-        f'{load_full_button}'
-        f'<label class="graph-control">Find'
-        f'<input id="graph-search" type="search" placeholder="node title"></label>'
-        f'<label class="graph-control">Type'
-        f'<select id="graph-category">{category_options}</select></label>'
-        f'<label class="graph-control">Neighborhood'
-        f'<select id="graph-depth"><option value="all">all</option><option value="1">1 hop</option>'
-        f'<option value="2">2 hops</option><option value="3">3 hops</option></select></label>'
-        f'<span id="graph-status" class="graph-status" aria-live="polite">'
-        f'{node_count}/{total_node_count} nodes · {edge_count}/{total_edge_count} edges</span>'
-        f'</div>'
-        f'<div class="graph-shell">'
-        f'<canvas id="graph-canvas" tabindex="0" role="img" '
-        f'aria-label="Knowledge graph with {node_count} nodes and {edge_count} edges"></canvas>'
-        f'<aside id="graph-inspector" class="graph-inspector" aria-live="polite">'
-        f'<strong id="graph-inspector-title">Select a node</strong>'
-        f'<p id="graph-inspector-meta">Click a node to inspect it. Drag a node to place it. '
-        f'Double-click a node, or use Open page, to navigate.</p>'
-        f'<div id="graph-inspector-links" class="graph-inspector-links"></div>'
-        f'<button id="graph-focus" type="button" disabled>Focus neighborhood</button>'
-        f'<button id="graph-open" type="button" disabled>Open page</button>'
-        f'</aside>'
-        f'</div>'
-        f'<div class="graph-legend">{legend_items}</div>'
-        f'</section>'
-        f'{graph_js}'
+    body = _core_render_graph_page_body(
+        graph_js=graph_js,
+        node_count=node_count,
+        edge_count=edge_count,
+        total_node_count=total_node_count,
+        total_edge_count=total_edge_count,
+        graph_mode=graph_mode,
+        graph_note=graph_note,
+        category_options=category_options,
+        legend_items=_core_graph_legend_items(cat_colors),
     )
     return _layout("Knowledge Graph", body, page_class="graph-page")
 
 
 def _render_search(query):
     q = query.lower().strip()
-    if not q:
-        return _layout("Search",
-            f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
-            f'<h1>Search</h1><p>Enter a search term above.</p>')
-    results = _search_pages(q, limit=30)
-    total = len(results)
-    cap_note = f" (showing 30 of {total})" if total > 30 else ""
-
-    def _highlight(text: str, term: str) -> str:
-        """Wrap all occurrences of term in <mark> tags (case-insensitive)."""
-        if not term or not text: return html.escape(text)
-        parts = re.split(f"({re.escape(term)})", text, flags=re.IGNORECASE)
-        return "".join(
-            f"<mark>{html.escape(p)}</mark>" if p.lower() == term.lower() else html.escape(p)
-            for p in parts
-        )
-
-    items = "".join(
-        f'<li><a href="{_page_href(r["name"])}">{_highlight(r["title"], query)}</a>'
-        f'<br><small style="color:#888">...{_highlight(r.get("snippet",""), query)}...</small></li>'
-        for r in results[:30]
+    results = _search_pages(q, limit=30) if q else []
+    return _core_render_search_page(
+        query,
+        results,
+        page_href=_page_href,
+        layout=_layout,
+        limit=30,
     )
-    return _layout(f"Search: {query}",
-        f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
-        f'<h1>Search: {html.escape(query)}</h1>'
-        f'<p>{total} result{"s" if total != 1 else ""}{cap_note}</p>'
-        f'<ul class="page-list search-results">{items}</ul>')
 
 
 # ---------------------------------------------------------------------------
@@ -3078,6 +1134,20 @@ def _link_status_payload(include_validation: bool = False) -> dict[str, object]:
     return payload
 
 
+def _operations_payload() -> dict[str, object]:
+    payload = _core_operation_report(WIKI_DIR)
+    payload["api_version"] = API_VERSION
+    return payload
+
+
+def _render_health():
+    return _core_render_health_page(
+        _link_status_payload(include_validation=True),
+        _operations_payload(),
+        layout=_layout,
+    )
+
+
 # ---------------------------------------------------------------------------
 # HTTP handler
 # ---------------------------------------------------------------------------
@@ -3123,44 +1193,28 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not self._require_mutation_rate_limit():
             return
         parsed = urllib.parse.urlparse(self.path)
-        path = parsed.path
+        self._handle_api_post(parsed.path)
+
+    def _handle_api_post(self, path: str) -> None:
         if path == "/api/rebuild-index":
-            if not self._require_local_action_header({"rebuilt": False}):
-                return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"rebuilt": False, "error": error}, status=status)
-                return
-            assert payload is not None
-            self._json(_rebuild_index_payload())
+            self._handle_rebuild_post(_rebuild_index_payload)
             return
         if path == "/api/rebuild-backlinks":
-            if not self._require_local_action_header({"rebuilt": False}):
-                return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"rebuilt": False, "error": error}, status=status)
-                return
-            assert payload is not None
-            self._json(_rebuild_backlinks_payload())
+            self._handle_rebuild_post(_rebuild_backlinks_payload)
             return
         if path == "/api/raw-source":
             if not self._require_local_action_header({"created": False}):
                 return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"created": False, "error": error}, status=status)
+            payload = self._read_json_or_reply({"created": False})
+            if payload is None:
                 return
-            assert payload is not None
             result, http_status = _create_raw_source_payload(payload)
             self._json(result, status=http_status)
             return
         if path == "/api/propose-memories":
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"proposed": False, "error": error, "count": 0, "proposals": []}, status=status)
+            payload = self._read_json_or_reply({"proposed": False, "count": 0, "proposals": []})
+            if payload is None:
                 return
-            assert payload is not None
             text = _clean_text_input(payload.get("text"), max_len=MAX_POST_BYTES)
             if not text.strip():
                 self._json({"proposed": False, "error": "text required", "count": 0, "proposals": []}, status=400)
@@ -3181,11 +1235,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path in {"/api/remember-memory", "/api/update-memory"}:
             if not self._require_local_action_header({"saved": False}):
                 return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"saved": False, "error": error}, status=status)
+            payload = self._read_json_or_reply({"saved": False})
+            if payload is None:
                 return
-            assert payload is not None
             try:
                 if path == "/api/remember-memory":
                     result = _remember_memory_from_web(payload)
@@ -3201,11 +1253,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path in {"/api/review-memory", "/api/archive-memory", "/api/restore-memory"}:
             if not self._require_local_action_header():
                 return
-            payload, error, status = self._read_json_body()
-            if error:
-                self._json({"updated": False, "error": error}, status=status)
+            payload = self._read_json_or_reply({"updated": False})
+            if payload is None:
                 return
-            assert payload is not None
             identifier = _clean_text_input(payload.get("memory") or payload.get("identifier"), max_len=300)
             if not identifier:
                 self._json({"updated": False, "error": "memory required"}, status=400)
@@ -3249,6 +1299,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._err("file")
         elif path in ("/", ""):
             self._ok(_render_home())
+        elif path == "/health":
+            self._ok(_render_health())
         elif path == "/ingest":
             self._ok(_render_ingest())
         elif path == "/brief":
@@ -3286,7 +1338,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             page = _find_page(urllib.parse.unquote(path[6:]))
             if page: self._ok(_render_page(page))
             else: self._err(urllib.parse.unquote(path[6:]))
-        elif path == "/api/pages":
+        elif path.startswith("/api/"):
+            self._handle_api_get(path, query)
+        else:
+            self._err("page")
+
+    def _handle_api_get(self, path: str, query: dict[str, list[str]]) -> None:
+        if path == "/api/pages":
             self._json(_all_pages())
         elif path == "/api/page-list":
             limit, limit_error = _core_parse_bounded_int(query.get("limit", ["100"])[0], "limit", 100, 1, 1000)
@@ -3308,6 +1366,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/status":
             include_validation = query.get("validate", ["false"])[0].lower() in {"1", "true", "yes"}
             self._json(_link_status_payload(include_validation=include_validation))
+        elif path == "/api/operations":
+            self._json(_operations_payload())
         elif path == "/api/prompts":
             self._json(_starter_prompts_payload(project=_query_text(query, "project", max_len=80)))
         elif path == "/api/ingest-status":
@@ -3342,88 +1402,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             strict = query.get("strict", ["false"])[0].lower() in {"1", "true", "yes"}
             payload = _validate_wiki_payload(strict=strict)
             self._json(payload, status=200 if payload.get("passed") else 422)
-        elif path == "/api/graph":
-            self._json(_get_graph_data())
-        elif path == "/api/graph-summary":
-            limit, limit_error = _core_parse_bounded_int(query.get("limit", ["40"])[0], "limit", 40, 1, 250)
-            depth, depth_error = _core_parse_bounded_int(query.get("depth", ["1"])[0], "depth", 1, 0, 3)
-            max_edges, edge_error = _core_parse_bounded_int(query.get("max_edges", ["120"])[0], "max_edges", 120, 0, 1000)
-            error = limit_error or depth_error or edge_error
-            if error:
-                self._json({"error": error}, status=400)
-            else:
-                assert limit is not None
-                assert depth is not None
-                assert max_edges is not None
-                self._json(_get_graph_summary(
-                    topic=_query_text(query, "topic", "q"),
-                    limit=limit,
-                    depth=depth,
-                    max_edges=max_edges,
-                ))
-        elif path == "/api/memory-profile":
-            limit, error = _parse_search_limit(query.get("limit", ["10"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
-                self._json(_memory_profile(limit=limit, project=_query_text(query, "project", max_len=80)))
-        elif path == "/api/memory-dashboard":
-            limit, error = _parse_search_limit(query.get("limit", ["12"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
-                self._json(_memory_dashboard(limit=limit, project=_query_text(query, "project", max_len=80)))
-        elif path == "/api/memory-brief":
-            limit, error = _parse_search_limit(query.get("limit", ["6"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
-                self._json(_memory_brief(
-                    query=_query_text(query, "q", "query"),
-                    limit=limit,
-                    project=_query_text(query, "project", max_len=80),
-                ))
-        elif path == "/api/query-link":
-            query_text = _query_text(query, "q", "query")
-            if not query_text.strip():
-                self._json({"found": False, "error": "query parameter required", "context_packet": []}, status=400)
-            else:
-                self._json(_query_link(
-                    query=query_text,
-                    budget=query.get("budget", ["medium"])[0],
-                    project=_query_text(query, "project", max_len=80),
-                ))
-        elif path == "/api/memory-audit":
-            limit, error = _parse_search_limit(query.get("limit", ["10"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
-                self._json(_memory_audit(limit=limit, project=_query_text(query, "project", max_len=80)))
-        elif path == "/api/memory-inbox":
-            limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
-                include_archived = query.get("include_archived", ["false"])[0].lower() in {"1", "true", "yes"}
-                self._json(_memory_inbox(
-                    limit=limit,
-                    include_archived=include_archived,
-                    project=_query_text(query, "project", max_len=80),
-                ))
-        elif path == "/api/capture-inbox":
-            limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
-            if error:
-                self._json({"error": error}, status=400)
-            else:
-                self._json(_capture_inbox(
-                    limit=limit,
-                    project=_query_text(query, "project", max_len=80),
-                ))
+        elif path in {"/api/graph", "/api/graph-summary", "/api/search", "/api/context"}:
+            self._handle_knowledge_api_get(path, query)
+        elif path in {
+            "/api/memory-profile",
+            "/api/memory-dashboard",
+            "/api/memory-brief",
+            "/api/query-link",
+            "/api/memory-audit",
+            "/api/memory-inbox",
+            "/api/capture-inbox",
+        }:
+            self._handle_memory_api_get(path, query)
         elif path == "/api/proposal-sources":
-            limit, error = _parse_search_limit(query.get("limit", ["50"])[0])
-            if error:
-                self._json({"error": error, "sources": []}, status=400)
-            else:
+            limit = self._query_limit_or_reply(query, "50", {"sources": []})
+            if limit is not None:
                 self._json(_proposal_sources(limit=min(limit, 100)))
         elif path == "/api/proposal-source":
             source_path = query.get("path", [""])[0]
@@ -3444,11 +1437,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self._json(_memory_explanation(identifier))
                 except ValueError as exc:
                     self._json({"found": False, "error": str(exc)}, status=404)
+        else:
+            self._err("page")
+
+    def _handle_knowledge_api_get(self, path: str, query: dict[str, list[str]]) -> None:
+        if path == "/api/graph":
+            self._json(_get_graph_data())
+        elif path == "/api/graph-summary":
+            limit, limit_error = _core_parse_bounded_int(query.get("limit", ["40"])[0], "limit", 40, 1, 250)
+            depth, depth_error = _core_parse_bounded_int(query.get("depth", ["1"])[0], "depth", 1, 0, 3)
+            max_edges, edge_error = _core_parse_bounded_int(query.get("max_edges", ["120"])[0], "max_edges", 120, 0, 1000)
+            error = limit_error or depth_error or edge_error
+            if error:
+                self._json({"error": error}, status=400)
+            else:
+                assert limit is not None
+                assert depth is not None
+                assert max_edges is not None
+                self._json(_get_graph_summary(
+                    topic=_query_text(query, "topic", "q"),
+                    limit=limit,
+                    depth=depth,
+                    max_edges=max_edges,
+                ))
         elif path == "/api/search":
             q = _query_text(query, "q")
-            limit, error = _parse_search_limit(query.get("limit", ["20"])[0])
-            if error:
-                self._json({"error": error, "results": []}, status=400)
+            limit = self._query_limit_or_reply(query, "20", {"results": []})
+            if limit is None:
                 return
             if not q:
                 self._json({"error": "q parameter required", "results": []}, status=400)
@@ -3461,8 +1476,54 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"error": "topic parameter required"}, status=400)
             else:
                 self._json(_get_context(topic))
-        else:
-            self._err("page")
+
+    def _handle_memory_api_get(self, path: str, query: dict[str, list[str]]) -> None:
+        if path == "/api/memory-profile":
+            limit = self._query_limit_or_reply(query, "10")
+            if limit is not None:
+                self._json(_memory_profile(limit=limit, project=_query_text(query, "project", max_len=80)))
+        elif path == "/api/memory-dashboard":
+            limit = self._query_limit_or_reply(query, "12")
+            if limit is not None:
+                self._json(_memory_dashboard(limit=limit, project=_query_text(query, "project", max_len=80)))
+        elif path == "/api/memory-brief":
+            limit = self._query_limit_or_reply(query, "6")
+            if limit is not None:
+                self._json(_memory_brief(
+                    query=_query_text(query, "q", "query"),
+                    limit=limit,
+                    project=_query_text(query, "project", max_len=80),
+                ))
+        elif path == "/api/query-link":
+            query_text = _query_text(query, "q", "query")
+            if not query_text.strip():
+                self._json({"found": False, "error": "query parameter required", "context_packet": []}, status=400)
+            else:
+                self._json(_query_link(
+                    query=query_text,
+                    budget=query.get("budget", ["medium"])[0],
+                    project=_query_text(query, "project", max_len=80),
+                ))
+        elif path == "/api/memory-audit":
+            limit = self._query_limit_or_reply(query, "10")
+            if limit is not None:
+                self._json(_memory_audit(limit=limit, project=_query_text(query, "project", max_len=80)))
+        elif path == "/api/memory-inbox":
+            limit = self._query_limit_or_reply(query, "20")
+            if limit is not None:
+                include_archived = query.get("include_archived", ["false"])[0].lower() in {"1", "true", "yes"}
+                self._json(_memory_inbox(
+                    limit=limit,
+                    include_archived=include_archived,
+                    project=_query_text(query, "project", max_len=80),
+                ))
+        elif path == "/api/capture-inbox":
+            limit = self._query_limit_or_reply(query, "20")
+            if limit is not None:
+                self._json(_capture_inbox(
+                    limit=limit,
+                    project=_query_text(query, "project", max_len=80),
+                ))
 
     def _ok(self, body: str):
         encoded = body.encode()
@@ -3550,6 +1611,34 @@ class Handler(http.server.BaseHTTPRequestHandler):
             status=405,
             headers={"Allow": "GET, HEAD, POST"},
         )
+
+    def _read_json_or_reply(self, error_payload: dict[str, object]) -> dict | None:
+        payload, error, status = self._read_json_body()
+        if error:
+            self._json({**error_payload, "error": error}, status=status)
+            return None
+        assert payload is not None
+        return payload
+
+    def _handle_rebuild_post(self, payload_builder: Callable[[], dict[str, object]]) -> None:
+        if not self._require_local_action_header({"rebuilt": False}):
+            return
+        if self._read_json_or_reply({"rebuilt": False}) is None:
+            return
+        self._json(payload_builder())
+
+    def _query_limit_or_reply(
+        self,
+        query: dict[str, list[str]],
+        default: str,
+        error_payload: dict[str, object] | None = None,
+    ) -> int | None:
+        limit, error = _parse_search_limit(query.get("limit", [default])[0])
+        if error:
+            self._json({**(error_payload or {}), "error": error}, status=400)
+            return None
+        assert limit is not None
+        return limit
 
     def _read_json_body(self) -> tuple[dict | None, str | None, int]:
         content_type = self.headers.get("Content-Type", "")

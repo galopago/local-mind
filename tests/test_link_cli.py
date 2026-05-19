@@ -18,6 +18,8 @@ link_cli = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(link_cli)
 
+from link_core.operations import begin_operation  # noqa: E402
+
 
 def create_demo_quiet(target: Path, force: bool = False) -> None:
     with redirect_stdout(StringIO()):
@@ -505,6 +507,35 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["next_actions"][0]["tool"], "ingest_status")
         self.assertEqual(payload["next_actions"][1]["tool"], "starter_prompts")
 
+    def test_operations_reports_interrupted_write_markers(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-operations-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        begin_operation(
+            target / "wiki",
+            "remember",
+            "Save memory",
+            timestamp="2026-05-17T00:00:00Z",
+            paths=["wiki/memories/prefer-local.md"],
+        )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.operations(target, limit=5)
+
+        self.assertEqual(code, 1)
+        self.assertIn("Link operations:", out.getvalue())
+        self.assertIn("remember | pending | stale", out.getvalue())
+        self.assertIn("link validate", out.getvalue())
+
+        json_out = StringIO()
+        with redirect_stdout(json_out):
+            json_code = link_cli.operations(target, limit=5, json_output=True)
+        payload = json.loads(json_out.getvalue())
+        self.assertEqual(json_code, 1)
+        self.assertEqual(payload["stale_count"], 1)
+        self.assertEqual(payload["operations"][0]["operation"], "remember")
+
     def test_status_prints_readiness_warnings(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))
         target = tmp / "my-link"
@@ -921,6 +952,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["proposals"][1]["memory_type"], "decision")
         self.assertEqual(payload["proposals"][1]["scope"], "project")
         self.assertEqual(payload["proposals"][1]["primary_action"]["kind"], "remember")
+        self.assertIn(str(target), payload["proposals"][1]["primary_action"]["command"])
         self.assertFalse((target / "wiki/memories/decision-keep-memory-mode-local.md").exists())
 
     def test_recall_finds_memory_pages(self):
@@ -1908,11 +1940,11 @@ class LinkCliTests(unittest.TestCase):
             "error": "No module named mcp",
         })
         with patch.object(
-            link_cli.subprocess,
+            link_cli._core_check_link_mcp_import.__globals__["subprocess"],
             "run",
             return_value=subprocess.CompletedProcess(["/tmp/python"], 0, stdout=stdout, stderr=""),
         ) as run:
-            payload = link_cli._check_link_mcp_import("/tmp/python")
+            payload = link_cli._core_check_link_mcp_import("/tmp/python")
 
         self.assertTrue(payload["installed"])
         self.assertEqual(payload["version"], link_cli.LINK_VERSION)

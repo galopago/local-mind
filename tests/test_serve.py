@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import serve
+from link_core.operations import begin_operation
 from link_core.schema import write_schema
 
 
@@ -240,6 +241,28 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertEqual(headers["Pragma"], "no-cache")
         self.assertEqual(headers["Expires"], "0")
+
+    def test_health_page_and_operations_api_show_interrupted_writes(self):
+        wiki = self.make_wiki()
+        begin_operation(
+            wiki,
+            "remember",
+            "Save memory",
+            timestamp="2026-05-17T00:00:00Z",
+            paths=["wiki/memories/prefer-local.md"],
+        )
+
+        page_status, body, _ = run_handler_raw("GET", "/health")
+        api_status, payload = run_handler("GET", "/api/operations")
+
+        self.assertEqual(page_status, 200)
+        self.assertIn(b"Health", body)
+        self.assertIn(b"Interrupted Operations", body)
+        self.assertIn(b"link operations", body)
+        self.assertEqual(api_status, 200)
+        self.assertEqual(payload["api_version"], serve.API_VERSION)
+        self.assertEqual(payload["stale_count"], 1)
+        self.assertEqual(payload["operations"][0]["operation"], "remember")
 
     def test_html_responses_are_not_browser_cached(self):
         self.make_wiki()
@@ -1319,6 +1342,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("update-memory", payload["proposals"][0]["primary_action"]["command"])
         self.assertEqual(payload["proposals"][1]["suggested_action"], "remember")
         self.assertEqual(payload["proposals"][1]["primary_action"]["tool"], "remember_memory")
+        self.assertIn(str(wiki.parent), payload["proposals"][1]["primary_action"]["command"])
         self.assertEqual(before_files, after_files)
         self.assertEqual(get_status, 405)
         self.assertIn("use POST", get_payload["error"])
@@ -2193,6 +2217,9 @@ class ServeTests(unittest.TestCase):
         self.assertIn("if (fastRender) {", html)
         self.assertIn("strokeEdgeBatch(currentEdges, 'rgba(88,166,255,0.07)', 0.45);", html)
         self.assertIn("Radial glow stays off in large overview mode except for focused nodes.", html)
+        self.assertIn("function seedLargeGraphPosition(n, i, total)", html)
+        self.assertIn("Large graphs skip physics, so they use a stable spiral seed instead of rings.", html)
+        self.assertIn("seedMissingPositions();\n    invalidateSearchCache();", html)
         self.assertIn("ctx.fillStyle = fastRender ? color + '28' : color + '40';", html)
 
     def test_graph_caps_default_overview_for_huge_visible_sets(self):

@@ -103,6 +103,7 @@ from link_core.memory import (
     memory_inbox as _core_memory_inbox,
     memory_profile as _core_memory_profile,
     memory_audit_report as _core_memory_audit_report,
+    memory_audit_next_actions as _core_memory_audit_next_actions,
     memory_records as _core_memory_records,
     normalize_project as _core_normalize_project,
     memory_review_issues as _core_memory_review_issues,
@@ -112,7 +113,6 @@ from link_core.memory import (
     resolve_memory_page as _core_resolve_memory_page,
     set_memory_status as _core_set_memory_status,
     slim_memory as _core_slim_memory,
-    slugify as _core_slugify,
     top_tags as _core_top_tags,
     update_memory_page as _core_update_memory_page,
     write_memory_page as _core_write_memory_page,
@@ -123,21 +123,19 @@ from link_core.backup import (
     list_backups as _core_list_backups,
 )
 from link_core.capture import (
-    capture_filename as _core_capture_filename,
+    capture_accept_memory_args as _core_capture_accept_memory_args,
+    capture_accept_payload as _core_capture_accept_payload,
     capture_inbox as _core_capture_inbox,
-    capture_notes_from_markdown as _core_capture_notes_from_markdown,
+    capture_proposal_selection as _core_capture_proposal_selection,
     capture_records as _core_capture_records,
     capture_review_summary as _core_capture_review_summary,
-    capture_title as _core_capture_title,
+    delete_capture_file as _core_delete_capture_file,
     mcp_capture_commands as _core_mcp_capture_commands,
-    resolve_capture_file as _core_resolve_capture_file,
+    redact_capture_file as _core_redact_capture_file,
+    write_session_capture as _core_write_session_capture,
 )
 from link_core.files import (
     atomic_write_json as _core_atomic_write_json,
-    atomic_write_text as _core_atomic_write_text,
-)
-from link_core.frontmatter import (
-    frontmatter_string as _frontmatter_string,
 )
 from link_core.ingest import (
     collect_ingest_status as _core_collect_ingest_status,
@@ -148,8 +146,6 @@ from link_core.log import (
 )
 from link_core.security import (
     clean_text_input as _clean_text_input,
-    redact_secret_values as _redact_secret_values,
-    secret_value_warnings as _secret_value_warnings,
 )
 from link_core.query import (
     query_link as _core_query_link,
@@ -196,6 +192,29 @@ def _parse_limit(value, default: int = 20, max_limit: int = 50) -> int:
     except (TypeError, ValueError):
         return default
     return min(max(limit, 1), max_limit)
+
+
+def _pagination_args(
+    limit: int,
+    offset: int,
+    include_all: bool,
+    *,
+    default_limit: int = 100,
+    max_limit: int = 1000,
+) -> tuple[int, int, bool]:
+    try:
+        parsed_offset = int(offset)
+    except (TypeError, ValueError):
+        parsed_offset = 0
+    if isinstance(include_all, bool):
+        parsed_include_all = include_all
+    else:
+        parsed_include_all = str(include_all).strip().lower() in {"1", "true", "yes", "on"}
+    return (
+        _parse_limit(limit, default=default_limit, max_limit=max_limit),
+        max(parsed_offset, 0),
+        parsed_include_all,
+    )
 
 
 def _default_project() -> str:
@@ -261,6 +280,7 @@ def _memory_inbox(limit: int = 20, include_archived: bool = False, project: str 
         include_archived=include_archived,
         review_command="review_memory",
         project=project,
+        command_target=WIKI_DIR.parent,
     )
 
 
@@ -270,6 +290,7 @@ def _memory_explanation(identifier: str) -> dict[str, object]:
         identifier,
         records=_memory_records(),
         review_command="review_memory",
+        command_target=WIKI_DIR.parent,
     )
 
 
@@ -303,6 +324,7 @@ def _memory_brief(query: str = "", limit: int = 6, project: str = "") -> dict[st
     payload = _core_memory_brief(
         _memory_records(), query=_clean_text_input(query, max_len=500),
         limit=limit, review_command="review_memory", project=project_name,
+        command_target=WIKI_DIR.parent,
     )
     return _core_add_capture_review_to_brief(payload, _capture_review_summary(project=project_name))
 
@@ -350,34 +372,6 @@ def _ingest_status() -> dict[str, object]:
     return _core_collect_ingest_status(WIKI_DIR.parent)
 
 
-def _mcp_memory_audit_actions(
-    inbox: dict[str, object],
-    captures: dict[str, object],
-    project_name: str,
-) -> list[dict[str, object]]:
-    project_arg = f', project="{project_name}"' if project_name else ""
-    return [
-        {
-            "label": "Review memory inbox",
-            "tool": "memory_inbox",
-            "command": f"memory_inbox(include_archived=true{project_arg})",
-            "recommended": bool(inbox["review_count"]),
-        },
-        {
-            "label": "Review raw captures",
-            "tool": "capture_inbox",
-            "command": f"capture_inbox({project_arg.lstrip(', ')})" if project_arg else "capture_inbox()",
-            "recommended": bool(captures["count"] or captures.get("read_warning_count")),
-        },
-        {
-            "label": "Explain a memory",
-            "tool": "explain_memory",
-            "command": 'explain_memory(identifier="<memory-name>")',
-            "recommended": False,
-        },
-    ]
-
-
 def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
     parsed_limit = _parse_limit(limit, default=10, max_limit=50)
     project_name = _resolve_project(project)
@@ -388,7 +382,12 @@ def _memory_audit(limit: int = 10, project: str = "") -> dict[str, object]:
         profile,
         inbox,
         captures,
-        _mcp_memory_audit_actions(inbox, captures, project_name),
+        _core_memory_audit_next_actions(
+            mode="mcp",
+            inbox=inbox,
+            captures=captures,
+            project=project_name,
+        ),
         project=project_name,
     )
 
@@ -437,41 +436,15 @@ def _capture_session(
         raise ValueError("session text required")
     clean_source = _clean_text_input(source, max_len=500) or "mcp"
     project_name = _resolve_project(project)
-    timestamp = _utc_timestamp()
-    capture_title = _core_capture_title(
-        clean_text,
-        clean_source,
-        _clean_text_input(title, max_len=200),
+    capture_record = _core_write_session_capture(
+        WIKI_DIR.parent,
+        text=clean_text,
+        source=clean_source,
+        title=_clean_text_input(title, max_len=200),
+        project=project_name,
         default_source="mcp",
     )
-    secret_warnings = _secret_value_warnings(clean_text)
-    root = WIKI_DIR.parent
-    capture_dir = root / "raw" / "memory-captures"
-    capture_dir.mkdir(parents=True, exist_ok=True)
-    capture_path = _core_capture_filename(timestamp, capture_title, capture_dir)
-    project_line = f'project: "{_frontmatter_string(project_name)}"\n' if project_name else ""
-    _core_atomic_write_text(
-        capture_path,
-        f"""---
-title: "{_frontmatter_string(capture_title)}"
-source_type: conversation
-date_captured: "{timestamp}"
-{project_line}---
-
-# {capture_title}
-
-Captured locally for Link memory review. This raw note is proposal-only until the user approves durable memories.
-
-## Source Input
-
-{clean_source}
-
-## Notes
-
-{clean_text}
-""",
-    )
-    rel_path = capture_path.relative_to(root).as_posix()
+    rel_path = str(capture_record["path"])
     proposals = _propose_memories_from_text(
         clean_text,
         source=rel_path,
@@ -479,13 +452,13 @@ Captured locally for Link memory review. This raw note is proposal-only until th
         project=project_name,
     )
     _append_log(
-        timestamp,
+        str(capture_record["timestamp"]),
         "capture-session",
         f"Captured proposal-only session notes at {rel_path}",
         [
             f"Source input: {clean_source}",
-            f"Project: {project_name or 'none'}",
-            f"Secret warnings: {', '.join(secret_warnings) if secret_warnings else 'none'}",
+            f"Project: {capture_record['project'] or 'none'}",
+            f"Secret warnings: {', '.join(capture_record['secret_warnings']) if capture_record['secret_warnings'] else 'none'}",
             f"Proposals: {proposals['count']}",
         ],
     )
@@ -494,15 +467,11 @@ Captured locally for Link memory review. This raw note is proposal-only until th
         "captured": True,
         "path": rel_path,
         "source": clean_source,
-        "title": capture_title,
-        "project": project_name,
-        "secret_warnings": secret_warnings,
+        "title": capture_record["title"],
+        "project": capture_record["project"],
+        "secret_warnings": capture_record["secret_warnings"],
         "proposals": proposals,
     }
-
-
-def _resolve_capture_file(capture: str) -> Path | None:
-    return _core_resolve_capture_file(WIKI_DIR.parent, capture, max_len=500)
 
 
 def _capture_records(limit: int = 20, project: str = "") -> list[dict[str, object]]:
@@ -550,57 +519,42 @@ def _accept_capture(
     allow_duplicate: bool = False,
     allow_conflict: bool = False,
 ) -> dict[str, object]:
-    try:
-        proposal_index = int(index)
-    except (TypeError, ValueError):
-        raise ValueError("proposal index must be an integer")
-    if proposal_index < 1:
-        raise ValueError("proposal index must be 1 or greater")
-
     root = WIKI_DIR.parent
-    capture_path = _resolve_capture_file(capture)
-    if capture_path is None:
-        raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
-    raw_text = capture_path.read_text(encoding="utf-8", errors="replace")
-    meta, notes = _core_capture_notes_from_markdown(raw_text)
-    if not notes:
-        raise ValueError("capture has no notes")
-
-    rel_path = capture_path.relative_to(root).as_posix()
-    project_name = _core_slugify(
-        _clean_text_input(project) or str(meta.get("project") or "") or _default_project(),
-        fallback="",
+    selection = _core_capture_proposal_selection(
+        root,
+        capture,
+        index=index,
+        project=_clean_text_input(project),
+        default_project=_default_project(),
+        max_capture_len=500,
+        propose_memories=lambda notes, rel_path, proposal_limit, project_name: _propose_memories_from_text(
+            notes,
+            source=rel_path,
+            limit=proposal_limit,
+            project=project_name,
+        ),
     )
-    proposals = _propose_memories_from_text(
-        notes,
-        source=rel_path,
-        limit=max(1, min(max(proposal_index, 10), 50)),
-        project=project_name,
-    )
-    if proposal_index > len(proposals["proposals"]):
-        raise ValueError(f"capture has {len(proposals['proposals'])} proposal(s); index {proposal_index} is unavailable")
-    proposal = proposals["proposals"][proposal_index - 1]
-    chosen_scope = _clean_text_input(scope).lower() or str(proposal["scope"])
-    chosen_project = project_name if chosen_scope == "project" else ""
-    result = _write_memory_page(
-        str(proposal["memory"]),
-        title=_clean_text_input(title) or str(proposal["title"]),
-        memory_type=_clean_text_input(memory_type).lower() or str(proposal["memory_type"]),
-        scope=chosen_scope,
+    rel_path = str(selection["capture"])
+    proposal_index = int(selection["proposal_index"])
+    memory_args = _core_capture_accept_memory_args(
+        selection,
+        title=_clean_text_input(title),
+        memory_type=_clean_text_input(memory_type).lower(),
+        scope=_clean_text_input(scope).lower(),
         tags=tags,
-        source=rel_path,
+    )
+    result = _write_memory_page(
+        str(memory_args["text"]),
+        title=str(memory_args["title"]),
+        memory_type=str(memory_args["memory_type"]),
+        scope=str(memory_args["scope"]),
+        tags=memory_args["tags"] if isinstance(memory_args["tags"], str) else "",
+        source=str(memory_args["source"]),
         allow_duplicate=allow_duplicate,
         allow_conflict=allow_conflict,
-        project=chosen_project,
+        project=str(memory_args["project"]),
     )
-    payload = {
-        "accepted": bool(result.get("created")),
-        "capture": rel_path,
-        "proposal_index": proposal_index,
-        "project": str(result.get("project") or proposal.get("project") or ""),
-        "proposal": proposal,
-        "result": result,
-    }
+    payload = _core_capture_accept_payload(selection, result)
     if result.get("created"):
         _append_log(
             _utc_timestamp(),
@@ -616,56 +570,37 @@ def _accept_capture(
 
 def _redact_capture(capture: str, replacement: str = "[redacted-secret]") -> dict[str, object]:
     root = WIKI_DIR.parent
-    capture_path = _resolve_capture_file(capture)
-    if capture_path is None:
-        raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
-    original = capture_path.read_text(encoding="utf-8", errors="replace")
-    redacted, labels, replacement_count = _redact_secret_values(
-        original,
+    payload = _core_redact_capture_file(
+        root,
+        capture,
         replacement=_clean_text_input(replacement, max_len=100) or "[redacted-secret]",
+        max_capture_len=500,
     )
-    rel_path = capture_path.relative_to(root).as_posix()
-    if replacement_count:
-        _core_atomic_write_text(capture_path, redacted)
+    if payload["redacted"]:
+        labels = payload.get("labels") if isinstance(payload.get("labels"), list) else []
         _append_log(
             _utc_timestamp(),
             "redact-capture",
-            f"Redacted secret-looking values from {rel_path}",
+            f"Redacted secret-looking values from {payload['path']}",
             [
                 f"Labels: {', '.join(labels)}",
-                f"Replacement count: {replacement_count}",
+                f"Replacement count: {payload['replacement_count']}",
             ],
         )
-    return {
-        "redacted": bool(replacement_count),
-        "path": rel_path,
-        "labels": labels,
-        "replacement_count": replacement_count,
-    }
+    return payload
 
 
 def _delete_capture(capture: str, confirm: bool = False) -> dict[str, object]:
     root = WIKI_DIR.parent
-    capture_path = _resolve_capture_file(capture)
-    if capture_path is None:
-        raise ValueError(f"capture not found: {_clean_text_input(capture, max_len=500)}")
-    rel_path = capture_path.relative_to(root).as_posix()
-    payload = {
-        "deleted": False,
-        "path": rel_path,
-        "confirmation_required": not confirm,
-    }
+    payload = _core_delete_capture_file(root, capture, confirm=confirm, max_capture_len=500)
     if not confirm:
         return payload
-    capture_path.unlink()
     _append_log(
         _utc_timestamp(),
         "delete-capture",
-        f"Deleted raw capture {rel_path}",
+        f"Deleted raw capture {payload['path']}",
         ["Deleted file only; capture contents were not logged."],
     )
-    payload["deleted"] = True
-    payload["confirmation_required"] = False
     return payload
 
 
@@ -1262,15 +1197,16 @@ def get_pages(
     Use search_wiki, query_link, or get_context instead of paging through the
     whole wiki when answering a question.
     """
+    parsed_limit, parsed_offset, parsed_include_all = _pagination_args(limit, offset, include_all)
     return json.dumps(
         _core_list_pages(
             _build_cache(),
             category=_clean_text_input(category).lower(),
             page_type=_clean_text_input(page_type).lower(),
             maturity=_clean_text_input(maturity).lower(),
-            limit=limit,
-            offset=offset,
-            include_all=include_all,
+            limit=parsed_limit,
+            offset=parsed_offset,
+            include_all=parsed_include_all,
         ),
         ensure_ascii=False,
     )
@@ -1299,13 +1235,14 @@ def get_backlinks(page_name: str, limit: int = 100, offset: int = 0, include_all
     if not page_name:
         return json.dumps({"error": "page_name required", "inbound": [], "forward": []})
 
+    parsed_limit, parsed_offset, parsed_include_all = _pagination_args(limit, offset, include_all)
     return json.dumps(
         _core_page_link_summary(
             backlinks,
             page_name,
-            limit=limit,
-            offset=offset,
-            include_all=include_all,
+            limit=parsed_limit,
+            offset=parsed_offset,
+            include_all=parsed_include_all,
         ),
         ensure_ascii=False,
     )
