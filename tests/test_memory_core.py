@@ -446,6 +446,19 @@ class MemoryCoreTests(unittest.TestCase):
         self.assertEqual(action["arguments"]["project"], "link")
         self.assertIn("--project link", action["command"])
 
+    def test_memory_proposal_command_uses_explicit_target(self):
+        payload = propose_memories_from_text(
+            "I prefer local agent memory for release work.",
+            [],
+            source="unit test",
+            command_target="/tmp/link demo",
+        )
+        action = payload["proposals"][0]["primary_action"]
+
+        self.assertEqual(action["kind"], "remember")
+        self.assertIn("link demo", action["command"])
+        self.assertNotIn(" remember . ", action["command"])
+
     def test_memory_conflict_candidates_catch_branch_policy_changes(self):
         records = [
             {

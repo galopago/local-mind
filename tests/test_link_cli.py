@@ -952,6 +952,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["proposals"][1]["memory_type"], "decision")
         self.assertEqual(payload["proposals"][1]["scope"], "project")
         self.assertEqual(payload["proposals"][1]["primary_action"]["kind"], "remember")
+        self.assertIn(str(target), payload["proposals"][1]["primary_action"]["command"])
         self.assertFalse((target / "wiki/memories/decision-keep-memory-mode-local.md").exists())
 
     def test_recall_finds_memory_pages(self):

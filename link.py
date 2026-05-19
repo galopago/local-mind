@@ -394,6 +394,7 @@ def _propose_memories_from_text(
     source: str = "inline",
     limit: int = 10,
     project: str | None = None,
+    command_target: str | Path = ".",
 ) -> dict[str, object]:
     return _core_propose_memories_from_text(
         text,
@@ -402,6 +403,7 @@ def _propose_memories_from_text(
         limit=limit,
         writes_memory=False,
         project=project,
+        command_target=command_target,
     )
 
 
@@ -774,6 +776,7 @@ def propose_memories(
         source=source,
         limit=max(1, min(limit, 20)),
         project=project or _default_project(target),
+        command_target=target,
     )
 
     if json_output:
@@ -822,6 +825,7 @@ def capture_session(
         source=rel_path,
         limit=max(1, min(limit, 20)),
         project=project_name,
+        command_target=root,
     )
     payload = {
         "captured": True,
@@ -935,6 +939,7 @@ def accept_capture(
                 source=rel_path,
                 limit=proposal_limit,
                 project=project_name,
+                command_target=root,
             ),
         )
     except ValueError as exc:

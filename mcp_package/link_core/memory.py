@@ -1915,7 +1915,7 @@ def _shell_words(*parts: object) -> str:
     return shlex.join(words)
 
 
-def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
+def memory_proposal_action(proposal: Mapping[str, object], *, command_target: str | Path = ".") -> dict[str, object]:
     """Return the safest next action for a memory proposal."""
     memory = str(proposal.get("memory") or "")
     title = str(proposal.get("title") or proposal_title(memory, str(proposal.get("memory_type") or "note")))
@@ -1931,7 +1931,16 @@ def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
     if duplicate_list:
         first = duplicate_list[0] if isinstance(duplicate_list[0], Mapping) else {}
         identifier = str(first.get("name") or first.get("title") or "")
-        command_parts: list[object] = ["python3", "link.py", "update-memory", identifier, memory, ".", "--source", source]
+        command_parts: list[object] = [
+            "python3",
+            "link.py",
+            "update-memory",
+            identifier,
+            memory,
+            command_target,
+            "--source",
+            source,
+        ]
         if project:
             command_parts.extend(["--project", project])
         command = _shell_words(*command_parts)
@@ -1957,7 +1966,7 @@ def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
             kind="review_conflict",
             label="Review conflict",
             description="A likely conflicting memory exists; inspect it before saving or archiving anything.",
-            command=_shell_words("python3", "link.py", "explain-memory", identifier, "."),
+            command=_shell_words("python3", "link.py", "explain-memory", identifier, command_target),
             tool="explain_memory",
             arguments={"identifier": identifier},
             priority="high",
@@ -1970,7 +1979,7 @@ def memory_proposal_action(proposal: Mapping[str, object]) -> dict[str, object]:
         "link.py",
         "remember",
         memory,
-        ".",
+        command_target,
         "--title",
         title,
         "--type",
@@ -2080,6 +2089,7 @@ def propose_memories_from_text(
     limit: int = 10,
     writes_memory: bool = False,
     project: str | None = None,
+    command_target: str | Path = ".",
 ) -> dict[str, object]:
     record_list = [dict(record) for record in records]
     project_name = normalize_project(project)
@@ -2140,7 +2150,7 @@ def propose_memories_from_text(
             "conflict_candidates": conflict_candidates,
             "suggested_action": suggested_action,
         }
-        proposal["primary_action"] = memory_proposal_action(proposal)
+        proposal["primary_action"] = memory_proposal_action(proposal, command_target=command_target)
         proposals.append(proposal)
         if len(proposals) >= limit:
             break

@@ -476,6 +476,7 @@ def _propose_memories_from_text(
         limit=limit,
         writes_memory=False,
         project=project,
+        command_target=WIKI_DIR.parent,
     )
 
 

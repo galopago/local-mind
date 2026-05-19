@@ -1342,6 +1342,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("update-memory", payload["proposals"][0]["primary_action"]["command"])
         self.assertEqual(payload["proposals"][1]["suggested_action"], "remember")
         self.assertEqual(payload["proposals"][1]["primary_action"]["tool"], "remember_memory")
+        self.assertIn(str(wiki.parent), payload["proposals"][1]["primary_action"]["command"])
         self.assertEqual(before_files, after_files)
         self.assertEqual(get_status, 405)
         self.assertIn("use POST", get_payload["error"])
