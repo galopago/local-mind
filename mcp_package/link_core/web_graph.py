@@ -166,9 +166,38 @@ def render_graph_script(
     return ((h >>> 0) % 1000) / 1000;
   }}
 
-  // Start in a loose two-lobe silhouette. Physics keeps it organic after load.
+  function categorySeedAngle(category) {{
+    var angles = {{
+      concepts: -0.25,
+      entities: 0.85,
+      memories: -1.15,
+      sources: 2.35,
+      comparisons: -2.45,
+      explorations: 1.75
+    }};
+    return angles[category] || 0;
+  }}
+
+  function seedLargeGraphPosition(n, i, total) {{
+    var angle = i * 2.399963 + categorySeedAngle(n.category) + stableNoise(n.id, 11) * 0.55;
+    var spread = total > 2500 ? 360 : 285;
+    var r = 30 + Math.sqrt((i + 1) / Math.max(total, 1)) * spread;
+    var categoryLift = n.category === 'sources' ? 62 : (n.category === 'memories' ? -50 : (n.category === 'entities' ? 26 : -4));
+    pos[n.id] = {{
+      x: Math.cos(angle) * r * 1.04,
+      y: Math.sin(angle) * r * 0.82 + categoryLift
+    }};
+    vel[n.id] = {{ x: 0, y: 0 }};
+  }}
+
+  // Small graphs start in a loose two-lobe silhouette and settle with physics.
+  // Large graphs skip physics, so they use a stable spiral seed instead of rings.
   var pos = {{}}, vel = {{}}, pinned = {{}};
   function seedNodePosition(n, i, total) {{
+    if (total > LARGE_GRAPH_LIMIT) {{
+      seedLargeGraphPosition(n, i, total);
+      return;
+    }}
     var lobe = i % 2 === 0 ? -1 : 1;
     var a = i * 2.399963 + stableNoise(n.id, 7) * 0.7;
     var r = 50 + Math.sqrt((i + 1) / Math.max(total, 1)) * 155;
@@ -791,6 +820,7 @@ def render_graph_script(
     if (depthFilter) depthFilter.value = 'all';
     rebuildGraphIndexes();
     syncCategoryOptions();
+    seedMissingPositions();
     invalidateSearchCache();
     invalidateFilters();
     if (!lockedOverviewIds) reseedVisiblePositions();
