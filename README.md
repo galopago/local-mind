@@ -197,15 +197,16 @@ Full setup: [MCP guide](https://gowtham0992.github.io/link/mcp.html).
 
 ## How Link Works
 
-Link has one simple rule:
+Link separates source-backed knowledge from durable agent memory:
 
-```text
-Sources become wiki knowledge.
-Explicit "remember" becomes agent memory.
-Queries use both.
-```
+1. Drop raw notes, transcripts, articles, and project context into `raw/`.
+2. Agents compile those sources into inspectable pages under `wiki/`.
+3. Explicit "remember" requests become reviewable memory pages.
+4. Queries retrieve compact MCP context from both the wiki and memory layer.
 
-![Link architecture: raw sources become structured wiki knowledge, reviewed memory, and MCP context for agents](docs/assets/link-architecture.svg)
+<p align="center">
+  <img src="docs/assets/link-architecture.svg" alt="Link architecture: raw sources become wiki knowledge, explicit remembers become reviewed memory, and agents retrieve compact MCP context" width="820">
+</p>
 
 The storage model is plain and inspectable:
 

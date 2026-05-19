@@ -1,125 +1,76 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 860" role="img" aria-labelledby="title desc">
-  <title id="title">How Link works</title>
-  <desc id="desc">Raw local sources become source-backed Markdown wiki pages. Reviewed memories and graph indexes are retrieved through MCP as compact context for agents.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">Link architecture</title>
+  <desc id="desc">Raw local sources become wiki pages, explicit remember requests become reviewed memory, and agents retrieve compact MCP context.</desc>
   <defs>
-    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
-      <path d="M32 0H0V32" fill="none" stroke="#17120c" stroke-opacity=".055" stroke-width="1"/>
-    </pattern>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0 0 10 5 0 10Z" fill="#17120c"/>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#16130f"/>
     </marker>
     <style>
-      .paper { fill: #fff7c7; }
-      .ink { fill: #17120c; }
-      .muted { fill: #5d5547; }
-      .window { fill: #fffdf1; stroke: #17120c; stroke-width: 4; }
-      .shadow { filter: drop-shadow(8px 8px 0 #17120c); }
-      .green { fill: #dff8ef; }
-      .blue { fill: #e8edff; }
-      .yellow { fill: #ffd342; }
-      .red { fill: #ffe1dc; }
-      .dark { fill: #0b0b0b; }
-      .line { fill: none; stroke: #17120c; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
-      text { fill: #17120c; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
-      .serif { font-family: Georgia, "Times New Roman", serif; font-weight: 800; }
+      .bg { fill: #fff7cf; }
+      .panel { fill: #fffdf3; stroke: #16130f; stroke-width: 3; }
+      .raw { fill: #ddf7ee; }
+      .wiki { fill: #e8edff; }
+      .memory { fill: #ffe4df; }
+      .agent { fill: #ffd94a; }
+      .ink { fill: #16130f; }
+      .muted { fill: #5c5548; }
+      .arrow { fill: none; stroke: #16130f; stroke-width: 4; stroke-linecap: round; marker-end: url(#arrow); }
+      text { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #16130f; letter-spacing: 0; }
+      .title { font-size: 24px; font-weight: 800; }
+      .body { font-size: 17px; font-weight: 600; }
+      .small { font-size: 14px; font-weight: 700; }
       .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
-      .title { font-size: 66px; }
-      .subtitle { font-size: 25px; font-weight: 650; }
-      .step { font-size: 30px; font-weight: 900; }
-      .body { font-size: 22px; font-weight: 650; }
-      .small { font-size: 16px; font-weight: 800; }
-      .tiny { font-size: 14px; font-weight: 800; }
     </style>
   </defs>
 
-  <rect class="paper" width="1600" height="860"/>
-  <rect width="1600" height="860" fill="url(#grid)"/>
+  <rect class="bg" width="1200" height="420" rx="18"/>
+  <text class="title" x="60" y="58">Link keeps agent memory local and inspectable</text>
+  <text class="body muted" x="60" y="88">Sources become wiki knowledge. Explicit remembers become reviewed memory. Queries use both.</text>
 
-  <g transform="translate(56 48)">
-    <text class="serif title" x="0" y="62">How Link works</text>
-    <text class="subtitle" x="2" y="104">A local Markdown memory loop for agents.</text>
+  <g transform="translate(60 130)">
+    <rect class="panel raw" width="210" height="145" rx="14"/>
+    <text class="title" x="26" y="42">1. Capture</text>
+    <text class="body" x="26" y="78">Drop files into</text>
+    <text class="mono body" x="26" y="108">raw/</text>
+    <text class="small muted" x="26" y="132">notes, transcripts, docs</text>
   </g>
 
-  <g transform="translate(56 154)" class="shadow">
-    <rect class="window" width="1488" height="560" rx="16"/>
-    <rect class="dark" x="0" y="0" width="1488" height="54" rx="16"/>
-    <rect class="dark" x="0" y="32" width="1488" height="22"/>
-    <circle cx="34" cy="27" r="10" fill="#ff6d5f" stroke="#17120c" stroke-width="3"/>
-    <circle cx="66" cy="27" r="10" fill="#ffd342" stroke="#17120c" stroke-width="3"/>
-    <circle cx="98" cy="27" r="10" fill="#54c79d" stroke="#17120c" stroke-width="3"/>
-    <text class="mono small" x="126" y="33" fill="#fffdf1">~/link</text>
+  <path class="arrow" d="M292 202H370"/>
 
-    <g transform="translate(42 96)">
-      <rect class="window green" width="270" height="244" rx="12"/>
-      <rect class="yellow" x="18" y="18" width="52" height="52" rx="26" stroke="#17120c" stroke-width="4"/>
-      <text class="step" x="35" y="54">1</text>
-      <text class="step" x="88" y="54">Capture</text>
-      <text class="body" x="28" y="104">Drop sources into</text>
-      <text class="mono body" x="28" y="137">raw/</text>
-      <line x1="28" y1="162" x2="238" y2="162" stroke="#17120c" stroke-width="3"/>
-      <text class="mono tiny" x="28" y="194">notes.md</text>
-      <text class="mono tiny" x="28" y="220">transcript.txt</text>
-    </g>
-
-    <path class="line" d="M330 218H400"/>
-
-    <g transform="translate(418 96)">
-      <rect class="window blue" width="270" height="244" rx="12"/>
-      <rect class="yellow" x="18" y="18" width="52" height="52" rx="26" stroke="#17120c" stroke-width="4"/>
-      <text class="step" x="35" y="54">2</text>
-      <text class="step" x="88" y="54">Structure</text>
-      <text class="body" x="28" y="104">Agents compile</text>
-      <text class="mono body" x="28" y="137">wiki/</text>
-      <line x1="28" y1="162" x2="238" y2="162" stroke="#17120c" stroke-width="3"/>
-      <text class="mono tiny" x="28" y="194">sources/</text>
-      <text class="mono tiny" x="28" y="220">concepts/ + graph</text>
-    </g>
-
-    <path class="line" d="M706 218H776"/>
-
-    <g transform="translate(794 96)">
-      <rect class="window red" width="270" height="244" rx="12"/>
-      <rect class="yellow" x="18" y="18" width="52" height="52" rx="26" stroke="#17120c" stroke-width="4"/>
-      <text class="step" x="35" y="54">3</text>
-      <text class="step" x="88" y="54">Remember</text>
-      <text class="body" x="28" y="104">Only explicit</text>
-      <text class="mono body" x="28" y="137">remember</text>
-      <line x1="28" y1="162" x2="238" y2="162" stroke="#17120c" stroke-width="3"/>
-      <text class="mono tiny" x="28" y="194">reviewed</text>
-      <text class="mono tiny" x="28" y="220">archive / forget</text>
-    </g>
-
-    <path class="line" d="M1082 218H1152"/>
-
-    <g transform="translate(1170 96)">
-      <rect class="window yellow" width="270" height="244" rx="12"/>
-      <rect class="dark" x="26" y="24" width="218" height="88" rx="10"/>
-      <text class="mono small" x="44" y="58" fill="#fffdf1">$ query_link</text>
-      <text class="mono small" x="44" y="88" fill="#fffdf1">$ memory_brief</text>
-      <text class="step" x="28" y="154">Retrieve</text>
-      <line x1="28" y1="178" x2="238" y2="178" stroke="#17120c" stroke-width="3"/>
-      <text class="mono tiny" x="28" y="210">compact MCP context</text>
-    </g>
-
-    <g transform="translate(168 402)">
-      <rect class="window" width="1152" height="96" rx="12"/>
-      <text class="step" x="32" y="59">Plain local files</text>
-      <text class="mono body" x="342" y="58">raw/</text>
-      <text class="mono body" x="486" y="58">wiki/sources/</text>
-      <text class="mono body" x="726" y="58">wiki/memories/</text>
-      <text class="mono body" x="1004" y="58">_backlinks.json</text>
-    </g>
+  <g transform="translate(390 130)">
+    <rect class="panel wiki" width="210" height="145" rx="14"/>
+    <text class="title" x="26" y="42">2. Structure</text>
+    <text class="body" x="26" y="78">Compile into</text>
+    <text class="mono body" x="26" y="108">wiki/</text>
+    <text class="small muted" x="26" y="132">sources, concepts, graph</text>
   </g>
 
-  <g transform="translate(56 770)">
-    <rect x="0" y="0" width="184" height="42" rx="21" fill="#fffdf1" stroke="#17120c" stroke-width="3"/>
-    <text class="mono small" x="24" y="27">no cloud</text>
-    <rect x="204" y="0" width="216" height="42" rx="21" fill="#fffdf1" stroke="#17120c" stroke-width="3"/>
-    <text class="mono small" x="228" y="27">no telemetry</text>
-    <rect x="440" y="0" width="254" height="42" rx="21" fill="#fffdf1" stroke="#17120c" stroke-width="3"/>
-    <text class="mono small" x="464" y="27">source-backed</text>
-    <rect x="714" y="0" width="268" height="42" rx="21" fill="#fffdf1" stroke="#17120c" stroke-width="3"/>
-    <text class="mono small" x="738" y="27">review-gated memory</text>
-    <text class="mono small muted" x="1044" y="27">The wiki is storage. Memory is the product.</text>
+  <path class="arrow" d="M622 202H700"/>
+
+  <g transform="translate(720 130)">
+    <rect class="panel memory" width="210" height="145" rx="14"/>
+    <text class="title" x="26" y="42">3. Remember</text>
+    <text class="body" x="26" y="78">Save only explicit</text>
+    <text class="mono body" x="26" y="108">remember</text>
+    <text class="small muted" x="26" y="132">review, archive, forget</text>
+  </g>
+
+  <path class="arrow" d="M952 202H1030"/>
+
+  <g transform="translate(990 130)">
+    <rect class="panel agent" width="150" height="145" rx="14"/>
+    <text class="title" x="22" y="42">4. Query</text>
+    <text class="mono small" x="22" y="78">query_link</text>
+    <text class="mono small" x="22" y="104">memory_brief</text>
+    <text class="small muted" x="22" y="132">compact context</text>
+  </g>
+
+  <g transform="translate(170 326)">
+    <rect class="panel" width="860" height="54" rx="12"/>
+    <text class="body" x="28" y="35">Plain local files:</text>
+    <text class="mono small" x="190" y="35">raw/</text>
+    <text class="mono small" x="305" y="35">wiki/sources/</text>
+    <text class="mono small" x="500" y="35">wiki/memories/</text>
+    <text class="mono small" x="720" y="35">_backlinks.json</text>
   </g>
 </svg>
