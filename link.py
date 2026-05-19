@@ -36,7 +36,6 @@ Usage:
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -201,7 +200,6 @@ from link_core.mcp_verify import (
 )
 from link_core.schema import (
     migrate_wiki as _core_migrate_wiki,
-    schema_status as _core_schema_status,
 )
 from link_core.security import (
     clean_text_input as _clean_text_input,
