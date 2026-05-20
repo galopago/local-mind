@@ -138,6 +138,10 @@ class LargeWikiSmokeTests(unittest.TestCase):
         self.assertEqual(payload["page_list"]["returned_count"], 100)
         self.assertEqual(payload["graph_initial"]["mode"], "full")
         self.assertEqual(payload["graph_initial"]["nodes"], payload["graph_initial"]["total_nodes"])
+        self.assertEqual(payload["work_dir"], str(root))
+        self.assertEqual(payload["viewer"]["serve_command"], f"python3 link.py serve {root}")
+        self.assertEqual(payload["viewer"]["graph_url"], "http://127.0.0.1:3000/graph")
+        self.assertEqual(payload["viewer"]["health_url"], "http://127.0.0.1:3000/health")
 
 
 if __name__ == "__main__":
