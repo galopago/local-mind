@@ -63,3 +63,41 @@ def starter_prompt_payload(target: Path, project: str | None = None) -> dict[str
             'link benchmark "agent memory"',
         ],
     }
+
+
+def welcome_payload(target: Path, project: str | None = None) -> dict[str, object]:
+    """Return a short first-use path for a human trying Link with an agent."""
+    starter = starter_prompt_payload(target, project=project)
+    prompts = [
+        item for item in starter.get("prompts", [])
+        if isinstance(item, dict)
+    ]
+    proof = [
+        "Agent can find Link and check readiness.",
+        "Agent can prime itself with compact local memory.",
+        "Agent can save explicit memory only when you ask.",
+    ]
+    steps = []
+    for index, item in enumerate(prompts[:3], start=1):
+        steps.append({
+            "step": index,
+            "label": item.get("label", ""),
+            "prompt": item.get("prompt", ""),
+            "proves": proof[index - 1],
+        })
+    return {
+        "target": starter["target"],
+        "project": starter["project"],
+        "steps": steps,
+        "commands": [
+            "link status --validate",
+            "link serve",
+            "link ingest-status",
+            "link prompts",
+        ],
+        "urls": [
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3000/health",
+            "http://127.0.0.1:3000/graph",
+        ],
+    }

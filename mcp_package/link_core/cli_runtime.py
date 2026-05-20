@@ -36,6 +36,30 @@ def render_starter_prompts_text(payload: Mapping[str, object]) -> tuple[int, str
     return 0, "\n".join(lines)
 
 
+def render_welcome_text(payload: Mapping[str, object]) -> tuple[int, str]:
+    """Render a short first-use guide for humans trying Link with an agent."""
+    lines = [f"Link welcome: {payload['target']}"]
+    if payload["project"]:
+        lines.append(f"Project: {payload['project']}")
+    lines.extend([
+        "",
+        "Try these with your agent",
+    ])
+    steps = payload.get("steps", [])
+    if isinstance(steps, Sequence) and not isinstance(steps, (str, bytes)):
+        for item in steps:
+            if isinstance(item, Mapping):
+                lines.append(f"{item.get('step', '-')}. {item.get('prompt', '')}")
+                lines.append(f"   Proves: {item.get('proves', '')}")
+    lines.extend(["", "Local checks"])
+    for command in payload.get("commands", []):
+        lines.append(f"- {command}")
+    lines.extend(["", "Open"])
+    for url in payload.get("urls", []):
+        lines.append(f"- {url}")
+    return 0, "\n".join(lines)
+
+
 def render_demo_text(
     *,
     target: object,

@@ -5,6 +5,7 @@ Usage:
   python link.py init [target]
   python link.py serve [target]
   python link.py demo [target]
+  python link.py welcome [target]
   python link.py prompts [target]
   python link.py status [target]
   python link.py operations [target]
@@ -220,9 +221,11 @@ from link_core.cli_runtime import (
     render_demo_text as _core_render_demo_text,
     render_init_text as _core_render_init_text,
     render_starter_prompts_text as _core_render_starter_prompts_text,
+    render_welcome_text as _core_render_welcome_text,
 )
 from link_core.prompts import (
     starter_prompt_payload as _core_starter_prompt_payload,
+    welcome_payload as _core_welcome_payload,
 )
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
@@ -1509,6 +1512,17 @@ def starter_prompts(target: Path, project: str | None = None, json_output: bool 
     return code
 
 
+def welcome(target: Path, project: str | None = None, json_output: bool = False) -> int:
+    payload = _core_welcome_payload(target, project=project)
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    code, text = _core_render_welcome_text(payload)
+    print(text)
+    return code
+
+
 def serve_wiki(target: Path, port: int = 3000) -> int:
     target = target.expanduser().resolve()
     if port < 1 or port > 65535:
@@ -1573,6 +1587,7 @@ def main(argv: list[str] | None = None) -> int:
             "init": init_wiki,
             "serve": serve_wiki,
             "demo": create_demo,
+            "welcome": welcome,
             "prompts": starter_prompts,
             "status": status,
             "operations": operations,

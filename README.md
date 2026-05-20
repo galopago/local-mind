@@ -53,6 +53,7 @@ macOS with Homebrew:
 ```bash
 brew install gowtham0992/link/link
 link demo
+link welcome link-demo
 link serve link-demo
 ```
 
@@ -62,6 +63,7 @@ Windows or source checkout:
 git clone https://github.com/gowtham0992/link.git
 cd link
 py link.py demo
+py link.py welcome link-demo
 py link.py serve link-demo
 ```
 
@@ -71,6 +73,7 @@ Or from source:
 git clone https://github.com/gowtham0992/link.git
 cd link
 python3 link.py demo
+python3 link.py welcome link-demo
 python3 link.py serve link-demo
 ```
 

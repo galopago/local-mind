@@ -40,6 +40,16 @@ class CliParserCoreTests(unittest.TestCase):
         self.assertEqual(args.limit, 5)
         self.assertTrue(args.json)
 
+    def test_welcome_project_and_json_options(self):
+        parser = build_cli_parser()
+
+        args = parser.parse_args(["welcome", "/tmp/link", "--project", "Client Launch", "--json"])
+
+        self.assertEqual(args.command, "welcome")
+        self.assertEqual(args.target, "/tmp/link")
+        self.assertEqual(args.project, "Client Launch")
+        self.assertTrue(args.json)
+
     def test_memory_choices_are_enforced(self):
         parser = build_cli_parser()
 
@@ -81,6 +91,22 @@ class CliParserCoreTests(unittest.TestCase):
         self.assertEqual(code, 9)
         self.assertEqual(calls[0][0], Path("/tmp/link"))
         self.assertEqual(calls[0][1]["limit"], 5)
+        self.assertTrue(calls[0][1]["json_output"])
+
+    def test_dispatch_routes_welcome_arguments(self):
+        parser = build_cli_parser()
+        args = parser.parse_args(["welcome", "/tmp/link", "--project", "alpha", "--json"])
+        calls = []
+
+        def welcome_handler(target, **kwargs):
+            calls.append((target, kwargs))
+            return 8
+
+        code = dispatch_cli_command(args, {"welcome": welcome_handler})
+
+        self.assertEqual(code, 8)
+        self.assertEqual(calls[0][0], Path("/tmp/link"))
+        self.assertEqual(calls[0][1]["project"], "alpha")
         self.assertTrue(calls[0][1]["json_output"])
 
     def test_dispatch_routes_accept_capture_arguments(self):

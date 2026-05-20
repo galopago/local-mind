@@ -4,6 +4,7 @@ from mcp_package.link_core.cli_runtime import (
     render_demo_text,
     render_init_text,
     render_starter_prompts_text,
+    render_welcome_text,
 )
 
 
@@ -32,6 +33,27 @@ class CliRuntimeCoreTests(unittest.TestCase):
         self.assertIn("Project: link", text)
         self.assertIn("- is Link ready?", text)
         self.assertIn("- link status --validate", text)
+
+    def test_render_welcome_text(self):
+        code, text = render_welcome_text({
+            "target": "/tmp/link",
+            "project": "link",
+            "steps": [{
+                "step": 1,
+                "prompt": "is Link ready?",
+                "proves": "Agent can find Link.",
+            }],
+            "commands": ["link status --validate"],
+            "urls": ["http://127.0.0.1:3000/health"],
+        })
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link welcome: /tmp/link", text)
+        self.assertIn("Project: link", text)
+        self.assertIn("1. is Link ready?", text)
+        self.assertIn("Proves: Agent can find Link.", text)
+        self.assertIn("- link status --validate", text)
+        self.assertIn("- http://127.0.0.1:3000/health", text)
 
     def test_render_demo_text(self):
         code, text = render_demo_text(

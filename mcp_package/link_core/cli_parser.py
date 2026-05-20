@@ -31,6 +31,11 @@ def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.Argum
     demo.add_argument("target", nargs="?", default=default_demo_dir)
     demo.add_argument("--force", action="store_true", help="replace an existing Link demo directory")
 
+    welcome_cmd = sub.add_parser("welcome", help="print the shortest first-use path for Link")
+    welcome_cmd.add_argument("target", nargs="?", default=".")
+    welcome_cmd.add_argument("--project", default=None, help="project slug for project-scoped prompt examples")
+    welcome_cmd.add_argument("--json", action="store_true", help="print machine-readable welcome data")
+
     prompts_cmd = sub.add_parser("prompts", help="print first-run agent prompts and local checks")
     prompts_cmd.add_argument("target", nargs="?", default=".")
     prompts_cmd.add_argument("--project", default=None, help="project slug for project-scoped prompt examples")
@@ -245,6 +250,8 @@ def dispatch_cli_command(args: Any, handlers: Mapping[str, CliHandler]) -> int:
         return handlers["serve"](Path(args.target), port=args.port)
     if command == "demo":
         return handlers["demo"](Path(args.target), force=args.force)
+    if command == "welcome":
+        return handlers["welcome"](Path(args.target), project=args.project, json_output=args.json)
     if command == "prompts":
         return handlers["prompts"](Path(args.target), project=args.project, json_output=args.json)
     if command == "status":

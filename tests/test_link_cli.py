@@ -116,6 +116,36 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("this project uses Link", payload["prompts"][2]["prompt"])
         self.assertIn("what this project remembers", payload["prompts"][3]["prompt"])
 
+    def test_welcome_prints_short_first_use_path(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-welcome-test-"))
+        target = tmp / "my-link"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.welcome(target)
+
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("Link welcome:", text)
+        self.assertIn("1. is Link ready?", text)
+        self.assertIn("Proves: Agent can find Link", text)
+        self.assertIn("link status --validate", text)
+        self.assertIn("http://127.0.0.1:3000/health", text)
+
+    def test_welcome_json_supports_project_examples(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-welcome-test-"))
+        target = tmp / "my-link"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.welcome(target, project="Client Launch", json_output=True)
+        payload = json.loads(out.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["project"], "client-launch")
+        self.assertEqual(payload["steps"][0]["prompt"], "is Link ready?")
+        self.assertIn("Agent can save explicit memory", payload["steps"][2]["proves"])
+
     def test_serve_runs_target_viewer(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-serve-test-"))
         target = tmp / "demo"

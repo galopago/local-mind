@@ -45,6 +45,7 @@ EXPECTED_CLI_COMMANDS = {
     "update-memory",
     "validate",
     "verify-mcp",
+    "welcome",
 }
 
 EXPECTED_MCP_TOOLS = {
