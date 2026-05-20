@@ -499,6 +499,21 @@ class ServeTests(unittest.TestCase):
         self.assertIn("/graph?focus=agent-memory&amp;depth=2", html)
         self.assertIn("Open local graph", html)
 
+    def test_source_page_links_to_memory_proposals(self):
+        wiki = self.make_wiki()
+        page = write_page(
+            wiki,
+            "sources/release-notes.md",
+            "---\ntype: source\ntitle: Release Notes\n---\n"
+            "# Release Notes\n\n## Summary\n\nNotes.\n\n## Raw Source\n\n`raw/release-notes.md`\n",
+        )
+
+        html = serve._render_page(page)
+
+        self.assertIn("/propose?source=raw%2Frelease-notes.md", html)
+        self.assertIn("Propose memories", html)
+        self.assertIn('data-copy-text="propose memories from raw/release-notes.md"', html)
+
     def test_context_reads_current_backlinks_shape(self):
         wiki = self.make_wiki()
         write_page(

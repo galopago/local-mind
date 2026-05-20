@@ -66,6 +66,9 @@ from link_core.prompts import (
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
 )
+from link_core.doctor import (
+    raw_source_refs as _core_raw_source_refs,
+)
 from link_core.version import (
     LINK_VERSION,
 )
@@ -390,6 +393,10 @@ def _page_href(name: str) -> str:
 
 def _graph_href(name: str, *, depth: int = 2) -> str:
     return f"/graph?focus={urllib.parse.quote(name.strip(), safe='')}&depth={depth}"
+
+
+def _proposal_href(raw_path: str) -> str:
+    return "/propose?source=" + urllib.parse.quote(raw_path.strip(), safe="")
 
 
 def _plural_type_label(page_type: str) -> str:
@@ -858,6 +865,8 @@ def _render_page(page_path):
 
     rel = page_path.relative_to(WIKI_DIR)
     cat = rel.parts[0] if len(rel.parts) > 1 else ""
+    raw_refs = _core_raw_source_refs(body) if cat == "sources" else []
+    proposal_prompt = f"propose memories from {raw_refs[0]}" if raw_refs else ""
     return _core_render_wiki_page(
         str(title),
         category=cat,
@@ -865,6 +874,8 @@ def _render_page(page_path):
         body_html=body_html,
         layout=_layout,
         graph_href=_graph_href(page_path.stem),
+        proposal_href=_proposal_href(raw_refs[0]) if raw_refs else "",
+        proposal_prompt=proposal_prompt,
     )
 
 

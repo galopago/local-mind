@@ -97,3 +97,19 @@ def test_render_wiki_page_includes_local_graph_action():
 
     assert '<a class="button-link" href="/graph?focus=agent-memory&amp;depth=2">Open local graph</a>' in html
     assert "<p>Trusted body</p>" in html
+
+
+def test_render_wiki_page_includes_memory_proposal_action():
+    html = render_wiki_page(
+        "Release Notes",
+        category="sources",
+        meta={},
+        body_html="<p>Trusted body</p>",
+        layout=_layout,
+        proposal_href="/propose?source=raw/release-notes.md",
+        proposal_prompt="propose memories from raw/release-notes.md",
+    )
+
+    assert '<a class="button-link" href="/propose?source=raw/release-notes.md">Propose memories</a>' in html
+    assert 'data-copy-text="propose memories from raw/release-notes.md"' in html
+    assert "Copy memory prompt" in html

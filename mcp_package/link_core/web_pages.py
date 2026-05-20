@@ -4,6 +4,8 @@ from __future__ import annotations
 import html
 from collections.abc import Callable, Mapping, Sequence
 
+from .web_ingest import copy_button
+
 
 PageHref = Callable[[str], str]
 PageLayout = Callable[[str, str], str]
@@ -17,6 +19,8 @@ def render_wiki_page(
     body_html: str,
     layout: PageLayout,
     graph_href: str = "",
+    proposal_href: str = "",
+    proposal_prompt: str = "",
 ) -> str:
     """Render a single wiki page shell around already-rendered Markdown."""
     crumb = '<div class="breadcrumb"><a href="/">Link</a>'
@@ -24,14 +28,19 @@ def render_wiki_page(
         crumb += f" / {html.escape(category)}"
     crumb += f" / {html.escape(title)}</div>"
     meta_line = render_page_meta_line(meta)
-    graph_action = ""
+    action_links = []
     if graph_href:
-        graph_action = (
-            '<div class="page-actions">'
+        action_links.append(
             f'<a class="button-link" href="{html.escape(graph_href, quote=True)}">Open local graph</a>'
-            "</div>"
         )
-    return layout(title, crumb + meta_line + graph_action + body_html)
+    if proposal_href:
+        action_links.append(
+            f'<a class="button-link" href="{html.escape(proposal_href, quote=True)}">Propose memories</a>'
+        )
+    if proposal_prompt:
+        action_links.append(copy_button(proposal_prompt, "Copy memory prompt"))
+    page_actions = f'<div class="page-actions">{"".join(action_links)}</div>' if action_links else ""
+    return layout(title, crumb + meta_line + page_actions + body_html)
 
 
 def render_page_meta_line(meta: Mapping[str, object]) -> str:
