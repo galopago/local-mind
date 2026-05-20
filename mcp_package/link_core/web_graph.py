@@ -113,6 +113,7 @@ def render_graph_script(
     focus_depth: int = 2,
     search_json: str = '""',
     category_json: str = '"all"',
+    size_json: str = '"category"',
     total_node_count: int,
     total_edge_count: int,
 ) -> str:
@@ -135,6 +136,7 @@ def render_graph_script(
   var copyLinkButton = document.getElementById('graph-copy-link');
   var searchInput = document.getElementById('graph-search');
   var categoryFilter = document.getElementById('graph-category');
+  var sizeFilter = document.getElementById('graph-size');
   var depthFilter = document.getElementById('graph-depth');
   var frameEl = document.getElementById('graph-frame');
   var status = document.getElementById('graph-status');
@@ -161,6 +163,7 @@ def render_graph_script(
   var initialFocusDepth = {max(0, min(3, int(focus_depth)))};
   var initialSearchTerm = {search_json};
   var initialCategoryValue = {category_json};
+  var initialSizeValue = {size_json};
   var totalNodeCount = {total_node_count};
   var totalEdgeCount = {total_edge_count};
   var fullGraphLoaded = initialGraphMode === 'full';
@@ -182,7 +185,8 @@ def render_graph_script(
         showAllLabels: showAllLabels,
         motionPaused: motionPaused,
         searchTerm: searchTerm,
-        categoryValue: categoryValue
+        categoryValue: categoryValue,
+        sizeMode: sizeMode
       }}));
     }} catch (error) {{
       // Local storage can be disabled; graph controls should still work.
@@ -299,6 +303,12 @@ def render_graph_script(
       ? initialCategoryValue
       : (storedGraphSettings.categoryValue || initialCategoryValue || 'all')
   ).trim() || 'all';
+  var sizeMode = String(
+    initialSizeValue && initialSizeValue !== 'category'
+      ? initialSizeValue
+      : (storedGraphSettings.sizeMode || initialSizeValue || 'category')
+  ).trim() || 'category';
+  if (['category', 'degree'].indexOf(sizeMode) === -1) sizeMode = 'category';
   var depthValue = 'all';
   var visibleCache = null;
   var renderQueued = false;
@@ -318,6 +328,7 @@ def render_graph_script(
     if (selectedNode) params.set('focus', selectedNode.id);
     if (searchTerm) params.set('q', searchTerm);
     if (categoryValue && categoryValue !== 'all') params.set('type', categoryValue);
+    if (sizeMode && sizeMode !== 'category') params.set('size', sizeMode);
     if (selectedNode && depthValue !== 'all') params.set('depth', depthValue);
     return window.location.origin + window.location.pathname + (params.toString() ? '?' + params.toString() : '');
   }}
@@ -477,6 +488,9 @@ def render_graph_script(
     labelsButton.textContent = showAllLabels ? 'Hide labels' : (graphTooLargeForDefaultLabels() ? 'Show labels' : 'Labels');
   }}
   function nodeRadius(n) {{
+    if (sizeMode === 'degree') {{
+      return Math.max(4.5, Math.min(12, 4.2 + Math.log2((degree[n.id] || 0) + 1) * 1.8));
+    }}
     if (n.category === 'sources') return 4.5;
     if (n.category === 'memories') return 6.4;
     if (n.category === 'entities') return 6.8;
@@ -505,6 +519,7 @@ def render_graph_script(
     ];
     if (!fullGraphLoaded) parts.push('fast overview');
     if (categoryValue !== 'all') parts.push(categoryValue);
+    if (sizeMode !== 'category') parts.push('size ' + sizeMode);
     if (depthValue !== 'all') parts.push('depth ' + depthValue);
     if (graphTooLargeForMotion()) parts.push('motion capped');
     if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');
@@ -841,9 +856,11 @@ def render_graph_script(
     searchTerm = '';
     invalidateSearchCache();
     categoryValue = 'all';
+    sizeMode = 'category';
     depthValue = 'all';
     if (searchInput) searchInput.value = '';
     if (categoryFilter) categoryFilter.value = 'all';
+    if (sizeFilter) sizeFilter.value = 'category';
     if (depthFilter) depthFilter.value = 'all';
     invalidateFilters();
     reseedVisiblePositions();
@@ -1132,6 +1149,12 @@ def render_graph_script(
     saveGraphSettings();
     drawSoon();
   }});
+  if (sizeFilter) sizeFilter.addEventListener('change', function() {{
+    sizeMode = sizeFilter.value || 'category';
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
+  }});
   if (depthFilter) depthFilter.addEventListener('change', function() {{
     depthValue = depthFilter.value || 'all';
     invalidateFilters();
@@ -1148,6 +1171,7 @@ def render_graph_script(
   if (motionPaused) {{ reseedVisiblePositions(); autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
   syncCategoryOptions();
+  if (sizeFilter) sizeFilter.value = sizeMode;
   if (searchInput) searchInput.value = searchTerm;
   applyInitialFocus();
   if (searchTerm && !fullGraphLoaded) loadFullGraph();
@@ -1187,6 +1211,7 @@ def render_graph_page_body(
     focus_depth: int = 2,
     search_label: str = "",
     category_label: str = "",
+    size_label: str = "",
 ) -> str:
     """Render the graph page shell around the browser simulation script."""
     load_full_button = ""
@@ -1203,6 +1228,8 @@ def render_graph_page_body(
         state_parts.append(f'Search <strong>{html.escape(search_label)}</strong>')
     if category_label and category_label != "all":
         state_parts.append(f'Type <strong>{html.escape(category_label)}</strong>')
+    if size_label and size_label != "category":
+        state_parts.append(f'Size <strong>{html.escape(size_label)}</strong>')
     if state_parts:
         focus_html = (
             '<p class="graph-focus-note">'
@@ -1230,6 +1257,9 @@ def render_graph_page_body(
         '<input id="graph-search" type="search" placeholder="node title"></label>'
         '<label class="graph-control">Type'
         f'<select id="graph-category">{category_options}</select></label>'
+        '<label class="graph-control">Size'
+        '<select id="graph-size"><option value="category">category</option>'
+        '<option value="degree">degree</option></select></label>'
         '<label class="graph-control">Neighborhood'
         '<select id="graph-depth"><option value="all">all</option><option value="1">1 hop</option>'
         '<option value="2">2 hops</option><option value="3">3 hops</option></select></label>'

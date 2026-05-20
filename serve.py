@@ -996,6 +996,9 @@ def _render_graph(query: dict[str, list[str]] | None = None):
     focus = _query_text(query, "focus", "page", "node", max_len=300)
     graph_search = _query_text(query, "q", "search", max_len=200)
     graph_category = _query_text(query, "type", "category", max_len=80) or "all"
+    graph_size = _query_text(query, "size", max_len=80) or "category"
+    if graph_size not in {"category", "degree"}:
+        graph_size = "category"
     focus_depth, focus_depth_error = _core_parse_bounded_int(query.get("depth", ["2"])[0], "depth", 2, 0, 3)
     if focus_depth_error:
         focus_depth = 2
@@ -1052,6 +1055,7 @@ def _render_graph(query: dict[str, list[str]] | None = None):
         focus_depth=focus_depth,
         search_json=_json_for_script(graph_search),
         category_json=_json_for_script(graph_category),
+        size_json=_json_for_script(graph_size),
         total_node_count=total_node_count,
         total_edge_count=total_edge_count,
     )
@@ -1070,6 +1074,7 @@ def _render_graph(query: dict[str, list[str]] | None = None):
         focus_depth=focus_depth,
         search_label=graph_search,
         category_label=graph_category,
+        size_label=graph_size,
     )
     return _layout("Knowledge Graph", body, page_class="graph-page")
 

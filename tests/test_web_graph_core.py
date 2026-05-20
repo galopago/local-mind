@@ -103,6 +103,8 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn("Load graph data (10 nodes)", html)
         self.assertIn('id="graph-search"', html)
         self.assertIn('id="graph-category"', html)
+        self.assertIn('id="graph-size"', html)
+        self.assertIn('<option value="degree">degree</option>', html)
         self.assertIn('<option value="concepts">concepts</option>', html)
         self.assertIn('id="graph-depth"', html)
         self.assertIn('id="graph-status"', html)
@@ -129,11 +131,13 @@ class WebGraphCoreTests(unittest.TestCase):
             focus_depth=2,
             search_label='agent <memory>',
             category_label="memories",
+            size_label="degree",
         )
 
         self.assertIn("Focused on <strong>Memory &lt;One&gt;</strong> · depth 2", html)
         self.assertIn("Search <strong>agent &lt;memory&gt;</strong>", html)
         self.assertIn("Type <strong>memories</strong>", html)
+        self.assertIn("Size <strong>degree</strong>", html)
         self.assertIn('<a href="/graph">Clear filters</a>', html)
 
     def test_render_graph_page_body_omits_load_button_for_full_graph(self):
@@ -161,6 +165,7 @@ class WebGraphCoreTests(unittest.TestCase):
             focus_depth=2,
             search_json='"memory"',
             category_json='"concepts"',
+            size_json='"degree"',
             total_node_count=10,
             total_edge_count=20,
         )
@@ -173,6 +178,7 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn("var initialFocusDepth = 2;", script)
         self.assertIn('var initialSearchTerm = "memory";', script)
         self.assertIn('var initialCategoryValue = "concepts";', script)
+        self.assertIn('var initialSizeValue = "degree";', script)
         self.assertIn("var totalNodeCount = 10;", script)
         self.assertIn("var totalEdgeCount = 20;", script)
         self.assertIn("var GRAPH_STORAGE_KEY = 'link.graph.controls.v1';", script)
@@ -181,6 +187,10 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn("var storedGraphSettings = readGraphSettings();", script)
         self.assertIn("var showAllLabels = storedGraphSettings.showAllLabels === true;", script)
         self.assertIn("storedGraphSettings.categoryValue", script)
+        self.assertIn("storedGraphSettings.sizeMode", script)
+        self.assertIn("var sizeFilter = document.getElementById('graph-size');", script)
+        self.assertIn("if (sizeMode && sizeMode !== 'category') params.set('size', sizeMode);", script)
+        self.assertIn("if (sizeMode === 'degree')", script)
         self.assertIn("if (searchInput) searchInput.value = searchTerm;", script)
         self.assertIn("var copyLinkButton = document.getElementById('graph-copy-link');", script)
         self.assertIn("function visibleNodes()", script)

@@ -2317,14 +2317,16 @@ class ServeTests(unittest.TestCase):
         )
         reset_wiki(wiki)
 
-        status, body, _ = run_handler_raw("GET", "/graph?q=agent%20memory&type=concepts")
+        status, body, _ = run_handler_raw("GET", "/graph?q=agent%20memory&type=concepts&size=degree")
         html = body.decode("utf-8")
 
         self.assertEqual(status, 200)
         self.assertIn('var initialSearchTerm = "agent memory";', html)
         self.assertIn('var initialCategoryValue = "concepts";', html)
+        self.assertIn('var initialSizeValue = "degree";', html)
         self.assertIn("Search <strong>agent memory</strong>", html)
         self.assertIn("Type <strong>concepts</strong>", html)
+        self.assertIn("Size <strong>degree</strong>", html)
 
     def test_graph_uses_bounded_initial_payload_for_large_wikis(self):
         wiki = self.make_wiki()
