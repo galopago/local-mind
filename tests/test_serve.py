@@ -809,6 +809,8 @@ class ServeTests(unittest.TestCase):
         self.assertNotIn(fake_key, json.dumps(payload))
         self.assertIn("Memory Brief", html)
         self.assertIn("Agent Guidance", html)
+        self.assertIn('data-copy-text="brief me from Link about brief for project alpha"', html)
+        self.assertIn('data-copy-text="query Link for brief"', html)
         self.assertIn("Alpha brief", html)
         self.assertIn("Alpha brief capture", html)
         self.assertNotIn(fake_key, html)

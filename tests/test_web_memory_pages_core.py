@@ -43,6 +43,10 @@ def test_render_brief_page_escapes_query_and_project():
 
     assert "<title>Memory Brief</title>" in html
     assert "value=\"&lt;task&gt;\"" in html
+    assert 'data-copy-text="brief me from Link about &lt;task&gt; for project &lt;alpha&gt;"' in html
+    assert "Copy brief prompt" in html
+    assert 'data-copy-text="query Link for &lt;task&gt;"' in html
+    assert "Copy query prompt" in html
     assert "Project:</strong> &lt;alpha&gt;" in html
     assert "Use &lt;Link&gt; first" in html
     assert "<task>" not in html

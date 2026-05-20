@@ -5,6 +5,7 @@ import html
 import urllib.parse
 from collections.abc import Callable, Mapping
 
+from .web_ingest import copy_button
 from .web_layout import render_stat_grid
 from .web_memory import (
     MemoryActionHints,
@@ -45,6 +46,12 @@ def render_brief_page(
         f'<input type="hidden" name="project" value="{html.escape(project, quote=True)}">'
         if project else ""
     )
+    brief_prompt = _brief_prompt(query, project)
+    query_prompt = str(query or "").strip()
+    query_action = (
+        copy_button(f"query Link for {query_prompt}", "Copy query prompt")
+        if query_prompt else ""
+    )
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / brief</div>'
         '<h1>Memory Brief</h1>'
@@ -53,6 +60,7 @@ def render_brief_page(
         '<form class="brief-form" action="/brief" method="get">'
         f'<input type="text" name="q" value="{html.escape(str(query), quote=True)}" placeholder="task or question">'
         f'{project_field}<button type="submit">Brief</button></form>'
+        f'<div class="page-actions">{copy_button(brief_prompt, "Copy brief prompt")}{query_action}</div>'
         f'{_project_line(project)}'
         f'{stats}'
         f'<h2>Agent Guidance</h2><ul>{guidance}</ul>'
@@ -62,6 +70,18 @@ def render_brief_page(
         '</div>'
     )
     return layout("Memory Brief", body)
+
+
+def _brief_prompt(query: str, project: str = "") -> str:
+    task = str(query or "").strip()
+    project_name = str(project or "").strip()
+    if task and project_name:
+        return f"brief me from Link about {task} for project {project_name}"
+    if task:
+        return f"brief me from Link about {task}"
+    if project_name:
+        return f"brief me from Link for project {project_name}"
+    return "brief me from Link before we continue"
 
 
 def render_memory_dashboard_page(
