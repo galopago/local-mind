@@ -89,6 +89,8 @@ link rebuild-backlinks
 link validate
 link verify-mcp</code></pre>
         <p>Use <code>link backup</code> before broad repair work. Use <code>link benchmark</code> when a wiki starts to feel slow.</p>
+        <p>From a source checkout, use the synthetic large-wiki smoke when you want local scale evidence without touching your real wiki. The script prints the exact <code>link serve</code> command and graph URL for the generated fixture.</p>
+        <pre><code>python3 scripts/smoke_large_wiki.py --pages 10000</code></pre>
 
         <h2 id="all">All Commands</h2>
         <pre><code>link --version
