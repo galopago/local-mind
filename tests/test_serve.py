@@ -2317,16 +2317,18 @@ class ServeTests(unittest.TestCase):
         )
         reset_wiki(wiki)
 
-        status, body, _ = run_handler_raw("GET", "/graph?q=agent%20memory&type=concepts&size=degree")
+        status, body, _ = run_handler_raw("GET", "/graph?q=agent%20memory&type=concepts&size=degree&labels=neighbors")
         html = body.decode("utf-8")
 
         self.assertEqual(status, 200)
         self.assertIn('var initialSearchTerm = "agent memory";', html)
         self.assertIn('var initialCategoryValue = "concepts";', html)
         self.assertIn('var initialSizeValue = "degree";', html)
+        self.assertIn('var initialLabelMode = "neighbors";', html)
         self.assertIn("Search <strong>agent memory</strong>", html)
         self.assertIn("Type <strong>concepts</strong>", html)
         self.assertIn("Size <strong>degree</strong>", html)
+        self.assertIn("Labels <strong>neighbors</strong>", html)
 
     def test_graph_uses_bounded_initial_payload_for_large_wikis(self):
         wiki = self.make_wiki()
@@ -2362,8 +2364,9 @@ class ServeTests(unittest.TestCase):
         html = serve._render_graph()
 
         self.assertIn("function graphTooLargeForDefaultLabels()", html)
-        self.assertIn("if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');", html)
-        self.assertIn("labelsButton.textContent = showAllLabels ? 'Hide labels'", html)
+        self.assertIn("if (graphTooLargeForDefaultLabels() && labelMode === 'sparse') parts.push('labels sparse');", html)
+        self.assertIn("function cycleLabelMode()", html)
+        self.assertIn("labelsButton.textContent = labelMode === 'all' ? 'Labels all'", html)
         self.assertIn("var largeLabelSet = currentNodes.length > LARGE_LABEL_LIMIT;", html)
         self.assertIn("var defaultSparseLabel = !largeLabelSet", html)
 

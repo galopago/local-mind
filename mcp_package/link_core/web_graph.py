@@ -114,6 +114,7 @@ def render_graph_script(
     search_json: str = '""',
     category_json: str = '"all"',
     size_json: str = '"category"',
+    label_json: str = '"sparse"',
     total_node_count: int,
     total_edge_count: int,
 ) -> str:
@@ -137,6 +138,7 @@ def render_graph_script(
   var searchInput = document.getElementById('graph-search');
   var categoryFilter = document.getElementById('graph-category');
   var sizeFilter = document.getElementById('graph-size');
+  var labelFilter = document.getElementById('graph-label-density');
   var depthFilter = document.getElementById('graph-depth');
   var frameEl = document.getElementById('graph-frame');
   var status = document.getElementById('graph-status');
@@ -164,6 +166,7 @@ def render_graph_script(
   var initialSearchTerm = {search_json};
   var initialCategoryValue = {category_json};
   var initialSizeValue = {size_json};
+  var initialLabelMode = {label_json};
   var totalNodeCount = {total_node_count};
   var totalEdgeCount = {total_edge_count};
   var fullGraphLoaded = initialGraphMode === 'full';
@@ -186,7 +189,8 @@ def render_graph_script(
         motionPaused: motionPaused,
         searchTerm: searchTerm,
         categoryValue: categoryValue,
-        sizeMode: sizeMode
+        sizeMode: sizeMode,
+        labelMode: labelMode
       }}));
     }} catch (error) {{
       // Local storage can be disabled; graph controls should still work.
@@ -291,7 +295,6 @@ def render_graph_script(
   var downX = 0, downY = 0, didDrag = false, suppressClick = false;
   var zoom = 1;
   var frame = 0;
-  var showAllLabels = storedGraphSettings.showAllLabels === true;
   var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var motionPaused = prefersReducedMotion || nodes.length > LARGE_GRAPH_LIMIT || storedGraphSettings.motionPaused === true;
   var SETTLE = 200; // frames of physics
@@ -309,6 +312,13 @@ def render_graph_script(
       : (storedGraphSettings.sizeMode || initialSizeValue || 'category')
   ).trim() || 'category';
   if (['category', 'degree'].indexOf(sizeMode) === -1) sizeMode = 'category';
+  var labelMode = String(
+    initialLabelMode && initialLabelMode !== 'sparse'
+      ? initialLabelMode
+      : (storedGraphSettings.labelMode || (storedGraphSettings.showAllLabels ? 'all' : initialLabelMode) || 'sparse')
+  ).trim() || 'sparse';
+  if (['sparse', 'neighbors', 'all'].indexOf(labelMode) === -1) labelMode = 'sparse';
+  var showAllLabels = labelMode === 'all';
   var depthValue = 'all';
   var visibleCache = null;
   var renderQueued = false;
@@ -329,6 +339,7 @@ def render_graph_script(
     if (searchTerm) params.set('q', searchTerm);
     if (categoryValue && categoryValue !== 'all') params.set('type', categoryValue);
     if (sizeMode && sizeMode !== 'category') params.set('size', sizeMode);
+    if (labelMode && labelMode !== 'sparse') params.set('labels', labelMode);
     if (selectedNode && depthValue !== 'all') params.set('depth', depthValue);
     return window.location.origin + window.location.pathname + (params.toString() ? '?' + params.toString() : '');
   }}
@@ -484,8 +495,18 @@ def render_graph_script(
   }}
   function syncLabelsButton() {{
     if (!labelsButton) return;
-    labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
-    labelsButton.textContent = showAllLabels ? 'Hide labels' : (graphTooLargeForDefaultLabels() ? 'Show labels' : 'Labels');
+    showAllLabels = labelMode === 'all';
+    labelsButton.setAttribute('aria-pressed', labelMode === 'sparse' ? 'false' : 'true');
+    labelsButton.textContent = labelMode === 'all' ? 'Labels all' : (labelMode === 'neighbors' ? 'Labels local' : 'Labels sparse');
+    if (labelFilter && labelFilter.value !== labelMode) labelFilter.value = labelMode;
+  }}
+  function cycleLabelMode() {{
+    labelMode = labelMode === 'sparse' ? 'neighbors' : (labelMode === 'neighbors' ? 'all' : 'sparse');
+    showAllLabels = labelMode === 'all';
+    syncLabelsButton();
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
   }}
   function nodeRadius(n) {{
     if (sizeMode === 'degree') {{
@@ -520,14 +541,14 @@ def render_graph_script(
     if (!fullGraphLoaded) parts.push('fast overview');
     if (categoryValue !== 'all') parts.push(categoryValue);
     if (sizeMode !== 'category') parts.push('size ' + sizeMode);
+    if (labelMode !== 'sparse') parts.push('labels ' + labelMode);
     if (depthValue !== 'all') parts.push('depth ' + depthValue);
     if (graphTooLargeForMotion()) parts.push('motion capped');
-    if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');
+    if (graphTooLargeForDefaultLabels() && labelMode === 'sparse') parts.push('labels sparse');
     if (graphNeedsFastRender(currentNodes, currentEdges)) parts.push('fast render');
     if (nodes.length > OVERVIEW_NODE_LIMIT && currentNodes.length < nodes.length) parts.push('overview capped');
     if (fullGraphLoaded && initialGraphMode !== 'full') parts.push('data loaded');
     if (fullGraphLoading) parts.push('loading graph data');
-    if (showAllLabels) parts.push('labels all');
     if (searchTerm) {{
       var matches = totalSearchMatches();
       parts.push(matches + ' match' + (matches === 1 ? '' : 'es'));
@@ -781,7 +802,8 @@ def render_graph_script(
       var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
       var defaultSparseLabel = !largeLabelSet && n.category !== 'sources' && degree[n.id] >= 2;
       var showMatchLabel = matched && totalSearchMatches() <= SEARCH_LABEL_LIMIT;
-      var showLabel = showAllLabels || selected || showMatchLabel || (hoverNode ? activeNode : defaultSparseLabel);
+      var showNeighborLabel = labelMode === 'neighbors' && selectedNode && (selected || isNeighbor(selectedNode.id, n.id));
+      var showLabel = labelMode === 'all' || showNeighborLabel || selected || showMatchLabel || (hoverNode ? activeNode : defaultSparseLabel);
       if (showLabel) {{
         ctx.font = LABEL_FONT;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -857,10 +879,13 @@ def render_graph_script(
     invalidateSearchCache();
     categoryValue = 'all';
     sizeMode = 'category';
+    labelMode = 'sparse';
+    showAllLabels = false;
     depthValue = 'all';
     if (searchInput) searchInput.value = '';
     if (categoryFilter) categoryFilter.value = 'all';
     if (sizeFilter) sizeFilter.value = 'category';
+    if (labelFilter) labelFilter.value = 'sparse';
     if (depthFilter) depthFilter.value = 'all';
     invalidateFilters();
     reseedVisiblePositions();
@@ -1081,22 +1106,14 @@ def render_graph_script(
       e.preventDefault();
     }}
     if (e.key === 'l' || e.key === 'L') {{
-      showAllLabels = !showAllLabels;
-      syncLabelsButton();
-      updateStatus();
-      saveGraphSettings();
-      drawSoon();
+      cycleLabelMode();
       e.preventDefault();
     }}
   }});
 
   if (resetButton) resetButton.addEventListener('click', resetView);
   if (labelsButton) labelsButton.addEventListener('click', function() {{
-    showAllLabels = !showAllLabels;
-    syncLabelsButton();
-    updateStatus();
-    saveGraphSettings();
-    drawSoon();
+    cycleLabelMode();
   }});
   if (motionButton) motionButton.addEventListener('click', function() {{
     setMotionPaused(!motionPaused);
@@ -1155,6 +1172,14 @@ def render_graph_script(
     saveGraphSettings();
     drawSoon();
   }});
+  if (labelFilter) labelFilter.addEventListener('change', function() {{
+    labelMode = labelFilter.value || 'sparse';
+    showAllLabels = labelMode === 'all';
+    syncLabelsButton();
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
+  }});
   if (depthFilter) depthFilter.addEventListener('change', function() {{
     depthValue = depthFilter.value || 'all';
     invalidateFilters();
@@ -1172,6 +1197,7 @@ def render_graph_script(
   setMotionPaused(motionPaused);
   syncCategoryOptions();
   if (sizeFilter) sizeFilter.value = sizeMode;
+  if (labelFilter) labelFilter.value = labelMode;
   if (searchInput) searchInput.value = searchTerm;
   applyInitialFocus();
   if (searchTerm && !fullGraphLoaded) loadFullGraph();
@@ -1212,6 +1238,7 @@ def render_graph_page_body(
     search_label: str = "",
     category_label: str = "",
     size_label: str = "",
+    label_label: str = "",
 ) -> str:
     """Render the graph page shell around the browser simulation script."""
     load_full_button = ""
@@ -1230,6 +1257,8 @@ def render_graph_page_body(
         state_parts.append(f'Type <strong>{html.escape(category_label)}</strong>')
     if size_label and size_label != "category":
         state_parts.append(f'Size <strong>{html.escape(size_label)}</strong>')
+    if label_label and label_label != "sparse":
+        state_parts.append(f'Labels <strong>{html.escape(label_label)}</strong>')
     if state_parts:
         focus_html = (
             '<p class="graph-focus-note">'
@@ -1260,6 +1289,9 @@ def render_graph_page_body(
         '<label class="graph-control">Size'
         '<select id="graph-size"><option value="category">category</option>'
         '<option value="degree">degree</option></select></label>'
+        '<label class="graph-control">Labels'
+        '<select id="graph-label-density"><option value="sparse">sparse</option>'
+        '<option value="neighbors">neighbors</option><option value="all">all</option></select></label>'
         '<label class="graph-control">Neighborhood'
         '<select id="graph-depth"><option value="all">all</option><option value="1">1 hop</option>'
         '<option value="2">2 hops</option><option value="3">3 hops</option></select></label>'

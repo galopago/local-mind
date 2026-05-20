@@ -999,6 +999,9 @@ def _render_graph(query: dict[str, list[str]] | None = None):
     graph_size = _query_text(query, "size", max_len=80) or "category"
     if graph_size not in {"category", "degree"}:
         graph_size = "category"
+    graph_labels = _query_text(query, "labels", "label", max_len=80) or "sparse"
+    if graph_labels not in {"sparse", "neighbors", "all"}:
+        graph_labels = "sparse"
     focus_depth, focus_depth_error = _core_parse_bounded_int(query.get("depth", ["2"])[0], "depth", 2, 0, 3)
     if focus_depth_error:
         focus_depth = 2
@@ -1056,6 +1059,7 @@ def _render_graph(query: dict[str, list[str]] | None = None):
         search_json=_json_for_script(graph_search),
         category_json=_json_for_script(graph_category),
         size_json=_json_for_script(graph_size),
+        label_json=_json_for_script(graph_labels),
         total_node_count=total_node_count,
         total_edge_count=total_edge_count,
     )
@@ -1075,6 +1079,7 @@ def _render_graph(query: dict[str, list[str]] | None = None):
         search_label=graph_search,
         category_label=graph_category,
         size_label=graph_size,
+        label_label=graph_labels,
     )
     return _layout("Knowledge Graph", body, page_class="graph-page")
 
