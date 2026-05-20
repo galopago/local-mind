@@ -46,6 +46,7 @@ def render_ingest_page(
         (safety.get("status") or "unknown", "safety"),
     ])
     safety_html = _render_safety(safety)
+    progress_html = _render_progress(status, state)
     actions = _render_actions(agent_prompt, commands)
     next_html, ingest_prompt, optional_memory_html = _render_next_step(
         agent_prompt=agent_prompt,
@@ -66,6 +67,7 @@ def render_ingest_page(
         f'<p class="summary">{html.escape(str(guidance.get("summary") or "Check raw source ingest state."))}</p>'
         f'{_render_raw_source_form()}'
         f'{stats}'
+        f'{progress_html}'
         f'{safety_html}'
         f'{source_warning_html}'
         f'{next_html}'
@@ -99,6 +101,46 @@ def _render_safety(safety: Mapping[str, object]) -> str:
         f'<div class="memory-next"><strong>Raw safety: {html.escape(str(safety.get("status") or "unknown"))}</strong>'
         f'<p>{html.escape(str(safety.get("summary") or ""))}</p>{labels_html}</div>'
     )
+
+
+def _render_progress(status: Mapping[str, object], state: str) -> str:
+    raw_count = int(status.get("raw_count") or 0)
+    represented_count = int(status.get("represented_count") or 0)
+    pending_count = int(status.get("pending_count") or 0)
+    stale_count = int(status.get("stale_count") or 0)
+    backlinks_status = str(status.get("backlinks_status") or "unknown")
+    safety = _mapping(status.get("safety"))
+    safety_state = str(safety.get("status") or "unknown")
+
+    source_state = "done" if raw_count else "next"
+    ingest_state = "done" if represented_count and not pending_count and not stale_count else ("next" if raw_count else "wait")
+    validate_state = "done" if backlinks_status == "current" and state == "ready" else ("blocked" if backlinks_status != "current" else "wait")
+    memory_state = "next" if represented_count else "wait"
+    if safety_state == "blocked":
+        source_state = "blocked"
+        ingest_state = "blocked"
+        validate_state = "wait"
+        memory_state = "wait"
+    elif stale_count:
+        ingest_state = "next"
+        validate_state = "wait"
+
+    phases = [
+        ("Source", source_state, f"{raw_count} raw file{'s' if raw_count != 1 else ''}"),
+        ("Ingest", ingest_state, f"{represented_count} represented · {pending_count} pending"),
+        ("Validate", validate_state, f"graph {backlinks_status}"),
+        ("Memory", memory_state, "proposal review optional"),
+    ]
+    rows = "".join(
+        '<article class="ingest-progress-step" data-state="'
+        f'{html.escape(phase_state, quote=True)}">'
+        f'<strong>{html.escape(label)}</strong>'
+        f'<span>{html.escape(phase_state)}</span>'
+        f'<small>{html.escape(detail)}</small>'
+        "</article>"
+        for label, phase_state, detail in phases
+    )
+    return f'<section class="ingest-progress" aria-label="Ingest progress">{rows}</section>'
 
 
 def _render_actions(agent_prompt: str, commands: list[object]) -> str:

@@ -56,6 +56,10 @@ def test_render_ingest_page_shows_pending_workflow():
     assert "<title>Ingest</title>" in html
     assert "Add Raw Source" in html
     assert "Raw safety: clear" in html
+    assert 'aria-label="Ingest progress"' in html
+    assert '<strong>Source</strong><span>done</span><small>1 raw file</small>' in html
+    assert '<strong>Ingest</strong><span>next</span><small>0 represented · 1 pending</small>' in html
+    assert '<strong>Validate</strong><span>wait</span><small>graph current</small>' in html
     assert "Copy this into your agent chat" in html
     assert 'data-copy-text="ingest raw/new-source.md into Link"' in html
     assert 'data-copy-text="link validate"' in html
@@ -98,6 +102,9 @@ def test_render_ingest_page_shows_completion_with_page_links():
     html = render_ingest_page(payload, page_href=_page_href, layout=_layout)
 
     assert "Ingest completion" in html
+    assert '<strong>Ingest</strong><span>done</span><small>1 represented · 0 pending</small>' in html
+    assert '<strong>Validate</strong><span>done</span><small>graph current</small>' in html
+    assert '<strong>Memory</strong><span>next</span><small>proposal review optional</small>' in html
     assert "All 1 raw source(s) are represented." in html
     assert "/page/represented-source" in html
     assert "Represented Source" in html
@@ -125,6 +132,8 @@ def test_render_ingest_page_blocks_secret_raw_without_proposal_link():
     html = render_ingest_page(payload, page_href=_page_href, layout=_layout)
 
     assert "Raw safety: blocked" in html
+    assert '<strong>Source</strong><span>blocked</span><small>1 raw file</small>' in html
+    assert '<strong>Ingest</strong><span>blocked</span><small>0 represented · 1 pending</small>' in html
     assert 'data-copy-text="edit raw/secret-note.md"' in html
     assert "redact secret-looking values in raw/secret-note.md before ingest" in html
     assert "secret warning: OpenAI API key" in html

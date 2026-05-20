@@ -38,6 +38,10 @@ CSS = """
   --button-disabled: #8c959f;
   --accent: #0969da;
   --accent-soft: #6ea8fe;
+  --success-bg: #f0fff4;
+  --success-border: #4ac26b;
+  --danger-bg: #fff5f5;
+  --danger-border: #e5534b;
   --quote-border: #cccccc;
   --quote-text: #555555;
   --shadow: rgba(0,0,0,0.15);
@@ -68,6 +72,10 @@ CSS = """
     --button-disabled: #777777;
     --accent: #4ea1ff;
     --accent-soft: #7db7ff;
+    --success-bg: #07130b;
+    --success-border: #2ea043;
+    --danger-bg: #180808;
+    --danger-border: #f85149;
     --quote-border: #333333;
     --quote-text: #c7c7c7;
     --shadow: rgba(0,0,0,0.55);
@@ -98,6 +106,10 @@ CSS = """
   --button-disabled: #777777;
   --accent: #4ea1ff;
   --accent-soft: #7db7ff;
+  --success-bg: #07130b;
+  --success-border: #2ea043;
+  --danger-bg: #180808;
+  --danger-border: #f85149;
   --quote-border: #333333;
   --quote-text: #c7c7c7;
   --shadow: rgba(0,0,0,0.55);
@@ -269,6 +281,17 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .ingest-step h3 { margin: 8px 0 5px; font-size: 15px; }
 .ingest-step p { margin: 0 0 8px; color: var(--muted); line-height: 1.4; }
 .ingest-step code { white-space: normal; overflow-wrap: anywhere; }
+.ingest-progress { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 14px 0; font-family: sans-serif; }
+.ingest-progress-step { border: 1px solid var(--border-soft); border-radius: 6px; padding: 10px; background: var(--surface); min-width: 0; }
+.ingest-progress-step strong,
+.ingest-progress-step span,
+.ingest-progress-step small { display: block; overflow-wrap: anywhere; }
+.ingest-progress-step strong { color: var(--text-strong); font-size: 13px; }
+.ingest-progress-step span { margin: 4px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0; color: var(--muted); }
+.ingest-progress-step small { color: var(--subtle); line-height: 1.35; }
+.ingest-progress-step[data-state="done"] { border-color: var(--success-border); background: var(--success-bg); }
+.ingest-progress-step[data-state="next"] { border-color: var(--accent-soft); }
+.ingest-progress-step[data-state="blocked"] { border-color: var(--danger-border); background: var(--danger-bg); }
 .ingest-completion-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 14px 0; }
 .ingest-completion-card { border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface); padding: 12px; min-width: 0; font-family: sans-serif; }
 .ingest-completion-card h3 { margin: 0 0 8px; font-size: 16px; overflow-wrap: anywhere; }
