@@ -6,7 +6,18 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ## [Unreleased]
 
-- Nothing yet.
+### Added
+
+- Added copyable agent prompts across page, search, ingest, brief, memory dashboard, profile, audit, capture, and inbox views so browser-first users do not need to memorize Link phrasing.
+- Added copy buttons to memory action commands, capture commands, and memory next actions in the local web UI.
+- Added interactive graph legend chips that filter the graph by page type.
+- Added viewer commands and graph/health URLs to the synthetic large-wiki smoke output so local 10k-page checks are easier to inspect.
+
+### Changed
+
+- Changed large-graph canvas seeding to use deterministic category clusters, with higher-degree pages nearer cluster centers, instead of a single global spiral.
+- Updated the CLI product docs with the local large-wiki smoke command and how to inspect the generated fixture.
+- Updated CI to run the full pytest suite rather than the narrower unittest discovery path.
 
 ## [1.2.0] - 2026-05-19
 
