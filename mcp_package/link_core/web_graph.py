@@ -130,6 +130,7 @@ def render_graph_script(
   var ctx = canvas.getContext('2d');
   var tooltip = document.getElementById('graph-tooltip');
   var resetButton = document.getElementById('graph-reset');
+  var fitButton = document.getElementById('graph-fit');
   var labelsButton = document.getElementById('graph-labels');
   var motionButton = document.getElementById('graph-motion');
   var fullscreenButton = document.getElementById('graph-fullscreen');
@@ -897,6 +898,13 @@ def render_graph_script(
     drawSoon();
   }}
 
+  function fitCurrentView() {{
+    autoFit();
+    fitted = true;
+    updateStatus();
+    drawSoon();
+  }}
+
   function setMotionPaused(next) {{
     motionPaused = next || graphTooLargeForMotion();
     if (motionButton) {{
@@ -1096,6 +1104,7 @@ def render_graph_script(
     if (e.key === '+' || e.key === '=') {{ zoom = Math.min(6, zoom * 1.12); updateStatus(); drawSoon(); e.preventDefault(); }}
     if (e.key === '-' || e.key === '_') {{ zoom = Math.max(0.15, zoom * 0.9); updateStatus(); drawSoon(); e.preventDefault(); }}
     if (e.key === '0') {{ resetView(); e.preventDefault(); }}
+    if (e.key === 'f' || e.key === 'F') {{ fitCurrentView(); e.preventDefault(); }}
     if (e.key === 'Enter' && hoverNode) {{ openNode(hoverNode); e.preventDefault(); }}
     if (e.key === 'Escape') {{
       if (frameEl && frameEl.classList.contains('is-fullscreen')) {{
@@ -1112,6 +1121,7 @@ def render_graph_script(
   }});
 
   if (resetButton) resetButton.addEventListener('click', resetView);
+  if (fitButton) fitButton.addEventListener('click', fitCurrentView);
   if (labelsButton) labelsButton.addEventListener('click', function() {{
     cycleLabelMode();
   }});
@@ -1277,6 +1287,7 @@ def render_graph_page_body(
         '<section id="graph-frame" class="graph-frame">'
         '<div class="graph-toolbar" aria-label="Graph controls">'
         '<button id="graph-reset" type="button">Reset</button>'
+        '<button id="graph-fit" type="button">Fit view</button>'
         '<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
         '<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
         '<button id="graph-fullscreen" type="button" aria-pressed="false">Fullscreen</button>'

@@ -2156,6 +2156,7 @@ class ServeTests(unittest.TestCase):
         html = serve._render_graph()
 
         self.assertLess(html.index('id="graph-reset"'), html.index("var resetButton ="))
+        self.assertLess(html.index('id="graph-fit"'), html.index("var fitButton ="))
         self.assertLess(html.index('id="graph-labels"'), html.index("var labelsButton ="))
         self.assertLess(html.index('id="graph-motion"'), html.index("var motionButton ="))
         self.assertLess(html.index('id="graph-search"'), html.index("var searchInput ="))
