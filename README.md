@@ -313,7 +313,7 @@ Before opening a PR:
 
 ```bash
 python3 -m ruff check .
-python3 -m unittest discover -s tests
+python3 -m pytest tests
 python3 scripts/check_release_hygiene.py
 python3 scripts/check_runtime_duplication.py
 python3 scripts/check_tool_contract.py
