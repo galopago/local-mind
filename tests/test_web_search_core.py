@@ -36,8 +36,25 @@ def test_render_search_page_caps_results_and_escapes_content():
     html = render_search_page("link", results, page_href=lambda name: f"/page/{name}", layout=_layout, limit=2)
 
     assert "3 results (showing 2 of 3)" in html
+    assert '/graph?q=link' in html
+    assert '/brief?q=link' in html
+    assert 'data-copy-text="query Link for link"' in html
+    assert "Copy query prompt" in html
     assert "/page/page-0" in html
     assert "/page/page-1" in html
     assert "/page/page-2" not in html
     assert "&lt;agent memory&gt;" in html
     assert "<mark>Link</mark>" in html
+
+
+def test_render_search_page_escapes_actions_and_result_hrefs():
+    html = render_search_page(
+        'agent "memory"',
+        [{"name": 'bad"name', "title": "Agent", "snippet": "memory"}],
+        page_href=lambda name: f'/page/{name}?x="bad"',
+        layout=_layout,
+    )
+
+    assert '/graph?q=agent%20%22memory%22' in html
+    assert 'data-copy-text="query Link for agent &quot;memory&quot;"' in html
+    assert '/page/bad&quot;name?x=&quot;bad&quot;' in html

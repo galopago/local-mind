@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import html
 import re
+import urllib.parse
 from collections.abc import Callable, Sequence
+
+from .web_ingest import copy_button
 
 
 PageHref = Callable[[str], str]
@@ -40,8 +43,18 @@ def render_search_page(
 
     total = len(results)
     cap_note = f" (showing {limit} of {total})" if total > limit else ""
+    graph_href = "/graph?q=" + urllib.parse.quote(query)
+    brief_href = "/brief?q=" + urllib.parse.quote(query)
+    actions = (
+        '<div class="page-actions">'
+        f'<a class="button-link" href="{html.escape(graph_href, quote=True)}">Open graph search</a>'
+        f'<a class="button-link" href="{html.escape(brief_href, quote=True)}">Open memory brief</a>'
+        f'{copy_button(f"query Link for {query}", "Copy query prompt")}'
+        "</div>"
+    )
     items = "".join(
-        f'<li><a href="{page_href(str(result["name"]))}">{highlight_search_term(str(result["title"]), query)}</a>'
+        f'<li><a href="{html.escape(page_href(str(result["name"])), quote=True)}">'
+        f'{highlight_search_term(str(result["title"]), query)}</a>'
         f'<br><small style="color:#888">...{highlight_search_term(str(result.get("snippet", "")), query)}...</small></li>'
         for result in results[:limit]
     )
@@ -50,5 +63,6 @@ def render_search_page(
         f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
         f'<h1>Search: {html.escape(query)}</h1>'
         f'<p>{total} result{"s" if total != 1 else ""}{cap_note}</p>'
+        f'{actions}'
         f'<ul class="page-list search-results">{items}</ul>',
     )
