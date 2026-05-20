@@ -75,6 +75,9 @@ def test_render_memory_dashboard_page_shows_counts_next_actions_and_sections():
 
     assert "Memory Dashboard" in html
     assert '<span class="num">3</span><span class="label">memories</span>' in html
+    assert 'data-copy-text="what does Link remember about project alpha?"' in html
+    assert 'data-copy-text="brief me from Link for project alpha"' in html
+    assert 'data-copy-text="audit Link memory for project alpha"' in html
     assert "<strong>Types:</strong> preference: 2" in html
     assert "link memory-inbox" in html
     assert "No memories need review." in html
@@ -106,6 +109,8 @@ def test_render_profile_page_lists_memory_sections_and_explain_links():
     html = render_profile_page(payload, page_href=_page_href, layout=_layout)
 
     assert "Memory Profile" in html
+    assert 'data-copy-text="what does Link remember about me?"' in html
+    assert 'data-copy-text="brief me from Link before we continue"' in html
     assert "/page/prefer-short-notes" in html
     assert "/explain-memory?memory=prefer-short-notes" in html
     assert "Keep release notes short." in html
@@ -125,6 +130,8 @@ def test_render_memory_audit_page_reports_risks():
     html = render_memory_audit_page(payload, page_href=_page_href, action_hints=_action_hints, layout=_layout)
 
     assert "Memory Audit" in html
+    assert 'data-copy-text="audit Link memory for project alpha"' in html
+    assert 'data-copy-text="review Link memory inbox for project alpha"' in html
     assert "needs_attention" in html
     assert "Review &lt;memory&gt;" in html
 
@@ -142,6 +149,7 @@ def test_render_captures_page_shows_redaction_and_read_warnings():
     html = render_captures_page(payload, layout=_layout)
 
     assert "Raw Capture Inbox" in html
+    assert 'data-copy-text="review Link raw captures for project alpha"' in html
     assert "1 raw capture contains secret-looking values" in html
     assert "raw/memory-captures/bad.md" in html
     assert "&lt;denied&gt;" in html
@@ -170,6 +178,7 @@ def test_render_inbox_page_lists_review_items_and_actions():
     html = render_inbox_page(payload, page_href=_page_href, layout=_layout)
 
     assert "Memory Review Inbox" in html
+    assert 'data-copy-text="review Link memory inbox"' in html
     assert "Memory &lt;One&gt;" in html
     assert "Needs &lt;review&gt;" in html
     assert "/explain-memory?memory=memory-one" in html

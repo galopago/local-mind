@@ -84,6 +84,39 @@ def _brief_prompt(query: str, project: str = "") -> str:
     return "brief me from Link before we continue"
 
 
+def _copy_actions(actions: list[tuple[str, str]]) -> str:
+    buttons = "".join(copy_button(prompt, label) for prompt, label in actions if prompt)
+    return f'<div class="page-actions">{buttons}</div>' if buttons else ""
+
+
+def _memory_overview_prompt(project: str = "") -> str:
+    project_name = str(project or "").strip()
+    if project_name:
+        return f"what does Link remember about project {project_name}?"
+    return "what does Link remember about me?"
+
+
+def _audit_prompt(project: str = "") -> str:
+    project_name = str(project or "").strip()
+    if project_name:
+        return f"audit Link memory for project {project_name}"
+    return "audit Link memory"
+
+
+def _inbox_prompt(project: str = "") -> str:
+    project_name = str(project or "").strip()
+    if project_name:
+        return f"review Link memory inbox for project {project_name}"
+    return "review Link memory inbox"
+
+
+def _capture_prompt(project: str = "") -> str:
+    project_name = str(project or "").strip()
+    if project_name:
+        return f"review Link raw captures for project {project_name}"
+    return "review Link raw captures"
+
+
 def render_memory_dashboard_page(
     dashboard: Mapping[str, object],
     *,
@@ -107,11 +140,17 @@ def render_memory_dashboard_page(
     if by_scope:
         counts += _counts_line("Scopes", by_scope)
     project = str(dashboard.get("project") or "")
+    dashboard_actions = _copy_actions([
+        (_memory_overview_prompt(project), "Copy profile prompt"),
+        (_brief_prompt("", project), "Copy brief prompt"),
+        (_audit_prompt(project), "Copy audit prompt"),
+    ])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / memory</div>'
         '<h1>Memory Dashboard</h1>'
         '<div class="memory-dashboard">'
         '<p class="summary">Read-only command center for what local agents can remember, what needs review, and what changed recently.</p>'
+        f'{dashboard_actions}'
         f'{_project_line(project)}'
         f'{stats}'
         f'{render_memory_next_actions(_dict_list(dashboard.get("next_actions")))}'
@@ -138,12 +177,18 @@ def render_profile_page(
         (profile.get("review_count", 0), "review"),
     ])
     archived = _dict_list(profile.get("archived"))
+    project = str(profile.get("project") or "")
+    profile_actions = _copy_actions([
+        (_memory_overview_prompt(project), "Copy profile prompt"),
+        (_brief_prompt("", project), "Copy brief prompt"),
+    ])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / profile</div>'
         '<h1>Memory Profile</h1>'
         '<div class="memory-profile">'
         '<p class="summary">What Link currently remembers about the user, projects, decisions, and preferences.</p>'
-        f'{_project_line(str(profile.get("project") or ""))}'
+        f'{profile_actions}'
+        f'{_project_line(project)}'
         f'{stats}'
         f'{_counts_line("Types", _mapping(profile.get("by_type")))}'
         f'{_counts_line("Scopes", _mapping(profile.get("by_scope")))}'
@@ -185,12 +230,18 @@ def render_memory_audit_page(
         ) + "</ul>"
     else:
         risk_html = "<h2>Needs attention</h2><p>No memory audit risks detected.</p>"
+    project = str(audit.get("project") or "")
+    audit_actions = _copy_actions([
+        (_audit_prompt(project), "Copy audit prompt"),
+        (_inbox_prompt(project), "Copy review prompt"),
+    ])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / audit</div>'
         '<h1>Memory Audit</h1>'
         '<div class="memory-profile">'
         '<p class="summary">Read-only health report for local agent memory, review backlog, raw captures, and safe next actions.</p>'
-        f'{_project_line(str(audit.get("project") or ""))}'
+        f'{audit_actions}'
+        f'{_project_line(project)}'
         f'<p><strong>Status:</strong> {html.escape(str(audit.get("status") or ""))}</p>'
         f'{stats}'
         f'{risk_html}'
@@ -230,12 +281,15 @@ def render_captures_page(inbox: Mapping[str, object], *, layout: PageLayout) -> 
             '<p>Some raw captures could not be read and are not listed for approval.</p>'
             f'<ul>{rows}</ul></div>'
         )
+    project = str(inbox.get("project") or "")
+    capture_actions = _copy_actions([(_capture_prompt(project), "Copy capture prompt")])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / captures</div>'
         '<h1>Raw Capture Inbox</h1>'
         '<div class="memory-profile">'
         '<p class="summary">Saved proposal-only session notes waiting for human review before they become durable memory.</p>'
-        f'{_project_line(str(inbox.get("project") or ""))}'
+        f'{capture_actions}'
+        f'{_project_line(project)}'
         f'{stats}'
         f'{warning_html}'
         f'{read_warning_html}'
@@ -259,12 +313,15 @@ def render_inbox_page(
     else:
         rows = "".join(_render_inbox_item(item, page_href=page_href) for item in items)
         content = f"<ul class='page-list'>{rows}</ul>"
+    project = str(inbox.get("project") or "")
+    inbox_actions = _copy_actions([(_inbox_prompt(project), "Copy review prompt")])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / inbox</div>'
         '<h1>Memory Review Inbox</h1>'
         '<div class="memory-profile">'
         '<p class="summary">Memories that need confirmation, stronger metadata, or cleanup.</p>'
-        f'{_project_line(str(inbox.get("project") or ""))}'
+        f'{inbox_actions}'
+        f'{_project_line(project)}'
         f'{stats}'
         f'{severity_html}'
         f'{content}'
