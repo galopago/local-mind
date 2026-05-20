@@ -42,6 +42,11 @@ def test_render_home_page_shows_stats_sections_and_prompts():
     assert "Try These Prompts" in html
     assert "is Link ready?" in html
     assert "ingest raw/&lt;file&gt; into Link" in html
+    assert "Next Steps" in html
+    assert 'href="/health"' in html
+    assert 'href="/ingest"' in html
+    assert 'href="/memory"' in html
+    assert 'href="/graph"' in html
     assert "Index" not in html
 
 

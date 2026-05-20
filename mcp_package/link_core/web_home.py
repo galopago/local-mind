@@ -27,6 +27,7 @@ def render_home_page(
         "<h1>Link</h1><p>Local agent memory. Knowledge compounds here.</p>"
         f"{_render_product_lanes()}"
         f"{_render_prompt_strip(starter_prompts)}"
+        f"{_render_next_steps()}"
         f"{_render_stats(pages)}"
         f"{_render_page_sections(pages, page_href=page_href)}"
     )
@@ -99,4 +100,25 @@ def _render_prompt_strip(starter_prompts: Mapping[str, object]) -> str:
         '<p>Ask from Codex, Claude, Cursor, Kiro, or any agent with Link installed. <a href="/prompts">Open starter prompts</a>.</p>'
         '<div class="prompt-grid">'
         f"{prompt_codes}</div></section>"
+    )
+
+
+def _render_next_steps() -> str:
+    actions = [
+        ("Check health", "/health", "Readiness, validation, interrupted writes, and safe repairs."),
+        ("Add source", "/ingest", "Save raw notes locally, then ask your agent to ingest them."),
+        ("Review memory", "/memory", "Inspect remembered preferences, decisions, and project context."),
+        ("Explore graph", "/graph", "Open relationships, focused neighborhoods, and page evidence."),
+    ]
+    items = "".join(
+        '<a class="home-next-card" href="'
+        f'{html.escape(href, quote=True)}"><strong>{html.escape(label)}</strong>'
+        f'<span>{html.escape(detail)}</span></a>'
+        for label, href, detail in actions
+    )
+    return (
+        '<section class="home-next" aria-label="Next steps">'
+        "<h2>Next Steps</h2>"
+        f'<div class="home-next-grid">{items}</div>'
+        "</section>"
     )

@@ -309,6 +309,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .prompt-strip p { color: var(--muted); margin-bottom: 10px; }
 .prompt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
 .prompt-grid code { display: block; padding: 8px; background: var(--surface-code); border-radius: 4px; white-space: normal; }
+.home-next { margin: 16px 0 20px; }
+.home-next h2 { margin-top: 0; font-size: 17px; }
+.home-next-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.home-next-card { border: 1px solid var(--border-soft); border-radius: 6px; padding: 11px; background: var(--surface);
+                  color: var(--text); text-decoration: none; display: grid; gap: 5px; min-width: 0; }
+.home-next-card:hover { background: var(--button-hover); text-decoration: none; }
+.home-next-card strong { color: var(--text-strong); font-family: sans-serif; font-size: 14px; }
+.home-next-card span { color: var(--muted); font-family: sans-serif; font-size: 12px; line-height: 1.4; }
 .health-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 16px 0 18px; font-family: sans-serif; }
 .health-card { border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface); padding: 12px; min-width: 0; }
 .health-card strong,
@@ -380,6 +388,7 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--border
   header .theme-toggle { justify-self: end; }
   .home-stats { flex-wrap: wrap; gap: 14px 22px; }
   .product-lanes { grid-template-columns: minmax(0, 1fr); }
+  .home-next-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .memory-grid { grid-template-columns: minmax(0, 1fr); }
   .proposal-controls { grid-template-columns: minmax(0, 1fr); }
   .raw-source-controls { grid-template-columns: minmax(0, 1fr); }
@@ -393,6 +402,7 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--border
 @media (max-width: 560px) {
   header .header-top { flex-wrap: wrap; }
   header .header-tools { flex-basis: 100%; max-width: none; justify-items: stretch; }
+  .home-next-grid { grid-template-columns: minmax(0, 1fr); }
   header .theme-toggle { justify-self: end; }
 }
 """
