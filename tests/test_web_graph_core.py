@@ -190,6 +190,8 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn("var totalEdgeCount = 20;", script)
         self.assertIn("var GRAPH_STORAGE_KEY = 'link.graph.controls.v1';", script)
         self.assertIn("var fitButton = document.getElementById('graph-fit');", script)
+        self.assertIn("function categoryClusterCenter(category, total)", script)
+        self.assertIn("Large graphs skip physics, so they use stable category clusters instead of global rings.", script)
         self.assertIn("function readGraphSettings()", script)
         self.assertIn("function saveGraphSettings()", script)
         self.assertIn("function fitCurrentView()", script)

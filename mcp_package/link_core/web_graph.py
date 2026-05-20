@@ -221,20 +221,35 @@ def render_graph_script(
     return angles[category] || 0;
   }}
 
+  function categoryClusterCenter(category, total) {{
+    var scale = total > 2500 ? 1.22 : 1;
+    var centers = {{
+      concepts: {{ x: -40, y: 0 }},
+      sources: {{ x: 210, y: 115 }},
+      memories: {{ x: 118, y: -145 }},
+      entities: {{ x: -230, y: -100 }},
+      comparisons: {{ x: -240, y: 135 }},
+      explorations: {{ x: 18, y: 188 }}
+    }};
+    var center = centers[category] || {{ x: 0, y: 0 }};
+    return {{ x: center.x * scale, y: center.y * scale }};
+  }}
+
   function seedLargeGraphPosition(n, i, total) {{
-    var angle = i * 2.399963 + categorySeedAngle(n.category) + stableNoise(n.id, 11) * 0.55;
-    var spread = total > 2500 ? 360 : 285;
-    var r = 30 + Math.sqrt((i + 1) / Math.max(total, 1)) * spread;
-    var categoryLift = n.category === 'sources' ? 62 : (n.category === 'memories' ? -50 : (n.category === 'entities' ? 26 : -4));
+    var center = categoryClusterCenter(n.category, total);
+    var angle = stableNoise(n.id, 11) * Math.PI * 2 + categorySeedAngle(n.category);
+    var clusterRadius = total > 2500 ? 260 : 195;
+    var centrality = Math.min(0.7, Math.log2((degree[n.id] || 0) + 1) / 8);
+    var r = 18 + Math.sqrt(stableNoise(n.id, 17)) * clusterRadius * (1 - centrality);
     pos[n.id] = {{
-      x: Math.cos(angle) * r * 1.04,
-      y: Math.sin(angle) * r * 0.82 + categoryLift
+      x: center.x + Math.cos(angle) * r * 1.04,
+      y: center.y + Math.sin(angle) * r * 0.82
     }};
     vel[n.id] = {{ x: 0, y: 0 }};
   }}
 
   // Small graphs start in a loose two-lobe silhouette and settle with physics.
-  // Large graphs skip physics, so they use a stable spiral seed instead of rings.
+  // Large graphs skip physics, so they use stable category clusters instead of global rings.
   var pos = {{}}, vel = {{}}, pinned = {{}};
   function seedNodePosition(n, i, total) {{
     if (total > LARGE_GRAPH_LIMIT) {{

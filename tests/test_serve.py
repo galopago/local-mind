@@ -2256,7 +2256,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn("strokeEdgeBatch(currentEdges, 'rgba(88,166,255,0.07)', 0.45);", html)
         self.assertIn("Radial glow stays off in large overview mode except for focused nodes.", html)
         self.assertIn("function seedLargeGraphPosition(n, i, total)", html)
-        self.assertIn("Large graphs skip physics, so they use a stable spiral seed instead of rings.", html)
+        self.assertIn("function categoryClusterCenter(category, total)", html)
+        self.assertIn("Large graphs skip physics, so they use stable category clusters instead of global rings.", html)
         self.assertIn("seedMissingPositions();\n    invalidateSearchCache();", html)
         self.assertIn("ctx.fillStyle = fastRender ? color + '28' : color + '40';", html)
 
