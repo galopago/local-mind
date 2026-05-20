@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import urllib.parse
 from collections.abc import Callable, Sequence
 
 
@@ -152,10 +153,20 @@ def render_memory_card(
         ) + "</ul>"
     actions = render_memory_action_commands(record.get("actions") or (action_hints(record) if action_hints else []))
     summary_html = f'<p class="summary">{html.escape(summary)}</p>' if summary else ""
+    page_url = html.escape(page_href(name), quote=True)
+    encoded_name = urllib.parse.quote(name, safe="")
+    trust_links = (
+        '<div class="memory-meta">'
+        f'<a href="/explain-memory?memory={encoded_name}">explain</a>'
+        ' · '
+        f'<a href="/graph?focus={encoded_name}&amp;depth=2">graph</a>'
+        "</div>"
+    )
     return (
         '<article class="memory-card">'
-        f'<h3><a href="{page_href(name)}">{html.escape(title)}</a></h3>'
+        f'<h3><a href="{page_url}">{html.escape(title)}</a></h3>'
         f'<div class="memory-meta">{html.escape(meta)}</div>'
+        f'{trust_links}'
         f'{summary_html}'
         f'{issues_html}'
         f'{actions}'

@@ -40,9 +40,21 @@ class WebMemoryCoreTests(unittest.TestCase):
         html = render_memory_card(record, page_href=page_href)
 
         self.assertIn('<a href="/page/local-memory">&lt;Local Memory&gt;</a>', html)
+        self.assertIn('/explain-memory?memory=local-memory', html)
+        self.assertIn('/graph?focus=local-memory&amp;depth=2', html)
         self.assertIn("Use &lt;local&gt; memory.", html)
         self.assertIn('data-memory-action="review"', html)
         self.assertNotIn("<Local Memory>", html)
+
+    def test_memory_card_escapes_generated_trust_links(self):
+        html = render_memory_card(
+            {"name": 'memory <one>', "title": "Memory"},
+            page_href=lambda name: f'/page/{name}',
+        )
+
+        self.assertIn('/page/memory &lt;one&gt;', html)
+        self.assertIn('/explain-memory?memory=memory%20%3Cone%3E', html)
+        self.assertIn('/graph?focus=memory%20%3Cone%3E&amp;depth=2', html)
 
     def test_memory_section_uses_action_hints_when_record_has_no_actions(self):
         record = {"name": "agent-memory", "title": "Agent Memory"}
