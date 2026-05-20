@@ -166,6 +166,30 @@ def render_graph_script(
   var fullGraphLoaded = initialGraphMode === 'full';
   var fullGraphLoading = false;
   var nodeById = {{}};
+  var GRAPH_STORAGE_KEY = 'link.graph.controls.v1';
+
+  function readGraphSettings() {{
+    try {{
+      return JSON.parse(window.localStorage.getItem(GRAPH_STORAGE_KEY) || '{{}}') || {{}};
+    }} catch (error) {{
+      return {{}};
+    }}
+  }}
+
+  function saveGraphSettings() {{
+    try {{
+      window.localStorage.setItem(GRAPH_STORAGE_KEY, JSON.stringify({{
+        showAllLabels: showAllLabels,
+        motionPaused: motionPaused,
+        searchTerm: searchTerm,
+        categoryValue: categoryValue
+      }}));
+    }} catch (error) {{
+      // Local storage can be disabled; graph controls should still work.
+    }}
+  }}
+
+  var storedGraphSettings = readGraphSettings();
 
   function stableNoise(id, salt) {{
     var h = salt * 2166136261;
@@ -263,13 +287,18 @@ def render_graph_script(
   var downX = 0, downY = 0, didDrag = false, suppressClick = false;
   var zoom = 1;
   var frame = 0;
-  var showAllLabels = false;
-  var motionPaused = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || nodes.length > LARGE_GRAPH_LIMIT;
+  var showAllLabels = storedGraphSettings.showAllLabels === true;
+  var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var motionPaused = prefersReducedMotion || nodes.length > LARGE_GRAPH_LIMIT || storedGraphSettings.motionPaused === true;
   var SETTLE = 200; // frames of physics
-  var searchTerm = String(initialSearchTerm || '').trim().toLowerCase();
+  var searchTerm = String(initialSearchTerm || storedGraphSettings.searchTerm || '').trim().toLowerCase();
   var cachedSearchTerm = '';
   var cachedSearchMatches = 0;
-  var categoryValue = String(initialCategoryValue || 'all').trim() || 'all';
+  var categoryValue = String(
+    initialCategoryValue && initialCategoryValue !== 'all'
+      ? initialCategoryValue
+      : (storedGraphSettings.categoryValue || initialCategoryValue || 'all')
+  ).trim() || 'all';
   var depthValue = 'all';
   var visibleCache = null;
   var renderQueued = false;
@@ -822,6 +851,7 @@ def render_graph_script(
     autoFit();
     updateInspector();
     updateStatus();
+    saveGraphSettings();
     drawSoon();
   }}
 
@@ -1037,6 +1067,7 @@ def render_graph_script(
       showAllLabels = !showAllLabels;
       syncLabelsButton();
       updateStatus();
+      saveGraphSettings();
       drawSoon();
       e.preventDefault();
     }}
@@ -1047,10 +1078,12 @@ def render_graph_script(
     showAllLabels = !showAllLabels;
     syncLabelsButton();
     updateStatus();
+    saveGraphSettings();
     drawSoon();
   }});
   if (motionButton) motionButton.addEventListener('click', function() {{
     setMotionPaused(!motionPaused);
+    saveGraphSettings();
   }});
   if (fullscreenButton) fullscreenButton.addEventListener('click', function() {{
     setFullscreen(!frameEl.classList.contains('is-fullscreen'));
@@ -1079,6 +1112,7 @@ def render_graph_script(
       reseedVisiblePositions();
       autoFit();
       updateStatus();
+      saveGraphSettings();
       drawSoon();
     }});
     searchInput.addEventListener('keydown', function(e) {{
@@ -1095,6 +1129,7 @@ def render_graph_script(
     setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
+    saveGraphSettings();
     drawSoon();
   }});
   if (depthFilter) depthFilter.addEventListener('change', function() {{
@@ -1104,6 +1139,7 @@ def render_graph_script(
     setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
+    saveGraphSettings();
     drawSoon();
   }});
 
@@ -1112,7 +1148,7 @@ def render_graph_script(
   if (motionPaused) {{ reseedVisiblePositions(); autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
   syncCategoryOptions();
-  if (searchInput) searchInput.value = String(initialSearchTerm || '');
+  if (searchInput) searchInput.value = searchTerm;
   applyInitialFocus();
   if (searchTerm && !fullGraphLoaded) loadFullGraph();
   syncLabelsButton();
