@@ -333,7 +333,16 @@ def render_graph_script(
 
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
   function pageHref(id) {{ return '/page/' + encodeURIComponent(id); }}
-  function graphHref(id, depth) {{ return '/graph?focus=' + encodeURIComponent(id) + '&depth=' + encodeURIComponent(String(depth || 2)); }}
+  function graphHref(id, depth) {{
+    var params = new URLSearchParams();
+    params.set('focus', id);
+    params.set('depth', String(depth || 2));
+    if (searchTerm) params.set('q', searchTerm);
+    if (categoryValue && categoryValue !== 'all') params.set('type', categoryValue);
+    if (sizeMode && sizeMode !== 'category') params.set('size', sizeMode);
+    if (labelMode && labelMode !== 'sparse') params.set('labels', labelMode);
+    return '/graph?' + params.toString();
+  }}
   function graphStateUrl() {{
     var params = new URLSearchParams();
     if (selectedNode) params.set('focus', selectedNode.id);

@@ -211,6 +211,9 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn("function visibleNodes()", script)
         self.assertIn("function graphStateUrl()", script)
         self.assertIn("function graphHref(id, depth)", script)
+        self.assertIn("params.set('focus', id);", script)
+        self.assertIn("params.set('depth', String(depth || 2));", script)
+        self.assertIn("return '/graph?' + params.toString();", script)
         self.assertIn("canvas.addEventListener('dblclick'", script)
 
 
