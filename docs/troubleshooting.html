@@ -84,6 +84,8 @@ python3 link.py query "why does Link help agents?" link-demo --budget small</cod
         <pre><code>link benchmark "agent memory"
 link graph-summary "agent memory" --limit 40 --depth 1</code></pre>
         <p>Large graph views intentionally open bounded first. Use type filters, node search, depth controls, and explicit full-graph load only when you need everything.</p>
+        <p>From a source checkout, use the synthetic smoke script when you want local scale evidence without touching your real wiki:</p>
+        <pre><code>python3 scripts/smoke_large_wiki.py --pages 10000</code></pre>
 
         <h2 id="pip">pip Is Blocked By Homebrew Python</h2>
         <p>If pip reports <code>externally-managed-environment</code>, avoid forcing packages into Homebrew Python. Use a dedicated venv:</p>

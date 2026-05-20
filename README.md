@@ -79,6 +79,7 @@ Open:
 ```text
 http://127.0.0.1:3000
 http://127.0.0.1:3000/graph
+http://127.0.0.1:3000/health
 ```
 
 The web viewer is for local use only. It binds to `127.0.0.1`, has no user
@@ -94,6 +95,9 @@ link benchmark "agent memory" link-demo
 link status --validate link-demo
 ```
 
+The `/health` page mirrors the readiness loop in the browser: validation state,
+interrupted writes, memory review status, and copyable repair commands.
+
 From a source checkout, use `python3 link.py ...`:
 
 ```bash
@@ -107,6 +111,16 @@ The generated demo is the public proof wiki. The repo's root `wiki/` directory
 is only a scaffold for local development and personal testing. Generated content
 inside `wiki/`, `raw/`, and `link-demo/` is ignored by git so personal memory is
 not published by accident.
+
+For local scale checks from a source checkout, run:
+
+```bash
+python3 scripts/smoke_large_wiki.py --pages 10000
+```
+
+This generates a temporary synthetic wiki, verifies bounded graph/query payloads,
+and reports cache, search, query, graph, and health timings without touching your
+real Link wiki.
 
 ## Three Ways To Use Link
 

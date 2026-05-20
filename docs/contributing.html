@@ -61,6 +61,8 @@ bash -n integrations/*/install.sh integrations/*/uninstall.sh integrations/_shar
 python3 link.py demo /tmp/link-mcp-smoke --force
 PYTHONPATH=mcp_package python3 scripts/smoke_mcp_stdio.py /tmp/link-mcp-smoke/wiki
 git diff --check</code></pre>
+        <p>For graph or query performance changes, also run a local 10k-page stress check. It is intentionally not part of normal PR CI.</p>
+        <pre><code>python3 scripts/smoke_large_wiki.py --pages 10000</code></pre>
 
         <h2 id="description">PR Description</h2>
         <ul>
