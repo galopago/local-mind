@@ -30,6 +30,7 @@ def test_render_health_page_shows_readiness_operations_and_commands():
             "operation_count": 1,
             "stale_count": 1,
             "active_count": 0,
+            "next_actions": [{"label": "inspect operation marker files before deleting them", "command": "link operations"}],
             "operations": [{"operation": "remember", "description": "Save memory", "marker": "remember-1.json"}],
         },
         layout=_layout,
@@ -41,6 +42,8 @@ def test_render_health_page_shows_readiness_operations_and_commands():
     assert '<strong>Validation</strong><span>failed</span><small>0 errors · 0 warnings</small>' in html
     assert '<strong>Operations</strong><span>needs review</span><small>1 stale · 0 active</small>' in html
     assert '<strong>Memory Review</strong><span>1 pending</span><small>2 active memories</small>' in html
+    assert "Next Safe Action" in html
+    assert "Interrupted writes should be inspected before more repairs." in html
     assert "sqlite-fts" in html
     assert "stale_operations" in html
     assert "remember-1.json" in html

@@ -62,6 +62,59 @@ def _render_operation_actions(operations: Mapping[str, object]) -> str:
     return f'<section><h2>Operation Next Actions</h2><ul class="command-list">{rows}</ul></section>'
 
 
+def _command_for_action(action: Mapping[str, object]) -> str:
+    command = str(action.get("command") or "").strip()
+    if command:
+        return command
+    tool = str(action.get("tool") or "").strip()
+    arguments = action.get("arguments") if isinstance(action.get("arguments"), dict) else {}
+    if tool == "doctor":
+        return "link doctor --fix" if arguments.get("fix") else "link doctor"
+    if tool == "validate_wiki":
+        return "link validate"
+    if tool == "rebuild_backlinks":
+        return "link rebuild-backlinks"
+    if tool == "ingest_status":
+        return "link ingest-status"
+    if tool == "starter_prompts":
+        return "link prompts"
+    if tool == "memory_inbox":
+        return "link memory-inbox"
+    if tool == "backup_wiki":
+        return "link backup"
+    return ""
+
+
+def _render_primary_next_action(status: Mapping[str, object], operations: Mapping[str, object]) -> str:
+    operation_actions = _dict_list(operations.get("next_actions"))
+    status_actions = _dict_list(status.get("next_actions"))
+    if operation_actions:
+        action = operation_actions[0]
+        label = str(action.get("label") or "Review interrupted operation")
+        detail = "Interrupted writes should be inspected before more repairs."
+    elif status_actions:
+        action = status_actions[0]
+        label = str(action.get("label") or action.get("tool") or "Run the next health check")
+        detail = str(action.get("description") or action.get("detail") or "Run this before relying on Link.")
+    elif int(status.get("needs_review_count") or 0):
+        action = {"command": "link memory-inbox"}
+        label = "Review pending memories"
+        detail = "Confirm or archive memories that should not affect recall yet."
+    else:
+        action = {"command": "link brief \"working with Link\""}
+        label = "Ready for agent work"
+        detail = "Prime the agent with a brief or query Link for project context."
+    command = _command_for_action(action)
+    command_html = f"<code>{html.escape(command)}</code>{copy_button(command, 'Copy')}" if command else ""
+    return (
+        '<section class="health-next">'
+        "<h2>Next Safe Action</h2>"
+        f"<p><strong>{html.escape(label)}</strong><span>{html.escape(detail)}</span></p>"
+        f"{command_html}"
+        "</section>"
+    )
+
+
 def _render_validation_details(validation: Mapping[str, object]) -> str:
     if not validation.get("checked"):
         return "<section><h2>Validation Gate</h2><p>Validation has not been run in this status check.</p></section>"
@@ -168,6 +221,7 @@ def render_health_page(
         "<h1>Health</h1>"
         '<p class="summary">One local check for readiness, validation, interrupted writes, and repair commands.</p>'
         f"{_render_health_cards(status, operations)}"
+        f"{_render_primary_next_action(status, operations)}"
         f"{stats}"
         "<section><h2>Readiness</h2>"
         '<ul class="page-list">'

@@ -328,6 +328,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .health-card[data-state="done"] { border-color: var(--success-border); background: var(--success-bg); }
 .health-card[data-state="next"] { border-color: var(--accent-soft); }
 .health-card[data-state="blocked"] { border-color: var(--danger-border); background: var(--danger-bg); }
+.health-next { border: 1px solid var(--border-soft); border-left: 3px solid var(--accent);
+               border-radius: 6px; padding: 12px; margin: 14px 0 18px; background: var(--surface); font-family: sans-serif; }
+.health-next h2 { margin: 0 0 8px; border: 0; padding: 0; font: 15px -apple-system, BlinkMacSystemFont, sans-serif; }
+.health-next p { margin: 0 0 8px; line-height: 1.45; }
+.health-next strong,
+.health-next span { display: block; overflow-wrap: anywhere; }
+.health-next span { color: var(--muted); font-size: 13px; }
+.health-next code { display: inline-block; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .command-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
 .command-list li { border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface); padding: 8px 10px; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .command-list strong { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
