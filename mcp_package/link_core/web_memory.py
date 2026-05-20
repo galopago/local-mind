@@ -5,6 +5,8 @@ import html
 import urllib.parse
 from collections.abc import Callable, Sequence
 
+from .web_ingest import copy_button
+
 
 MemoryActionHints = Callable[[dict[str, object]], list[dict[str, object]]]
 PageHref = Callable[[str], str]
@@ -115,10 +117,12 @@ def render_memory_action_commands(actions: Sequence[dict[str, object]]) -> str:
         priority = str(action.get("priority") or "")
         priority_html = f'<span class="memory-meta">{html.escape(priority)}</span>' if priority else ""
         button_html = render_memory_action_button(action)
+        command = str(action.get("command") or "")
+        copy_html = copy_button(command, "Copy command")
         rows += (
             f'<div class="memory-action-row"><span class="memory-action-head"><strong>{label_html}</strong>'
             f'{priority_html}{button_html}</span>'
-            f'<code>{html.escape(str(action.get("command") or ""))}</code></div>'
+            f'<code>{html.escape(command)}</code>{copy_html}</div>'
         )
     return f'<div class="memory-actions">{rows}</div>'
 
@@ -216,7 +220,9 @@ def render_capture_card(capture: dict[str, object]) -> str:
         )
     commands = capture.get("commands") or {}
     actions = "".join(
-        f'<div><strong>{html.escape(label)}</strong><code>{html.escape(str(command))}</code></div>'
+        f'<div><strong>{html.escape(label)}</strong>'
+        f'{copy_button(str(command), "Copy command")}'
+        f'<code>{html.escape(str(command))}</code></div>'
         for label, command in (
             ("Accept proposal", commands.get("accept", "")),
             ("Redact", commands.get("redact", "")),
@@ -253,6 +259,7 @@ def render_memory_next_actions(actions: list[dict[str, str]]) -> str:
             label_html = label
         items += (
             f'<li><strong>{label_html}</strong>: {html.escape(action["detail"])}'
-            f'<br><code>{html.escape(action["command"])}</code></li>'
+            f'<br><code>{html.escape(action["command"])}</code>'
+            f'{copy_button(action["command"], "Copy command")}</li>'
         )
     return f'<div class="memory-next"><strong>Next actions</strong><ul>{items}</ul></div>'
