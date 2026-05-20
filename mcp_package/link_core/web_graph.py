@@ -97,7 +97,11 @@ def graph_category_options(nodes: list[Mapping[str, Any]]) -> str:
 
 def graph_legend_items(colors: Mapping[str, str] = GRAPH_CATEGORY_COLORS) -> str:
     return "".join(
-        f'<span style="background:{html.escape(str(color), quote=True)}"></span>{html.escape(str(category))} '
+        '<button type="button" class="graph-legend-item" aria-pressed="false" '
+        f'data-graph-category="{html.escape(str(category), quote=True)}" '
+        f'title="Filter graph to {html.escape(str(category), quote=True)}">'
+        f'<span style="background:{html.escape(str(color), quote=True)}"></span>'
+        f'{html.escape(str(category))}</button>'
         for category, color in colors.items()
         if category != "root"
     )
@@ -143,6 +147,7 @@ def render_graph_script(
   var depthFilter = document.getElementById('graph-depth');
   var frameEl = document.getElementById('graph-frame');
   var status = document.getElementById('graph-status');
+  var legend = document.getElementById('graph-legend');
   var inspector = document.getElementById('graph-inspector');
   var inspectorTitle = document.getElementById('graph-inspector-title');
   var inspectorMeta = document.getElementById('graph-inspector-meta');
@@ -525,6 +530,13 @@ def render_graph_script(
     labelsButton.textContent = labelMode === 'all' ? 'Labels all' : (labelMode === 'neighbors' ? 'Labels local' : 'Labels sparse');
     if (labelFilter && labelFilter.value !== labelMode) labelFilter.value = labelMode;
   }}
+  function syncLegendButtons() {{
+    if (!legend) return;
+    Array.from(legend.querySelectorAll('[data-graph-category]')).forEach(function(button) {{
+      var category = button.getAttribute('data-graph-category') || '';
+      button.setAttribute('aria-pressed', categoryValue === category ? 'true' : 'false');
+    }});
+  }}
   function cycleLabelMode() {{
     labelMode = labelMode === 'sparse' ? 'neighbors' : (labelMode === 'neighbors' ? 'all' : 'sparse');
     showAllLabels = labelMode === 'all';
@@ -584,6 +596,7 @@ def render_graph_script(
     if (selectedNode) parts.push('selected ' + selectedNode.id);
     status.textContent = parts.join(' · ');
     syncLabelsButton();
+    syncLegendButtons();
   }}
 
   function syncDepthControl() {{
@@ -1200,6 +1213,20 @@ def render_graph_script(
     saveGraphSettings();
     drawSoon();
   }});
+  if (legend) legend.addEventListener('click', function(e) {{
+    var button = e.target.closest ? e.target.closest('[data-graph-category]') : null;
+    if (!button) return;
+    var nextCategory = button.getAttribute('data-graph-category') || 'all';
+    categoryValue = categoryValue === nextCategory ? 'all' : nextCategory;
+    if (categoryFilter) categoryFilter.value = categoryValue;
+    invalidateFilters();
+    reseedVisiblePositions();
+    setMotionPaused(motionPaused);
+    autoFit();
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
+  }});
   if (sizeFilter) sizeFilter.addEventListener('change', function() {{
     sizeMode = sizeFilter.value || 'category';
     updateStatus();
@@ -1236,6 +1263,7 @@ def render_graph_script(
   applyInitialFocus();
   if (searchTerm && !fullGraphLoaded) loadFullGraph();
   syncLabelsButton();
+  syncLegendButtons();
   updateInspector();
   updateStatus();
   if (shouldRunContinuously()) startLoop();
@@ -1346,7 +1374,7 @@ def render_graph_page_body(
         '<button id="graph-open" type="button" disabled>Open page</button>'
         "</aside>"
         "</div>"
-        f'<div class="graph-legend">{legend_items}</div>'
+        f'<div id="graph-legend" class="graph-legend">{legend_items}</div>'
         "</section>"
         f"{graph_js}"
     )

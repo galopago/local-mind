@@ -382,9 +382,13 @@ mark { background: var(--mark-bg); color: inherit; border-radius: 2px; padding: 
 .graph-tooltip { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
                  padding: 6px 10px; font-size: 13px; pointer-events: none; display: none;
                  box-shadow: 0 2px 8px var(--shadow); z-index: 100; }
-.graph-legend { font-size: 12px; color: var(--subtle); font-family: sans-serif; margin-top: 8px; }
+.graph-legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--subtle); font-family: sans-serif; margin-top: 8px; }
+.graph-legend-item { border: 1px solid transparent; background: transparent; color: var(--subtle);
+                     border-radius: 999px; padding: 3px 7px; cursor: pointer; font: inherit; }
+.graph-legend-item:hover,
+.graph-legend-item[aria-pressed="true"] { border-color: var(--border); background: var(--button-bg); color: var(--text); }
 .graph-legend span { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
-                     margin-right: 4px; vertical-align: middle; }
+                     margin-right: 4px; vertical-align: -1px; }
 .graph-empty { border: 1px solid var(--border-soft); border-radius: 4px; padding: 28px; background: var(--surface-empty);
                color: var(--muted); font-family: sans-serif; margin: 12px 0; }
 
