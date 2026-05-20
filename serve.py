@@ -867,6 +867,7 @@ def _render_page(page_path):
     cat = rel.parts[0] if len(rel.parts) > 1 else ""
     raw_refs = _core_raw_source_refs(body) if cat == "sources" else []
     proposal_prompt = f"propose memories from {raw_refs[0]}" if raw_refs else ""
+    query_prompt = f"query Link for {title}"
     return _core_render_wiki_page(
         str(title),
         category=cat,
@@ -876,6 +877,7 @@ def _render_page(page_path):
         graph_href=_graph_href(page_path.stem),
         proposal_href=_proposal_href(raw_refs[0]) if raw_refs else "",
         proposal_prompt=proposal_prompt,
+        query_prompt=query_prompt,
     )
 
 

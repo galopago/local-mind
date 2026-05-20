@@ -498,6 +498,8 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn("/graph?focus=agent-memory&amp;depth=2", html)
         self.assertIn("Open local graph", html)
+        self.assertIn('data-copy-text="query Link for Agent Memory"', html)
+        self.assertIn("Copy query prompt", html)
 
     def test_source_page_links_to_memory_proposals(self):
         wiki = self.make_wiki()

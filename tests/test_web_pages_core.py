@@ -93,9 +93,12 @@ def test_render_wiki_page_includes_local_graph_action():
         body_html="<p>Trusted body</p>",
         layout=_layout,
         graph_href='/graph?focus=agent-memory&depth=2',
+        query_prompt="query Link for Agent Memory",
     )
 
     assert '<a class="button-link" href="/graph?focus=agent-memory&amp;depth=2">Open local graph</a>' in html
+    assert 'data-copy-text="query Link for Agent Memory"' in html
+    assert "Copy query prompt" in html
     assert "<p>Trusted body</p>" in html
 
 
@@ -113,3 +116,17 @@ def test_render_wiki_page_includes_memory_proposal_action():
     assert '<a class="button-link" href="/propose?source=raw/release-notes.md">Propose memories</a>' in html
     assert 'data-copy-text="propose memories from raw/release-notes.md"' in html
     assert "Copy memory prompt" in html
+
+
+def test_render_wiki_page_escapes_query_prompt_action():
+    html = render_wiki_page(
+        "Unsafe",
+        category="concepts",
+        meta={},
+        body_html="<p>Trusted body</p>",
+        layout=_layout,
+        query_prompt='query Link for "<unsafe>"',
+    )
+
+    assert 'data-copy-text="query Link for &quot;&lt;unsafe&gt;&quot;"' in html
+    assert 'query Link for "<unsafe>"' not in html

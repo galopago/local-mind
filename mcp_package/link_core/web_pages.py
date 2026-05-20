@@ -21,6 +21,7 @@ def render_wiki_page(
     graph_href: str = "",
     proposal_href: str = "",
     proposal_prompt: str = "",
+    query_prompt: str = "",
 ) -> str:
     """Render a single wiki page shell around already-rendered Markdown."""
     crumb = '<div class="breadcrumb"><a href="/">Link</a>'
@@ -39,6 +40,8 @@ def render_wiki_page(
         )
     if proposal_prompt:
         action_links.append(copy_button(proposal_prompt, "Copy memory prompt"))
+    if query_prompt:
+        action_links.append(copy_button(query_prompt, "Copy query prompt"))
     page_actions = f'<div class="page-actions">{"".join(action_links)}</div>' if action_links else ""
     return layout(title, crumb + meta_line + page_actions + body_html)
 
