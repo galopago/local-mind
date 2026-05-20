@@ -252,17 +252,21 @@ def _render_pending(pending: list[dict[str, object]], represented: list[dict[str
     for item in pending[:50]:
         raw_path = str(item.get("raw") or "")
         propose_href = "/propose?source=" + urllib.parse.quote(raw_path)
+        ingest_prompt = f"ingest {raw_path} into Link" if raw_path else "ingest raw/<file> into Link"
+        actions = ""
         secret_warnings = _list(status_value=item.get("secret_warnings"))
         if secret_warnings:
             meta = (
                 f'{int(item.get("size_bytes") or 0)} bytes · secret warning: '
                 f'{", ".join(html.escape(str(label)) for label in secret_warnings)} · redact before ingest'
             )
+            actions = copy_button(f"redact secret-looking values in {raw_path} before ingest", "Copy redaction prompt")
         elif item.get("scan_error"):
             meta = (
                 f'{int(item.get("size_bytes") or 0)} bytes · '
                 f'could not inspect: {html.escape(str(item.get("scan_error") or ""))} · fix access before ingest'
             )
+            actions = copy_button(f"fix raw source access for {raw_path} before ingest", "Copy access prompt")
         elif item.get("stale"):
             target_pages = _list(status_value=item.get("source_page_paths"))
             target_label = ", ".join(html.escape(str(page)) for page in target_pages if page)
@@ -272,12 +276,21 @@ def _render_pending(pending: list[dict[str, object]], represented: list[dict[str
                 f'{html.escape(str(item.get("stale_reason") or "raw changed after wiki source page"))}'
                 f'{target_text}'
             )
+            actions = copy_button(ingest_prompt, "Copy ingest prompt")
         else:
             meta = (
                 f'{int(item.get("size_bytes") or 0)} bytes · '
                 f'<a href="{html.escape(propose_href, quote=True)}">propose memories</a>'
             )
-        rows += f'<li><code>{html.escape(raw_path)}</code><span class="type">{meta}</span></li>'
+            actions = (
+                f'<a href="{html.escape(propose_href, quote=True)}">memory proposals</a>'
+                f'{copy_button(ingest_prompt, "Copy ingest prompt")}'
+            )
+        rows += (
+            '<li class="ingest-pending-item">'
+            f'<code>{html.escape(raw_path)}</code><span class="type">{meta}</span>'
+            f'<span class="ingest-pending-actions">{actions}</span></li>'
+        )
     if len(pending) > 50:
         rows += f'<li>... {len(pending) - 50} more</li>'
     return '<div class="section-heading"><h2>Pending Raw Files</h2><a href="/propose">propose memories</a></div><ul class="page-list">' + rows + "</ul>"

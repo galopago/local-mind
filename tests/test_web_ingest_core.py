@@ -67,6 +67,8 @@ def test_render_ingest_page_shows_pending_workflow():
     assert "Ingest pending raw sources" in html
     assert "wiki/sources/new-source.md" in html
     assert "/propose?source=raw/new-source.md" in html
+    assert "Copy ingest prompt" in html
+    assert 'data-copy-text="ingest raw/new-source.md into Link"' in html
     assert "After ingest, validate." in html
 
 
@@ -136,5 +138,6 @@ def test_render_ingest_page_blocks_secret_raw_without_proposal_link():
     assert '<strong>Ingest</strong><span>blocked</span><small>0 represented · 1 pending</small>' in html
     assert 'data-copy-text="edit raw/secret-note.md"' in html
     assert "redact secret-looking values in raw/secret-note.md before ingest" in html
+    assert "Copy redaction prompt" in html
     assert "secret warning: OpenAI API key" in html
     assert "/propose?source=raw/secret-note.md" not in html

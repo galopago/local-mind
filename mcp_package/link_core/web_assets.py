@@ -301,6 +301,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .ingest-completion-pages a { border: 1px solid var(--border-soft); border-radius: 999px; padding: 3px 8px; background: var(--surface-soft); font-size: 12px; }
 .ingest-completion-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
 .ingest-completion-actions a { font-size: 13px; }
+.ingest-pending-item { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.2fr) auto; gap: 8px; align-items: center; }
+.ingest-pending-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; font-family: sans-serif; font-size: 12px; }
 .trust-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
 .trust-grid div { border: 1px solid var(--border-soft); border-radius: 4px; padding: 10px; font-family: sans-serif; background: var(--surface); }
 .trust-grid strong { display: block; font-size: 12px; color: var(--subtle); margin-bottom: 4px; }
@@ -400,6 +402,8 @@ footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--border
   .memory-grid { grid-template-columns: minmax(0, 1fr); }
   .proposal-controls { grid-template-columns: minmax(0, 1fr); }
   .raw-source-controls { grid-template-columns: minmax(0, 1fr); }
+  .ingest-pending-item { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .ingest-pending-actions { justify-content: flex-start; }
   .section-heading,
   .memory-dashboard .section-heading { flex-wrap: wrap; }
   .memory-actions code, .memory-next code { word-break: break-word; }
