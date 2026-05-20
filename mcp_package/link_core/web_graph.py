@@ -111,6 +111,8 @@ def render_graph_script(
     graph_mode_json: str,
     focus_id_json: str = "null",
     focus_depth: int = 2,
+    search_json: str = '""',
+    category_json: str = '"all"',
     total_node_count: int,
     total_edge_count: int,
 ) -> str:
@@ -130,6 +132,7 @@ def render_graph_script(
   var motionButton = document.getElementById('graph-motion');
   var fullscreenButton = document.getElementById('graph-fullscreen');
   var loadFullButton = document.getElementById('graph-load-full');
+  var copyLinkButton = document.getElementById('graph-copy-link');
   var searchInput = document.getElementById('graph-search');
   var categoryFilter = document.getElementById('graph-category');
   var depthFilter = document.getElementById('graph-depth');
@@ -156,6 +159,8 @@ def render_graph_script(
   var initialGraphMode = {graph_mode_json};
   var initialFocusId = {focus_id_json};
   var initialFocusDepth = {max(0, min(3, int(focus_depth)))};
+  var initialSearchTerm = {search_json};
+  var initialCategoryValue = {category_json};
   var totalNodeCount = {total_node_count};
   var totalEdgeCount = {total_edge_count};
   var fullGraphLoaded = initialGraphMode === 'full';
@@ -261,10 +266,10 @@ def render_graph_script(
   var showAllLabels = false;
   var motionPaused = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || nodes.length > LARGE_GRAPH_LIMIT;
   var SETTLE = 200; // frames of physics
-  var searchTerm = '';
+  var searchTerm = String(initialSearchTerm || '').trim().toLowerCase();
   var cachedSearchTerm = '';
   var cachedSearchMatches = 0;
-  var categoryValue = 'all';
+  var categoryValue = String(initialCategoryValue || 'all').trim() || 'all';
   var depthValue = 'all';
   var visibleCache = null;
   var renderQueued = false;
@@ -279,6 +284,37 @@ def render_graph_script(
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
   function pageHref(id) {{ return '/page/' + encodeURIComponent(id); }}
   function graphHref(id, depth) {{ return '/graph?focus=' + encodeURIComponent(id) + '&depth=' + encodeURIComponent(String(depth || 2)); }}
+  function graphStateUrl() {{
+    var params = new URLSearchParams();
+    if (selectedNode) params.set('focus', selectedNode.id);
+    if (searchTerm) params.set('q', searchTerm);
+    if (categoryValue && categoryValue !== 'all') params.set('type', categoryValue);
+    if (selectedNode && depthValue !== 'all') params.set('depth', depthValue);
+    return window.location.origin + window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+  }}
+  function fallbackCopy(text) {{
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    try {{ document.execCommand('copy'); }} finally {{ document.body.removeChild(area); }}
+  }}
+  async function copyGraphLink() {{
+    if (!copyLinkButton) return;
+    var previous = copyLinkButton.textContent;
+    var text = graphStateUrl();
+    try {{
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+      else fallbackCopy(text);
+      copyLinkButton.textContent = 'Copied link';
+    }} catch (error) {{
+      copyLinkButton.textContent = 'Copy failed';
+    }}
+    window.setTimeout(function() {{ copyLinkButton.textContent = previous || 'Copy link'; }}, 1400);
+  }}
   function invalidateFilters() {{ visibleCache = null; }}
   function invalidateSearchCache() {{ cachedSearchTerm = ''; cachedSearchMatches = 0; }}
   function escapeHtml(value) {{
@@ -1019,6 +1055,7 @@ def render_graph_script(
   if (fullscreenButton) fullscreenButton.addEventListener('click', function() {{
     setFullscreen(!frameEl.classList.contains('is-fullscreen'));
   }});
+  if (copyLinkButton) copyLinkButton.addEventListener('click', copyGraphLink);
   if (loadFullButton) loadFullButton.addEventListener('click', loadFullGraph);
   if (inspectorOpen) inspectorOpen.addEventListener('click', function() {{ openNode(selectedNode); }});
   if (inspectorLocal) inspectorLocal.addEventListener('click', function() {{ openLocalGraph(selectedNode, 2); }});
@@ -1075,7 +1112,9 @@ def render_graph_script(
   if (motionPaused) {{ reseedVisiblePositions(); autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
   syncCategoryOptions();
+  if (searchInput) searchInput.value = String(initialSearchTerm || '');
   applyInitialFocus();
+  if (searchTerm && !fullGraphLoaded) loadFullGraph();
   syncLabelsButton();
   updateInspector();
   updateStatus();
@@ -1110,6 +1149,8 @@ def render_graph_page_body(
     legend_items: str,
     focus_label: str = "",
     focus_depth: int = 2,
+    search_label: str = "",
+    category_label: str = "",
 ) -> str:
     """Render the graph page shell around the browser simulation script."""
     load_full_button = ""
@@ -1119,11 +1160,18 @@ def render_graph_page_body(
             f"Load graph data ({total_node_count} nodes)</button>"
         )
     focus_html = ""
+    state_parts = []
     if focus_label:
+        state_parts.append(f'Focused on <strong>{html.escape(focus_label)}</strong> · depth {html.escape(str(focus_depth))}')
+    if search_label:
+        state_parts.append(f'Search <strong>{html.escape(search_label)}</strong>')
+    if category_label and category_label != "all":
+        state_parts.append(f'Type <strong>{html.escape(category_label)}</strong>')
+    if state_parts:
         focus_html = (
             '<p class="graph-focus-note">'
-            f'Focused on <strong>{html.escape(focus_label)}</strong> · depth {html.escape(str(focus_depth))}. '
-            '<a href="/graph">Clear focus</a>'
+            f'{". ".join(state_parts)}. '
+            '<a href="/graph">Clear filters</a>'
             "</p>"
         )
 
@@ -1140,6 +1188,7 @@ def render_graph_page_body(
         '<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
         '<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
         '<button id="graph-fullscreen" type="button" aria-pressed="false">Fullscreen</button>'
+        '<button id="graph-copy-link" type="button">Copy link</button>'
         f"{load_full_button}"
         '<label class="graph-control">Find'
         '<input id="graph-search" type="search" placeholder="node title"></label>'

@@ -99,6 +99,7 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn('id="graph-labels"', html)
         self.assertIn('id="graph-motion"', html)
         self.assertIn('id="graph-fullscreen"', html)
+        self.assertIn('id="graph-copy-link"', html)
         self.assertIn("Load graph data (10 nodes)", html)
         self.assertIn('id="graph-search"', html)
         self.assertIn('id="graph-category"', html)
@@ -113,7 +114,7 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn("&lt;fast &amp; &quot;bounded&quot;&gt;", html)
         self.assertIn("<script>var resetButton = true;</script>", html)
 
-    def test_render_graph_page_body_includes_focus_note(self):
+    def test_render_graph_page_body_includes_graph_state_note(self):
         html = render_graph_page_body(
             graph_js="<script></script>",
             node_count=3,
@@ -126,10 +127,14 @@ class WebGraphCoreTests(unittest.TestCase):
             legend_items="",
             focus_label='Memory <One>',
             focus_depth=2,
+            search_label='agent <memory>',
+            category_label="memories",
         )
 
         self.assertIn("Focused on <strong>Memory &lt;One&gt;</strong> · depth 2", html)
-        self.assertIn('<a href="/graph">Clear focus</a>', html)
+        self.assertIn("Search <strong>agent &lt;memory&gt;</strong>", html)
+        self.assertIn("Type <strong>memories</strong>", html)
+        self.assertIn('<a href="/graph">Clear filters</a>', html)
 
     def test_render_graph_page_body_omits_load_button_for_full_graph(self):
         html = render_graph_page_body(
@@ -154,6 +159,8 @@ class WebGraphCoreTests(unittest.TestCase):
             graph_mode_json='"summary"',
             focus_id_json='"a"',
             focus_depth=2,
+            search_json='"memory"',
+            category_json='"concepts"',
             total_node_count=10,
             total_edge_count=20,
         )
@@ -164,9 +171,13 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn('var initialGraphMode = "summary";', script)
         self.assertIn('var initialFocusId = "a";', script)
         self.assertIn("var initialFocusDepth = 2;", script)
+        self.assertIn('var initialSearchTerm = "memory";', script)
+        self.assertIn('var initialCategoryValue = "concepts";', script)
         self.assertIn("var totalNodeCount = 10;", script)
         self.assertIn("var totalEdgeCount = 20;", script)
+        self.assertIn("var copyLinkButton = document.getElementById('graph-copy-link');", script)
         self.assertIn("function visibleNodes()", script)
+        self.assertIn("function graphStateUrl()", script)
         self.assertIn("function graphHref(id, depth)", script)
         self.assertIn("canvas.addEventListener('dblclick'", script)
 

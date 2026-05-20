@@ -2161,6 +2161,7 @@ class ServeTests(unittest.TestCase):
         self.assertLess(html.index('id="graph-search"'), html.index("var searchInput ="))
         self.assertLess(html.index('id="graph-category"'), html.index("var categoryFilter ="))
         self.assertLess(html.index('id="graph-depth"'), html.index("var depthFilter ="))
+        self.assertLess(html.index('id="graph-copy-link"'), html.index("var copyLinkButton ="))
         self.assertLess(html.index('id="graph-inspector"'), html.index("var inspector ="))
         self.assertLess(html.index('id="graph-focus"'), html.index("var inspectorFocus ="))
         self.assertLess(html.index('id="graph-local"'), html.index("var inspectorLocal ="))
@@ -2173,6 +2174,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn('<option value="concepts">concepts</option>', html)
         self.assertIn("function visibleNodes()", html)
         self.assertIn("function visibleEdges()", html)
+        self.assertIn("function graphStateUrl()", html)
+        self.assertIn("copyLinkButton.addEventListener('click', copyGraphLink);", html)
         self.assertIn("function syncDepthControl()", html)
         self.assertIn("depthValue = '1'", html)
         self.assertIn("depthFilter.disabled = !selectedNode;", html)
@@ -2304,6 +2307,24 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Focused on <strong>agent-memory</strong> · depth 2", html)
         self.assertIn('var initialFocusId = "agent-memory";', html)
         self.assertIn("var initialFocusDepth = 2;", html)
+
+    def test_graph_route_can_load_search_and_type_state(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n",
+        )
+        reset_wiki(wiki)
+
+        status, body, _ = run_handler_raw("GET", "/graph?q=agent%20memory&type=concepts")
+        html = body.decode("utf-8")
+
+        self.assertEqual(status, 200)
+        self.assertIn('var initialSearchTerm = "agent memory";', html)
+        self.assertIn('var initialCategoryValue = "concepts";', html)
+        self.assertIn("Search <strong>agent memory</strong>", html)
+        self.assertIn("Type <strong>concepts</strong>", html)
 
     def test_graph_uses_bounded_initial_payload_for_large_wikis(self):
         wiki = self.make_wiki()

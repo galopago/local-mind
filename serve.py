@@ -994,17 +994,20 @@ def _render_explain_memory(identifier: str):
 def _render_graph(query: dict[str, list[str]] | None = None):
     query = query or {}
     focus = _query_text(query, "focus", "page", "node", max_len=300)
+    graph_search = _query_text(query, "q", "search", max_len=200)
+    graph_category = _query_text(query, "type", "category", max_len=80) or "all"
     focus_depth, focus_depth_error = _core_parse_bounded_int(query.get("depth", ["2"])[0], "depth", 2, 0, 3)
     if focus_depth_error:
         focus_depth = 2
     assert focus_depth is not None
     full_graph = _get_graph_data()
     summary_graph = None
-    if focus:
+    summary_topic = focus or graph_search
+    if summary_topic:
         summary = _get_graph_summary(
-            topic=focus,
+            topic=summary_topic,
             limit=_core_graph_initial_summary_node_limit,
-            depth=focus_depth,
+            depth=focus_depth if focus else 1,
             max_edges=_core_graph_initial_summary_edge_limit,
         )
         summary_graph = {
@@ -1047,6 +1050,8 @@ def _render_graph(query: dict[str, list[str]] | None = None):
         graph_mode_json=_json_for_script(graph_mode),
         focus_id_json=_json_for_script(focus or None),
         focus_depth=focus_depth,
+        search_json=_json_for_script(graph_search),
+        category_json=_json_for_script(graph_category),
         total_node_count=total_node_count,
         total_edge_count=total_edge_count,
     )
@@ -1063,6 +1068,8 @@ def _render_graph(query: dict[str, list[str]] | None = None):
         legend_items=_core_graph_legend_items(cat_colors),
         focus_label=focus,
         focus_depth=focus_depth,
+        search_label=graph_search,
+        category_label=graph_category,
     )
     return _layout("Knowledge Graph", body, page_class="graph-page")
 
