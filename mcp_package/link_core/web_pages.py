@@ -16,6 +16,7 @@ def render_wiki_page(
     meta: Mapping[str, object],
     body_html: str,
     layout: PageLayout,
+    graph_href: str = "",
 ) -> str:
     """Render a single wiki page shell around already-rendered Markdown."""
     crumb = '<div class="breadcrumb"><a href="/">Link</a>'
@@ -23,7 +24,14 @@ def render_wiki_page(
         crumb += f" / {html.escape(category)}"
     crumb += f" / {html.escape(title)}</div>"
     meta_line = render_page_meta_line(meta)
-    return layout(title, crumb + meta_line + body_html)
+    graph_action = ""
+    if graph_href:
+        graph_action = (
+            '<div class="page-actions">'
+            f'<a class="button-link" href="{html.escape(graph_href, quote=True)}">Open local graph</a>'
+            "</div>"
+        )
+    return layout(title, crumb + meta_line + graph_action + body_html)
 
 
 def render_page_meta_line(meta: Mapping[str, object]) -> str:

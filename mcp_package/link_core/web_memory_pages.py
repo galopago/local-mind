@@ -266,6 +266,8 @@ def render_memory_explanation_page(
     lifecycle = _mapping(explanation.get("lifecycle"))
     graph = _mapping(explanation.get("graph"))
     title = str(memory.get("title") or memory.get("name") or "Memory")
+    memory_name = str(memory.get("name") or "")
+    graph_href = f"/graph?focus={urllib.parse.quote(memory_name, safe='')}&depth=2" if memory_name else "/graph"
     summary = memory.get("tldr") or memory.get("snippet") or ""
     issues = "".join(
         f'<li><span class="severity">{html.escape(str(issue.get("severity") or ""))}</span> '
@@ -286,6 +288,7 @@ def render_memory_explanation_page(
     action_html = f'<h2>Actions</h2>{primary_html}{render_memory_action_commands(_dict_list(review.get("actions")))}'
     graph_html = (
         '<h2>Graph</h2>'
+        f'<p><a class="button-link" href="{html.escape(graph_href, quote=True)}">Open local graph</a></p>'
         f'<p><strong>Forward:</strong> {html.escape(", ".join(str(item) for item in _list(graph.get("forward"))) or "none")}</p>'
         f'<p><strong>Inbound:</strong> {html.escape(", ".join(str(item) for item in _list(graph.get("inbound"))) or "none")}</p>'
         f'<p><strong>Wikilinks:</strong> {html.escape(", ".join(str(item) for item in _list(graph.get("wikilinks"))) or "none")}</p>'

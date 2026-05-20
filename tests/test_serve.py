@@ -486,6 +486,19 @@ class ServeTests(unittest.TestCase):
         self.assertIn("var labelX = Math.max(labelWidth / 2 + 4", html)
         self.assertIn("ctx.fillText(label, labelX", html)
 
+    def test_wiki_page_links_to_local_graph(self):
+        wiki = self.make_wiki()
+        page = write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n",
+        )
+
+        html = serve._render_page(page)
+
+        self.assertIn("/graph?focus=agent-memory&amp;depth=2", html)
+        self.assertIn("Open local graph", html)
+
     def test_context_reads_current_backlinks_shape(self):
         wiki = self.make_wiki()
         write_page(
@@ -2135,8 +2148,10 @@ class ServeTests(unittest.TestCase):
         self.assertLess(html.index('id="graph-depth"'), html.index("var depthFilter ="))
         self.assertLess(html.index('id="graph-inspector"'), html.index("var inspector ="))
         self.assertLess(html.index('id="graph-focus"'), html.index("var inspectorFocus ="))
+        self.assertLess(html.index('id="graph-local"'), html.index("var inspectorLocal ="))
         self.assertIn('id="graph-status"', html)
         self.assertIn("Focus neighborhood", html)
+        self.assertIn("Open local graph", html)
         self.assertIn('id="graph-open"', html)
         self.assertIn('tabindex="0"', html)
         self.assertIn('role="img"', html)
@@ -2251,6 +2266,29 @@ class ServeTests(unittest.TestCase):
         self.assertIn("matches > SEARCH_LABEL_LIMIT", html)
         self.assertIn("parts.push('data loaded');", html)
         self.assertIn("parts.push('overview capped');", html)
+
+    def test_graph_route_can_focus_on_page_neighborhood(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n[[link]]\n",
+        )
+        write_page(
+            wiki,
+            "entities/link.md",
+            "---\ntype: entity\ntitle: Link\n---\n# Link\n",
+        )
+        reset_wiki(wiki)
+
+        status, body, headers = run_handler_raw("GET", "/graph?focus=agent-memory&depth=2")
+        html = body.decode("utf-8")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        self.assertIn("Focused on <strong>agent-memory</strong> · depth 2", html)
+        self.assertIn('var initialFocusId = "agent-memory";', html)
+        self.assertIn("var initialFocusDepth = 2;", html)
 
     def test_graph_uses_bounded_initial_payload_for_large_wikis(self):
         wiki = self.make_wiki()

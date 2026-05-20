@@ -205,6 +205,8 @@ def test_render_memory_explanation_page_shows_trust_context_actions_and_body():
     assert "Needs &lt;review&gt;" in html
     assert "Next:</strong> Review" in html
     assert "link forget-memory prefer-reviewable-memory" in html
+    assert "/graph?focus=prefer-reviewable-memory&amp;depth=2" in html
+    assert "Open local graph" in html
     assert "agent-memory" in html
     assert "2026-05-05 remember &lt;memory&gt;" in html
     assert "<p>Trusted body</p>" in html

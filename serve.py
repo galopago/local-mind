@@ -388,6 +388,10 @@ def _page_href(name: str) -> str:
     return "/page/" + urllib.parse.quote(name.strip(), safe="")
 
 
+def _graph_href(name: str, *, depth: int = 2) -> str:
+    return f"/graph?focus={urllib.parse.quote(name.strip(), safe='')}&depth={depth}"
+
+
 def _plural_type_label(page_type: str) -> str:
     return _core_plural_type_label(page_type)
 
@@ -854,7 +858,14 @@ def _render_page(page_path):
 
     rel = page_path.relative_to(WIKI_DIR)
     cat = rel.parts[0] if len(rel.parts) > 1 else ""
-    return _core_render_wiki_page(str(title), category=cat, meta=meta, body_html=body_html, layout=_layout)
+    return _core_render_wiki_page(
+        str(title),
+        category=cat,
+        meta=meta,
+        body_html=body_html,
+        layout=_layout,
+        graph_href=_graph_href(page_path.stem),
+    )
 
 
 def _render_all(query: dict[str, list[str]] | None = None):
@@ -969,10 +980,27 @@ def _render_explain_memory(identifier: str):
     )
 
 
-def _render_graph():
+def _render_graph(query: dict[str, list[str]] | None = None):
+    query = query or {}
+    focus = _query_text(query, "focus", "page", "node", max_len=300)
+    focus_depth, focus_depth_error = _core_parse_bounded_int(query.get("depth", ["2"])[0], "depth", 2, 0, 3)
+    if focus_depth_error:
+        focus_depth = 2
+    assert focus_depth is not None
     full_graph = _get_graph_data()
     summary_graph = None
-    if _core_graph_needs_bounded_overview(full_graph):
+    if focus:
+        summary = _get_graph_summary(
+            topic=focus,
+            limit=_core_graph_initial_summary_node_limit,
+            depth=focus_depth,
+            max_edges=_core_graph_initial_summary_edge_limit,
+        )
+        summary_graph = {
+            "nodes": summary.get("nodes", []),
+            "edges": summary.get("edges", []),
+        }
+    elif _core_graph_needs_bounded_overview(full_graph):
         summary = _get_graph_summary(
             limit=_core_graph_initial_summary_node_limit,
             depth=1,
@@ -1006,6 +1034,8 @@ def _render_graph():
         edges_json=edges_json,
         cat_colors_json=_json_for_script(cat_colors),
         graph_mode_json=_json_for_script(graph_mode),
+        focus_id_json=_json_for_script(focus or None),
+        focus_depth=focus_depth,
         total_node_count=total_node_count,
         total_edge_count=total_edge_count,
     )
@@ -1020,6 +1050,8 @@ def _render_graph():
         graph_note=graph_note,
         category_options=category_options,
         legend_items=_core_graph_legend_items(cat_colors),
+        focus_label=focus,
+        focus_depth=focus_depth,
     )
     return _layout("Knowledge Graph", body, page_class="graph-page")
 
@@ -1331,7 +1363,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/all":
             self._ok(_render_all(query))
         elif path == "/graph":
-            self._ok(_render_graph())
+            self._ok(_render_graph(query))
         elif path == "/search":
             self._ok(_render_search(_query_text(query, "q")))
         elif path.startswith("/page/"):

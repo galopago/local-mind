@@ -108,9 +108,28 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn("3/10 nodes · 2/20 edges", html)
         self.assertIn('role="img"', html)
         self.assertIn("Focus neighborhood", html)
+        self.assertIn("Open local graph", html)
         self.assertIn("Open page", html)
         self.assertIn("&lt;fast &amp; &quot;bounded&quot;&gt;", html)
         self.assertIn("<script>var resetButton = true;</script>", html)
+
+    def test_render_graph_page_body_includes_focus_note(self):
+        html = render_graph_page_body(
+            graph_js="<script></script>",
+            node_count=3,
+            edge_count=2,
+            total_node_count=3,
+            total_edge_count=2,
+            graph_mode="full",
+            graph_note="",
+            category_options="",
+            legend_items="",
+            focus_label='Memory <One>',
+            focus_depth=2,
+        )
+
+        self.assertIn("Focused on <strong>Memory &lt;One&gt;</strong> · depth 2", html)
+        self.assertIn('<a href="/graph">Clear focus</a>', html)
 
     def test_render_graph_page_body_omits_load_button_for_full_graph(self):
         html = render_graph_page_body(
@@ -133,6 +152,8 @@ class WebGraphCoreTests(unittest.TestCase):
             edges_json='[{"source":"a","target":"b"}]',
             cat_colors_json='{"concepts":"#fff"}',
             graph_mode_json='"summary"',
+            focus_id_json='"a"',
+            focus_depth=2,
             total_node_count=10,
             total_edge_count=20,
         )
@@ -141,9 +162,12 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn('var edges = [{"source":"a","target":"b"}];', script)
         self.assertIn('var catColors = {"concepts":"#fff"};', script)
         self.assertIn('var initialGraphMode = "summary";', script)
+        self.assertIn('var initialFocusId = "a";', script)
+        self.assertIn("var initialFocusDepth = 2;", script)
         self.assertIn("var totalNodeCount = 10;", script)
         self.assertIn("var totalEdgeCount = 20;", script)
         self.assertIn("function visibleNodes()", script)
+        self.assertIn("function graphHref(id, depth)", script)
         self.assertIn("canvas.addEventListener('dblclick'", script)
 
 

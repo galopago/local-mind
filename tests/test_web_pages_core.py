@@ -83,3 +83,17 @@ def test_render_wiki_page_escapes_breadcrumb_and_meta():
     assert "also: &lt;alias&gt;, Link" in html
     assert "<h1>Trusted body</h1>" in html
     assert "<concept>" not in html
+
+
+def test_render_wiki_page_includes_local_graph_action():
+    html = render_wiki_page(
+        "Agent Memory",
+        category="concepts",
+        meta={},
+        body_html="<p>Trusted body</p>",
+        layout=_layout,
+        graph_href='/graph?focus=agent-memory&depth=2',
+    )
+
+    assert '<a class="button-link" href="/graph?focus=agent-memory&amp;depth=2">Open local graph</a>' in html
+    assert "<p>Trusted body</p>" in html

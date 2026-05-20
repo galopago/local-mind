@@ -109,6 +109,8 @@ def render_graph_script(
     edges_json: str,
     cat_colors_json: str,
     graph_mode_json: str,
+    focus_id_json: str = "null",
+    focus_depth: int = 2,
     total_node_count: int,
     total_edge_count: int,
 ) -> str:
@@ -139,6 +141,7 @@ def render_graph_script(
   var inspectorLinks = document.getElementById('graph-inspector-links');
   var inspectorOpen = document.getElementById('graph-open');
   var inspectorFocus = document.getElementById('graph-focus');
+  var inspectorLocal = document.getElementById('graph-local');
   var W, H;
 
   // Compact neural-map sizing: concepts lead, sources recede.
@@ -151,6 +154,8 @@ def render_graph_script(
   var OVERVIEW_NODE_LIMIT = 650;
   var SEARCH_LABEL_LIMIT = 60;
   var initialGraphMode = {graph_mode_json};
+  var initialFocusId = {focus_id_json};
+  var initialFocusDepth = {max(0, min(3, int(focus_depth)))};
   var totalNodeCount = {total_node_count};
   var totalEdgeCount = {total_edge_count};
   var fullGraphLoaded = initialGraphMode === 'full';
@@ -273,6 +278,7 @@ def render_graph_script(
 
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
   function pageHref(id) {{ return '/page/' + encodeURIComponent(id); }}
+  function graphHref(id, depth) {{ return '/graph?focus=' + encodeURIComponent(id) + '&depth=' + encodeURIComponent(String(depth || 2)); }}
   function invalidateFilters() {{ visibleCache = null; }}
   function invalidateSearchCache() {{ cachedSearchTerm = ''; cachedSearchMatches = 0; }}
   function escapeHtml(value) {{
@@ -466,13 +472,14 @@ def render_graph_script(
   }}
 
   function updateInspector() {{
-    if (!inspector || !inspectorTitle || !inspectorMeta || !inspectorLinks || !inspectorOpen || !inspectorFocus) return;
+    if (!inspector || !inspectorTitle || !inspectorMeta || !inspectorLinks || !inspectorOpen || !inspectorFocus || !inspectorLocal) return;
     inspectorLinks.textContent = '';
     if (!selectedNode) {{
       inspectorTitle.textContent = 'Select a node';
       inspectorMeta.textContent = 'Click a node to inspect it. Drag a node to place it. Double-click a node, or use Open page, to navigate.';
       inspectorOpen.disabled = true;
       inspectorFocus.disabled = true;
+      inspectorLocal.disabled = true;
       return;
     }}
     var neighbors = (adj[selectedNode.id] || []).slice().sort(function(a, b) {{
@@ -482,6 +489,7 @@ def render_graph_script(
     inspectorMeta.textContent = selectedNode.category + ' · ' + neighbors.length + ' linked page' + (neighbors.length === 1 ? '' : 's');
     inspectorOpen.disabled = false;
     inspectorFocus.disabled = false;
+    inspectorLocal.disabled = false;
     neighbors.slice(0, 10).forEach(function(id) {{
       var target = nodeById[id];
       var link = document.createElement('a');
@@ -508,6 +516,9 @@ def render_graph_script(
 
   function openNode(node) {{
     if (node) window.location.href = pageHref(node.id);
+  }}
+  function openLocalGraph(node, depth) {{
+    if (node) window.location.href = graphHref(node.id, depth || 2);
   }}
 
   function toScreen(x, y) {{
@@ -803,6 +814,8 @@ def render_graph_script(
   }}
 
   function applyGraphPayload(payload) {{
+    var previousSelectedId = selectedNode ? selectedNode.id : null;
+    var previousDepthValue = depthValue;
     var nextNodes = (payload.nodes || []).filter(function(n) {{ return n.category !== 'root'; }});
     var ids = {{}};
     nextNodes.forEach(function(n) {{ ids[n.id] = true; }});
@@ -814,11 +827,11 @@ def render_graph_script(
     fullGraphLoaded = true;
     fullGraphLoading = false;
     pinned = {{}};
-    selectedNode = null;
-    hoverNode = null;
-    depthValue = 'all';
-    if (depthFilter) depthFilter.value = 'all';
     rebuildGraphIndexes();
+    selectedNode = previousSelectedId && nodeById[previousSelectedId] ? nodeById[previousSelectedId] : null;
+    hoverNode = selectedNode;
+    depthValue = selectedNode ? previousDepthValue : 'all';
+    if (depthFilter) depthFilter.value = depthValue;
     syncCategoryOptions();
     seedMissingPositions();
     invalidateSearchCache();
@@ -832,6 +845,20 @@ def render_graph_script(
       loadFullButton.disabled = true;
       loadFullButton.textContent = 'Graph data loaded';
     }}
+  }}
+
+  function applyInitialFocus() {{
+    if (!initialFocusId || !nodeById[initialFocusId]) return;
+    selectedNode = nodeById[initialFocusId];
+    hoverNode = selectedNode;
+    depthValue = String(initialFocusDepth || 2);
+    if (depthFilter) depthFilter.value = depthValue;
+    invalidateFilters();
+    reseedVisiblePositions();
+    frame = SETTLE;
+    fitted = true;
+    autoFit();
+    updateInspector();
   }}
 
   function loadFullGraph() {{
@@ -994,6 +1021,7 @@ def render_graph_script(
   }});
   if (loadFullButton) loadFullButton.addEventListener('click', loadFullGraph);
   if (inspectorOpen) inspectorOpen.addEventListener('click', function() {{ openNode(selectedNode); }});
+  if (inspectorLocal) inspectorLocal.addEventListener('click', function() {{ openLocalGraph(selectedNode, 2); }});
   if (inspectorFocus) inspectorFocus.addEventListener('click', function() {{
     if (!selectedNode) return;
     depthValue = '1';
@@ -1047,6 +1075,7 @@ def render_graph_script(
   if (motionPaused) {{ reseedVisiblePositions(); autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
   syncCategoryOptions();
+  applyInitialFocus();
   syncLabelsButton();
   updateInspector();
   updateStatus();
@@ -1079,6 +1108,8 @@ def render_graph_page_body(
     graph_note: str,
     category_options: str,
     legend_items: str,
+    focus_label: str = "",
+    focus_depth: int = 2,
 ) -> str:
     """Render the graph page shell around the browser simulation script."""
     load_full_button = ""
@@ -1087,6 +1118,14 @@ def render_graph_page_body(
             '<button id="graph-load-full" type="button">'
             f"Load graph data ({total_node_count} nodes)</button>"
         )
+    focus_html = ""
+    if focus_label:
+        focus_html = (
+            '<p class="graph-focus-note">'
+            f'Focused on <strong>{html.escape(focus_label)}</strong> · depth {html.escape(str(focus_depth))}. '
+            '<a href="/graph">Clear focus</a>'
+            "</p>"
+        )
 
     return (
         '<div class="breadcrumb"><a href="/">Link</a> / graph</div>'
@@ -1094,6 +1133,7 @@ def render_graph_page_body(
         '<p class="meta">For large wikis, use fullscreen, zoom, pan, and sparse labels. '
         "The graph is for exploring neighborhoods, not reading every label at once."
         f"{html.escape(graph_note)}</p>"
+        f"{focus_html}"
         '<section id="graph-frame" class="graph-frame">'
         '<div class="graph-toolbar" aria-label="Graph controls">'
         '<button id="graph-reset" type="button">Reset</button>'
@@ -1120,6 +1160,7 @@ def render_graph_page_body(
         "Double-click a node, or use Open page, to navigate.</p>"
         '<div id="graph-inspector-links" class="graph-inspector-links"></div>'
         '<button id="graph-focus" type="button" disabled>Focus neighborhood</button>'
+        '<button id="graph-local" type="button" disabled>Open local graph</button>'
         '<button id="graph-open" type="button" disabled>Open page</button>'
         "</aside>"
         "</div>"

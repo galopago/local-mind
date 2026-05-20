@@ -135,6 +135,9 @@ header .theme-text { white-space: nowrap; }
 
 .meta { font-size: 13px; color: var(--muted); margin-bottom: 16px; font-family: sans-serif; }
 .meta .badge { background: var(--surface-muted); padding: 1px 8px; border-radius: 3px; font-size: 12px; }
+.page-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 18px; font-family: sans-serif; font-size: 13px; }
+.button-link { border: 1px solid var(--border); border-radius: 4px; padding: 4px 9px; color: var(--button-text); background: var(--button-bg); text-decoration: none; display: inline-flex; align-items: center; }
+.button-link:hover { background: var(--button-hover); text-decoration: none; }
 
 h1 { font-size: 26px; margin-bottom: 4px; line-height: 1.3; }
 h2 { font-size: 20px; margin-top: 28px; margin-bottom: 10px; border-bottom: 1px solid var(--border-soft); padding-bottom: 4px; }
@@ -167,8 +170,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .page-list li:last-child { border-bottom: none; }
 .page-list .type { font-size: 11px; color: var(--subtle); font-family: sans-serif; margin-left: 6px; }
 .pager { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0; font-family: sans-serif; color: var(--muted); font-size: 13px; }
-.pager .button-link { border: 1px solid var(--border); border-radius: 4px; padding: 4px 9px; color: var(--button-text); background: var(--button-bg); text-decoration: none; }
-.pager .button-link:hover { background: var(--button-hover); }
 .pager .button-link.disabled { color: var(--button-disabled); background: transparent; cursor: default; }
 .section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
                    margin-top: 28px; border-bottom: 1px solid var(--border-soft); }
@@ -300,6 +301,7 @@ mark { background: var(--mark-bg); color: inherit; border-radius: 2px; padding: 
 .graph-frame.is-fullscreen .graph-shell { flex: 1; min-height: 0; }
 .graph-frame.is-fullscreen #graph-canvas { height: 100%; min-height: 0; }
 .graph-frame.is-fullscreen .graph-inspector { max-height: 100%; overflow: auto; }
+.graph-focus-note { border-left: 3px solid var(--accent-soft); padding-left: 10px; color: var(--muted); font-family: sans-serif; font-size: 13px; }
 .graph-shell { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; align-items: stretch; margin: 12px 0; }
 .graph-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
                  margin: 12px 0 8px; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; }
