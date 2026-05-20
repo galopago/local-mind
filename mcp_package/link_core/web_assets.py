@@ -309,6 +309,21 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .prompt-strip p { color: var(--muted); margin-bottom: 10px; }
 .prompt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
 .prompt-grid code { display: block; padding: 8px; background: var(--surface-code); border-radius: 4px; white-space: normal; }
+.health-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 16px 0 18px; font-family: sans-serif; }
+.health-card { border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface); padding: 12px; min-width: 0; }
+.health-card strong,
+.health-card span,
+.health-card small { display: block; overflow-wrap: anywhere; }
+.health-card strong { color: var(--subtle); font-size: 12px; text-transform: uppercase; letter-spacing: 0; }
+.health-card span { color: var(--text-strong); font-size: 18px; font-weight: 700; margin: 5px 0 3px; }
+.health-card small { color: var(--muted); line-height: 1.35; }
+.health-card[data-state="done"] { border-color: var(--success-border); background: var(--success-bg); }
+.health-card[data-state="next"] { border-color: var(--accent-soft); }
+.health-card[data-state="blocked"] { border-color: var(--danger-border); background: var(--danger-bg); }
+.command-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
+.command-list li { border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface); padding: 8px 10px; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.command-list strong { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+.command-list code { flex: 1 1 220px; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .log-entry { white-space: pre-wrap; font-size: 12px; }
 
 mark { background: var(--mark-bg); color: inherit; border-radius: 2px; padding: 0 1px; }

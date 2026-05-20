@@ -36,8 +36,15 @@ def test_render_health_page_shows_readiness_operations_and_commands():
     )
 
     assert "<h1>Health</h1>" in html
+    assert 'aria-label="Health summary"' in html
+    assert '<strong>Readiness</strong><span>needs attention</span><small>12 content pages</small>' in html
+    assert '<strong>Validation</strong><span>failed</span><small>0 errors · 0 warnings</small>' in html
+    assert '<strong>Operations</strong><span>needs review</span><small>1 stale · 0 active</small>' in html
+    assert '<strong>Memory Review</strong><span>1 pending</span><small>2 active memories</small>' in html
     assert "sqlite-fts" in html
     assert "stale_operations" in html
     assert "remember-1.json" in html
+    assert "Operation Next Actions" in html
+    assert 'data-copy-text="link status --validate"' in html
     assert "link operations" in html
     assert "link benchmark &quot;agent memory&quot;" in html
