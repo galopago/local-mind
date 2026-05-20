@@ -26,8 +26,10 @@ def test_render_prompts_page_shows_project_and_commands():
     assert "Ask Your Agent" in html
     assert "Local Checks" in html
     assert "is Link ready?" in html
+    assert 'data-copy-text="is Link ready?"' in html
     assert "Before work" in html
     assert "link status --validate" in html
+    assert 'data-copy-text="link status --validate"' in html
 
 
 def test_render_prompts_page_escapes_payload_fields():
@@ -42,6 +44,7 @@ def test_render_prompts_page_escapes_payload_fields():
     assert "&lt;project&gt;" in html
     assert "&lt;label&gt;" in html
     assert "ingest raw/&lt;file&gt;" in html
+    assert 'data-copy-text="ingest raw/&lt;file&gt;"' in html
     assert "&lt;when&gt;" in html
     assert "link query &#x27;&lt;topic&gt;&#x27;" in html
     assert "<project>" not in html

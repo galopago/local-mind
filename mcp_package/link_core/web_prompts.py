@@ -4,6 +4,8 @@ from __future__ import annotations
 import html
 from collections.abc import Callable, Mapping
 
+from .web_ingest import copy_button
+
 
 PageLayout = Callable[[str, str], str]
 
@@ -16,12 +18,13 @@ def render_prompts_page(payload: Mapping[str, object], *, layout: PageLayout) ->
         prompt_rows += (
             '<article class="proposal-card">'
             f'<h3>{html.escape(str(item.get("label") or "Prompt"))}</h3>'
+            f'{copy_button(item.get("prompt") or "", "Copy prompt")}'
             f'<code class="proposal-command">{html.escape(str(item.get("prompt") or ""))}</code>'
             f'<p class="summary">{html.escape(str(item.get("when") or ""))}</p>'
             "</article>"
         )
     command_rows = "".join(
-        f"<li><code>{html.escape(str(command))}</code></li>"
+        f"<li>{copy_button(command, 'Copy command')}<code>{html.escape(str(command))}</code></li>"
         for command in payload.get("commands", [])
     )
     project_line = (
