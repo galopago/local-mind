@@ -81,6 +81,9 @@ class WebGraphCoreTests(unittest.TestCase):
 
         self.assertIn("Knowledge Graph", html)
         self.assertIn("No graph pages yet.", html)
+        self.assertIn('href="/ingest"', html)
+        self.assertIn('data-copy-text="ingest the new raw Link files"', html)
+        self.assertIn("Copy ingest prompt", html)
         self.assertNotIn('id="graph-canvas"', html)
 
     def test_render_graph_page_body_includes_controls_and_escapes_note(self):

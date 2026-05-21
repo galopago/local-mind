@@ -11,6 +11,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added copyable agent prompts across page, search, ingest, brief, memory dashboard, profile, audit, capture, and inbox views so browser-first users do not need to memorize Link phrasing.
 - Added copy buttons to memory action commands, capture commands, and memory next actions in the local web UI.
 - Added empty-wiki home recovery actions that link to ingest and copy the first ingest prompt.
+- Added graph empty-state recovery actions that link to ingest and copy the first ingest prompt.
 - Added search no-result recovery actions with source-ingest and memory-proposal prompts.
 - Added interactive graph legend chips that filter the graph by page type.
 - Added viewer commands and graph/health URLs to the synthetic large-wiki smoke output so local 10k-page checks are easier to inspect.

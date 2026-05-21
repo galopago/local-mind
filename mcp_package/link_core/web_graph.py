@@ -4,6 +4,8 @@ from __future__ import annotations
 import html
 from typing import Any, Mapping
 
+from .web_ingest import copy_button
+
 
 GRAPH_INITIAL_FULL_NODE_LIMIT = 900
 GRAPH_INITIAL_SUMMARY_NODE_LIMIT = 250
@@ -1279,7 +1281,11 @@ def render_graph_empty_body() -> str:
         "<h1>Knowledge Graph</h1>"
         '<div class="graph-empty">'
         "<strong>No graph pages yet.</strong><br>"
-        "Add sources to <code>raw/</code>, ingest them, then rebuild backlinks."
+        "Add sources, ingest them, then rebuild backlinks."
+        '<div class="page-actions">'
+        '<a class="button-link" href="/ingest">Open ingest</a>'
+        f"{copy_button('ingest the new raw Link files', 'Copy ingest prompt')}"
+        "</div>"
         "</div>"
     )
 
