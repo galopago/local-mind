@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from .frontmatter import parse_frontmatter
+from .mcp_verify import display_command
 from .security import secret_file_scan
 from .wiki import build_backlinks, load_backlinks_index
 
@@ -149,6 +150,23 @@ def _source_page_suggestion(raw_rel: str) -> str:
     stem = Path(raw_rel).stem.lower()
     slug = re.sub(r"[^a-z0-9]+", "-", stem).strip("-") or "source"
     return f"wiki/sources/{slug}.md"
+
+
+def _target_command(command: str, target: str) -> str:
+    if target and target in command:
+        return command
+    parts = command.split()
+    if not parts or parts[0] != "link" or not target:
+        return command
+    if target in parts[1:]:
+        return display_command(parts)
+    return display_command([*parts, target])
+
+
+def _target_commands(commands: object, target: str) -> list[str]:
+    if not isinstance(commands, list):
+        return []
+    return [_target_command(str(command), target) for command in commands if str(command).strip()]
 
 
 def _secret_blocked_items(items: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -479,7 +497,7 @@ def render_ingest_status_text(target: str, status: dict[str, object]) -> str:
     if not status["has_wiki_dir"]:
         lines.append("Missing wiki/ directory")
     if not status["has_raw_dir"] or not status["has_wiki_dir"]:
-        lines.extend(["", "Next:", "  Run an installer or initialize this directory: link init"])
+        lines.extend(["", "Next:", f"  Run an installer or initialize this directory: {_target_command('link init', target)}"])
         return "\n".join(lines)
 
     lines.append(f"Raw files: {status['raw_count']}")
@@ -528,7 +546,7 @@ def render_ingest_status_text(target: str, status: dict[str, object]) -> str:
         agent_prompt = guidance.get("agent_prompt")
         if agent_prompt:
             lines.append(f"  Ask your agent: {agent_prompt}")
-        for command in guidance.get("commands", []):
+        for command in _target_commands(guidance.get("commands", []), target):
             lines.append(f"  Run: {command}")
         notes = guidance.get("notes") or []
         for note in notes[:2]:
@@ -556,7 +574,7 @@ def render_ingest_status_text(target: str, status: dict[str, object]) -> str:
                 lines.append(f"  - {subject} -> {target_page}")
         if post_checks:
             lines.append("  Post-ingest checks:")
-            for check in post_checks[:6]:
+            for check in _target_commands(post_checks[:6], target):
                 lines.append(f"  - {check}")
 
     completion = status.get("completion") if isinstance(status.get("completion"), dict) else {}
@@ -814,6 +832,12 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     payload["guidance"] = build_ingest_guidance(payload)
     payload["plan"] = build_ingest_plan(payload)
     payload["completion"] = build_ingest_completion(payload)
+    guidance = payload.get("guidance") if isinstance(payload.get("guidance"), dict) else {}
+    if guidance:
+        guidance["commands"] = _target_commands(guidance.get("commands"), str(target))
+    plan = payload.get("plan") if isinstance(payload.get("plan"), dict) else {}
+    if plan:
+        plan["post_checks"] = _target_commands(plan.get("post_checks"), str(target))
     return payload
 
 

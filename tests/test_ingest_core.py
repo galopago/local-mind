@@ -46,6 +46,7 @@ class IngestCoreTests(unittest.TestCase):
         (wiki / "_backlinks.json").write_text(json.dumps(build_backlinks(wiki)), encoding="utf-8")
 
         payload = collect_ingest_status(root)
+        resolved_root = str(root.resolve())
 
         self.assertEqual(payload["pending_count"], 1)
         self.assertEqual(payload["pending_raw"][0]["raw"], "raw/new-note.md")
@@ -55,13 +56,16 @@ class IngestCoreTests(unittest.TestCase):
         self.assertEqual(payload["plan"]["title"], "Ingest pending raw sources")
         self.assertEqual(payload["plan"]["batch"][0]["suggested_source_page"], "wiki/sources/new-note.md")
         self.assertEqual(payload["plan"]["memory_prompt"], "propose memories from raw/new-note.md")
-        self.assertIn("link rebuild-index", payload["plan"]["post_checks"])
+        self.assertTrue(any(command.startswith("link rebuild-index ") for command in payload["plan"]["post_checks"]))
+        self.assertIn(resolved_root, "\n".join(payload["plan"]["post_checks"]))
 
         text = render_ingest_status_text(str(root), payload)
         self.assertIn(f"Link ingest status: {root}", text)
         self.assertIn("Raw files: 1", text)
         self.assertIn("Pending raw files:\n- raw/new-note.md", text)
         self.assertIn("Ask your agent: ingest raw/new-note.md into Link", text)
+        self.assertIn(f"Run: link rebuild-index {resolved_root}", text)
+        self.assertIn(f"- link status --validate {resolved_root}", text)
         self.assertIn("Suggested workflow: Ingest pending raw sources", text)
         self.assertIn("Memory review: propose memories from raw/new-note.md", text)
 
