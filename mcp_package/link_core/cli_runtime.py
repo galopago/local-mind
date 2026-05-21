@@ -3,8 +3,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from .mcp_verify import display_command
+
 
 def render_init_text(*, target: object, fixes: Sequence[str]) -> tuple[int, str]:
+    command_target = str(target)
     lines = [f"Link wiki ready at {target}"]
     if fixes:
         lines.extend(["", "Initialized:"])
@@ -12,8 +15,8 @@ def render_init_text(*, target: object, fixes: Sequence[str]) -> tuple[int, str]
     lines.extend([
         "",
         "Next:",
-        "  link status --validate",
-        "  link serve",
+        f"  {display_command(['link', 'status', '--validate', command_target])}",
+        f"  {display_command(['link', 'serve', command_target])}",
         "  Drop sources into raw/ and ask your agent: ingest raw/<file> into Link",
     ])
     return 0, "\n".join(lines)

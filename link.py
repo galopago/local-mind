@@ -1562,18 +1562,24 @@ def create_demo(target: Path, force: bool = False) -> int:
     code, text = _core_render_demo_text(
         target=target,
         guide_path=target / "START_HERE.md",
-        serve_command=_display_command(["python3", "link.py", "serve", str(target)]),
+        serve_command=_display_command(["python3", str(target / "link.py"), "serve", str(target)]),
         query_command=_display_command([
             "python3",
-            "link.py",
+            str(target / "link.py"),
             "query",
             "why does Link help agents?",
             str(target),
             "--budget",
             "small",
         ]),
-        brief_command=_display_command(["python3", "link.py", "brief", "working on agent memory", str(target)]),
-        audit_command=_display_command(["python3", "link.py", "memory-audit", str(target)]),
+        brief_command=_display_command([
+            "python3",
+            str(target / "link.py"),
+            "brief",
+            "working on agent memory",
+            str(target),
+        ]),
+        audit_command=_display_command(["python3", str(target / "link.py"), "memory-audit", str(target)]),
     )
     print(text)
     return code

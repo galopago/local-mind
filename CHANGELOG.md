@@ -26,6 +26,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Updated starter prompt local-check commands to include the explicit Link root so CLI, web, and MCP prompt payloads are paste-safe outside the wiki directory.
 - Updated operation recovery commands to include the explicit Link root for interrupted-write repair flows.
 - Updated health page repair and next-action commands to include the explicit Link root where the page can infer it.
+- Updated init and demo next-step commands so setup guidance remains paste-safe outside the current checkout directory.
 - Updated the CLI product docs with the local large-wiki smoke command and how to inspect the generated fixture.
 - Updated CI to run the full pytest suite rather than the narrower unittest discovery path.
 

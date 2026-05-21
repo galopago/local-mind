@@ -15,7 +15,8 @@ class CliRuntimeCoreTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Link wiki ready at /tmp/link", text)
         self.assertIn("Initialized:", text)
-        self.assertIn("link status --validate", text)
+        self.assertIn("link status --validate /tmp/link", text)
+        self.assertIn("link serve /tmp/link", text)
 
     def test_render_starter_prompts_text(self):
         code, text = render_starter_prompts_text({

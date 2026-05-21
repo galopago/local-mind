@@ -227,6 +227,18 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("link", backlinks["backlinks"])
         self.assertIn("agent-memory", backlinks["forward"]["link"])
 
+    def test_demo_output_uses_copied_runtime_path(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-demo-test-"))
+        target = tmp / "demo"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.create_demo(target)
+
+        self.assertEqual(code, 0)
+        self.assertIn(str(target.resolve() / "link.py"), out.getvalue())
+        self.assertIn(str(target.resolve()), out.getvalue())
+
     def test_demo_refuses_to_overwrite_non_demo_directory(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-demo-test-"))
         target = tmp / "not-demo"
