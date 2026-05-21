@@ -52,6 +52,27 @@ def test_render_brief_page_escapes_query_and_project():
     assert "<task>" not in html
 
 
+def test_render_brief_page_guides_empty_memory_recovery():
+    payload = {
+        "project": "",
+        "profile": {"active_count": 0},
+        "captures": {"count": 0, "items": []},
+        "review": {"count": 0, "items": []},
+        "relevant_count": 0,
+        "agent_guidance": [],
+        "relevant_memories": [],
+    }
+
+    html = render_brief_page(payload, "release notes", page_href=_page_href, action_hints=_action_hints, layout=_layout)
+
+    assert "No relevant memories yet." in html
+    assert "Teach Link before the next brief" in html
+    assert 'href="/ingest"' in html
+    assert 'href="/propose"' in html
+    assert 'data-copy-text="propose memories about release notes from Link raw sources"' in html
+    assert "Copy memory proposal prompt" in html
+
+
 def test_render_memory_dashboard_page_shows_counts_next_actions_and_sections():
     payload = {
         "project": "alpha",

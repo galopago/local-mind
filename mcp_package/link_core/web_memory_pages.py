@@ -52,6 +52,7 @@ def render_brief_page(
         copy_button(f"query Link for {query_prompt}", "Copy query prompt")
         if query_prompt else ""
     )
+    relevant_memories = _dict_list(brief.get("relevant_memories"))
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / brief</div>'
         '<h1>Memory Brief</h1>'
@@ -64,12 +65,29 @@ def render_brief_page(
         f'{_project_line(project)}'
         f'{stats}'
         f'<h2>Agent Guidance</h2><ul>{guidance}</ul>'
-        f'{render_memory_section("Relevant memories", _dict_list(brief.get("relevant_memories")), "No relevant memories yet.", page_href=page_href, action_hints=action_hints)}'
+        f'{render_memory_section("Relevant memories", relevant_memories, "No relevant memories yet.", page_href=page_href, action_hints=action_hints)}'
+        f'{_render_empty_brief_actions(query_prompt) if not relevant_memories else ""}'
         f'{render_memory_section("Review queue", _dict_list(review.get("items")), "No memory review items.", page_href=page_href, action_hints=action_hints, href="/inbox", include_issues=True)}'
         f'{render_capture_section(_dict_list(captures.get("items")))}'
         '</div>'
     )
     return layout("Memory Brief", body)
+
+
+def _render_empty_brief_actions(query: str) -> str:
+    query_text = str(query or "").strip()
+    proposal_prompt = (
+        f"propose memories about {query_text} from Link raw sources"
+        if query_text else "propose memories from Link raw sources"
+    )
+    return (
+        '<div class="memory-next"><strong>Teach Link before the next brief</strong>'
+        "<ul>"
+        '<li><a href="/ingest">Add source material</a> if this context is in notes, docs, or transcripts.</li>'
+        '<li><a href="/propose">Review memory proposals</a> before saving durable memory.</li>'
+        f"<li>{copy_button(proposal_prompt, 'Copy memory proposal prompt')}</li>"
+        "</ul></div>"
+    )
 
 
 def _brief_prompt(query: str, project: str = "") -> str:
