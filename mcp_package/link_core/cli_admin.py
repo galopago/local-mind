@@ -55,6 +55,7 @@ def render_migrate_text(payload: Mapping[str, object], *, wiki_dir: object) -> t
 
 
 def render_status_text(payload: Mapping[str, object], *, wiki_dir: object, version: str) -> tuple[int, str]:
+    command_target = str(_root_from_wiki_dir(wiki_dir))
     lines = [
         f"Link status: {wiki_dir}",
         "",
@@ -104,6 +105,9 @@ def render_status_text(payload: Mapping[str, object], *, wiki_dir: object, versi
             args = action.get("arguments") or {}
             suffix = f" {json.dumps(args, ensure_ascii=False)}" if args else ""
             lines.append(f"- {action['tool']}: {action['label']}{suffix}")
+            command = _status_command_for_action(action, command_target)
+            if command:
+                lines.append(f"  Run: {command}")
     return (0 if payload["ready"] else 1), "\n".join(lines)
 
 
@@ -152,6 +156,48 @@ def _root_from_index_path(index_path: object) -> Path:
     if path.name == "wiki":
         return path.parent
     return path.parent
+
+
+def _root_from_wiki_dir(wiki_dir: object) -> Path:
+    path = Path(str(wiki_dir))
+    return path.parent if path.name == "wiki" else path
+
+
+def _link_command(command_target: str, *parts: str) -> str:
+    command = ["link", *parts]
+    if command_target:
+        command.append(command_target)
+    return display_command(command)
+
+
+def _status_command_for_action(action: Mapping[str, object], command_target: str) -> str:
+    tool = str(action.get("tool") or "").strip()
+    arguments = action.get("arguments") if isinstance(action.get("arguments"), Mapping) else {}
+    if tool == "doctor":
+        return _link_command(command_target, "doctor", "--fix") if arguments.get("fix") else _link_command(
+            command_target, "doctor"
+        )
+    if tool == "migrate_wiki":
+        return _link_command(command_target, "migrate")
+    if tool == "validate_wiki":
+        return _link_command(command_target, "validate")
+    if tool == "rebuild_backlinks":
+        return _link_command(command_target, "rebuild-backlinks")
+    if tool == "ingest_status":
+        return _link_command(command_target, "ingest-status")
+    if tool == "starter_prompts":
+        return _link_command(command_target, "prompts")
+    if tool == "query_link":
+        query = str(arguments.get("query") or "").strip()
+        if not query or query == "<user task>":
+            query = "what should I know before continuing?"
+        return _link_command(command_target, "query", query)
+    if tool == "memory_brief":
+        query = str(arguments.get("query") or "").strip()
+        if not query or query == "<user task>":
+            query = "working with Link"
+        return _link_command(command_target, "brief", query)
+    return ""
 
 
 def render_rebuild_index_text(result: Mapping[str, object], *, index_path: object) -> tuple[int, str]:
