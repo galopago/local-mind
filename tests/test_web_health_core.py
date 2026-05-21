@@ -12,9 +12,11 @@ def _layout(title: str, body: str) -> str:
     return f"<title>{title}</title>{body}"
 
 
-def test_render_health_page_shows_readiness_operations_and_commands():
+def test_render_health_page_shows_readiness_operations_and_commands(tmp_path):
+    wiki = tmp_path / "wiki"
     html = render_health_page(
         {
+            "wiki": str(wiki),
             "ready": False,
             "content_page_count": 12,
             "memory_count": 2,
@@ -27,10 +29,16 @@ def test_render_health_page_shows_readiness_operations_and_commands():
             "next_actions": [{"label": "validate wiki", "tool": "validate_wiki"}],
         },
         {
+            "wiki": str(wiki),
             "operation_count": 1,
             "stale_count": 1,
             "active_count": 0,
-            "next_actions": [{"label": "inspect operation marker files before deleting them", "command": "link operations"}],
+            "next_actions": [
+                {
+                    "label": "inspect operation marker files before deleting them",
+                    "command": f"link operations {tmp_path}",
+                }
+            ],
             "operations": [{"operation": "remember", "description": "Save memory", "marker": "remember-1.json"}],
         },
         layout=_layout,
@@ -48,6 +56,41 @@ def test_render_health_page_shows_readiness_operations_and_commands():
     assert "stale_operations" in html
     assert "remember-1.json" in html
     assert "Operation Next Actions" in html
-    assert 'data-copy-text="link status --validate"' in html
+    assert str(tmp_path) in html
+    assert "link status --validate" in html
     assert "link operations" in html
-    assert "link benchmark &quot;agent memory&quot;" in html
+    assert "link benchmark" in html
+    assert "agent memory" in html
+
+
+def test_render_health_page_maps_ready_actions_to_targeted_commands(tmp_path):
+    wiki = tmp_path / "wiki"
+    html = render_health_page(
+        {
+            "wiki": str(wiki),
+            "ready": True,
+            "content_page_count": 4,
+            "memory_count": 1,
+            "active_memory_count": 1,
+            "needs_review_count": 0,
+            "search_backend": "sqlite-fts",
+            "schema": {"status": "current"},
+            "validation": {"checked": True, "passed": True},
+            "warnings": [],
+            "next_actions": [{"label": "answer with compact local context", "tool": "query_link"}],
+        },
+        {
+            "wiki": str(wiki),
+            "operation_count": 0,
+            "stale_count": 0,
+            "active_count": 0,
+            "next_actions": [],
+            "operations": [],
+        },
+        layout=_layout,
+    )
+
+    assert "Next Safe Action" in html
+    assert "link query" in html
+    assert "what should I know before continuing?" in html
+    assert str(tmp_path) in html

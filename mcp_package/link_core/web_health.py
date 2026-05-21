@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import html
 from collections.abc import Callable, Mapping
+from pathlib import Path
 
+from .mcp_verify import display_command
 from .web_ingest import copy_button
 from .web_layout import render_stat_grid
 
@@ -62,30 +64,60 @@ def _render_operation_actions(operations: Mapping[str, object]) -> str:
     return f'<section><h2>Operation Next Actions</h2><ul class="command-list">{rows}</ul></section>'
 
 
-def _command_for_action(action: Mapping[str, object]) -> str:
+def _command_target(status: Mapping[str, object], operations: Mapping[str, object]) -> str:
+    raw = str(operations.get("wiki") or status.get("wiki") or "").strip()
+    if not raw:
+        return ""
+    path = Path(raw)
+    return str(path.parent if path.name == "wiki" else path)
+
+
+def _link_command(command_target: str, *parts: str) -> str:
+    command = ["link", *parts]
+    if command_target:
+        command.append(command_target)
+    return display_command(command)
+
+
+def _command_for_action(action: Mapping[str, object], command_target: str) -> str:
     command = str(action.get("command") or "").strip()
     if command:
         return command
     tool = str(action.get("tool") or "").strip()
     arguments = action.get("arguments") if isinstance(action.get("arguments"), dict) else {}
     if tool == "doctor":
-        return "link doctor --fix" if arguments.get("fix") else "link doctor"
+        return _link_command(command_target, "doctor", "--fix") if arguments.get("fix") else _link_command(
+            command_target, "doctor"
+        )
     if tool == "validate_wiki":
-        return "link validate"
+        return _link_command(command_target, "validate")
     if tool == "rebuild_backlinks":
-        return "link rebuild-backlinks"
+        return _link_command(command_target, "rebuild-backlinks")
+    if tool == "migrate_wiki":
+        return _link_command(command_target, "migrate")
     if tool == "ingest_status":
-        return "link ingest-status"
+        return _link_command(command_target, "ingest-status")
     if tool == "starter_prompts":
-        return "link prompts"
+        return _link_command(command_target, "prompts")
     if tool == "memory_inbox":
-        return "link memory-inbox"
+        return _link_command(command_target, "memory-inbox")
     if tool == "backup_wiki":
-        return "link backup"
+        return _link_command(command_target, "backup")
+    if tool == "query_link":
+        query = str(arguments.get("query") or "").strip()
+        if not query or query == "<user task>":
+            query = "what should I know before continuing?"
+        return _link_command(command_target, "query", query)
+    if tool == "memory_brief":
+        query = str(arguments.get("query") or "").strip()
+        if not query or query == "<user task>":
+            query = "working with Link"
+        return _link_command(command_target, "brief", query)
     return ""
 
 
 def _render_primary_next_action(status: Mapping[str, object], operations: Mapping[str, object]) -> str:
+    command_target = _command_target(status, operations)
     operation_actions = _dict_list(operations.get("next_actions"))
     status_actions = _dict_list(status.get("next_actions"))
     if operation_actions:
@@ -101,10 +133,10 @@ def _render_primary_next_action(status: Mapping[str, object], operations: Mappin
         label = "Review pending memories"
         detail = "Confirm or archive memories that should not affect recall yet."
     else:
-        action = {"command": "link brief \"working with Link\""}
+        action = {"tool": "memory_brief", "arguments": {"query": "working with Link"}}
         label = "Ready for agent work"
         detail = "Prime the agent with a brief or query Link for project context."
-    command = _command_for_action(action)
+    command = _command_for_action(action, command_target)
     command_html = f"<code>{html.escape(command)}</code>{copy_button(command, 'Copy')}" if command else ""
     return (
         '<section class="health-next">'
@@ -209,12 +241,13 @@ def render_health_page(
     warnings = _dict_list(status.get("warnings"))
     next_actions = _dict_list(status.get("next_actions"))
     operation_items = _dict_list(operations.get("operations"))
+    command_target = _command_target(status, operations)
     commands = [
-        "link status --validate",
-        "link operations",
-        "link doctor --fix",
-        "link validate",
-        "link benchmark \"agent memory\"",
+        _link_command(command_target, "status", "--validate"),
+        _link_command(command_target, "operations"),
+        _link_command(command_target, "doctor", "--fix"),
+        _link_command(command_target, "validate"),
+        _link_command(command_target, "benchmark", "agent memory"),
     ]
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / health</div>'
