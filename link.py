@@ -1307,7 +1307,7 @@ def query(
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
-    code, text = _core_render_query_text(payload, query_text=query_text)
+    code, text = _core_render_query_text(payload, query_text=query_text, command_target=str(target))
     print(text)
     return code
 

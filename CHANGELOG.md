@@ -22,6 +22,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 ### Changed
 
 - Changed large-graph canvas seeding to use deterministic category clusters, with higher-degree pages nearer cluster centers, instead of a single global spiral.
+- Updated CLI query no-context recovery commands to include the explicit Link root so they work from any terminal directory.
 - Updated the CLI product docs with the local large-wiki smoke command and how to inspect the generated fixture.
 - Updated CI to run the full pytest suite rather than the narrower unittest discovery path.
 
