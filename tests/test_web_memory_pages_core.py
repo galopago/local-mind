@@ -137,6 +137,31 @@ def test_render_profile_page_lists_memory_sections_and_explain_links():
     assert "Keep release notes short." in html
 
 
+def test_render_profile_page_guides_first_memory_recovery():
+    payload = {
+        "project": "alpha",
+        "memory_count": 0,
+        "active_count": 0,
+        "review_count": 0,
+        "by_type": {},
+        "by_scope": {},
+        "by_status": {},
+        "recent": [],
+        "preferences": [],
+        "decisions": [],
+        "projects": [],
+        "archived": [],
+    }
+
+    html = render_profile_page(payload, page_href=_page_href, layout=_layout)
+
+    assert "No durable memories yet" in html
+    assert 'href="/ingest"' in html
+    assert 'href="/propose"' in html
+    assert 'data-copy-text="remember that &lt;preference or decision&gt; for project alpha"' in html
+    assert "Copy remember prompt" in html
+
+
 def test_render_memory_audit_page_reports_risks():
     payload = {
         "project": "alpha",

@@ -211,6 +211,7 @@ def render_profile_page(
         f'{_counts_line("Types", _mapping(profile.get("by_type")))}'
         f'{_counts_line("Scopes", _mapping(profile.get("by_scope")))}'
         f'{_counts_line("Status", _mapping(profile.get("by_status")))}'
+        f'{_render_empty_profile_actions(project) if not int(profile.get("memory_count") or 0) else ""}'
         f'{_profile_section("Recent memories", _dict_list(profile.get("recent")), page_href=page_href)}'
         f'{_profile_section("Preferences", _dict_list(profile.get("preferences")), page_href=page_href)}'
         f'{_profile_section("Decisions", _dict_list(profile.get("decisions")), page_href=page_href)}'
@@ -219,6 +220,22 @@ def render_profile_page(
         '</div>'
     )
     return layout("Memory Profile", body)
+
+
+def _render_empty_profile_actions(project: str) -> str:
+    project_name = str(project or "").strip()
+    remember_prompt = (
+        f"remember that <preference or decision> for project {project_name}"
+        if project_name else "remember that <preference or decision>"
+    )
+    return (
+        '<div class="memory-next"><strong>No durable memories yet</strong>'
+        "<ul>"
+        '<li><a href="/ingest">Add source material</a> when the context belongs in the wiki first.</li>'
+        '<li><a href="/propose">Review memory proposals</a> when raw notes contain preferences, decisions, or project facts.</li>'
+        f"<li>{copy_button(remember_prompt, 'Copy remember prompt')}</li>"
+        "</ul></div>"
+    )
 
 
 def render_memory_audit_page(
