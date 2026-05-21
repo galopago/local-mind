@@ -31,6 +31,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Updated rebuild-index follow-up guidance to include the concrete `link.py` runtime and Link root for the next backlinks repair step.
 - Updated ingest UI next-step and validation cards to reuse target-aware commands instead of generic or chained shell snippets.
 - Updated `link status` text output to pair MCP-style next actions with concrete local commands for terminal users.
+- Updated the health page memory-review fallback to copy a target-aware `link memory-inbox` command.
 - Updated the CLI product docs with the local large-wiki smoke command and how to inspect the generated fixture.
 - Updated CI to run the full pytest suite rather than the narrower unittest discovery path.
 

@@ -94,3 +94,35 @@ def test_render_health_page_maps_ready_actions_to_targeted_commands(tmp_path):
     assert "link query" in html
     assert "what should I know before continuing?" in html
     assert str(tmp_path) in html
+
+
+def test_render_health_page_targets_memory_review_command(tmp_path):
+    wiki = tmp_path / "wiki"
+    html = render_health_page(
+        {
+            "wiki": str(wiki),
+            "ready": True,
+            "content_page_count": 4,
+            "memory_count": 1,
+            "active_memory_count": 1,
+            "needs_review_count": 1,
+            "search_backend": "sqlite-fts",
+            "schema": {"status": "current"},
+            "validation": {"checked": True, "passed": True},
+            "warnings": [],
+            "next_actions": [],
+        },
+        {
+            "wiki": str(wiki),
+            "operation_count": 0,
+            "stale_count": 0,
+            "active_count": 0,
+            "next_actions": [],
+            "operations": [],
+        },
+        layout=_layout,
+    )
+
+    assert "Review pending memories" in html
+    assert "link memory-inbox" in html
+    assert str(tmp_path) in html

@@ -129,7 +129,7 @@ def _render_primary_next_action(status: Mapping[str, object], operations: Mappin
         label = str(action.get("label") or action.get("tool") or "Run the next health check")
         detail = str(action.get("description") or action.get("detail") or "Run this before relying on Link.")
     elif int(status.get("needs_review_count") or 0):
-        action = {"command": "link memory-inbox"}
+        action = {"tool": "memory_inbox"}
         label = "Review pending memories"
         detail = "Confirm or archive memories that should not affect recall yet."
     else:
