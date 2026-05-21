@@ -47,6 +47,18 @@ def test_render_search_page_caps_results_and_escapes_content():
     assert "<mark>Link</mark>" in html
 
 
+def test_render_search_page_no_results_guides_recovery():
+    html = render_search_page("meeting notes", [], page_href=lambda name: f"/page/{name}", layout=_layout)
+
+    assert "<p>0 results</p>" in html
+    assert "No matching pages yet" in html
+    assert 'href="/ingest"' in html
+    assert 'data-copy-text="ingest the new raw Link files"' in html
+    assert 'data-copy-text="propose memories about meeting notes from Link raw sources"' in html
+    assert "Copy ingest prompt" in html
+    assert "Copy memory proposal prompt" in html
+
+
 def test_render_search_page_escapes_actions_and_result_hrefs():
     html = render_search_page(
         'agent "memory"',

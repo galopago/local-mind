@@ -52,6 +52,22 @@ def render_search_page(
         f'{copy_button(f"query Link for {query}", "Copy query prompt")}'
         "</div>"
     )
+    if total == 0:
+        ingest_prompt = "ingest the new raw Link files"
+        proposal_prompt = f"propose memories about {query} from Link raw sources"
+        return layout(
+            f"Search: {query}",
+            f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
+            f'<h1>Search: {html.escape(query)}</h1>'
+            "<p>0 results</p>"
+            f"{actions}"
+            '<div class="memory-next"><strong>No matching pages yet</strong>'
+            "<ul>"
+            '<li><a href="/ingest">Add source material</a> for this topic.</li>'
+            f"<li>{copy_button(ingest_prompt, 'Copy ingest prompt')}</li>"
+            f"<li>{copy_button(proposal_prompt, 'Copy memory proposal prompt')}</li>"
+            "</ul></div>",
+        )
     items = "".join(
         f'<li><a href="{html.escape(page_href(str(result["name"])), quote=True)}">'
         f'{highlight_search_term(str(result["title"]), query)}</a>'
