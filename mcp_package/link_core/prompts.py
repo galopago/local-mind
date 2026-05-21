@@ -4,11 +4,19 @@ from __future__ import annotations
 from pathlib import Path
 
 from .memory import default_project_for_target, normalize_project
+from .mcp_verify import display_command
+
+
+def _command_target(target: Path) -> Path:
+    if target.name == "wiki" and (target / "index.md").exists():
+        return target.parent
+    return target
 
 
 def starter_prompt_payload(target: Path, project: str | None = None) -> dict[str, object]:
     """Return natural agent prompts and local checks for a Link user."""
     target = target.expanduser().resolve()
+    command_target = str(_command_target(target))
     project_name = normalize_project(project) if project is not None else default_project_for_target(target)
     remember_prompt = (
         "remember that this project uses Link for local agent memory"
@@ -57,10 +65,10 @@ def starter_prompt_payload(target: Path, project: str | None = None) -> dict[str
         "project": project_name,
         "prompts": prompts,
         "commands": [
-            "link status --validate",
-            "link ingest-status",
-            "link memory-inbox",
-            'link benchmark "agent memory"',
+            display_command(["link", "status", "--validate", command_target]),
+            display_command(["link", "ingest-status", command_target]),
+            display_command(["link", "memory-inbox", command_target]),
+            display_command(["link", "benchmark", "agent memory", command_target]),
         ],
     }
 
@@ -68,6 +76,7 @@ def starter_prompt_payload(target: Path, project: str | None = None) -> dict[str
 def welcome_payload(target: Path, project: str | None = None) -> dict[str, object]:
     """Return a short first-use path for a human trying Link with an agent."""
     starter = starter_prompt_payload(target, project=project)
+    command_target = str(_command_target(target.expanduser().resolve()))
     prompts = [
         item for item in starter.get("prompts", [])
         if isinstance(item, dict)
@@ -90,10 +99,10 @@ def welcome_payload(target: Path, project: str | None = None) -> dict[str, objec
         "project": starter["project"],
         "steps": steps,
         "commands": [
-            "link status --validate",
-            "link serve",
-            "link ingest-status",
-            "link prompts",
+            display_command(["link", "status", "--validate", command_target]),
+            display_command(["link", "serve", command_target]),
+            display_command(["link", "ingest-status", command_target]),
+            display_command(["link", "prompts", command_target]),
         ],
         "urls": [
             "http://127.0.0.1:3000",
