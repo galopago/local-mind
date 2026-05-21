@@ -15,6 +15,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added empty memory-brief recovery actions that link to ingest/proposal review and copy a proposal prompt.
 - Added empty memory-profile recovery actions that link to ingest/proposal review and copy a remember prompt.
 - Added search no-result recovery actions with source-ingest and memory-proposal prompts.
+- Added CLI query no-context recovery steps for ingest status, raw source ingest, and rerunning the query.
 - Added interactive graph legend chips that filter the graph by page type.
 - Added viewer commands and graph/health URLs to the synthetic large-wiki smoke output so local 10k-page checks are easier to inspect.
 

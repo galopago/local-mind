@@ -11,6 +11,13 @@ def render_query_text(payload: Mapping[str, object], *, query_text: str) -> tupl
         if payload.get("error"):
             lines.append(f"Error: {payload['error']}")
             return 1, "\n".join(lines)
+        lines.extend([
+            "",
+            "Next:",
+            "- Add source material under raw/ and ask your agent: ingest the new raw Link files",
+            "- Run: link ingest-status",
+            f"- Then rerun: link query {json.dumps(query_text)}",
+        ])
         return 0, "\n".join(lines)
 
     lines = [f"Link context packet: {payload['query']}"]

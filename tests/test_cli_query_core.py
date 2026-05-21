@@ -12,6 +12,10 @@ class CliQueryCoreTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("No Link context found for: missing", text)
+        self.assertIn("Next:", text)
+        self.assertIn("ingest the new raw Link files", text)
+        self.assertIn("Run: link ingest-status", text)
+        self.assertIn('Then rerun: link query "missing"', text)
 
     def test_render_query_error(self):
         code, text = render_query_text({"found": False, "error": "cache failed"}, query_text="missing")
