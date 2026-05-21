@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from pathlib import Path
+
+from .mcp_verify import display_command
 
 
 def render_validate_text(payload: Mapping[str, object], *, wiki_dir: object) -> tuple[int, str]:
@@ -141,11 +144,24 @@ def render_rebuild_backlinks_text(*, out_path: object, page_count: int, edge_cou
     ])
 
 
+def _root_from_index_path(index_path: object) -> Path:
+    path = Path(str(index_path))
+    if path.name == "index.md":
+        wiki_dir = path.parent
+        return wiki_dir.parent if wiki_dir.name == "wiki" else wiki_dir
+    if path.name == "wiki":
+        return path.parent
+    return path.parent
+
+
 def render_rebuild_index_text(result: Mapping[str, object], *, index_path: object) -> tuple[int, str]:
+    root = _root_from_index_path(index_path)
+    link_py = root / "link.py"
+    rebuild_command = display_command(["python3", str(link_py), "rebuild-backlinks", str(root)])
     return 0, "\n".join([
         f"Rebuilt {index_path}",
         f"Pages: {result['page_count']}",
         f"Sources: {result['source_count']}",
         f"Memories: {result['memory_count']}",
-        "Next: run python3 link.py rebuild-backlinks before validation",
+        f"Next: run {rebuild_command} before validation",
     ])

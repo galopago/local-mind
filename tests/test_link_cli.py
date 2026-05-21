@@ -2157,7 +2157,8 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(backlinks_code, 0)
         self.assertEqual(doctor_code, 0)
         self.assertIn("Rebuilt", out.getvalue())
-        self.assertIn("rebuild-backlinks before validation", out.getvalue())
+        self.assertIn("rebuild-backlinks", out.getvalue())
+        self.assertIn(str(target.resolve()), out.getvalue())
         self.assertIn("[[agent-memory]]", index_text)
         self.assertIn("[[prefer-local-personal-memory]]", index_text)
 

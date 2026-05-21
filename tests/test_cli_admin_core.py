@@ -114,7 +114,7 @@ class CliAdminCoreTests(unittest.TestCase):
         self.assertEqual(backlinks_code, 0)
         self.assertIn("Edges: 3", backlinks_text)
         self.assertEqual(index_code, 0)
-        self.assertIn("Next: run python3 link.py rebuild-backlinks before validation", index_text)
+        self.assertIn("Next: run python3 /tmp/link/link.py rebuild-backlinks /tmp/link before validation", index_text)
 
 
 if __name__ == "__main__":

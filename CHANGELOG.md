@@ -28,6 +28,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Updated health page repair and next-action commands to include the explicit Link root where the page can infer it.
 - Updated init and demo next-step commands so setup guidance remains paste-safe outside the current checkout directory.
 - Updated ingest guidance commands and post-checks to include the explicit Link root across CLI, JSON, web, and MCP payloads.
+- Updated rebuild-index follow-up guidance to include the concrete `link.py` runtime and Link root for the next backlinks repair step.
 - Updated the CLI product docs with the local large-wiki smoke command and how to inspect the generated fixture.
 - Updated CI to run the full pytest suite rather than the narrower unittest discovery path.
 
