@@ -116,6 +116,31 @@ def test_render_ingest_page_shows_completion_with_page_links():
     assert "brief me from Link before we continue" in html
 
 
+def test_render_ingest_page_targets_next_step_commands():
+    payload = {
+        "target": "/tmp/link",
+        "raw_count": 0,
+        "represented_count": 0,
+        "pending_count": 0,
+        "stale_count": 0,
+        "backlinks_status": "current",
+        "guidance": {
+            "state": "empty",
+            "summary": "Link is ready, but raw/ has no source files yet.",
+            "commands": ["link ingest-status /tmp/link"],
+        },
+        "safety": {"status": "clear", "summary": "No warnings.", "labels": []},
+        "pending_raw": [],
+        "represented_raw": [],
+        "plan": {"state": "empty", "title": "Add first sources", "steps": [], "batch": [], "post_checks": []},
+    }
+
+    html = render_ingest_page(payload, page_href=_page_href, layout=_layout)
+
+    assert 'data-copy-text="link ingest-status /tmp/link"' in html
+    assert "<code>link validate /tmp/link</code>" in html
+
+
 def test_render_ingest_page_blocks_secret_raw_without_proposal_link():
     payload = {
         "raw_count": 1,

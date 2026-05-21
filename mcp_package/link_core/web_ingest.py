@@ -5,6 +5,7 @@ import html
 import urllib.parse
 from collections.abc import Callable, Mapping
 
+from .mcp_verify import display_command
 from .web_layout import render_stat_grid
 
 
@@ -36,6 +37,7 @@ def render_ingest_page(
     memory_prompt = str(plan.get("memory_prompt") or f"propose memories from {first_raw}")
     propose_href = "/propose?source=" + urllib.parse.quote(first_raw) if pending else "/propose"
     state = str(guidance.get("state") or plan.get("state") or "unknown")
+    command_target = str(status.get("target") or "").strip()
 
     stats = render_stat_grid([
         (int(status.get("raw_count") or 0), "raw"),
@@ -50,12 +52,19 @@ def render_ingest_page(
     actions = _render_actions(agent_prompt, commands)
     next_html, ingest_prompt, optional_memory_html = _render_next_step(
         agent_prompt=agent_prompt,
+        commands=commands,
+        command_target=command_target,
         state=state,
         first_raw=first_raw,
         propose_href=propose_href,
         memory_prompt=memory_prompt,
     )
-    guide_html = _render_guide(first_raw, ingest_prompt, optional_memory_html)
+    guide_html = _render_guide(
+        first_raw,
+        ingest_prompt,
+        optional_memory_html,
+        validate_command=_link_command(command_target, "validate"),
+    )
     pending_html = _render_pending(pending, represented)
     notes_html = _render_notes(notes)
     source_warning_html = _render_source_warnings(_dict_list(status.get("source_read_warnings")))
@@ -161,6 +170,8 @@ def _render_actions(agent_prompt: str, commands: list[object]) -> str:
 def _render_next_step(
     *,
     agent_prompt: str,
+    commands: list[object],
+    command_target: str,
     state: str,
     first_raw: str,
     propose_href: str,
@@ -183,23 +194,23 @@ def _render_next_step(
         next_extra = ""
     elif state == "blocked_source_access":
         next_detail = "Fix source page access before relying on ingest state. Link could not inspect represented source pages."
-        next_code = "link ingest-status"
+        next_code = _first_command(commands, _link_command(command_target, "ingest-status"))
         next_extra = ""
     elif state == "stale_graph":
-        next_detail = "Repair the graph index before relying on search, context, or the graph view."
-        next_code = "link rebuild-backlinks && link validate"
+        next_detail = "Repair the graph index before relying on search, context, or the graph view. Run the remaining checks below after this step."
+        next_code = _first_command(commands, _link_command(command_target, "rebuild-backlinks"))
         next_extra = ""
     elif state == "empty":
         next_detail = "Add a note, article, transcript, or project file to raw/, then refresh this page."
-        next_code = "cp notes.md raw/ && link ingest-status"
+        next_code = _link_command(command_target, "ingest-status")
         next_extra = ""
     elif state == "ready":
         next_detail = "No ingest is pending. Ask Link for context, or add another source when there is new material."
-        next_code = 'link brief "current task"'
+        next_code = _link_command(command_target, "brief", "current task")
         next_extra = ""
     else:
         next_detail = "Initialize or repair the Link folder before ingesting sources."
-        next_code = "link init && link status --validate"
+        next_code = _first_command(commands, _link_command(command_target, "init"))
         next_extra = ""
 
     ingest_prompt = agent_prompt or f"ingest {first_raw} into Link"
@@ -226,7 +237,7 @@ def _render_next_step(
     return next_html, ingest_prompt, optional_memory_html
 
 
-def _render_guide(first_raw: str, ingest_prompt: str, optional_memory_html: str) -> str:
+def _render_guide(first_raw: str, ingest_prompt: str, optional_memory_html: str, *, validate_command: str) -> str:
     return (
         '<section class="ingest-path" aria-label="Ingest path">'
         '<article class="ingest-step"><span class="step-num">1</span>'
@@ -237,12 +248,27 @@ def _render_guide(first_raw: str, ingest_prompt: str, optional_memory_html: str)
         f'<code>{html.escape(ingest_prompt)}</code></article>'
         '<article class="ingest-step"><span class="step-num">3</span>'
         '<h3>Validate</h3><p>Check page shape, links, and graph freshness before relying on the result.</p>'
-        '<code>link validate</code></article>'
+        f'<code>{html.escape(validate_command)}</code></article>'
         '<article class="ingest-step"><span class="step-num">4</span>'
         '<h3>Optional memory</h3><p>Only save preferences, decisions, or project facts after approval.</p>'
         f'{optional_memory_html}</article>'
         '</section>'
     )
+
+
+def _first_command(commands: list[object], fallback: str) -> str:
+    for command in commands:
+        text = str(command or "").strip()
+        if text:
+            return text
+    return fallback
+
+
+def _link_command(command_target: str, *parts: str) -> str:
+    command = ["link", *parts]
+    if command_target:
+        command.append(command_target)
+    return display_command(command)
 
 
 def _render_pending(pending: list[dict[str, object]], represented: list[dict[str, object]]) -> str:
