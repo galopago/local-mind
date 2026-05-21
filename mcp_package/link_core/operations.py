@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .files import atomic_write_json
+from .mcp_verify import display_command
 
 OPERATION_DIR_NAME = ".link-operations"
 DEFAULT_STALE_AFTER_SECONDS = 10 * 60
@@ -173,31 +174,32 @@ def operation_report(
     stale_count = sum(1 for item in operations if item.get("stale"))
     failed_count = sum(1 for item in operations if str(item.get("status") or "") == "failed")
     active_count = len(operations) - stale_count
+    command_target = str(wiki_dir.parent if wiki_dir.name == "wiki" else wiki_dir)
     next_actions: list[dict[str, object]] = []
     if stale_count:
         next_actions.extend([
             {
                 "label": "inspect operation marker files before deleting them",
-                "command": "link operations",
+                "command": display_command(["link", "operations", command_target]),
             },
             {
                 "label": "validate wiki structure after reviewing interrupted writes",
-                "command": "link validate",
+                "command": display_command(["link", "validate", command_target]),
             },
             {
                 "label": "repair generated indexes if validation reports stale graph data",
-                "command": "link doctor --fix",
+                "command": display_command(["link", "doctor", "--fix", command_target]),
             },
         ])
     elif active_count:
         next_actions.append({
             "label": "wait for the active Link write to finish, then rerun this command",
-            "command": "link operations",
+            "command": display_command(["link", "operations", command_target]),
         })
     else:
         next_actions.append({
             "label": "continue using Link normally",
-            "command": "link status --validate",
+            "command": display_command(["link", "status", "--validate", command_target]),
         })
     return {
         "wiki": str(wiki_dir),
