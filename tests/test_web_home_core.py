@@ -67,4 +67,6 @@ def test_render_home_page_handles_empty_wiki():
     html = render_home_page([], starter_prompts={"prompts": []}, page_href=lambda name: f"/page/{name}", layout=_layout)
 
     assert "Wiki is empty" in html
-    assert "<code>raw/</code>" in html
+    assert 'href="/ingest"' in html
+    assert 'data-copy-text="ingest the new raw Link files"' in html
+    assert "Copy ingest prompt" in html

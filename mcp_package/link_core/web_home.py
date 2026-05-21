@@ -4,6 +4,8 @@ from __future__ import annotations
 import html
 from collections.abc import Callable, Mapping, Sequence
 
+from .web_ingest import copy_button
+
 
 PageHref = Callable[[str], str]
 PageLayout = Callable[[str, str], str]
@@ -60,7 +62,13 @@ def _render_page_sections(pages: Sequence[dict[str, object]], *, page_href: Page
         categories.setdefault(category, []).append(page)
 
     if not categories:
-        return "<p>Wiki is empty. Drop sources into <code>raw/</code> and tell your agent to ingest them.</p>"
+        return (
+            '<div class="memory-next"><strong>Wiki is empty</strong>'
+            "<ul>"
+            '<li><a href="/ingest">Add the first raw source</a>.</li>'
+            f"<li>{copy_button('ingest the new raw Link files', 'Copy ingest prompt')}</li>"
+            "</ul></div>"
+        )
 
     sections = ""
     for category in sorted(categories):
