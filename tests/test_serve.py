@@ -2400,11 +2400,11 @@ class ServeTests(unittest.TestCase):
         self.assertIn("var totalNodeCount = 920;", html)
         self.assertIn("250/920 nodes", html)
         self.assertIn("fast overview", html)
-        self.assertIn("Load full data (920 nodes)", html)
+        self.assertIn("Load all data (920 nodes)", html)
         self.assertIn("var loadFullButton = document.getElementById('graph-load-full');", html)
         self.assertIn("function loadFullGraph()", html)
         self.assertIn("fetch('/api/graph')", html)
-        self.assertIn("Full data loaded; overview capped", html)
+        self.assertIn("All data ready; overview capped", html)
 
     def test_graph_labels_are_sparse_for_large_visible_sets(self):
         wiki = self.make_wiki()
