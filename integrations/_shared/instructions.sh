@@ -43,7 +43,7 @@ link_print_next_steps() {
     if [ "$mode" = "--project" ]; then
         echo "  Drop sources into raw/."
         echo "  View wiki: python3 link.py serve"
-        echo "  Print starter prompts: python3 link.py prompts"
+        echo "  Print starter prompts: python3 link.py next"
         echo "  Try in your agent:"
         echo "    is Link ready?"
         echo "    brief me from Link before we continue"
@@ -53,7 +53,7 @@ link_print_next_steps() {
     else
         echo "  Drop sources into ~/link/raw/."
         echo "  View wiki: link serve"
-        echo "  Print starter prompts: link prompts"
+        echo "  Print starter prompts: link next"
         echo "  Try in your agent:"
         echo "    is Link ready?"
         echo "    brief me from Link before we continue"

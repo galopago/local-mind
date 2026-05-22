@@ -4,7 +4,7 @@ This project has a Link wiki. Raw sources live in `raw/`, compiled wiki pages in
 
 If you are unsure whether this project Link wiki is ready, use MCP `link_status` when available, or run `python3 link.py status --validate`.
 
-If the user asks what to try after installing Link, use MCP `starter_prompts` when available, or run `python3 link.py prompts`.
+If the user asks what to try after installing Link, use MCP `starter_prompts` when available, or run `python3 link.py next`.
 
 If status reports a missing or old schema marker, use MCP `migrate_wiki` when available, or run `python3 link.py migrate`, before other writes.
 

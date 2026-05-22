@@ -31,6 +31,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Clarified graph controls so large wikis say "load all data" for search/filtering instead of implying the canvas renders every node.
 - Added persistent-cache state to status payloads, CLI status output, and the local health page.
 - Updated docs to explain persistent-cache reuse in status, benchmark, health, and slow-wiki troubleshooting flows.
+- Updated installer and agent-instruction next steps to point at `link next`.
 
 ### Changed
 

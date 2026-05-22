@@ -55,6 +55,8 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('if [ "$mode" = "--project" ]; then', instructions)
         self.assertIn("View wiki: python3 link.py serve", instructions)
         self.assertIn("View wiki: link serve", instructions)
+        self.assertIn("Print starter prompts: python3 link.py next", instructions)
+        self.assertIn("Print starter prompts: link next", instructions)
         self.assertIn("Try in your agent:", instructions)
         self.assertIn("is Link ready?", instructions)
         self.assertIn("brief me from Link before we continue", instructions)
