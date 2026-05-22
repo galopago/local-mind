@@ -53,7 +53,6 @@ macOS with Homebrew:
 ```bash
 brew install gowtham0992/link/link
 link demo
-link welcome link-demo
 link next link-demo
 link serve link-demo
 ```
@@ -64,7 +63,6 @@ Windows or source checkout:
 git clone https://github.com/gowtham0992/link.git
 cd link
 py link.py demo
-py link.py welcome link-demo
 py link.py next link-demo
 py link.py serve link-demo
 ```
@@ -75,7 +73,6 @@ Or from source:
 git clone https://github.com/gowtham0992/link.git
 cd link
 python3 link.py demo
-python3 link.py welcome link-demo
 python3 link.py next link-demo
 python3 link.py serve link-demo
 ```
@@ -91,6 +88,8 @@ http://127.0.0.1:3000/health
 The web viewer is for local use only. It binds to `127.0.0.1`, has no user
 accounts or authentication, and should not be exposed to the internet unless you
 add your own auth layer.
+
+For the shortest guided proof path, run `link welcome link-demo`.
 
 Try the value loop:
 
