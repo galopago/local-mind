@@ -100,6 +100,8 @@ link status --validate link-demo
 
 The `/health` page mirrors the readiness loop in the browser: validation state,
 interrupted writes, memory review status, and copyable repair commands.
+The viewer itself stays document-first: common paths are in the top nav, deeper
+tools live under `more`, and structured wiki pages get a local contents outline.
 
 From a source checkout, use `python3 link.py ...`:
 
@@ -134,7 +136,7 @@ local Markdown wiki.
   <tr>
     <td width="33%">
       <strong>Web UI</strong><br>
-      Review memory, ingest, graph, audits, captures, and explanations in a local viewer.<br><br>
+      Read the local wiki, then review memory, ingest, graph, audits, captures, and explanations.<br><br>
       <a href="https://gowtham0992.github.io/link/ui.html"><img src="docs/assets/link-ui-tour.gif" alt="Link web UI walkthrough" width="270"></a>
     </td>
     <td width="33%">
