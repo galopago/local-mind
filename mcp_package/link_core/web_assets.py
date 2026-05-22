@@ -206,8 +206,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .catalog-summary p { margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.4; }
 .catalog-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .catalog-chip { border: 1px solid var(--border-soft); border-radius: 999px; padding: 3px 8px;
-                color: var(--muted); font-size: 12px; background: var(--surface-muted); }
+                color: var(--muted); font-size: 12px; background: var(--surface-muted); text-decoration: none; }
 .catalog-chip strong { color: var(--text-strong); margin-right: 5px; }
+.catalog-chip:hover,
+.catalog-chip.active { border-color: var(--accent-soft); color: var(--text-strong); text-decoration: none; }
 .page-groups { display: grid; gap: 4px; margin-top: 6px; }
 .page-group h2 { font-size: 15px; margin: 18px 0 2px; padding-bottom: 4px; font-family: sans-serif;
                  color: var(--text-strong); text-transform: lowercase; }

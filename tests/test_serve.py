@@ -208,13 +208,19 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn("All Pages (302)", html)
         self.assertIn("Showing 26-50 of 302", html)
-        self.assertIn("/all?limit=25&amp;offset=0", html)
+        self.assertIn('href="/all?limit=25">Previous</a>', html)
         self.assertIn("/all?limit=25&amp;offset=50", html)
         self.assertIn("Topic 023", html)
         self.assertNotIn("Topic 299", html)
         self.assertIn("catalog-summary", html)
-        self.assertIn('<span class="catalog-chip"><strong>concept</strong>300</span>', html)
+        self.assertIn('<a class="catalog-chip" href="/all?limit=25&amp;type=concept"><strong>concept</strong>300</a>', html)
         self.assertIn("<h2>concept <span>25</span></h2>", html)
+
+        filtered = serve._render_all({"limit": ["25"], "type": ["concept"]})
+
+        self.assertIn("All Pages / concept (300)", filtered)
+        self.assertIn('<a class="catalog-chip active" href="/all?limit=25&amp;type=concept"><strong>concept</strong>300</a>', filtered)
+        self.assertNotIn("Link Test Wiki Index", filtered)
 
     def test_security_headers_include_api_version(self):
         handler = object.__new__(serve.Handler)

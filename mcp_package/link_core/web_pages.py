@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import re
+import urllib.parse
 from collections.abc import Callable, Mapping, Sequence
 
 from .web_ingest import copy_button
@@ -125,16 +126,26 @@ def render_all_pages(
     layout: PageLayout,
     error: str = "",
     type_counts: Mapping[str, int] | None = None,
+    active_type: str = "",
 ) -> str:
     """Render the paginated all-pages view."""
-    controls = render_page_controls(total=total, limit=limit, offset=offset)
+    controls = render_page_controls(total=total, limit=limit, offset=offset, active_type=active_type)
     warning = f'<p class="error">{html.escape(error)}</p>' if error else ""
-    summary = render_page_catalog_summary(total=total, visible=len(pages), type_counts=type_counts)
+    summary = render_page_catalog_summary(
+        total=total,
+        visible=len(pages),
+        type_counts=type_counts,
+        active_type=active_type,
+        limit=limit,
+    )
     groups = render_page_groups(pages, page_href=page_href)
+    heading = "All Pages"
+    if active_type:
+        heading += f" / {active_type}"
     return layout(
         "All Pages",
         '<div class="breadcrumb"><a href="/">Link</a> / all pages</div>'
-        f"<h1>All Pages ({total})</h1>{warning}{summary}{controls}{groups}{controls}",
+        f"<h1>{html.escape(heading)} ({total})</h1>{warning}{summary}{controls}{groups}{controls}",
     )
 
 
@@ -143,21 +154,34 @@ def render_page_catalog_summary(
     total: int,
     visible: int,
     type_counts: Mapping[str, int] | None = None,
+    active_type: str = "",
+    limit: int = 250,
 ) -> str:
     """Render a compact type summary for the all-pages catalog."""
     if not type_counts:
         return ""
+    all_class = " active" if not active_type else ""
+    all_chip = (
+        f'<a class="catalog-chip{all_class}" href="{html.escape(_all_pages_href(limit=limit), quote=True)}">'
+        f"<strong>all</strong>{sum(int(count) for count in type_counts.values())}</a>"
+    )
     chips = "".join(
-        f'<span class="catalog-chip"><strong>{html.escape(label)}</strong>{count}</span>'
+        '<a class="catalog-chip{active}" href="{href}"><strong>{label}</strong>{count}</a>'.format(
+            active=" active" if label == active_type else "",
+            href=html.escape(_all_pages_href(limit=limit, page_type=label), quote=True),
+            label=html.escape(label),
+            count=count,
+        )
         for label, count in sorted(
             ((str(label or "root"), int(count)) for label, count in type_counts.items()),
             key=lambda item: (-item[1], item[0]),
         )
     )
+    subject = f"{html.escape(active_type)} pages" if active_type else "pages"
     return (
         '<div class="catalog-summary">'
-        f"<p>Showing {visible} of {total} pages, grouped by page type.</p>"
-        f'<div class="catalog-chips">{chips}</div>'
+        f"<p>Showing {visible} of {total} {subject}, grouped by page type.</p>"
+        f'<div class="catalog-chips">{all_chip}{chips}</div>'
         "</div>"
     )
 
@@ -188,7 +212,7 @@ def render_page_groups(pages: Sequence[dict[str, object]], *, page_href: PageHre
     return '<div class="page-groups">' + "".join(sections) + "</div>"
 
 
-def render_page_controls(*, total: int, limit: int, offset: int) -> str:
+def render_page_controls(*, total: int, limit: int, offset: int, active_type: str = "") -> str:
     """Render previous/next controls for a bounded page window."""
     if total <= limit and offset <= 0:
         return ""
@@ -197,8 +221,8 @@ def render_page_controls(*, total: int, limit: int, offset: int) -> str:
     end = min(offset + limit, total)
     next_offset = offset + limit
     prev_offset = max(0, offset - limit)
-    prev_href = html.escape(f"/all?limit={limit}&offset={prev_offset}", quote=True)
-    next_href = html.escape(f"/all?limit={limit}&offset={next_offset}", quote=True)
+    prev_href = html.escape(_all_pages_href(limit=limit, offset=prev_offset, page_type=active_type), quote=True)
+    next_href = html.escape(_all_pages_href(limit=limit, offset=next_offset, page_type=active_type), quote=True)
     prev_link = (
         f'<a class="button-link" href="{prev_href}">Previous</a>'
         if offset > 0
@@ -210,3 +234,12 @@ def render_page_controls(*, total: int, limit: int, offset: int) -> str:
         else '<span class="button-link disabled">Next</span>'
     )
     return f'<div class="pager"><span>Showing {start}-{end} of {total}</span>{prev_link}{next_link}</div>'
+
+
+def _all_pages_href(*, limit: int, offset: int = 0, page_type: str = "") -> str:
+    params: dict[str, str] = {"limit": str(limit)}
+    if offset:
+        params["offset"] = str(offset)
+    if page_type:
+        params["type"] = page_type
+    return "/all?" + urllib.parse.urlencode(params)

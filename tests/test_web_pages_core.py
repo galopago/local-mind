@@ -59,7 +59,7 @@ def test_render_all_pages_includes_error_and_pagination():
     )
 
     assert "Showing 26-50 of 302" in html
-    assert "/all?limit=25&amp;offset=0" in html
+    assert 'href="/all?limit=25">Previous</a>' in html
     assert "/all?limit=25&amp;offset=50" in html
     assert "Invalid &lt;limit&gt;" in html
     assert "Topic 025" in html
@@ -82,10 +82,34 @@ def test_render_all_pages_groups_visible_pages_by_type():
         type_counts={"concept": 2, "source": 1},
     )
 
-    assert '<span class="catalog-chip"><strong>concept</strong>2</span>' in html
+    assert '<a class="catalog-chip active" href="/all?limit=250"><strong>all</strong>3</a>' in html
+    assert '<a class="catalog-chip" href="/all?limit=250&amp;type=concept"><strong>concept</strong>2</a>' in html
     assert "<h2>concept <span>2</span></h2>" in html
     assert "<h2>source <span>1</span></h2>" in html
     assert html.index("Agent memory") < html.index("Release notes")
+
+
+def test_render_all_pages_marks_active_type_filter_and_preserves_pagination():
+    pages = [
+        {"name": "agent-memory", "title": "Agent memory", "type": "concept", "category": "concepts"},
+    ]
+
+    html = render_all_pages(
+        pages,
+        total=52,
+        limit=25,
+        offset=25,
+        page_href=lambda name: f"/page/{name}",
+        layout=_layout,
+        type_counts={"concept": 52, "source": 10},
+        active_type="concept",
+    )
+
+    assert "All Pages / concept (52)" in html
+    assert "Showing 1 of 52 concept pages" in html
+    assert '<a class="catalog-chip active" href="/all?limit=25&amp;type=concept"><strong>concept</strong>52</a>' in html
+    assert 'href="/all?limit=25&amp;type=concept">Previous</a>' in html
+    assert "/all?limit=25&amp;offset=50&amp;type=concept" in html
 
 
 def test_render_page_catalog_summary_is_empty_without_counts():

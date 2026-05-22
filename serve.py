@@ -897,8 +897,14 @@ def _render_all(query: dict[str, list[str]] | None = None):
     assert limit is not None
     assert offset is not None
     sorted_pages = sorted(pages, key=lambda x: x["title"])
-    window = sorted_pages[offset:offset + limit]
     type_counts = Counter(str(page.get("type") or page.get("category") or "root") for page in sorted_pages)
+    active_type = _query_text(query, "type", "page_type", max_len=80).lower()
+    visible_pages = [
+        page for page in sorted_pages
+        if not active_type or str(page.get("type") or page.get("category") or "root").lower() == active_type
+    ]
+    total = len(visible_pages)
+    window = visible_pages[offset:offset + limit]
     return _core_render_all_pages(
         window,
         total=total,
@@ -908,6 +914,7 @@ def _render_all(query: dict[str, list[str]] | None = None):
         layout=_layout,
         error=error or "",
         type_counts=type_counts,
+        active_type=active_type,
     )
 
 
