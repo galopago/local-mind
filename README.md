@@ -130,8 +130,8 @@ python3 scripts/smoke_large_wiki.py --pages 10000
 ```
 
 This generates a temporary synthetic wiki, verifies bounded graph/query payloads,
-and reports cache, search, query, graph, and health timings without touching your
-real Link wiki.
+and reports cache timing, persistent-cache reuse, search, query, graph, and
+health signals without touching your real Link wiki.
 
 ## Three Ways To Use Link
 

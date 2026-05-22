@@ -83,7 +83,8 @@ python3 link.py query "why does Link help agents?" link-demo --budget small</cod
         <h2 id="slow">The Wiki Feels Slow</h2>
         <pre><code>link benchmark "agent memory"
 link graph-summary "agent memory" --limit 40 --depth 1</code></pre>
-        <p>Large graph views intentionally open bounded first. Use type filters, node search, depth controls, and explicit full-graph load only when you need everything.</p>
+        <p>Large graph views intentionally open bounded first. Use type filters, node search, depth controls, and explicit all-data loading only when you need search or filtering across every page.</p>
+        <p>If <code>link status --validate</code> or <code>link benchmark</code> shows low persistent-cache reuse after repeated runs, inspect recently edited pages or generated files that are changing on every request.</p>
         <p>From a source checkout, use the synthetic smoke script when you want local scale evidence without touching your real wiki:</p>
         <pre><code>python3 scripts/smoke_large_wiki.py --pages 10000</code></pre>
 
