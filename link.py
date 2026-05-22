@@ -1563,6 +1563,7 @@ def create_demo(target: Path, force: bool = False) -> int:
         target=target,
         guide_path=target / "START_HERE.md",
         serve_command=_display_command(["python3", str(target / "link.py"), "serve", str(target)]),
+        next_command=_display_command(["python3", str(target / "link.py"), "next", str(target)]),
         query_command=_display_command([
             "python3",
             str(target / "link.py"),

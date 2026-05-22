@@ -61,6 +61,7 @@ class CliRuntimeCoreTests(unittest.TestCase):
             target="/tmp/link-demo",
             guide_path="/tmp/link-demo/START_HERE.md",
             serve_command="python3 link.py serve /tmp/link-demo",
+            next_command="python3 link.py next /tmp/link-demo",
             query_command="python3 link.py query 'why does Link help agents?' /tmp/link-demo --budget small",
             brief_command="python3 link.py brief 'working on agent memory' /tmp/link-demo",
             audit_command="python3 link.py memory-audit /tmp/link-demo",
@@ -68,6 +69,8 @@ class CliRuntimeCoreTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("Link demo created at /tmp/link-demo", text)
+        self.assertIn("Ask an agent what to try next:", text)
+        self.assertIn("python3 link.py next /tmp/link-demo", text)
         self.assertIn("Try the value loop:", text)
         self.assertIn("/tmp/link-demo/START_HERE.md", text)
         self.assertIn("http://127.0.0.1:3000/graph", text)
