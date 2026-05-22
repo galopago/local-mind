@@ -48,6 +48,7 @@
 
         <h2 id="read">Read Endpoints</h2>
         <pre><code>GET /api/status?validate=true
+GET /api/health
 GET /api/prompts?project=slug
 GET /api/ingest-status
 GET /api/page-list?limit=100&amp;offset=0
@@ -84,6 +85,7 @@ POST /api/rebuild-index</code></pre>
         <h2 id="large">Large Wiki Endpoints</h2>
         <p>Agents and integrations should prefer bounded endpoints over full dumps:</p>
         <ul>
+          <li><code>/api/health</code> for one machine-readable readiness packet with validation and interrupted-operation state.</li>
           <li><code>/api/query-link</code> for answer-ready context.</li>
           <li><code>/api/page-list</code> instead of <code>/api/pages</code> when paging matters.</li>
           <li><code>/api/graph-summary</code> instead of <code>/api/graph</code> for agent context.</li>

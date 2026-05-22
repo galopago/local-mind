@@ -1262,6 +1262,17 @@ def _operations_payload() -> dict[str, object]:
     return payload
 
 
+def _health_payload() -> dict[str, object]:
+    status = _link_status_payload(include_validation=True)
+    operations = _operations_payload()
+    return {
+        "api_version": API_VERSION,
+        "ready": bool(status.get("ready")),
+        "status": status,
+        "operations": operations,
+    }
+
+
 def _render_health():
     return _core_render_health_page(
         _link_status_payload(include_validation=True),
@@ -1492,6 +1503,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/status":
             include_validation = query.get("validate", ["false"])[0].lower() in {"1", "true", "yes"}
             self._json(_link_status_payload(include_validation=include_validation))
+        elif path == "/api/health":
+            self._json(_health_payload())
         elif path == "/api/operations":
             self._json(_operations_payload())
         elif path == "/api/prompts":

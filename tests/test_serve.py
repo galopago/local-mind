@@ -304,6 +304,24 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["stale_count"], 1)
         self.assertEqual(payload["operations"][0]["operation"], "remember")
 
+    def test_health_api_combines_status_validation_and_operations(self):
+        wiki = self.make_wiki()
+        for dirname in ("sources", "concepts", "entities", "memories", "comparisons", "explorations"):
+            (wiki / dirname).mkdir(exist_ok=True)
+        (wiki / "_backlinks.json").write_text(json.dumps(serve._build_backlinks()), encoding="utf-8")
+        reset_wiki(wiki)
+
+        status, payload = run_handler("GET", "/api/health")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["api_version"], serve.API_VERSION)
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["status"]["api_version"], serve.API_VERSION)
+        self.assertEqual(payload["status"]["validation"]["checked"], True)
+        self.assertTrue(payload["status"]["validation"]["passed"])
+        self.assertEqual(payload["operations"]["api_version"], serve.API_VERSION)
+        self.assertEqual(payload["operations"]["operation_count"], 0)
+
     def test_html_responses_are_not_browser_cached(self):
         self.make_wiki()
 

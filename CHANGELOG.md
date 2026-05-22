@@ -36,6 +36,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added copy buttons to the home-page starter prompt strip.
 - Added a local HTTP request timeout so stalled clients cannot hold server threads indefinitely.
 - Added legacy browser hardening headers for frame denial, DNS prefetch control, and cross-domain policy denial.
+- Added `/api/health` for a machine-readable readiness packet with validation and interrupted-operation state.
 
 ### Changed
 
