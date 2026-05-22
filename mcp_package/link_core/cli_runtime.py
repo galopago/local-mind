@@ -26,6 +26,8 @@ def render_starter_prompts_text(payload: Mapping[str, object]) -> tuple[int, str
     lines = [f"Link starter prompts: {payload['target']}"]
     if payload["project"]:
         lines.append(f"Project: {payload['project']}")
+    if payload.get("shortcut"):
+        lines.extend(["", "Shortcut", f"- {payload['shortcut']}"])
     lines.extend(["", "Ask your agent"])
     prompts = payload.get("prompts", [])
     if isinstance(prompts, Sequence) and not isinstance(prompts, (str, bytes)):

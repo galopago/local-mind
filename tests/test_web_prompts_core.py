@@ -15,6 +15,7 @@ def _layout(title: str, body: str) -> str:
 def test_render_prompts_page_shows_project_and_commands():
     payload = {
         "project": "client-launch",
+        "shortcut": "link next /tmp/link",
         "prompts": [{"label": "Readiness", "prompt": "is Link ready?", "when": "Before work"}],
         "commands": ["link status --validate"],
     }
@@ -23,6 +24,10 @@ def test_render_prompts_page_shows_project_and_commands():
 
     assert "<title>Starter Prompts</title>" in html
     assert "Project examples are scoped to <code>client-launch</code>" in html
+    assert "One Command" in html
+    assert "Use this any time you forget what to ask next." in html
+    assert "link next /tmp/link" in html
+    assert 'data-copy-text="link next /tmp/link"' in html
     assert "Ask Your Agent" in html
     assert "Local Checks" in html
     assert "is Link ready?" in html

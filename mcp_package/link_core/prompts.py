@@ -63,6 +63,7 @@ def starter_prompt_payload(target: Path, project: str | None = None) -> dict[str
     return {
         "target": str(target),
         "project": project_name,
+        "shortcut": display_command(["link", "next", command_target]),
         "prompts": prompts,
         "commands": [
             display_command(["link", "status", "--validate", command_target]),

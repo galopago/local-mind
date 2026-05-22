@@ -22,6 +22,7 @@ class CliRuntimeCoreTests(unittest.TestCase):
         code, text = render_starter_prompts_text({
             "target": "/tmp/link",
             "project": "link",
+            "shortcut": "link next /tmp/link",
             "prompts": [{
                 "prompt": "is Link ready?",
                 "when": "first run",
@@ -32,6 +33,8 @@ class CliRuntimeCoreTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Link starter prompts: /tmp/link", text)
         self.assertIn("Project: link", text)
+        self.assertIn("Shortcut", text)
+        self.assertIn("- link next /tmp/link", text)
         self.assertIn("- is Link ready?", text)
         self.assertIn("- link status --validate", text)
 

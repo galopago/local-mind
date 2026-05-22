@@ -28,6 +28,7 @@ class PromptsCoreTests(unittest.TestCase):
         self.assertIn("remember that I prefer local-first agent memory", prompts)
         self.assertIn("query Link for what you know about me", prompts)
         self.assertIn("propose memories from raw/<file>", prompts)
+        self.assertTrue(str(payload["shortcut"]).startswith("link next "))
         self.assertTrue(any(command.startswith("link status --validate ") for command in payload["commands"]))
         self.assertTrue(any(str(root) in command for command in payload["commands"]))
 

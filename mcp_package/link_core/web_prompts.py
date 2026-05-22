@@ -32,10 +32,22 @@ def render_prompts_page(payload: Mapping[str, object], *, layout: PageLayout) ->
         if payload.get("project")
         else '<p class="summary">These prompts work for a personal Link wiki. Add <code>?project=slug</code> for project wording.</p>'
     )
+    shortcut = str(payload.get("shortcut") or "")
+    shortcut_block = (
+        '<section class="callout">'
+        "<h2>One Command</h2>"
+        "<p>Use this any time you forget what to ask next.</p>"
+        f'{copy_button(shortcut, "Copy command")}'
+        f'<code class="proposal-command">{html.escape(shortcut)}</code>'
+        "</section>"
+        if shortcut
+        else ""
+    )
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / prompts</div>'
         "<h1>Starter Prompts</h1>"
         f"{project_line}"
+        f"{shortcut_block}"
         f'<section><h2>Ask Your Agent</h2><div class="proposal-results">{prompt_rows}</div></section>'
         f'<section><h2>Local Checks</h2><ul class="page-list">{command_rows}</ul></section>'
     )

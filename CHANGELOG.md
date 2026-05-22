@@ -26,6 +26,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added page-level persistent cache reuse so edited wikis reread changed Markdown pages without rereading unchanged pages.
 - Added `link next` as a short alias for starter prompts so first-run users have one memorable next-step command.
 - Added the `link next` prompt command to demo output so the first terminal screen points to the agent-first workflow.
+- Added the `link next` shortcut to starter prompt payloads and the local prompts page.
 
 ### Changed
 
