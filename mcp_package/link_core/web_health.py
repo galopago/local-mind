@@ -79,6 +79,22 @@ def _link_command(command_target: str, *parts: str) -> str:
     return display_command(command)
 
 
+def _render_persistent_cache_item(status: Mapping[str, object]) -> str:
+    persistent_cache = status.get("persistent_cache")
+    if not isinstance(persistent_cache, Mapping):
+        return ""
+    state = "enabled" if persistent_cache.get("enabled") else "disabled"
+    detail = (
+        f"{persistent_cache.get('reused_records', 0)}/"
+        f"{persistent_cache.get('total_records', 0)} pages reused"
+    )
+    return (
+        "<li><strong>Persistent cache</strong>"
+        f"<span>{html.escape(state)}</span>"
+        f"<small>{html.escape(detail)}</small></li>"
+    )
+
+
 def _command_for_action(action: Mapping[str, object], command_target: str) -> str:
     command = str(action.get("command") or "").strip()
     if command:
@@ -259,6 +275,7 @@ def render_health_page(
         "<section><h2>Readiness</h2>"
         '<ul class="page-list">'
         f"<li><strong>Search backend</strong><span>{html.escape(str(status.get('search_backend') or 'unknown'))}</span></li>"
+        f"{_render_persistent_cache_item(status)}"
         f"<li><strong>Schema</strong><span>{html.escape(str(schema.get('status') or 'unknown'))}</span></li>"
         f"<li><strong>Active memories</strong><span>{html.escape(str(status.get('active_memory_count') or 0))}</span></li>"
         f"<li><strong>Interrupted operations</strong><span>{html.escape(str(operations.get('stale_count') or 0))} stale · {html.escape(str(operations.get('active_count') or 0))} active</span></li>"

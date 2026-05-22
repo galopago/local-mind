@@ -64,6 +64,8 @@ class StatusCoreTests(unittest.TestCase):
         self.assertEqual(payload["memory_count"], 1)
         self.assertEqual(payload["active_memory_count"], 1)
         self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
+        self.assertTrue(payload["persistent_cache"]["enabled"])
+        self.assertEqual(payload["persistent_cache"]["total_records"], 3)
         self.assertEqual(payload["schema"]["status"], "current")
         self.assertTrue(payload["validation"]["passed"])
         self.assertEqual(payload["next_actions"][0]["tool"], "query_link")

@@ -29,6 +29,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added the `link next` shortcut to starter prompt payloads and the local prompts page.
 - Added persistent-cache reuse details to benchmark JSON and text output.
 - Clarified graph controls so large wikis say "load all data" for search/filtering instead of implying the canvas renders every node.
+- Added persistent-cache state to status payloads, CLI status output, and the local health page.
 
 ### Changed
 

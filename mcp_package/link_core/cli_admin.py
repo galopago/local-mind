@@ -70,6 +70,13 @@ def render_status_text(payload: Mapping[str, object], *, wiki_dir: object, versi
         ),
         f"Search backend: {payload.get('search_backend', 'unknown')}",
     ]
+    persistent_cache = payload.get("persistent_cache")
+    if isinstance(persistent_cache, Mapping):
+        lines.append(
+            "Persistent cache: "
+            f"{'enabled' if persistent_cache.get('enabled') else 'disabled'} · "
+            f"{persistent_cache.get('reused_records', 0)}/{persistent_cache.get('total_records', 0)} pages reused"
+        )
     schema = payload.get("schema") or {}
     if isinstance(schema, Mapping):
         schema_status = schema.get("status", "unknown")

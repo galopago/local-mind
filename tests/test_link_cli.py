@@ -512,6 +512,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Content pages:", out.getvalue())
         self.assertIn("Schema: current", out.getvalue())
         self.assertIn("Search backend:", out.getvalue())
+        self.assertIn("Persistent cache: enabled", out.getvalue())
         self.assertIn("Validation: passed", out.getvalue())
         self.assertIn("query_link", out.getvalue())
 
