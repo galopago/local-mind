@@ -9,6 +9,7 @@ import json
 import re
 import socketserver
 import sys
+import threading
 import time
 import urllib.parse
 from collections import Counter
@@ -236,21 +237,32 @@ _forward_links_index: dict[str, list[str]] = {}  # page name → canonical outbo
 _fts_index = None
 _search_backend = "token-index"
 _cache_read_warnings: list[dict[str, str]] = []
+_cache_lock = threading.RLock()
+_rate_limiter_lock = threading.Lock()
 _mutation_rate_limiter = _CoreLocalRateLimiter(
     max_events=MUTATION_RATE_LIMIT,
     window_seconds=MUTATION_RATE_WINDOW_SECONDS,
 )
 
+
+class ThreadingLocalTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    """Local-only server that keeps navigation responsive during slow requests."""
+
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 def _invalidate_pages_cache() -> None:
     global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _forward_links_index, _fts_index, _search_backend, _cache_read_warnings
-    _core_close_wiki_cache({"fts_index": _fts_index})
-    _pages_cache = None
-    _pages_cache_mtime = 0.0
-    _pages_cache_checked_at = 0.0
-    _forward_links_index = {}
-    _fts_index = None
-    _search_backend = "token-index"
-    _cache_read_warnings = []
+    with _cache_lock:
+        _core_close_wiki_cache({"fts_index": _fts_index})
+        _pages_cache = None
+        _pages_cache_mtime = 0.0
+        _pages_cache_checked_at = 0.0
+        _forward_links_index = {}
+        _fts_index = None
+        _search_backend = "token-index"
+        _cache_read_warnings = []
 
 
 def _wiki_mtime() -> float:
@@ -259,57 +271,59 @@ def _wiki_mtime() -> float:
 
 def _get_all_pages(force_check: bool = False) -> list:
     global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _page_index, _fulltext_index, _normalized_fulltext_index, _text_words_index, _meta_words_index, _snippet_index, _token_index, _page_map, _meta_token_index, _forward_links_index, _fts_index, _search_backend, _cache_read_warnings
-    now = time.monotonic()
-    if (
-        _pages_cache is not None
-        and not force_check
-        and CACHE_MTIME_CHECK_INTERVAL_SECONDS > 0
-        and now - _pages_cache_checked_at < CACHE_MTIME_CHECK_INTERVAL_SECONDS
-    ):
+    with _cache_lock:
+        now = time.monotonic()
+        if (
+            _pages_cache is not None
+            and not force_check
+            and CACHE_MTIME_CHECK_INTERVAL_SECONDS > 0
+            and now - _pages_cache_checked_at < CACHE_MTIME_CHECK_INTERVAL_SECONDS
+        ):
+            return _pages_cache
+        mtime = _wiki_mtime()
+        _pages_cache_checked_at = now
+        if _pages_cache is not None and mtime == _pages_cache_mtime:
+            return _pages_cache
+        _core_close_wiki_cache({"fts_index": _fts_index})
+        cache = _core_build_wiki_cache(WIKI_DIR)
+        _pages_cache = cache["pages"]
+        _pages_cache_mtime = mtime
+        _page_index = cache["page_index"]
+        _fulltext_index = cache["fulltext"]
+        _normalized_fulltext_index = cache["normalized_fulltext"]
+        _text_words_index = cache["text_words_index"]
+        _meta_words_index = cache["meta_words_index"]
+        _snippet_index = cache["snippet_index"]
+        _token_index = cache["token_index"]
+        _meta_token_index = cache["meta_token_index"]
+        _page_map = cache["page_map"]
+        _forward_links_index = cache.get("forward_links_index", {})
+        _fts_index = cache.get("fts_index")
+        _search_backend = str(cache.get("search_backend") or "token-index")
+        _cache_read_warnings = cache.get("read_warnings") if isinstance(cache.get("read_warnings"), list) else []
         return _pages_cache
-    mtime = _wiki_mtime()
-    _pages_cache_checked_at = now
-    if _pages_cache is not None and mtime == _pages_cache_mtime:
-        return _pages_cache
-    _core_close_wiki_cache({"fts_index": _fts_index})
-    cache = _core_build_wiki_cache(WIKI_DIR)
-    _pages_cache = cache["pages"]
-    _pages_cache_mtime = mtime
-    _page_index = cache["page_index"]
-    _fulltext_index = cache["fulltext"]
-    _normalized_fulltext_index = cache["normalized_fulltext"]
-    _text_words_index = cache["text_words_index"]
-    _meta_words_index = cache["meta_words_index"]
-    _snippet_index = cache["snippet_index"]
-    _token_index = cache["token_index"]
-    _meta_token_index = cache["meta_token_index"]
-    _page_map = cache["page_map"]
-    _forward_links_index = cache.get("forward_links_index", {})
-    _fts_index = cache.get("fts_index")
-    _search_backend = str(cache.get("search_backend") or "token-index")
-    _cache_read_warnings = cache.get("read_warnings") if isinstance(cache.get("read_warnings"), list) else []
-    return _pages_cache
 
 
 def _current_wiki_cache() -> dict[str, object]:
-    _get_all_pages()
-    return {
-        "pages": _pages_cache or [],
-        "page_index": _page_index,
-        "fulltext": _fulltext_index,
-        "normalized_fulltext": _normalized_fulltext_index,
-        "text_words_index": _text_words_index,
-        "meta_words_index": _meta_words_index,
-        "snippet_index": _snippet_index,
-        "token_index": _token_index,
-        "meta_token_index": _meta_token_index,
-        "page_map": _page_map,
-        "forward_links_index": _forward_links_index,
-        "fts_index": _fts_index,
-        "search_backend": _search_backend,
-        "read_warning_count": len(_cache_read_warnings),
-        "read_warnings": _cache_read_warnings,
-    }
+    with _cache_lock:
+        _get_all_pages()
+        return {
+            "pages": _pages_cache or [],
+            "page_index": _page_index,
+            "fulltext": _fulltext_index,
+            "normalized_fulltext": _normalized_fulltext_index,
+            "text_words_index": _text_words_index,
+            "meta_words_index": _meta_words_index,
+            "snippet_index": _snippet_index,
+            "token_index": _token_index,
+            "meta_token_index": _meta_token_index,
+            "page_map": _page_map,
+            "forward_links_index": _forward_links_index,
+            "fts_index": _fts_index,
+            "search_backend": _search_backend,
+            "read_warning_count": len(_cache_read_warnings),
+            "read_warnings": _cache_read_warnings,
+        }
 
 
 def _find_page(name: str) -> Path | None:
@@ -885,11 +899,12 @@ def _render_page(page_path):
 
 def _related_pages_for(page_name: str, max_items: int = 8) -> list[dict[str, str]]:
     """Return a compact inbound/forward page list for the wiki page footer."""
-    pages = _get_all_pages()
-    page_by_name = {str(page.get("name") or ""): page for page in pages}
-    backlinks, _ = _load_backlinks_index()
-    inbound = list(backlinks.get("backlinks", {}).get(page_name, []))
-    forward = list(_forward_links_index.get(page_name) or backlinks.get("forward", {}).get(page_name, []))
+    with _cache_lock:
+        pages = _get_all_pages()
+        page_by_name = {str(page.get("name") or ""): page for page in pages}
+        backlinks, _ = _load_backlinks_index()
+        inbound = list(backlinks.get("backlinks", {}).get(page_name, []))
+        forward = list(_forward_links_index.get(page_name) or backlinks.get("forward", {}).get(page_name, []))
     related: list[dict[str, str]] = []
     seen = {page_name}
     for relationship, names in (("links here", inbound), ("links out", forward)):
@@ -1144,19 +1159,21 @@ def _search_pages(q: str, limit: int = 20) -> list:
     """Search pages by title, alias, tag, and full-text body.
     Uses token index to pre-filter candidates, snippet index for zero file I/O.
     """
-    return _core_search_pages(q, _current_wiki_cache(), limit=limit)
+    with _cache_lock:
+        return _core_search_pages(q, _current_wiki_cache(), limit=limit)
 
 
 def _query_link(query: str, budget: str = "medium", project: str | None = None) -> dict[str, object]:
-    return _core_query_link(
-        WIKI_DIR,
-        query,
-        _current_wiki_cache(),
-        _memory_records(),
-        budget=budget,
-        project=project,
-        review_command="review-memory",
-    )
+    with _cache_lock:
+        return _core_query_link(
+            WIKI_DIR,
+            query,
+            _current_wiki_cache(),
+            _memory_records(),
+            budget=budget,
+            project=project,
+            review_command="review-memory",
+        )
 
 
 def _get_context(topic: str) -> dict:
@@ -1167,7 +1184,8 @@ def _get_context(topic: str) -> dict:
     - Its forward links (pages it references)
     - Related pages (shared tags or backlink overlap)
     """
-    return _core_context_for_topic(WIKI_DIR, topic, _current_wiki_cache())
+    with _cache_lock:
+        return _core_context_for_topic(WIKI_DIR, topic, _current_wiki_cache())
 
 
 # ---------------------------------------------------------------------------
@@ -1185,18 +1203,20 @@ def _get_graph_data() -> dict:
     """Return graph nodes and edges for visualization.
     Uses in-memory fulltext index — no separate rglob scan.
     """
-    return _core_graph_data(_current_wiki_cache())
+    with _cache_lock:
+        return _core_graph_data(_current_wiki_cache())
 
 
 def _get_graph_summary(topic: str = "", limit: int = 40, depth: int = 1, max_edges: int = 120) -> dict:
     """Return bounded graph context for agents and large local wikis."""
-    return _core_graph_summary(
-        _current_wiki_cache(),
-        topic=topic,
-        limit=limit,
-        depth=depth,
-        max_edges=max_edges,
-    )
+    with _cache_lock:
+        return _core_graph_summary(
+            _current_wiki_cache(),
+            topic=topic,
+            limit=limit,
+            depth=depth,
+            max_edges=max_edges,
+        )
 
 
 def _rebuild_backlinks_payload() -> dict[str, object]:
@@ -1213,7 +1233,8 @@ def _rebuild_backlinks_payload() -> dict[str, object]:
 
 def _rebuild_index_payload() -> dict[str, object]:
     try:
-        result = _core_rebuild_index(WIKI_DIR, cache=_current_wiki_cache())
+        with _cache_lock:
+            result = _core_rebuild_index(WIKI_DIR, cache=_current_wiki_cache())
     except OSError as exc:
         return {"rebuilt": False, "error": f"Could not rebuild index: {exc}"}
     _invalidate_pages_cache()
@@ -1689,7 +1710,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def _require_mutation_rate_limit(self) -> bool:
         client_host = self.client_address[0] if self.client_address else "local"
-        allowed, retry_after = _mutation_rate_limiter.check(client_host)
+        with _rate_limiter_lock:
+            allowed, retry_after = _mutation_rate_limiter.check(client_host)
         if allowed:
             return True
         self._json(
@@ -1846,9 +1868,8 @@ def main():
     PORT, root = _parse_serve_args(sys.argv[1:], default_port=PORT, default_root=ROOT)
     WIKI_DIR = root / "wiki"
     RAW_DIR = root / "raw"
-    socketserver.TCPServer.allow_reuse_address = True
     try:
-        with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as s:
+        with ThreadingLocalTCPServer(("127.0.0.1", PORT), Handler) as s:
             print(f"  Link → http://127.0.0.1:{PORT}")
             print("  Local-only: bound to 127.0.0.1; no public host mode.")
             print("  No auth: do not expose this server without your own authentication layer.")

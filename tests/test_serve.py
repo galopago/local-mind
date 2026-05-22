@@ -1,5 +1,6 @@
 import json
 import os
+import socketserver
 import tempfile
 import time
 import unittest
@@ -180,6 +181,11 @@ class ServeTests(unittest.TestCase):
         self.assertIn('<a href="/propose">propose</a>', html)
         self.assertIn('<a href="/audit">audit</a>', html)
         self.assertIn('<a href="/captures">captures</a>', html)
+
+    def test_local_server_uses_threaded_request_handling(self):
+        self.assertTrue(issubclass(serve.ThreadingLocalTCPServer, socketserver.ThreadingMixIn))
+        self.assertTrue(serve.ThreadingLocalTCPServer.daemon_threads)
+        self.assertTrue(serve.ThreadingLocalTCPServer.allow_reuse_address)
 
     def test_css_has_mobile_overflow_guards(self):
         self.assertIn("* { box-sizing: border-box; margin: 0; padding: 0; }", serve.CSS)
