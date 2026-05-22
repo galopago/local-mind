@@ -1096,15 +1096,16 @@ def _render_graph(query: dict[str, list[str]] | None = None):
     return _layout("Knowledge Graph", body, page_class="graph-page")
 
 
-def _render_search(query):
+def _render_search(query, page_type: str = ""):
     q = query.lower().strip()
-    results = _search_pages(q, limit=30) if q else []
+    results = _search_pages(q, limit=120) if q else []
     return _core_render_search_page(
         query,
         results,
         page_href=_page_href,
         layout=_layout,
         limit=30,
+        active_type=page_type.lower().strip(),
     )
 
 
@@ -1405,7 +1406,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/graph":
             self._ok(_render_graph(query))
         elif path == "/search":
-            self._ok(_render_search(_query_text(query, "q")))
+            self._ok(_render_search(_query_text(query, "q"), page_type=_query_text(query, "type", "page_type", max_len=80)))
         elif path.startswith("/page/"):
             page = _find_page(urllib.parse.unquote(path[6:]))
             if page: self._ok(_render_page(page))
