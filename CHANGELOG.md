@@ -23,6 +23,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added related-page links to wiki page footers using inbound and forward graph context.
 - Added threaded local HTTP request handling with locks around shared cache and mutation rate state.
 - Added accessible labels to local search inputs.
+- Added page-level persistent cache reuse so edited wikis reread changed Markdown pages without rereading unchanged pages.
 
 ### Changed
 
