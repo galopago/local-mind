@@ -111,7 +111,7 @@ explain why Link remembers local personal memory
 python3 link.py query "why does Link help agents?" . --budget small
 python3 link.py brief "working on agent memory" .
 python3 link.py memory-audit .
-python3 link.py status --validate .
+python3 link.py health .
 ```
 
 ## What To Look For
