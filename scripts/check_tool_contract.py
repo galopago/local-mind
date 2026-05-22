@@ -27,6 +27,7 @@ EXPECTED_CLI_COMMANDS = {
     "memory-audit",
     "memory-inbox",
     "migrate",
+    "next",
     "operations",
     "profile",
     "prompts",

@@ -50,6 +50,16 @@ class CliParserCoreTests(unittest.TestCase):
         self.assertEqual(args.project, "Client Launch")
         self.assertTrue(args.json)
 
+    def test_next_alias_routes_to_prompts(self):
+        parser = build_cli_parser()
+
+        args = parser.parse_args(["next", "/tmp/link", "--project", "Client Launch", "--json"])
+
+        self.assertEqual(args.command, "next")
+        self.assertEqual(args.target, "/tmp/link")
+        self.assertEqual(args.project, "Client Launch")
+        self.assertTrue(args.json)
+
     def test_memory_choices_are_enforced(self):
         parser = build_cli_parser()
 
@@ -105,6 +115,22 @@ class CliParserCoreTests(unittest.TestCase):
         code = dispatch_cli_command(args, {"welcome": welcome_handler})
 
         self.assertEqual(code, 8)
+        self.assertEqual(calls[0][0], Path("/tmp/link"))
+        self.assertEqual(calls[0][1]["project"], "alpha")
+        self.assertTrue(calls[0][1]["json_output"])
+
+    def test_dispatch_routes_next_alias_to_prompts_handler(self):
+        parser = build_cli_parser()
+        args = parser.parse_args(["next", "/tmp/link", "--project", "alpha", "--json"])
+        calls = []
+
+        def prompts_handler(target, **kwargs):
+            calls.append((target, kwargs))
+            return 6
+
+        code = dispatch_cli_command(args, {"prompts": prompts_handler})
+
+        self.assertEqual(code, 6)
         self.assertEqual(calls[0][0], Path("/tmp/link"))
         self.assertEqual(calls[0][1]["project"], "alpha")
         self.assertTrue(calls[0][1]["json_output"])
