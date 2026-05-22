@@ -22,6 +22,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added an in-page search refinement form that preserves the current query and page-type filter.
 - Added related-page links to wiki page footers using inbound and forward graph context.
 - Added threaded local HTTP request handling with locks around shared cache and mutation rate state.
+- Added accessible labels to local search inputs.
 
 ### Changed
 

@@ -91,7 +91,7 @@ def render_header_html() -> str:
         <span class="theme-icon" aria-hidden="true"></span><span class="theme-text" data-theme-text>system</span>
       </button>
       <form action="/search" method="get">
-        <input type="text" name="q" placeholder="search... (/)" autocomplete="off" id="search-input">
+        <input type="text" name="q" placeholder="search... (/)" autocomplete="off" id="search-input" aria-label="Search Link">
       </form>
     </div>
   </div>

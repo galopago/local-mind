@@ -21,6 +21,7 @@ class WebLayoutCoreTests(unittest.TestCase):
         self.assertIn('class="nav-more"', html)
         self.assertIn('<summary>more</summary>', html)
         self.assertIn('id="search-input"', html)
+        self.assertIn('aria-label="Search Link"', html)
         self.assertIn("data-theme-toggle", html)
 
     def test_footer_points_to_github(self):

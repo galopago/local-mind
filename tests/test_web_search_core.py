@@ -33,6 +33,7 @@ def test_render_search_page_handles_empty_query():
 
     assert "<title>Search</title>" in html
     assert 'class="search-refine"' in html
+    assert 'aria-label="Search Link"' in html
     assert "Search titles, aliases, tags, summaries, and page text." in html
 
 

@@ -110,7 +110,7 @@ def render_search_refine_form(query: str, *, active_type: str = "") -> str:
     return (
         '<form class="search-refine" action="/search" method="get">'
         f'<input type="search" name="q" value="{html.escape(query, quote=True)}" '
-        'placeholder="search titles, tags, and page text" autocomplete="off">'
+        'placeholder="search titles, tags, and page text" autocomplete="off" aria-label="Search Link">'
         f"{type_input}"
         '<button type="submit">Search</button>'
         "</form>"
