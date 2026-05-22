@@ -54,6 +54,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Updated starter prompt local-check commands to include the explicit Link root so CLI, web, and MCP prompt payloads are paste-safe outside the wiki directory.
 - Updated operation recovery commands to include the explicit Link root for interrupted-write repair flows.
 - Updated health page repair and next-action commands to include the explicit Link root where the page can infer it.
+- Updated starter prompts, installers, ingest post-checks, and quick-start docs to use `link health` as the primary readiness command.
 - Updated init and demo next-step commands so setup guidance remains paste-safe outside the current checkout directory.
 - Updated ingest guidance commands and post-checks to include the explicit Link root across CLI, JSON, web, and MCP payloads.
 - Updated rebuild-index follow-up guidance to include the concrete `link.py` runtime and Link root for the next backlinks repair step.

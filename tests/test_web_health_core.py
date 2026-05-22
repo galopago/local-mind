@@ -60,7 +60,6 @@ def test_render_health_page_shows_readiness_operations_and_commands(tmp_path):
     assert "remember-1.json" in html
     assert "Operation Next Actions" in html
     assert str(tmp_path) in html
-    assert "link status --validate" in html
     assert "link operations" in html
     assert "link benchmark" in html
     assert "agent memory" in html

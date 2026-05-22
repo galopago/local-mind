@@ -53,7 +53,7 @@ class LinkCliTests(unittest.TestCase):
         backlinks = json.loads((target / "wiki/_backlinks.json").read_text(encoding="utf-8"))
         self.assertIn("backlinks", backlinks)
         self.assertIn("forward", backlinks)
-        self.assertIn("link status --validate", out.getvalue())
+        self.assertIn("link health", out.getvalue())
         self.assertIn("link serve", out.getvalue())
 
     def test_init_preserves_existing_pages(self):
@@ -100,7 +100,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("remember that I prefer local-first agent memory", out.getvalue())
         self.assertIn("query Link for what you know about me", out.getvalue())
         self.assertIn("propose memories from raw/<file>", out.getvalue())
-        self.assertIn("link status --validate", out.getvalue())
+        self.assertIn("link health", out.getvalue())
 
     def test_prompts_json_supports_project_examples(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-prompts-test-"))
@@ -129,7 +129,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Link welcome:", text)
         self.assertIn("1. is Link ready?", text)
         self.assertIn("Proves: Agent can find Link", text)
-        self.assertIn("link status --validate", text)
+        self.assertIn("link health", text)
         self.assertIn("http://127.0.0.1:3000/health", text)
 
     def test_welcome_json_supports_project_examples(self):
@@ -343,7 +343,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Memory review: propose memories from raw/new-source.md", out.getvalue())
         self.assertIn("raw/new-source.md -> wiki/sources/new-source.md", out.getvalue())
         self.assertIn("Post-ingest checks:", out.getvalue())
-        self.assertIn("link status --validate", out.getvalue())
+        self.assertIn("link health", out.getvalue())
 
     def test_ingest_status_reports_represented_completion(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))

@@ -15,7 +15,7 @@ def render_init_text(*, target: object, fixes: Sequence[str]) -> tuple[int, str]
     lines.extend([
         "",
         "Next:",
-        f"  {display_command(['link', 'status', '--validate', command_target])}",
+        f"  {display_command(['link', 'health', command_target])}",
         f"  {display_command(['link', 'serve', command_target])}",
         "  Drop sources into raw/ and ask your agent: ingest raw/<file> into Link",
     ])

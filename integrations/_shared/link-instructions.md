@@ -2,7 +2,7 @@
 
 Local agent memory lives at `~/link/`. It has raw sources in `~/link/raw/`, compiled wiki pages in `~/link/wiki/`, and direct memories in `~/link/wiki/memories/`.
 
-If you are unsure whether Link is ready, use MCP `link_status` when available, or run `link status --validate`.
+If you are unsure whether Link is ready, use MCP `link_status` when available, or run `link health`.
 
 If the user asks what to try after installing Link, use MCP `starter_prompts` when available, or run `link next`.
 

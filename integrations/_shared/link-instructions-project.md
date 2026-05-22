@@ -2,7 +2,7 @@
 
 This project has a Link wiki. Raw sources live in `raw/`, compiled wiki pages in `wiki/`, and direct memories in `wiki/memories/`.
 
-If you are unsure whether this project Link wiki is ready, use MCP `link_status` when available, or run `python3 link.py status --validate`.
+If you are unsure whether this project Link wiki is ready, use MCP `link_status` when available, or run `python3 link.py health`.
 
 If the user asks what to try after installing Link, use MCP `starter_prompts` when available, or run `python3 link.py next`.
 

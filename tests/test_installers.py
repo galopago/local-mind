@@ -32,7 +32,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('LINK_CLI_BIN="$LINK_CLI_DIR/link"', scaffold)
         self.assertIn("Link command wrapper", scaffold)
         self.assertIn("not overwriting", scaffold)
-        self.assertIn("link status --validate", scaffold)
+        self.assertIn("link health", scaffold)
         self.assertIn('if [ "$MODE" = "--project" ]', scaffold)
 
     def test_scaffold_project_mode_uses_absolute_target(self):

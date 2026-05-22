@@ -65,7 +65,7 @@ class IngestCoreTests(unittest.TestCase):
         self.assertIn("Pending raw files:\n- raw/new-note.md", text)
         self.assertIn("Ask your agent: ingest raw/new-note.md into Link", text)
         self.assertIn(f"Run: link rebuild-index {resolved_root}", text)
-        self.assertIn(f"- link status --validate {resolved_root}", text)
+        self.assertIn(f"- link health {resolved_root}", text)
         self.assertIn("Suggested workflow: Ingest pending raw sources", text)
         self.assertIn("Memory review: propose memories from raw/new-note.md", text)
 

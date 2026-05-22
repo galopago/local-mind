@@ -97,7 +97,7 @@ Try the value loop:
 link query "why does Link help agents?" link-demo --budget small
 link brief "working on agent memory" link-demo
 link benchmark "agent memory" link-demo
-link status --validate link-demo
+link health link-demo
 ```
 
 The `/health` page mirrors the readiness loop in the browser: validation state,
@@ -114,7 +114,7 @@ From a source checkout, use `python3 link.py ...`:
 python3 link.py query "why does Link help agents?" link-demo --budget small
 python3 link.py brief "working on agent memory" link-demo
 python3 link.py benchmark "agent memory" link-demo
-python3 link.py status --validate link-demo
+python3 link.py health link-demo
 ```
 
 The generated demo is the public proof wiki. The repo's root `wiki/` directory

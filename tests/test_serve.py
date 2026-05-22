@@ -489,7 +489,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Ask Your Agent", html)
         self.assertIn("Local Checks", html)
         self.assertIn("Project examples are scoped to <code>client-launch</code>", html)
-        self.assertIn("link status --validate", html)
+        self.assertIn("link health", html)
 
     def test_css_has_explicit_black_dark_theme(self):
         self.assertIn(':root[data-theme="dark"]', serve.CSS)

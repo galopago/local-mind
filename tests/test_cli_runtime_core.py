@@ -15,7 +15,7 @@ class CliRuntimeCoreTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Link wiki ready at /tmp/link", text)
         self.assertIn("Initialized:", text)
-        self.assertIn("link status --validate /tmp/link", text)
+        self.assertIn("link health /tmp/link", text)
         self.assertIn("link serve /tmp/link", text)
 
     def test_render_starter_prompts_text(self):
@@ -27,7 +27,7 @@ class CliRuntimeCoreTests(unittest.TestCase):
                 "prompt": "is Link ready?",
                 "when": "first run",
             }],
-            "commands": ["link status --validate"],
+            "commands": ["link health"],
         })
 
         self.assertEqual(code, 0)
@@ -36,7 +36,7 @@ class CliRuntimeCoreTests(unittest.TestCase):
         self.assertIn("Shortcut", text)
         self.assertIn("- link next /tmp/link", text)
         self.assertIn("- is Link ready?", text)
-        self.assertIn("- link status --validate", text)
+        self.assertIn("- link health", text)
 
     def test_render_welcome_text(self):
         code, text = render_welcome_text({
@@ -47,7 +47,7 @@ class CliRuntimeCoreTests(unittest.TestCase):
                 "prompt": "is Link ready?",
                 "proves": "Agent can find Link.",
             }],
-            "commands": ["link status --validate"],
+            "commands": ["link health"],
             "urls": ["http://127.0.0.1:3000/health"],
         })
 
@@ -56,7 +56,7 @@ class CliRuntimeCoreTests(unittest.TestCase):
         self.assertIn("Project: link", text)
         self.assertIn("1. is Link ready?", text)
         self.assertIn("Proves: Agent can find Link.", text)
-        self.assertIn("- link status --validate", text)
+        self.assertIn("- link health", text)
         self.assertIn("- http://127.0.0.1:3000/health", text)
 
     def test_render_demo_text(self):

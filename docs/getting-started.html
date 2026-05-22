@@ -72,7 +72,7 @@ py link.py serve link-demo</code></pre>
         <pre><code>link query "why does Link help agents?" link-demo --budget small
 link brief "working on agent memory" link-demo
 link benchmark "agent memory" link-demo
-link status --validate link-demo</code></pre>
+link health link-demo</code></pre>
 
         <h2 id="install">2. Install Link For Your Agent</h2>
         <p>From the cloned checkout, run the installer for the agent you use. Re-running the same installer updates code and instructions without replacing existing wiki data.</p>
@@ -132,7 +132,7 @@ link memory-audit</code></pre>
 
         <h2 id="verify">6. Verify The Loop</h2>
         <pre><code>link doctor --fix
-link status --validate
+link health
 link ingest-status
 link validate
 link memory-audit

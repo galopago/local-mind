@@ -47,7 +47,8 @@
       </aside>
       <article class="doc-content">
 <h2 id="ready">Is Link Ready?</h2>
-        <pre><code>link status --validate
+        <pre><code>link health
+link status --validate
 link doctor
 link next</code></pre>
         <p>If <code>link</code> is not on your <code>PATH</code>, run from the source checkout with <code>python3 link.py</code>, or add <code>~/.local/bin</code> to your shell path.</p>
@@ -76,7 +77,7 @@ link validate</code></pre>
         <h2 id="demo">Demo Looks Stale</h2>
         <p><code>link-demo/</code> is generated local output and is ignored by git. If it was created with an older Link version, regenerate it:</p>
         <pre><code>python3 link.py demo link-demo --force
-python3 link.py status link-demo --validate
+python3 link.py health link-demo
 python3 link.py query "why does Link help agents?" link-demo --budget small</code></pre>
         <p>The current generated demo should include three raw sources, source-backed wiki pages, one starter memory, one exploration, current backlinks, and schema v1.</p>
 
@@ -84,7 +85,7 @@ python3 link.py query "why does Link help agents?" link-demo --budget small</cod
         <pre><code>link benchmark "agent memory"
 link graph-summary "agent memory" --limit 40 --depth 1</code></pre>
         <p>Large graph views intentionally open bounded first. Use type filters, node search, depth controls, and explicit all-data loading only when you need search or filtering across every page.</p>
-        <p>If <code>link status --validate</code> or <code>link benchmark</code> shows low persistent-cache reuse after repeated runs, inspect recently edited pages or generated files that are changing on every request.</p>
+        <p>If <code>link health</code> or <code>link benchmark</code> shows low persistent-cache reuse after repeated runs, inspect recently edited pages or generated files that are changing on every request.</p>
         <p>From a source checkout, use the synthetic smoke script when you want local scale evidence without touching your real wiki:</p>
         <pre><code>python3 scripts/smoke_large_wiki.py --pages 10000</code></pre>
 

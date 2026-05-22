@@ -17,7 +17,7 @@ def test_render_prompts_page_shows_project_and_commands():
         "project": "client-launch",
         "shortcut": "link next /tmp/link",
         "prompts": [{"label": "Readiness", "prompt": "is Link ready?", "when": "Before work"}],
-        "commands": ["link status --validate"],
+        "commands": ["link health"],
     }
 
     html = render_prompts_page(payload, layout=_layout)
@@ -33,8 +33,8 @@ def test_render_prompts_page_shows_project_and_commands():
     assert "is Link ready?" in html
     assert 'data-copy-text="is Link ready?"' in html
     assert "Before work" in html
-    assert "link status --validate" in html
-    assert 'data-copy-text="link status --validate"' in html
+    assert "link health" in html
+    assert 'data-copy-text="link health"' in html
 
 
 def test_render_prompts_page_escapes_payload_fields():

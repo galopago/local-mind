@@ -271,7 +271,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "link rebuild-index",
                 "link rebuild-backlinks",
                 "link validate",
-                "link status --validate",
+                "link health",
             ],
         }
 
@@ -297,7 +297,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "link rebuild-index",
                 "link rebuild-backlinks",
                 "link validate",
-                "link status --validate",
+                "link health",
             ],
         }
 
@@ -325,7 +325,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
             ],
             "agent_prompt": None,
             "memory_prompt": None,
-            "post_checks": ["link ingest-status", "link status --validate"],
+            "post_checks": ["link ingest-status", "link health"],
         }
 
     if state == "blocked_raw_access":
@@ -352,7 +352,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
             ],
             "agent_prompt": None,
             "memory_prompt": None,
-            "post_checks": ["link ingest-status", "link status --validate"],
+            "post_checks": ["link ingest-status", "link health"],
         }
 
     if state == "blocked_source_access":
@@ -378,7 +378,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
             ],
             "agent_prompt": None,
             "memory_prompt": None,
-            "post_checks": ["link ingest-status", "link validate", "link status --validate"],
+            "post_checks": ["link ingest-status", "link validate", "link health"],
         }
 
     if state == "stale_graph":
@@ -392,7 +392,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "Validate the wiki after rebuilding backlinks.",
             ],
             "agent_prompt": guidance.get("agent_prompt"),
-            "post_checks": ["link rebuild-backlinks", "link validate", "link status --validate"],
+            "post_checks": ["link rebuild-backlinks", "link validate", "link health"],
         }
 
     if state == "empty":
@@ -407,7 +407,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "Review generated pages before relying on them as memory.",
             ],
             "agent_prompt": None,
-            "post_checks": ["link ingest-status", "link status --validate"],
+            "post_checks": ["link ingest-status", "link health"],
         }
 
     if state == "ready":
@@ -421,7 +421,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "Add new files to raw/ when Link should learn new source-backed context.",
             ],
             "agent_prompt": None,
-            "post_checks": ["link doctor", "link status --validate"],
+            "post_checks": ["link doctor", "link health"],
         }
 
     return {
@@ -434,7 +434,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
             "Check readiness before adding sources.",
         ],
         "agent_prompt": None,
-        "post_checks": ["link init", "link status --validate"],
+        "post_checks": ["link init", "link health"],
     }
 
 
@@ -626,7 +626,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "missing_structure",
             "summary": "Link is not initialized here yet.",
             "agent_prompt": None,
-            "commands": ["link init", "link status --validate"],
+            "commands": ["link init", "link health"],
             "notes": ["Run the installer or initialize this directory before ingesting sources."],
         }
 
@@ -635,7 +635,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "blocked_source_access",
             "summary": f"{source_read_warning_count} source page could not be inspected. Fix source page access before ingest.",
             "agent_prompt": None,
-            "commands": ["link ingest-status", "link validate", "link status --validate"],
+            "commands": ["link ingest-status", "link validate", "link health"],
             "notes": [
                 "Represented and pending raw counts may be incomplete while source pages cannot be read.",
                 "Fix permissions or repair the page, then refresh ingest status.",
@@ -652,7 +652,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "blocked_raw_access",
             "summary": summary + f" Fix access for {first} before ingest.",
             "agent_prompt": None,
-            "commands": ["link ingest-status", "link status --validate"],
+            "commands": ["link ingest-status", "link health"],
             "notes": [
                 "Do not ask an agent to ingest raw files that Link cannot read and scan for secret-looking values.",
                 "Fix permissions or replace the file, then refresh ingest status.",
@@ -669,7 +669,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "blocked_secrets",
             "summary": summary + f" Redact {first} before ingest.",
             "agent_prompt": None,
-            "commands": ["link ingest-status", "link status --validate"],
+            "commands": ["link ingest-status", "link health"],
             "notes": [
                 "Do not ask an agent to ingest flagged raw files until the secret-looking values are removed or redacted.",
                 "After redaction, refresh ingest status and continue with the normal ingest prompt.",
@@ -686,7 +686,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "stale_raw",
             "summary": summary,
             "agent_prompt": f"re-ingest {first} into Link",
-            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link status --validate"],
+            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link health"],
             "notes": [
                 "The raw file is represented, but it is newer than the linked source page.",
                 "Ask the agent to refresh the existing source page before relying on retrieval.",
@@ -705,7 +705,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "pending_raw",
             "summary": summary,
             "agent_prompt": f"ingest {first} into Link",
-            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link status --validate"],
+            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link health"],
             "notes": [
                 "If the source contains user preferences, decisions, or project context, ask for memory proposals before saving durable memories.",
                 "After ingest, rebuild index/backlinks if your agent did not already do it.",
@@ -726,7 +726,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "empty",
             "summary": "Link is ready, but raw/ has no source files yet.",
             "agent_prompt": None,
-            "commands": ["link status --validate", "link serve"],
+            "commands": ["link health", "link serve"],
             "notes": ["Drop notes, articles, transcripts, or project files into raw/, then ask your agent to ingest them into Link."],
         }
 
@@ -734,7 +734,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
         "state": "ready",
         "summary": "All raw files are represented in wiki/sources and the graph index is current.",
         "agent_prompt": None,
-        "commands": ["link doctor", "link status --validate"],
+        "commands": ["link doctor", "link health"],
         "notes": ["Add new files to raw/ when you want Link to learn new source-backed knowledge."],
     }
 
