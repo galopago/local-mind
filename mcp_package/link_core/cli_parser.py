@@ -46,6 +46,10 @@ def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.Argum
     status_cmd.add_argument("--validate", action="store_true", help="include the ingest validation gate summary")
     status_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
 
+    health_cmd = sub.add_parser("health", help="show readiness, validation, and interrupted write state")
+    health_cmd.add_argument("target", nargs="?", default=".")
+    health_cmd.add_argument("--json", action="store_true", help="print machine-readable health status")
+
     operations_cmd = sub.add_parser("operations", help="inspect interrupted or active Link write operations")
     operations_cmd.add_argument("target", nargs="?", default=".")
     operations_cmd.add_argument("--limit", type=int, default=20, help="maximum operation markers to show")
@@ -256,6 +260,8 @@ def dispatch_cli_command(args: Any, handlers: Mapping[str, CliHandler]) -> int:
         return handlers["prompts"](Path(args.target), project=args.project, json_output=args.json)
     if command == "status":
         return handlers["status"](Path(args.target), include_validation=args.validate, json_output=args.json)
+    if command == "health":
+        return handlers["health"](Path(args.target), json_output=args.json)
     if command == "operations":
         return handlers["operations"](Path(args.target), limit=args.limit, json_output=args.json)
     if command == "backup":

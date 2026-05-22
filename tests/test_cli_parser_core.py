@@ -40,6 +40,15 @@ class CliParserCoreTests(unittest.TestCase):
         self.assertEqual(args.limit, 5)
         self.assertTrue(args.json)
 
+    def test_health_json_option(self):
+        parser = build_cli_parser()
+
+        args = parser.parse_args(["health", "/tmp/link", "--json"])
+
+        self.assertEqual(args.command, "health")
+        self.assertEqual(args.target, "/tmp/link")
+        self.assertTrue(args.json)
+
     def test_welcome_project_and_json_options(self):
         parser = build_cli_parser()
 
@@ -101,6 +110,21 @@ class CliParserCoreTests(unittest.TestCase):
         self.assertEqual(code, 9)
         self.assertEqual(calls[0][0], Path("/tmp/link"))
         self.assertEqual(calls[0][1]["limit"], 5)
+        self.assertTrue(calls[0][1]["json_output"])
+
+    def test_dispatch_routes_health_arguments(self):
+        parser = build_cli_parser()
+        args = parser.parse_args(["health", "/tmp/link", "--json"])
+        calls = []
+
+        def health_handler(target, **kwargs):
+            calls.append((target, kwargs))
+            return 6
+
+        code = dispatch_cli_command(args, {"health": health_handler})
+
+        self.assertEqual(code, 6)
+        self.assertEqual(calls[0][0], Path("/tmp/link"))
         self.assertTrue(calls[0][1]["json_output"])
 
     def test_dispatch_routes_welcome_arguments(self):

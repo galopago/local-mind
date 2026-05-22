@@ -22,6 +22,7 @@ EXPECTED_CLI_COMMANDS = {
     "explain-memory",
     "forget-memory",
     "graph-summary",
+    "health",
     "ingest-status",
     "init",
     "memory-audit",

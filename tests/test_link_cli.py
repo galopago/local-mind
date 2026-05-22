@@ -550,6 +550,31 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["next_actions"][0]["tool"], "ingest_status")
         self.assertEqual(payload["next_actions"][1]["tool"], "starter_prompts")
 
+    def test_health_combines_status_and_operations(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-health-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.health(target)
+
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("Link health:", text)
+        self.assertIn("Ready: yes", text)
+        self.assertIn("Validation: passed", text)
+        self.assertIn("Operations: 0 total", text)
+
+        json_out = StringIO()
+        with redirect_stdout(json_out):
+            json_code = link_cli.health(target, json_output=True)
+        payload = json.loads(json_out.getvalue())
+        self.assertEqual(json_code, 0)
+        self.assertTrue(payload["ready"])
+        self.assertTrue(payload["status"]["validation"]["passed"])
+        self.assertEqual(payload["operations"]["operation_count"], 0)
+
     def test_operations_reports_interrupted_write_markers(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-operations-test-"))
         target = tmp / "demo"
@@ -578,6 +603,27 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(json_code, 1)
         self.assertEqual(payload["stale_count"], 1)
         self.assertEqual(payload["operations"][0]["operation"], "remember")
+
+    def test_health_reports_interrupted_write_markers(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-health-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        begin_operation(
+            target / "wiki",
+            "remember",
+            "Save memory",
+            timestamp="2026-05-17T00:00:00Z",
+            paths=["wiki/memories/prefer-local.md"],
+        )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.health(target)
+
+        self.assertEqual(code, 1)
+        self.assertIn("Ready: no", out.getvalue())
+        self.assertIn("Operations: 1 total", out.getvalue())
+        self.assertIn("link operations", out.getvalue())
 
     def test_status_prints_readiness_warnings(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))
