@@ -20,6 +20,8 @@ def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.Argum
     parser.add_argument("--version", action="version", version=f"Link {LINK_VERSION}")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    sub.add_parser("version", help="print the Link CLI version")
+
     init_cmd = sub.add_parser("init", help="create or repair a normal Link wiki")
     init_cmd.add_argument("target", nargs="?", default=".")
 
@@ -248,6 +250,8 @@ def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.Argum
 def dispatch_cli_command(args: Any, handlers: Mapping[str, CliHandler]) -> int:
     """Dispatch parsed Link CLI arguments to runtime-provided handlers."""
     command = args.command
+    if command == "version":
+        return handlers["version"]()
     if command == "init":
         return handlers["init"](Path(args.target))
     if command == "serve":

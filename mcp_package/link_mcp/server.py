@@ -40,7 +40,13 @@ else:
     WIKI_DIR = Path.home() / "link" / "wiki"
 
 if not WIKI_DIR.exists():
-    print(f"[link-mcp] Wiki not found at {WIKI_DIR}. Run install.sh first.", file=sys.stderr)
+    print(
+        f"[link-mcp] Wiki not found at {WIKI_DIR}. "
+        "Initialize Link first with `link init` or `python3 link.py init`, "
+        "run an integration installer under integrations/*/install.sh, "
+        "or pass --wiki /path/to/wiki.",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 # ── Import MCP SDK ────────────────────────────────────────────────────

@@ -667,6 +667,15 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(cm.exception.code, 0)
         self.assertIn(f"Link {link_cli.LINK_VERSION}", out.getvalue())
 
+    def test_main_version_command_prints_version(self):
+        out = StringIO()
+
+        with redirect_stdout(out):
+            code = link_cli.main(["version"])
+
+        self.assertEqual(code, 0)
+        self.assertIn(f"Link {link_cli.LINK_VERSION}", out.getvalue())
+
     def test_backup_creates_local_archive_without_raw_by_default(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-backup-test-"))
         target = tmp / "demo"

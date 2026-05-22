@@ -43,6 +43,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added a `/more` page so direct navigation to advanced local viewer tools no longer lands on Not found.
 - Added a graph display cap control so large wikis can trade canvas density for responsiveness without loading every visible node at once.
 - Added non-alarmist benchmark scale notes for 1k/10k-page wikis, bounded graph overviews, and SQLite FTS headroom.
+- Added `link version` as a discoverable command alias for `link --version`.
 
 ### Changed
 
@@ -63,6 +64,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Updated ingest UI next-step and validation cards to reuse target-aware commands instead of generic or chained shell snippets.
 - Updated `link status` text output to pair MCP-style next actions with concrete local commands for terminal users.
 - Updated the health page memory-review fallback to copy a target-aware `link memory-inbox` command.
+- Updated `link-mcp` missing-wiki startup guidance to point at `link init`, source checkout init, integration installers, or `--wiki`.
 - Updated the CLI product docs with the local large-wiki smoke command and how to inspect the generated fixture.
 - Updated public docs to describe the wiki-style home, catalog, and search browsing flows.
 - Updated README and UI docs to describe related-page footers and search refinement.

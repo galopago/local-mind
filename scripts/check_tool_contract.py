@@ -46,6 +46,7 @@ EXPECTED_CLI_COMMANDS = {
     "status",
     "update-memory",
     "validate",
+    "version",
     "verify-mcp",
     "welcome",
 }

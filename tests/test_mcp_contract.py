@@ -5,7 +5,7 @@ import tarfile
 import tempfile
 import types
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -188,6 +188,30 @@ class McpContractTests(unittest.TestCase):
         self.assertEqual(payload["prompts"][0]["prompt"], "is Link ready?")
         self.assertIn("this project uses Link", payload["prompts"][2]["prompt"])
         self.assertTrue(any(command.startswith("link health ") for command in payload["commands"]))
+
+    def test_missing_wiki_message_points_to_current_setup_paths(self):
+        previous_argv = sys.argv[:]
+        missing = Path(tempfile.mkdtemp(prefix="link-mcp-missing-")) / "missing" / "wiki"
+        module_name = f"link_mcp_server_missing_{id(missing)}"
+        try:
+            sys.argv = ["link_mcp.server", "--wiki", str(missing)]
+            spec = importlib.util.spec_from_file_location(module_name, ROOT / "mcp_package/link_mcp/server.py")
+            module = importlib.util.module_from_spec(spec)
+            assert spec.loader is not None
+            err = StringIO()
+            with redirect_stderr(err), self.assertRaises(SystemExit) as cm:
+                spec.loader.exec_module(module)
+
+            self.assertEqual(cm.exception.code, 1)
+            text = err.getvalue()
+            self.assertIn("Wiki not found", text)
+            self.assertIn("link init", text)
+            self.assertIn("python3 link.py init", text)
+            self.assertIn("integrations/*/install.sh", text)
+            self.assertIn("--wiki /path/to/wiki", text)
+            self.assertNotIn("install.sh first", text)
+        finally:
+            sys.argv = previous_argv
 
     def test_migrate_wiki_contract(self):
         (self.target / "wiki/_link_schema.json").unlink()

@@ -49,6 +49,15 @@ class CliParserCoreTests(unittest.TestCase):
         self.assertEqual(args.target, "/tmp/link")
         self.assertTrue(args.json)
 
+    def test_version_command_routes_to_handler(self):
+        parser = build_cli_parser()
+
+        args = parser.parse_args(["version"])
+        code = dispatch_cli_command(args, {"version": lambda: 42})
+
+        self.assertEqual(args.command, "version")
+        self.assertEqual(code, 42)
+
     def test_welcome_project_and_json_options(self):
         parser = build_cli_parser()
 

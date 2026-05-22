@@ -1704,6 +1704,7 @@ def main(argv: list[str] | None = None) -> int:
             "rebuild-index": rebuild_index,
             "rebuild-backlinks": rebuild_backlinks,
             "verify-mcp": verify_mcp,
+            "version": lambda: print(f"Link {LINK_VERSION}") or 0,
         })
     except ValueError as exc:
         parser.error(str(exc))
