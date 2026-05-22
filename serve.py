@@ -192,6 +192,7 @@ LOCAL_ACTION_HEADER = "X-Link-Local-Action"
 LOCAL_ACTION_VALUES = {"1", "true", "yes"}
 MUTATION_RATE_LIMIT = 180
 MUTATION_RATE_WINDOW_SECONDS = 60
+REQUEST_TIMEOUT_SECONDS = 15
 CONTENT_SECURITY_POLICY = _core_content_security_policy
 PERMISSIONS_POLICY = _core_permissions_policy
 SVG_CONTENT_SECURITY_POLICY = _core_svg_content_security_policy
@@ -1274,6 +1275,10 @@ def _render_health():
 # ---------------------------------------------------------------------------
 
 class Handler(http.server.BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.request.settimeout(REQUEST_TIMEOUT_SECONDS)
+
     def do_HEAD(self):
         """HEAD requests: send headers only, no body."""
         self._head_only = True

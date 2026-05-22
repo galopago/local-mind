@@ -187,6 +187,25 @@ class ServeTests(unittest.TestCase):
         self.assertTrue(serve.ThreadingLocalTCPServer.daemon_threads)
         self.assertTrue(serve.ThreadingLocalTCPServer.allow_reuse_address)
 
+    def test_http_handler_sets_request_timeout(self):
+        class FakeSocket:
+            def __init__(self):
+                self.timeouts = []
+
+            def makefile(self, *_args, **_kwargs):
+                return BytesIO()
+
+            def settimeout(self, value):
+                self.timeouts.append(value)
+
+        request = FakeSocket()
+        handler = object.__new__(serve.Handler)
+        handler.request = request
+
+        handler.setup()
+
+        self.assertEqual(request.timeouts, [serve.REQUEST_TIMEOUT_SECONDS])
+
     def test_css_has_mobile_overflow_guards(self):
         self.assertIn("* { box-sizing: border-box; margin: 0; padding: 0; }", serve.CSS)
         self.assertIn("html { overflow-x: hidden; background: var(--bg); }", serve.CSS)

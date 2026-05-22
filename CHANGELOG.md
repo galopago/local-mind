@@ -34,6 +34,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Updated installer and agent-instruction next steps to point at `link next`.
 - Simplified quick-start examples around `link next`, with `link welcome` kept as the optional guided proof path.
 - Added copy buttons to the home-page starter prompt strip.
+- Added a local HTTP request timeout so stalled clients cannot hold server threads indefinitely.
 
 ### Changed
 
