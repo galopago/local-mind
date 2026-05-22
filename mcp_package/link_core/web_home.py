@@ -30,6 +30,7 @@ def render_home_page(
         f"{_render_product_lanes()}"
         f"{_render_prompt_strip(starter_prompts)}"
         f"{_render_next_steps()}"
+        f"{_render_recent_pages(pages, page_href=page_href)}"
         f"{_render_stats(pages)}"
         f"{_render_page_sections(pages, page_href=page_href)}"
     )
@@ -80,6 +81,31 @@ def _render_page_sections(pages: Sequence[dict[str, object]], *, page_href: Page
         )
         sections += f'<h2>{html.escape(category)}</h2><ul class="page-list">{items}</ul>'
     return sections
+
+
+def _render_recent_pages(pages: Sequence[dict[str, object]], *, page_href: PageHref, limit: int = 6) -> str:
+    recent = [
+        page for page in pages
+        if str(page.get("category") or "") != "root" and str(page.get("date_updated") or "").strip()
+    ]
+    if not recent:
+        return ""
+    items = "".join(
+        f'<li><a href="{html.escape(page_href(str(page["name"])), quote=True)}">'
+        f'{html.escape(str(page["title"]))}</a>'
+        f'<span class="type">{html.escape(str(page.get("type") or ""))} · updated {html.escape(str(page.get("date_updated") or ""))}</span></li>'
+        for page in sorted(recent, key=_recent_page_key, reverse=True)[:limit]
+    )
+    return (
+        '<section class="home-recent">'
+        '<div class="section-heading"><h2>Recently Updated</h2><a href="/all">all pages</a></div>'
+        f'<ul class="page-list">{items}</ul>'
+        "</section>"
+    )
+
+
+def _recent_page_key(page: Mapping[str, object]) -> tuple[str, str]:
+    return str(page.get("date_updated") or ""), str(page.get("title") or "")
 
 
 def _render_product_lanes() -> str:

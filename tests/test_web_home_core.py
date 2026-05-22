@@ -22,8 +22,20 @@ def test_plural_type_label_handles_irregular_labels():
 def test_render_home_page_shows_stats_sections_and_prompts():
     pages = [
         {"name": "index", "title": "Index", "type": "", "category": "root"},
-        {"name": "agent-memory", "title": "Agent Memory", "type": "concept", "category": "concepts"},
-        {"name": "local-memory", "title": "Local Memory", "type": "memory", "category": "memories"},
+        {
+            "name": "agent-memory",
+            "title": "Agent Memory",
+            "type": "concept",
+            "category": "concepts",
+            "date_updated": "2026-05-01",
+        },
+        {
+            "name": "local-memory",
+            "title": "Local Memory",
+            "type": "memory",
+            "category": "memories",
+            "date_updated": "2026-05-02",
+        },
     ]
     prompts = {"prompts": [{"prompt": "is Link ready?"}, {"prompt": "ingest raw/<file> into Link"}]}
 
@@ -43,6 +55,9 @@ def test_render_home_page_shows_stats_sections_and_prompts():
     assert "is Link ready?" in html
     assert "ingest raw/&lt;file&gt; into Link" in html
     assert "Next Steps" in html
+    assert "Recently Updated" in html
+    assert html.index("Local Memory") < html.index("Agent Memory")
+    assert "updated 2026-05-02" in html
     assert 'href="/health"' in html
     assert 'href="/ingest"' in html
     assert 'href="/memory"' in html

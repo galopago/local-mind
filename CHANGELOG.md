@@ -24,6 +24,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Improved the local All Pages view with page-type summary chips and grouped visible results so larger wikis are easier to scan.
 - Made All Pages summary chips filter by page type while preserving bounded pagination.
 - Grouped local search results by page type and added page-type chips for narrowing result sets.
+- Added a Recently Updated section to the local home page so users can resume from fresh wiki pages.
 - Refined the local web viewer toward a quieter wiki/document layout with grouped navigation, plainer page metadata, and automatic section outlines on structured wiki pages.
 - Changed large-graph canvas seeding to use deterministic category clusters, with higher-degree pages nearer cluster centers, instead of a single global spiral.
 - Updated CLI query no-context recovery commands to include the explicit Link root so they work from any terminal directory.
