@@ -201,6 +201,18 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .page-list li { padding: 6px 0; border-bottom: 1px solid var(--border-soft); }
 .page-list li:last-child { border-bottom: none; }
 .page-list .type { font-size: 11px; color: var(--subtle); font-family: sans-serif; margin-left: 6px; }
+.catalog-summary { border: 1px solid var(--border-soft); border-radius: 4px; padding: 10px 12px;
+                   background: var(--surface); margin: 12px 0 14px; font-family: sans-serif; }
+.catalog-summary p { margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.catalog-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.catalog-chip { border: 1px solid var(--border-soft); border-radius: 999px; padding: 3px 8px;
+                color: var(--muted); font-size: 12px; background: var(--surface-muted); }
+.catalog-chip strong { color: var(--text-strong); margin-right: 5px; }
+.page-groups { display: grid; gap: 4px; margin-top: 6px; }
+.page-group h2 { font-size: 15px; margin: 18px 0 2px; padding-bottom: 4px; font-family: sans-serif;
+                 color: var(--text-strong); text-transform: lowercase; }
+.page-group h2 span { color: var(--subtle); font-weight: normal; font-size: 12px; margin-left: 4px; }
+.empty-state { color: var(--muted); font-family: sans-serif; }
 .pager { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0; font-family: sans-serif; color: var(--muted); font-size: 13px; }
 .pager .button-link.disabled { color: var(--button-disabled); background: transparent; cursor: default; }
 .section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;

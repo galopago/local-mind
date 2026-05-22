@@ -11,6 +11,7 @@ import socketserver
 import sys
 import time
 import urllib.parse
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
@@ -897,6 +898,7 @@ def _render_all(query: dict[str, list[str]] | None = None):
     assert offset is not None
     sorted_pages = sorted(pages, key=lambda x: x["title"])
     window = sorted_pages[offset:offset + limit]
+    type_counts = Counter(str(page.get("type") or page.get("category") or "root") for page in sorted_pages)
     return _core_render_all_pages(
         window,
         total=total,
@@ -905,6 +907,7 @@ def _render_all(query: dict[str, list[str]] | None = None):
         page_href=_page_href,
         layout=_layout,
         error=error or "",
+        type_counts=type_counts,
     )
 
 

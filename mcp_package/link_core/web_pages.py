@@ -124,21 +124,68 @@ def render_all_pages(
     page_href: PageHref,
     layout: PageLayout,
     error: str = "",
+    type_counts: Mapping[str, int] | None = None,
 ) -> str:
     """Render the paginated all-pages view."""
-    items = "".join(
-        f'<li><a href="{html.escape(page_href(str(page["name"])), quote=True)}">'
-        f'{html.escape(str(page["title"]))}</a>'
-        f'<span class="type">{html.escape(str(page.get("type") or page.get("category") or ""))}</span></li>'
-        for page in pages
-    )
     controls = render_page_controls(total=total, limit=limit, offset=offset)
     warning = f'<p class="error">{html.escape(error)}</p>' if error else ""
+    summary = render_page_catalog_summary(total=total, visible=len(pages), type_counts=type_counts)
+    groups = render_page_groups(pages, page_href=page_href)
     return layout(
         "All Pages",
         '<div class="breadcrumb"><a href="/">Link</a> / all pages</div>'
-        f"<h1>All Pages ({total})</h1>{warning}{controls}<ul class='page-list'>{items}</ul>{controls}",
+        f"<h1>All Pages ({total})</h1>{warning}{summary}{controls}{groups}{controls}",
     )
+
+
+def render_page_catalog_summary(
+    *,
+    total: int,
+    visible: int,
+    type_counts: Mapping[str, int] | None = None,
+) -> str:
+    """Render a compact type summary for the all-pages catalog."""
+    if not type_counts:
+        return ""
+    chips = "".join(
+        f'<span class="catalog-chip"><strong>{html.escape(label)}</strong>{count}</span>'
+        for label, count in sorted(
+            ((str(label or "root"), int(count)) for label, count in type_counts.items()),
+            key=lambda item: (-item[1], item[0]),
+        )
+    )
+    return (
+        '<div class="catalog-summary">'
+        f"<p>Showing {visible} of {total} pages, grouped by page type.</p>"
+        f'<div class="catalog-chips">{chips}</div>'
+        "</div>"
+    )
+
+
+def render_page_groups(pages: Sequence[dict[str, object]], *, page_href: PageHref) -> str:
+    """Render visible pages grouped by page type."""
+    grouped: dict[str, list[dict[str, object]]] = {}
+    for page in pages:
+        label = str(page.get("type") or page.get("category") or "root")
+        grouped.setdefault(label, []).append(page)
+    if not grouped:
+        return '<p class="empty-state">No pages found.</p>'
+
+    sections = []
+    for label, group_pages in grouped.items():
+        items = "".join(
+            f'<li><a href="{html.escape(page_href(str(page["name"])), quote=True)}">'
+            f'{html.escape(str(page["title"]))}</a>'
+            f'<span class="type">{html.escape(str(page.get("category") or ""))}</span></li>'
+            for page in group_pages
+        )
+        sections.append(
+            '<section class="page-group">'
+            f"<h2>{html.escape(label)} <span>{len(group_pages)}</span></h2>"
+            f"<ul class='page-list'>{items}</ul>"
+            "</section>"
+        )
+    return '<div class="page-groups">' + "".join(sections) + "</div>"
 
 
 def render_page_controls(*, total: int, limit: int, offset: int) -> str:

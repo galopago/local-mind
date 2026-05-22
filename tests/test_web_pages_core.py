@@ -5,7 +5,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.web_pages import render_all_pages, render_page_controls, render_page_outline, render_wiki_page  # noqa: E402
+from link_core.web_pages import (  # noqa: E402
+    render_all_pages,
+    render_page_catalog_summary,
+    render_page_controls,
+    render_page_groups,
+    render_page_outline,
+    render_wiki_page,
+)
 
 
 def _layout(title: str, body: str) -> str:
@@ -24,10 +31,13 @@ def test_render_all_pages_escapes_page_fields():
         offset=0,
         page_href=lambda name: f"/page/{name}",
         layout=_layout,
+        type_counts={"<script>": 1},
     )
 
     assert "<title>All Pages</title>" in html
     assert "All Pages (1)" in html
+    assert "catalog-summary" in html
+    assert "page-group" in html
     assert "&lt;Link&gt;" in html
     assert "&lt;script&gt;" in html
     assert "<script>" not in html
@@ -53,6 +63,39 @@ def test_render_all_pages_includes_error_and_pagination():
     assert "/all?limit=25&amp;offset=50" in html
     assert "Invalid &lt;limit&gt;" in html
     assert "Topic 025" in html
+
+
+def test_render_all_pages_groups_visible_pages_by_type():
+    pages = [
+        {"name": "agent-memory", "title": "Agent memory", "type": "concept", "category": "concepts"},
+        {"name": "release-notes", "title": "Release notes", "type": "source", "category": "sources"},
+        {"name": "local-first", "title": "Local-first", "type": "concept", "category": "concepts"},
+    ]
+
+    html = render_all_pages(
+        pages,
+        total=3,
+        limit=250,
+        offset=0,
+        page_href=lambda name: f"/page/{name}",
+        layout=_layout,
+        type_counts={"concept": 2, "source": 1},
+    )
+
+    assert '<span class="catalog-chip"><strong>concept</strong>2</span>' in html
+    assert "<h2>concept <span>2</span></h2>" in html
+    assert "<h2>source <span>1</span></h2>" in html
+    assert html.index("Agent memory") < html.index("Release notes")
+
+
+def test_render_page_catalog_summary_is_empty_without_counts():
+    assert render_page_catalog_summary(total=10, visible=5, type_counts=None) == ""
+
+
+def test_render_page_groups_handles_empty_catalog():
+    html = render_page_groups([], page_href=lambda name: f"/page/{name}")
+
+    assert "No pages found." in html
 
 
 def test_render_page_controls_is_empty_without_pagination():
