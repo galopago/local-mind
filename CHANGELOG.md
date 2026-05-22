@@ -42,6 +42,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Updated the health page memory-review fallback to copy a target-aware `link memory-inbox` command.
 - Updated the CLI product docs with the local large-wiki smoke command and how to inspect the generated fixture.
 - Updated public docs to describe the wiki-style home, catalog, and search browsing flows.
+- Updated README and UI docs to describe related-page footers and search refinement.
 - Updated CI to run the full pytest suite rather than the narrower unittest discovery path.
 
 ## [1.2.0] - 2026-05-19
