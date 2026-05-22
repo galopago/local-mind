@@ -2386,22 +2386,24 @@ class ServeTests(unittest.TestCase):
 
         html = serve._render_graph()
 
-        self.assertIn("var OVERVIEW_NODE_LIMIT = 650;", html)
+        self.assertIn("var DEFAULT_OVERVIEW_NODE_LIMIT = 650;", html)
+        self.assertIn("var displayLimitFilter = document.getElementById('graph-display-limit');", html)
         self.assertIn("function capEligibleNodes(eligible)", html)
         self.assertIn("lockedOverviewIds[n.id] = true;", html)
         self.assertIn("fullGraphLoaded && lockedOverviewIds && !searchTerm", html)
         self.assertIn("function markKeep(n)", html)
-        self.assertIn("var highSignalLimit = Math.floor(OVERVIEW_NODE_LIMIT * 0.65);", html)
+        self.assertIn("var highSignalLimit = Math.floor(overviewNodeLimit * 0.65);", html)
+        self.assertIn("display capped", html)
         self.assertIn(".slice(0, highSignalLimit)", html)
         self.assertIn("var sampled = eligible[Math.floor((i + 0.5) * eligible.length / Math.max(sampleLimit, 1))];", html)
-        self.assertIn("while (keepCount < OVERVIEW_NODE_LIMIT && fillIndex < eligible.length)", html)
+        self.assertIn("while (keepCount < overviewNodeLimit && fillIndex < eligible.length)", html)
         self.assertIn("function reseedVisiblePositions()", html)
         self.assertIn("if (searchMatches(n)) markKeep(n);", html)
         self.assertIn("invalidateFilters();\n      if (searchTerm && !fullGraphLoaded) loadFullGraph();", html)
         self.assertIn("cachedSearchMatches = nodes.filter(searchMatches).length;", html)
         self.assertIn("matches > SEARCH_LABEL_LIMIT", html)
         self.assertIn("parts.push('data loaded');", html)
-        self.assertIn("parts.push('overview capped');", html)
+        self.assertIn("parts.push('display capped ' + overviewNodeLimit);", html)
 
     def test_graph_route_can_focus_on_page_neighborhood(self):
         wiki = self.make_wiki()

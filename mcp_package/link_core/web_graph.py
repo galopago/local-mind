@@ -146,6 +146,7 @@ def render_graph_script(
   var categoryFilter = document.getElementById('graph-category');
   var sizeFilter = document.getElementById('graph-size');
   var labelFilter = document.getElementById('graph-label-density');
+  var displayLimitFilter = document.getElementById('graph-display-limit');
   var depthFilter = document.getElementById('graph-depth');
   var frameEl = document.getElementById('graph-frame');
   var status = document.getElementById('graph-status');
@@ -166,7 +167,8 @@ def render_graph_script(
   var LARGE_LABEL_LIMIT = 160;
   var FAST_RENDER_NODE_LIMIT = 450;
   var FAST_RENDER_EDGE_LIMIT = 1200;
-  var OVERVIEW_NODE_LIMIT = 650;
+  var DEFAULT_OVERVIEW_NODE_LIMIT = 650;
+  var DISPLAY_LIMIT_OPTIONS = [250, 650, 1000];
   var SEARCH_LABEL_LIMIT = 60;
   var initialGraphMode = {graph_mode_json};
   var initialFocusId = {focus_id_json};
@@ -198,7 +200,8 @@ def render_graph_script(
         searchTerm: searchTerm,
         categoryValue: categoryValue,
         sizeMode: sizeMode,
-        labelMode: labelMode
+        labelMode: labelMode,
+        displayLimit: overviewNodeLimit
       }}));
     }} catch (error) {{
       // Local storage can be disabled; graph controls should still work.
@@ -341,6 +344,12 @@ def render_graph_script(
       : (storedGraphSettings.labelMode || (storedGraphSettings.showAllLabels ? 'all' : initialLabelMode) || 'sparse')
   ).trim() || 'sparse';
   if (['sparse', 'neighbors', 'all'].indexOf(labelMode) === -1) labelMode = 'sparse';
+  function normalizeDisplayLimit(value) {{
+    var parsed = parseInt(value, 10);
+    if (DISPLAY_LIMIT_OPTIONS.indexOf(parsed) !== -1) return parsed;
+    return DEFAULT_OVERVIEW_NODE_LIMIT;
+  }}
+  var overviewNodeLimit = normalizeDisplayLimit(storedGraphSettings.displayLimit || DEFAULT_OVERVIEW_NODE_LIMIT);
   var showAllLabels = labelMode === 'all';
   var depthValue = 'all';
   var visibleCache = null;
@@ -452,7 +461,7 @@ def render_graph_script(
     return seen;
   }}
   function capEligibleNodes(eligible) {{
-    if (eligible.length <= OVERVIEW_NODE_LIMIT) return eligible;
+    if (eligible.length <= overviewNodeLimit) return eligible;
     if (fullGraphLoaded && lockedOverviewIds && !searchTerm && categoryValue === 'all' && depthValue === 'all' && !selectedNode) {{
       var locked = eligible.filter(function(n) {{ return lockedOverviewIds[n.id]; }});
       if (locked.length) return locked;
@@ -465,8 +474,8 @@ def render_graph_script(
         keepCount++;
       }}
     }}
-    var highSignalLimit = Math.floor(OVERVIEW_NODE_LIMIT * 0.65);
-    var sampleLimit = Math.max(0, OVERVIEW_NODE_LIMIT - highSignalLimit);
+    var highSignalLimit = Math.floor(overviewNodeLimit * 0.65);
+    var sampleLimit = Math.max(0, overviewNodeLimit - highSignalLimit);
     eligible
       .slice()
       .sort(function(a, b) {{
@@ -481,7 +490,7 @@ def render_graph_script(
       markKeep(sampled);
     }}
     var fillIndex = 0;
-    while (keepCount < OVERVIEW_NODE_LIMIT && fillIndex < eligible.length) {{
+    while (keepCount < overviewNodeLimit && fillIndex < eligible.length) {{
       markKeep(eligible[fillIndex]);
       fillIndex++;
     }}
@@ -531,6 +540,14 @@ def render_graph_script(
     labelsButton.setAttribute('aria-pressed', labelMode === 'sparse' ? 'false' : 'true');
     labelsButton.textContent = labelMode === 'all' ? 'Labels all' : (labelMode === 'neighbors' ? 'Labels local' : 'Labels sparse');
     if (labelFilter && labelFilter.value !== labelMode) labelFilter.value = labelMode;
+  }}
+  function syncDisplayLimitControl() {{
+    if (!displayLimitFilter) return;
+    displayLimitFilter.value = String(overviewNodeLimit);
+    displayLimitFilter.disabled = nodes.length <= DEFAULT_OVERVIEW_NODE_LIMIT;
+    displayLimitFilter.title = displayLimitFilter.disabled
+      ? 'The full graph fits within the default overview.'
+      : 'Choose how many nodes the canvas may draw before you narrow the graph.';
   }}
   function syncLegendButtons() {{
     if (!legend) return;
@@ -585,7 +602,7 @@ def render_graph_script(
     if (graphTooLargeForMotion()) parts.push('motion capped');
     if (graphTooLargeForDefaultLabels() && labelMode === 'sparse') parts.push('labels sparse');
     if (graphNeedsFastRender(currentNodes, currentEdges)) parts.push('fast render');
-    if (nodes.length > OVERVIEW_NODE_LIMIT && currentNodes.length < nodes.length) parts.push('overview capped');
+    if (nodes.length > overviewNodeLimit && currentNodes.length < nodes.length) parts.push('display capped ' + overviewNodeLimit);
     if (fullGraphLoaded && initialGraphMode !== 'full') parts.push('data loaded');
     if (fullGraphLoading) parts.push('loading graph data');
     if (searchTerm) {{
@@ -598,6 +615,7 @@ def render_graph_script(
     if (selectedNode) parts.push('selected ' + selectedNode.id);
     status.textContent = parts.join(' · ');
     syncLabelsButton();
+    syncDisplayLimitControl();
     syncLegendButtons();
   }}
 
@@ -1243,6 +1261,16 @@ def render_graph_script(
     saveGraphSettings();
     drawSoon();
   }});
+  if (displayLimitFilter) displayLimitFilter.addEventListener('change', function() {{
+    overviewNodeLimit = normalizeDisplayLimit(displayLimitFilter.value);
+    invalidateFilters();
+    reseedVisiblePositions();
+    setMotionPaused(motionPaused);
+    autoFit();
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
+  }});
   if (depthFilter) depthFilter.addEventListener('change', function() {{
     depthValue = depthFilter.value || 'all';
     invalidateFilters();
@@ -1363,6 +1391,9 @@ def render_graph_page_body(
         '<label class="graph-control">Labels'
         '<select id="graph-label-density"><option value="sparse">sparse</option>'
         '<option value="neighbors">neighbors</option><option value="all">all</option></select></label>'
+        '<label class="graph-control">Display'
+        '<select id="graph-display-limit"><option value="250">250 nodes</option>'
+        '<option value="650" selected>650 nodes</option><option value="1000">1000 nodes</option></select></label>'
         '<label class="graph-control">Neighborhood'
         '<select id="graph-depth"><option value="all">all</option><option value="1">1 hop</option>'
         '<option value="2">2 hops</option><option value="3">3 hops</option></select></label>'
