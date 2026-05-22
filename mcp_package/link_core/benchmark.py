@@ -116,6 +116,9 @@ def build_benchmark_payload(
         graph_summary_info = graph_summary_payload if isinstance(graph_summary_payload, Mapping) else {}
         page_list_info = page_list_payload if isinstance(page_list_payload, Mapping) else {}
         graph_initial_info = graph_initial if isinstance(graph_initial, Mapping) else {}
+        persistent_cache_info = cache.get("persistent_cache")
+        if not isinstance(persistent_cache_info, Mapping):
+            persistent_cache_info = {}
         payload = {
             "target": str(target),
             "wiki": str(wiki_dir),
@@ -142,6 +145,13 @@ def build_benchmark_payload(
                 "total_edges": graph_initial_info.get("total_edge_count", 0),
             },
             "search_backend": str(cache.get("search_backend") or "token-index"),
+            "persistent_cache": {
+                "enabled": bool(persistent_cache_info.get("enabled")),
+                "hit": bool(persistent_cache_info.get("hit")),
+                "partial": bool(persistent_cache_info.get("partial")),
+                "reused_records": int(persistent_cache_info.get("reused_records") or 0),
+                "total_records": int(persistent_cache_info.get("total_records") or 0),
+            },
             "search_results": len(results) if isinstance(results, list) else 0,
             "context_items": len(packet.get("context_packet", [])) if isinstance(packet, dict) else 0,
             "found": bool(packet.get("found")) if isinstance(packet, dict) else False,
@@ -214,6 +224,14 @@ def render_benchmark_text(payload: Mapping[str, object]) -> str:
         f"{payload.get('edges', 0)} edges"
     )
     lines.append(f"Search backend: {payload.get('search_backend', 'unknown')}")
+    persistent_cache = payload.get("persistent_cache")
+    if isinstance(persistent_cache, Mapping):
+        lines.append(
+            "Persistent cache: "
+            f"{'enabled' if persistent_cache.get('enabled') else 'disabled'} · "
+            f"{persistent_cache.get('reused_records', 0)}/{persistent_cache.get('total_records', 0)} pages reused · "
+            f"hit={bool(persistent_cache.get('hit'))} · partial={bool(persistent_cache.get('partial'))}"
+        )
     lines.append(
         f"Results: {payload.get('search_results', 0)} search results · "
         f"{payload.get('context_items', 0)} context items"

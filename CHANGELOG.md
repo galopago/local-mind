@@ -27,6 +27,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `link next` as a short alias for starter prompts so first-run users have one memorable next-step command.
 - Added the `link next` prompt command to demo output so the first terminal screen points to the agent-first workflow.
 - Added the `link next` shortcut to starter prompt payloads and the local prompts page.
+- Added persistent-cache reuse details to benchmark JSON and text output.
 
 ### Changed
 

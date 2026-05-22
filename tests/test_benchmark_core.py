@@ -30,6 +30,9 @@ class BenchmarkCoreTests(unittest.TestCase):
         self.assertEqual(payload["pages"], 13)
         self.assertEqual(payload["memories"], 1)
         self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
+        self.assertIn("persistent_cache", payload)
+        self.assertTrue(payload["persistent_cache"]["enabled"])
+        self.assertEqual(payload["persistent_cache"]["total_records"], 13)
         self.assertTrue(payload["found"])
         self.assertIn("health", payload)
         self.assertIn("cache", payload["timings"])
@@ -133,6 +136,13 @@ class BenchmarkCoreTests(unittest.TestCase):
             "memories": 1,
             "edges": 58,
             "search_backend": "sqlite-fts",
+            "persistent_cache": {
+                "enabled": True,
+                "hit": False,
+                "partial": True,
+                "reused_records": 11,
+                "total_records": 12,
+            },
             "search_results": 4,
             "context_items": 3,
             "found": True,
@@ -167,6 +177,7 @@ class BenchmarkCoreTests(unittest.TestCase):
 
         self.assertIn("Link benchmark: /tmp/link", text)
         self.assertIn("Project: link", text)
+        self.assertIn("Persistent cache: enabled · 11/12 pages reused · hit=False · partial=True", text)
         self.assertIn("Agent-safe payloads: graph summary 5 nodes/6 edges · page list 12 pages", text)
         self.assertIn("Graph page initial load: full · 12/12 nodes", text)
         self.assertIn("Verdict: interactive", text)
