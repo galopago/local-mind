@@ -38,6 +38,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added legacy browser hardening headers for frame denial, DNS prefetch control, and cross-domain policy denial.
 - Added `/api/health` for a machine-readable readiness packet with validation and interrupted-operation state.
 - Added `/api` discovery output with recommended local endpoints and write-action header requirements.
+- Added MCP `link_operations` so agents can inspect pending, failed, or interrupted local writes.
 
 ### Changed
 

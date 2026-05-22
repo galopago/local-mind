@@ -64,6 +64,7 @@ EXPECTED_MCP_TOOLS = {
     "get_graph_summary",
     "get_pages",
     "ingest_status",
+    "link_operations",
     "link_status",
     "memory_audit",
     "memory_brief",

@@ -12,6 +12,9 @@ from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "mcp_package"))
+from link_core.operations import begin_operation  # noqa: E402
+
 LINK_SPEC = importlib.util.spec_from_file_location("link_cli_for_mcp_tests", ROOT / "link.py")
 link_cli = importlib.util.module_from_spec(LINK_SPEC)
 assert LINK_SPEC.loader is not None
@@ -160,6 +163,23 @@ class McpContractTests(unittest.TestCase):
         self.assertFalse(payload["ready"])
         self.assertGreater(payload["page_count"], 0)
         self.assertEqual(payload["warnings"][0]["code"], "cache_read_warnings")
+
+    def test_link_operations_contract(self):
+        begin_operation(
+            self.target / "wiki",
+            "remember",
+            "Save memory",
+            timestamp="2026-05-17T00:00:00Z",
+            paths=["wiki/memories/prefer-local.md"],
+        )
+
+        payload = json.loads(self.server.link_operations(limit=5))
+
+        self.assertEqual(payload["operation_count"], 1)
+        self.assertEqual(payload["stale_count"], 1)
+        self.assertEqual(payload["operations"][0]["operation"], "remember")
+        self.assertEqual(payload["operations"][0]["description"], "Save memory")
+        self.assertIn("link operations", payload["next_actions"][0]["command"])
 
     def test_starter_prompts_contract(self):
         payload = json.loads(self.server.starter_prompts(project="Client Launch"))
