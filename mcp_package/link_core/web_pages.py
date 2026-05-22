@@ -27,6 +27,7 @@ def render_wiki_page(
     proposal_href: str = "",
     proposal_prompt: str = "",
     query_prompt: str = "",
+    related_pages: Sequence[Mapping[str, object]] = (),
 ) -> str:
     """Render a single wiki page shell around already-rendered Markdown."""
     crumb = '<div class="breadcrumb"><a href="/">Link</a>'
@@ -52,7 +53,23 @@ def render_wiki_page(
     document_html = f'<article class="wiki-page-document">{body_html}</article>'
     if outline_html:
         document_html = f'<div class="wiki-page-shell">{outline_html}{document_html}</div>'
-    return layout(title, crumb + meta_line + page_actions + document_html)
+    related_html = render_related_pages(related_pages)
+    return layout(title, crumb + meta_line + page_actions + document_html + related_html)
+
+
+def render_related_pages(pages: Sequence[Mapping[str, object]]) -> str:
+    if not pages:
+        return ""
+    items = "".join(
+        '<li><span class="relationship">{relationship}</span>'
+        '<a href="{href}">{title}</a></li>'.format(
+            relationship=html.escape(str(page.get("relationship") or "related")),
+            href=html.escape(str(page.get("href") or "#"), quote=True),
+            title=html.escape(str(page.get("title") or page.get("name") or "Untitled")),
+        )
+        for page in pages
+    )
+    return f'<section class="related-pages"><h2>Related Pages</h2><ul>{items}</ul></section>'
 
 
 def render_page_outline(body_html: str) -> tuple[str, str]:

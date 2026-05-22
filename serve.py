@@ -879,7 +879,34 @@ def _render_page(page_path):
         proposal_href=_proposal_href(raw_refs[0]) if raw_refs else "",
         proposal_prompt=proposal_prompt,
         query_prompt=query_prompt,
+        related_pages=_related_pages_for(page_path.stem),
     )
+
+
+def _related_pages_for(page_name: str, max_items: int = 8) -> list[dict[str, str]]:
+    """Return a compact inbound/forward page list for the wiki page footer."""
+    pages = _get_all_pages()
+    page_by_name = {str(page.get("name") or ""): page for page in pages}
+    backlinks, _ = _load_backlinks_index()
+    inbound = list(backlinks.get("backlinks", {}).get(page_name, []))
+    forward = list(_forward_links_index.get(page_name) or backlinks.get("forward", {}).get(page_name, []))
+    related: list[dict[str, str]] = []
+    seen = {page_name}
+    for relationship, names in (("links here", inbound), ("links out", forward)):
+        for name in names:
+            if name in seen or name not in page_by_name:
+                continue
+            seen.add(name)
+            page = page_by_name[name]
+            related.append({
+                "name": name,
+                "title": str(page.get("title") or name),
+                "href": _page_href(name),
+                "relationship": relationship,
+            })
+            if len(related) >= max_items:
+                return related
+    return related
 
 
 def _render_all(query: dict[str, list[str]] | None = None):

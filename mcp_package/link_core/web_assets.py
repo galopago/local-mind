@@ -181,6 +181,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 
 .wiki-page-shell { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 26px; align-items: start; }
 .wiki-page-document { max-width: 760px; min-width: 0; }
+.related-pages { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--border-soft); font-family: sans-serif; }
+.related-pages h2 { font-family: Georgia, "Times New Roman", serif; font-size: 20px; margin-top: 0; }
+.related-pages ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
+.related-pages li { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.related-pages .relationship { color: var(--subtle); font-size: 12px; min-width: 58px; text-transform: lowercase; }
 .page-outline { position: sticky; top: 14px; display: grid; gap: 7px; padding: 10px 12px 10px 0;
                 border-right: 1px solid var(--border-soft); font: 12px -apple-system, BlinkMacSystemFont, sans-serif;
                 color: var(--muted); }

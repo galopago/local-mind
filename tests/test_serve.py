@@ -31,6 +31,7 @@ def reset_wiki(wiki_dir: Path) -> None:
     serve._token_index = {}
     serve._page_map = {}
     serve._meta_token_index = {}
+    serve._forward_links_index = {}
     serve._fts_index = None
     serve._search_backend = "token-index"
     serve._cache_read_warnings = []
@@ -511,6 +512,31 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Open local graph", html)
         self.assertIn('data-copy-text="query Link for Agent Memory"', html)
         self.assertIn("Copy query prompt", html)
+
+    def test_wiki_page_shows_related_pages_from_graph_links(self):
+        wiki = self.make_wiki()
+        page = write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n\n[[b]]\n",
+        )
+        write_page(
+            wiki,
+            "concepts/b.md",
+            "---\ntype: concept\ntitle: B\n---\n# B\n",
+        )
+        write_page(
+            wiki,
+            "sources/c.md",
+            "---\ntype: source\ntitle: C Source\n---\n# C\n\n[[a]]\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(serve._build_backlinks()), encoding="utf-8")
+
+        html = serve._render_page(page)
+
+        self.assertIn("Related Pages", html)
+        self.assertIn('<span class="relationship">links here</span><a href="/page/c">C Source</a>', html)
+        self.assertIn('<span class="relationship">links out</span><a href="/page/b">B</a>', html)
 
     def test_source_page_links_to_memory_proposals(self):
         wiki = self.make_wiki()

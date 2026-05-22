@@ -11,6 +11,7 @@ from link_core.web_pages import (  # noqa: E402
     render_page_controls,
     render_page_groups,
     render_page_outline,
+    render_related_pages,
     render_wiki_page,
 )
 
@@ -169,6 +170,24 @@ def test_render_wiki_page_includes_local_graph_action():
     assert "<p>Trusted body</p>" in html
 
 
+def test_render_wiki_page_includes_related_pages():
+    html = render_wiki_page(
+        "Agent Memory",
+        category="concepts",
+        meta={},
+        body_html="<p>Trusted body</p>",
+        layout=_layout,
+        related_pages=[
+            {"title": "Source <Notes>", "href": "/page/source?x=<bad>", "relationship": "links here"},
+        ],
+    )
+
+    assert "Related Pages" in html
+    assert "links here" in html
+    assert "Source &lt;Notes&gt;" in html
+    assert "/page/source?x=&lt;bad&gt;" in html
+
+
 def test_render_wiki_page_includes_memory_proposal_action():
     html = render_wiki_page(
         "Release Notes",
@@ -225,3 +244,7 @@ def test_render_page_outline_escapes_labels_and_deduplicates_slugs():
     assert "Use &lt;Link&gt;" in outline
     assert '<h2 id="use-link">Use &lt;Link&gt;</h2>' in body
     assert '<h2 id="use-link-2">Use &lt;Link&gt;</h2>' in body
+
+
+def test_render_related_pages_is_empty_without_pages():
+    assert render_related_pages([]) == ""
