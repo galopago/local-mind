@@ -102,6 +102,8 @@ The `/health` page mirrors the readiness loop in the browser: validation state,
 interrupted writes, memory review status, and copyable repair commands.
 The viewer itself stays document-first: common paths are in the top nav, deeper
 tools live under `more`, and structured wiki pages get a local contents outline.
+Home shows recently updated pages, while `/all` and search group results by page
+type with chips for narrowing larger wikis.
 
 From a source checkout, use `python3 link.py ...`:
 
