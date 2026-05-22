@@ -204,6 +204,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .page-list li:last-child { border-bottom: none; }
 .page-list .type { font-size: 11px; color: var(--subtle); font-family: sans-serif; margin-left: 6px; }
 .search-results small { color: var(--subtle); font-family: sans-serif; line-height: 1.35; }
+.search-refine { margin: 0 0 14px; display: flex; gap: 8px; align-items: center; max-width: 620px; }
+.search-refine input[type="search"] { flex: 1 1 auto; min-width: 150px; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); font-size: 14px; }
+.search-refine button { flex: 0 0 auto; }
 .catalog-summary { border: 1px solid var(--border-soft); border-radius: 4px; padding: 10px 12px;
                    background: var(--surface); margin: 12px 0 14px; font-family: sans-serif; }
 .catalog-summary p { margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.4; }

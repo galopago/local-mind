@@ -19,6 +19,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added interactive graph legend chips that filter the graph by page type.
 - Added viewer commands and graph/health URLs to the synthetic large-wiki smoke output so local 10k-page checks are easier to inspect.
 - Added active navigation highlighting to the local web viewer.
+- Added an in-page search refinement form that preserves the current query and page-type filter.
 
 ### Changed
 

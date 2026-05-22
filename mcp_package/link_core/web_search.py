@@ -39,7 +39,9 @@ def render_search_page(
         return layout(
             "Search",
             '<div class="breadcrumb"><a href="/">Link</a> / search</div>'
-            '<h1>Search</h1><p>Enter a search term above.</p>',
+            "<h1>Search</h1>"
+            f"{render_search_refine_form(query)}"
+            "<p>Search titles, aliases, tags, summaries, and page text.</p>",
         )
 
     filtered_results = filter_search_results(results, active_type=active_type)
@@ -75,6 +77,7 @@ def render_search_page(
             f"Search: {query}",
             f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
             f'<h1>Search: {html.escape(query)}</h1>'
+            f"{render_search_refine_form(query, active_type=active_type)}"
             f"<p>0{filtered} results</p>"
             f"{summary}"
             f"{actions}"
@@ -91,10 +94,26 @@ def render_search_page(
         f"Search: {query}",
         f'<div class="breadcrumb"><a href="/">Link</a> / search</div>'
         f'<h1>Search: {html.escape(query)}</h1>'
+        f"{render_search_refine_form(query, active_type=active_type)}"
         f'<p>{total} result{"s" if total != 1 else ""}{cap_note}</p>'
         f"{summary}"
         f'{actions}'
         f'{groups}',
+)
+
+
+def render_search_refine_form(query: str, *, active_type: str = "") -> str:
+    type_input = (
+        f'<input type="hidden" name="type" value="{html.escape(active_type, quote=True)}">'
+        if active_type else ""
+    )
+    return (
+        '<form class="search-refine" action="/search" method="get">'
+        f'<input type="search" name="q" value="{html.escape(query, quote=True)}" '
+        'placeholder="search titles, tags, and page text" autocomplete="off">'
+        f"{type_input}"
+        '<button type="submit">Search</button>'
+        "</form>"
     )
 
 

@@ -9,6 +9,7 @@ from link_core.web_search import (  # noqa: E402
     filter_search_results,
     highlight_search_term,
     render_search_page,
+    render_search_refine_form,
     render_search_result_groups,
     render_search_type_summary,
     search_type_counts,
@@ -31,7 +32,8 @@ def test_render_search_page_handles_empty_query():
     html = render_search_page("", [], page_href=lambda name: f"/page/{name}", layout=_layout)
 
     assert "<title>Search</title>" in html
-    assert "Enter a search term above." in html
+    assert 'class="search-refine"' in html
+    assert "Search titles, aliases, tags, summaries, and page text." in html
 
 
 def test_render_search_page_caps_results_and_escapes_content():
@@ -54,6 +56,7 @@ def test_render_search_page_caps_results_and_escapes_content():
     assert "/page/page-2" not in html
     assert "&lt;agent memory&gt;" in html
     assert "<mark>Link</mark>" in html
+    assert 'value="link"' in html
 
 
 def test_render_search_page_filters_by_type():
@@ -72,6 +75,7 @@ def test_render_search_page_filters_by_type():
 
     assert "1 result" in html
     assert '<a class="catalog-chip active" href="/search?q=memory&amp;type=source"><strong>source</strong>1</a>' in html
+    assert 'name="type" value="source"' in html
     assert "Release notes" in html
     assert "Agent memory" not in html
     assert '<a href="/search?q=memory">Clear page-type filter</a>' not in html
@@ -125,6 +129,13 @@ def test_search_type_helpers_escape_and_group_results():
     assert "type=%3Csource%3E" in summary
     assert "&lt;source&gt;" in summary
     assert "<h2>&lt;source&gt; <span>1</span></h2>" in groups
+
+
+def test_render_search_refine_form_escapes_query_and_filter():
+    html = render_search_refine_form('agent "memory"', active_type='source"bad')
+
+    assert 'value="agent &quot;memory&quot;"' in html
+    assert 'name="type" value="source&quot;bad"' in html
 
 
 def test_render_search_page_escapes_actions_and_result_hrefs():
