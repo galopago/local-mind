@@ -869,6 +869,33 @@ def _render_prompts(project: str | None = None):
     return _core_render_prompts_page(_starter_prompts_payload(project=project), layout=_layout)
 
 
+def _render_more():
+    links = [
+        ("/prompts", "Prompts", "Starter prompts and copyable next-step commands."),
+        ("/propose", "Propose", "Turn notes into review-only memory candidates."),
+        ("/audit", "Audit", "Review memory health, backlog, captures, and safe next actions."),
+        ("/inbox", "Inbox", "Confirm, update, archive, or explain memories needing review."),
+        ("/captures", "Captures", "Inspect saved raw session captures before accepting them."),
+        ("/profile", "Profile", "See what Link remembers by type, scope, status, and recency."),
+        ("/page/log", "Log", "Read the append-only wiki operation log."),
+        ("/all", "All Pages", "Browse grouped wiki pages with filters and pagination."),
+    ]
+    cards = "".join(
+        '<article class="memory-card">'
+        f'<h2><a href="{html.escape(href, quote=True)}">{html.escape(title)}</a></h2>'
+        f'<p>{html.escape(description)}</p>'
+        "</article>"
+        for href, title, description in links
+    )
+    return _layout(
+        "More",
+        '<div class="breadcrumb"><a href="/">Link</a> / more</div>'
+        "<h1>More Tools</h1>"
+        '<p class="summary">Advanced Link views for prompts, proposal review, audit, captures, and full wiki browsing.</p>'
+        f'<section class="memory-grid">{cards}</section>',
+    )
+
+
 def _render_page(page_path):
     text = page_path.read_text(encoding="utf-8", errors="replace")
     meta, body = _parse_frontmatter(text)
@@ -1503,6 +1530,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             ))
         elif path == "/prompts":
             self._ok(_render_prompts(project=_query_text(query, "project", max_len=80)))
+        elif path == "/more":
+            self._ok(_render_more())
         elif path == "/memory":
             self._ok(_render_memory_dashboard(project=_query_text(query, "project", max_len=80)))
         elif path == "/audit":

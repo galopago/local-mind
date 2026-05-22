@@ -347,6 +347,18 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(headers["Pragma"], "no-cache")
         self.assertEqual(headers["Expires"], "0")
 
+    def test_more_page_lists_advanced_tools(self):
+        self.make_wiki()
+
+        status, body, _ = run_handler_raw("GET", "/more")
+
+        self.assertEqual(status, 200)
+        self.assertIn(b"More Tools", body)
+        self.assertIn(b"/prompts", body)
+        self.assertIn(b"/propose", body)
+        self.assertIn(b"/captures", body)
+        self.assertIn(b"/all", body)
+
     def test_head_status_sends_headers_without_body(self):
         self.make_wiki()
 

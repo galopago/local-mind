@@ -40,6 +40,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added `/api` discovery output with recommended local endpoints and write-action header requirements.
 - Added MCP `link_operations` so agents can inspect pending, failed, or interrupted local writes.
 - Added `link health` as a single CLI readiness command combining status validation with interrupted-write state.
+- Added a `/more` page so direct navigation to advanced local viewer tools no longer lands on Not found.
 
 ### Changed
 
