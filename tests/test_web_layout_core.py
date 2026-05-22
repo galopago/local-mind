@@ -37,6 +37,8 @@ class WebLayoutCoreTests(unittest.TestCase):
         self.assertIn("<main>Body</main>", html)
         self.assertIn("document.activeElement.id === 'search-input'", html)
         self.assertIn("window.location.href = '/search?q=' + encodeURIComponent(q);", html)
+        self.assertIn("active.setAttribute('aria-current', 'page');", html)
+        self.assertIn("current.indexOf('/page/') === 0", html)
         self.assertIn("localStorage.getItem('link-theme')", html)
         self.assertIn("navigator.clipboard.writeText", html)
         self.assertIn("/api/raw-source", html)

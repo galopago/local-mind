@@ -133,6 +133,8 @@ header .logo small { font-weight: normal; font-size: 13px; color: var(--subtle);
 header nav { display: flex; gap: 8px 14px; font-size: 14px; font-family: sans-serif; flex-wrap: wrap; min-width: 0; align-items: center; }
 header nav a,
 header nav summary { line-height: 1.35; }
+header nav a[aria-current="page"],
+header nav summary[aria-current="page"] { color: var(--text-strong); font-weight: 600; text-decoration: none; }
 header .nav-more { position: relative; display: inline-flex; }
 header .nav-more summary { color: var(--link); cursor: pointer; list-style: none; text-decoration: underline; }
 header .nav-more summary::-webkit-details-marker { display: none; }
