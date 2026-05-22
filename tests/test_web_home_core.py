@@ -53,7 +53,9 @@ def test_render_home_page_shows_stats_sections_and_prompts():
     assert "/page/agent-memory" in html
     assert "Try These Prompts" in html
     assert "is Link ready?" in html
+    assert 'data-copy-text="is Link ready?"' in html
     assert "ingest raw/&lt;file&gt; into Link" in html
+    assert 'data-copy-text="ingest raw/&lt;file&gt; into Link"' in html
     assert "Next Steps" in html
     assert "Recently Updated" in html
     assert html.index("Local Memory") < html.index("Agent Memory")

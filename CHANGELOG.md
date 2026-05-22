@@ -33,6 +33,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Updated docs to explain persistent-cache reuse in status, benchmark, health, and slow-wiki troubleshooting flows.
 - Updated installer and agent-instruction next steps to point at `link next`.
 - Simplified quick-start examples around `link next`, with `link welcome` kept as the optional guided proof path.
+- Added copy buttons to the home-page starter prompt strip.
 
 ### Changed
 

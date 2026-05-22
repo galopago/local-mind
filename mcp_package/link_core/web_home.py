@@ -127,7 +127,13 @@ def _render_prompt_strip(starter_prompts: Mapping[str, object]) -> str:
     prompt_codes = ""
     for item in starter_prompts.get("prompts", []):
         if isinstance(item, dict):
-            prompt_codes += f'<code>{html.escape(str(item.get("prompt") or ""))}</code>'
+            prompt = str(item.get("prompt") or "")
+            prompt_codes += (
+                '<div class="prompt-chip">'
+                f"<code>{html.escape(prompt)}</code>"
+                f"{copy_button(prompt, 'Copy')}"
+                "</div>"
+            )
     return (
         '<section class="prompt-strip" aria-label="First Link prompts">'
         '<h2>Try These Prompts</h2>'

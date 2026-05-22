@@ -356,7 +356,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 .prompt-strip h2 { margin-top: 0; font-size: 17px; }
 .prompt-strip p { color: var(--muted); margin-bottom: 10px; }
 .prompt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
-.prompt-grid code { display: block; padding: 8px; background: var(--surface-code); border-radius: 4px; white-space: normal; }
+.prompt-chip { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.prompt-chip code { flex: 1; display: block; padding: 8px; background: var(--surface-code); border-radius: 4px; white-space: normal; overflow-wrap: anywhere; }
+.prompt-chip .copy-button { flex: 0 0 auto; }
 .home-next { margin: 16px 0 20px; }
 .home-next h2 { margin-top: 0; font-size: 17px; }
 .home-next-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
