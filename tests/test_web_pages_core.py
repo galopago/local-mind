@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.web_pages import render_all_pages, render_page_controls, render_wiki_page  # noqa: E402
+from link_core.web_pages import render_all_pages, render_page_controls, render_page_outline, render_wiki_page  # noqa: E402
 
 
 def _layout(title: str, body: str) -> str:
@@ -130,3 +130,31 @@ def test_render_wiki_page_escapes_query_prompt_action():
 
     assert 'data-copy-text="query Link for &quot;&lt;unsafe&gt;&quot;"' in html
     assert 'query Link for "<unsafe>"' not in html
+
+
+def test_render_wiki_page_adds_document_outline_for_sectioned_pages():
+    html = render_wiki_page(
+        "Sectioned",
+        category="concepts",
+        meta={},
+        body_html="<h1>Sectioned</h1><h2>Summary</h2><p>One</p><h2>Raw Source</h2><p>Two</p>",
+        layout=_layout,
+    )
+
+    assert 'class="wiki-page-shell"' in html
+    assert 'class="page-outline"' in html
+    assert '<h2 id="summary">Summary</h2>' in html
+    assert '<h2 id="raw-source">Raw Source</h2>' in html
+    assert '<a class="level-2" href="#summary">Summary</a>' in html
+
+
+def test_render_page_outline_escapes_labels_and_deduplicates_slugs():
+    outline, body = render_page_outline(
+        "<h2>Use &lt;Link&gt;</h2><p>x</p><h2>Use &lt;Link&gt;</h2>"
+    )
+
+    assert 'href="#use-link"' in outline
+    assert 'href="#use-link-2"' in outline
+    assert "Use &lt;Link&gt;" in outline
+    assert '<h2 id="use-link">Use &lt;Link&gt;</h2>' in body
+    assert '<h2 id="use-link-2">Use &lt;Link&gt;</h2>' in body

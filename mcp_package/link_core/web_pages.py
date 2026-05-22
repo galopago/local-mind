@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import re
 from collections.abc import Callable, Mapping, Sequence
 
 from .web_ingest import copy_button
@@ -9,6 +10,9 @@ from .web_ingest import copy_button
 
 PageHref = Callable[[str], str]
 PageLayout = Callable[[str, str], str]
+
+_HEADING_RE = re.compile(r"<h([23])>(.*?)</h\1>", re.DOTALL)
+_TAG_RE = re.compile(r"<[^>]+>")
 
 
 def render_wiki_page(
@@ -43,7 +47,53 @@ def render_wiki_page(
     if query_prompt:
         action_links.append(copy_button(query_prompt, "Copy query prompt"))
     page_actions = f'<div class="page-actions">{"".join(action_links)}</div>' if action_links else ""
-    return layout(title, crumb + meta_line + page_actions + body_html)
+    outline_html, body_html = render_page_outline(body_html)
+    document_html = f'<article class="wiki-page-document">{body_html}</article>'
+    if outline_html:
+        document_html = f'<div class="wiki-page-shell">{outline_html}{document_html}</div>'
+    return layout(title, crumb + meta_line + page_actions + document_html)
+
+
+def render_page_outline(body_html: str) -> tuple[str, str]:
+    """Add stable heading anchors and return a compact page outline."""
+    headings: list[tuple[str, str, str]] = []
+    used_slugs: set[str] = set()
+
+    def replace_heading(match: re.Match[str]) -> str:
+        level = match.group(1)
+        inner_html = match.group(2)
+        label = html.unescape(_TAG_RE.sub("", inner_html)).strip()
+        if not label:
+            return match.group(0)
+        slug = _heading_slug(label, used_slugs)
+        headings.append((level, label, slug))
+        return f'<h{level} id="{html.escape(slug, quote=True)}">{inner_html}</h{level}>'
+
+    updated_body = _HEADING_RE.sub(replace_heading, body_html)
+    if len(headings) < 2:
+        return "", updated_body
+
+    links = "".join(
+        '<a class="level-{level}" href="#{slug}">{label}</a>'.format(
+            level=html.escape(level, quote=True),
+            slug=html.escape(slug, quote=True),
+            label=html.escape(label),
+        )
+        for level, label, slug in headings
+    )
+    return f'<aside class="page-outline" aria-label="Page contents"><strong>contents</strong>{links}</aside>', updated_body
+
+
+def _heading_slug(label: str, used_slugs: set[str]) -> str:
+    words = re.findall(r"[a-z0-9]+", label.lower())
+    base = "-".join(words) or "section"
+    slug = base
+    counter = 2
+    while slug in used_slugs:
+        slug = f"{base}-{counter}"
+        counter += 1
+    used_slugs.add(slug)
+    return slug
 
 
 def render_page_meta_line(meta: Mapping[str, object]) -> str:

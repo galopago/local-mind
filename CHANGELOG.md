@@ -21,6 +21,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ### Changed
 
+- Refined the local web viewer toward a quieter wiki/document layout with grouped navigation, plainer page metadata, and automatic section outlines on structured wiki pages.
 - Changed large-graph canvas seeding to use deterministic category clusters, with higher-degree pages nearer cluster centers, instead of a single global spiral.
 - Updated CLI query no-context recovery commands to include the explicit Link root so they work from any terminal directory.
 - Updated starter prompt local-check commands to include the explicit Link root so CLI, web, and MCP prompt payloads are paste-safe outside the wiki directory.

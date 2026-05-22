@@ -18,6 +18,8 @@ class WebLayoutCoreTests(unittest.TestCase):
         self.assertIn('<a href="/brief">brief</a>', html)
         self.assertIn('<a href="/propose">propose</a>', html)
         self.assertIn('<a href="/graph">graph</a>', html)
+        self.assertIn('class="nav-more"', html)
+        self.assertIn('<summary>more</summary>', html)
         self.assertIn('id="search-input"', html)
         self.assertIn("data-theme-toggle", html)
 

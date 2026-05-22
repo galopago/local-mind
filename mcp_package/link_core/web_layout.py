@@ -65,21 +65,26 @@ def render_header_html() -> str:
       </form>
     </div>
   </div>
-  <nav>
+  <nav aria-label="Link sections">
     <a href="/">home</a>
-    <a href="/health">health</a>
-    <a href="/prompts">prompts</a>
-    <a href="/ingest">ingest</a>
     <a href="/brief">brief</a>
-    <a href="/propose">propose</a>
     <a href="/memory">memory</a>
-    <a href="/audit">audit</a>
-    <a href="/inbox">inbox</a>
-    <a href="/captures">captures</a>
-    <a href="/profile">profile</a>
-    <a href="/page/log">log</a>
-    <a href="/all">all pages</a>
+    <a href="/ingest">ingest</a>
     <a href="/graph">graph</a>
+    <a href="/health">health</a>
+    <details class="nav-more">
+      <summary>more</summary>
+      <div class="nav-more-menu">
+        <a href="/prompts">prompts</a>
+        <a href="/propose">propose</a>
+        <a href="/audit">audit</a>
+        <a href="/inbox">inbox</a>
+        <a href="/captures">captures</a>
+        <a href="/profile">profile</a>
+        <a href="/page/log">log</a>
+        <a href="/all">all pages</a>
+      </div>
+    </details>
   </nav>
 </header>"""
 
