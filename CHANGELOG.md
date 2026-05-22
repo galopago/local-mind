@@ -37,6 +37,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Added a local HTTP request timeout so stalled clients cannot hold server threads indefinitely.
 - Added legacy browser hardening headers for frame denial, DNS prefetch control, and cross-domain policy denial.
 - Added `/api/health` for a machine-readable readiness packet with validation and interrupted-operation state.
+- Added `/api` discovery output with recommended local endpoints and write-action header requirements.
 
 ### Changed
 

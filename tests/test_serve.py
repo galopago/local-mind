@@ -322,6 +322,19 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["operations"]["api_version"], serve.API_VERSION)
         self.assertEqual(payload["operations"]["operation_count"], 0)
 
+    def test_api_root_returns_discovery_payload(self):
+        self.make_wiki()
+
+        status, payload = run_handler("GET", "/api")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["api_version"], serve.API_VERSION)
+        self.assertTrue(payload["local_only"])
+        self.assertEqual(payload["recommended"]["readiness"], "/api/health")
+        self.assertIn("/api/query-link", payload["endpoints"]["read"])
+        self.assertIn("/api/remember-memory", payload["endpoints"]["write"])
+        self.assertEqual(payload["write_header"]["X-Link-Local-Action"], "true")
+
     def test_html_responses_are_not_browser_cached(self):
         self.make_wiki()
 

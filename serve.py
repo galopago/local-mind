@@ -1273,6 +1273,57 @@ def _health_payload() -> dict[str, object]:
     }
 
 
+def _api_discovery_payload() -> dict[str, object]:
+    return {
+        "api_version": API_VERSION,
+        "name": "Link local HTTP API",
+        "description": "Loopback-only API for Link local agent memory.",
+        "local_only": True,
+        "recommended": {
+            "readiness": "/api/health",
+            "agent_context": "/api/query-link?q=<query>&budget=small",
+            "graph_overview": "/api/graph-summary?limit=40&depth=1",
+            "ingest_guidance": "/api/ingest-status",
+        },
+        "endpoints": {
+            "read": [
+                "/api/health",
+                "/api/status?validate=true",
+                "/api/prompts",
+                "/api/ingest-status",
+                "/api/page-list",
+                "/api/query-link",
+                "/api/memory-brief",
+                "/api/memory-dashboard",
+                "/api/memory-audit",
+                "/api/memory-profile",
+                "/api/memory-inbox",
+                "/api/capture-inbox",
+                "/api/explain-memory",
+                "/api/validate",
+                "/api/search",
+                "/api/context",
+                "/api/graph-summary",
+                "/api/graph",
+                "/api/page-links",
+                "/api/operations",
+            ],
+            "write": [
+                "/api/raw-source",
+                "/api/propose-memories",
+                "/api/remember-memory",
+                "/api/update-memory",
+                "/api/review-memory",
+                "/api/archive-memory",
+                "/api/restore-memory",
+                "/api/rebuild-backlinks",
+                "/api/rebuild-index",
+            ],
+        },
+        "write_header": {"X-Link-Local-Action": "true"},
+    }
+
+
 def _render_health():
     return _core_render_health_page(
         _link_status_payload(include_validation=True),
@@ -1475,13 +1526,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             page = _find_page(urllib.parse.unquote(path[6:]))
             if page: self._ok(_render_page(page))
             else: self._err(urllib.parse.unquote(path[6:]))
-        elif path.startswith("/api/"):
+        elif path == "/api" or path.startswith("/api/"):
             self._handle_api_get(path, query)
         else:
             self._err("page")
 
     def _handle_api_get(self, path: str, query: dict[str, list[str]]) -> None:
-        if path == "/api/pages":
+        if path in {"/api", "/api/"}:
+            self._json(_api_discovery_payload())
+        elif path == "/api/pages":
             self._json(_all_pages())
         elif path == "/api/page-list":
             limit, limit_error = _core_parse_bounded_int(query.get("limit", ["100"])[0], "limit", 100, 1, 1000)
