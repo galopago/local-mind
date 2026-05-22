@@ -158,6 +158,7 @@ def build_benchmark_payload(
             "timings": {key: round(value, 4) for key, value in timings.items()},
             "budget_report": budget_report,
         }
+        payload["scale_notes"] = benchmark_scale_notes(payload)
         payload["health"] = benchmark_health(payload)
         return payload
     finally:
@@ -208,6 +209,36 @@ def benchmark_health(payload: Mapping[str, object]) -> dict[str, object]:
     }
 
 
+def benchmark_scale_notes(payload: Mapping[str, object]) -> list[str]:
+    """Return non-alarmist scale guidance for otherwise healthy local wikis."""
+    pages = int(payload.get("pages") or 0)
+    graph_initial = payload.get("graph_initial")
+    graph_mode = ""
+    graph_nodes = 0
+    graph_total_nodes = 0
+    if isinstance(graph_initial, Mapping):
+        graph_mode = str(graph_initial.get("mode") or "")
+        graph_nodes = int(graph_initial.get("nodes") or 0)
+        graph_total_nodes = int(graph_initial.get("total_nodes") or 0)
+
+    notes: list[str] = []
+    if pages >= 10_000:
+        notes.append(
+            "10k+ page wiki: prefer query, brief, search, graph-summary, and focused graph neighborhoods for daily work."
+        )
+    elif pages >= 1_000:
+        notes.append(
+            "1k+ page wiki: keep using bounded query packets and graph neighborhoods instead of asking agents to enumerate everything."
+        )
+    if graph_mode == "summary" or (graph_total_nodes and graph_nodes < graph_total_nodes):
+        notes.append(
+            "Graph opens as a bounded overview; load all data only when you need global search or filtering."
+        )
+    if payload.get("search_backend") == "sqlite-fts":
+        notes.append("SQLite FTS is active, so search has headroom for larger local wikis.")
+    return notes
+
+
 def render_benchmark_text(payload: Mapping[str, object]) -> str:
     """Render human-readable benchmark output."""
     lines = [
@@ -253,6 +284,11 @@ def render_benchmark_text(payload: Mapping[str, object]) -> str:
             f"{graph_initial.get('mode', 'unknown')} · "
             f"{graph_initial.get('nodes', 0)}/{graph_initial.get('total_nodes', 0)} nodes"
         )
+    scale_notes = payload.get("scale_notes")
+    if isinstance(scale_notes, list) and scale_notes:
+        lines.append("Scale notes:")
+        for note in scale_notes:
+            lines.append(f"- {note}")
 
     health = payload.get("health")
     if isinstance(health, Mapping):
