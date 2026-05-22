@@ -998,7 +998,7 @@ def render_graph_script(
     setMotionPaused(true);
     if (loadFullButton) {{
       loadFullButton.disabled = true;
-      loadFullButton.textContent = 'Graph data loaded';
+      loadFullButton.textContent = 'Full data loaded; overview capped';
     }}
   }}
 
@@ -1021,7 +1021,7 @@ def render_graph_script(
     fullGraphLoading = true;
     if (loadFullButton) {{
       loadFullButton.disabled = true;
-      loadFullButton.textContent = 'Loading graph data...';
+      loadFullButton.textContent = 'Loading full data...';
     }}
     updateStatus();
     fetch('/api/graph')
@@ -1038,9 +1038,9 @@ def render_graph_script(
         fullGraphLoading = false;
         if (loadFullButton) {{
           loadFullButton.disabled = false;
-          loadFullButton.textContent = 'Retry graph data';
+          loadFullButton.textContent = 'Retry full data';
         }}
-        if (status) status.textContent = 'Full graph load failed; local API did not return graph data.';
+        if (status) status.textContent = 'Full data load failed; local API did not return graph data.';
       }});
   }}
 
@@ -1312,8 +1312,10 @@ def render_graph_page_body(
     load_full_button = ""
     if graph_mode != "full":
         load_full_button = (
-            '<button id="graph-load-full" type="button">'
-            f"Load graph data ({total_node_count} nodes)</button>"
+            '<button id="graph-load-full" type="button" '
+            'title="Loads all graph data for search, filters, and focused neighborhoods; '
+            'the canvas remains capped until you narrow it.">'
+            f"Load full data ({total_node_count} nodes)</button>"
         )
     focus_html = ""
     state_parts = []

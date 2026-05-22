@@ -105,7 +105,8 @@ class WebGraphCoreTests(unittest.TestCase):
         self.assertIn('id="graph-motion"', html)
         self.assertIn('id="graph-fullscreen"', html)
         self.assertIn('id="graph-copy-link"', html)
-        self.assertIn("Load graph data (10 nodes)", html)
+        self.assertIn("Load full data (10 nodes)", html)
+        self.assertIn("the canvas remains capped until you narrow it.", html)
         self.assertIn('id="graph-search"', html)
         self.assertIn('id="graph-category"', html)
         self.assertIn('id="graph-size"', html)
@@ -163,7 +164,7 @@ class WebGraphCoreTests(unittest.TestCase):
             legend_items="",
         )
 
-        self.assertNotIn("Load graph data", html)
+        self.assertNotIn("Load full data", html)
 
     def test_render_graph_script_uses_supplied_json_payloads(self):
         script = render_graph_script(
