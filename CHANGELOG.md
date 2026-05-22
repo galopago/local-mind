@@ -35,6 +35,7 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 - Simplified quick-start examples around `link next`, with `link welcome` kept as the optional guided proof path.
 - Added copy buttons to the home-page starter prompt strip.
 - Added a local HTTP request timeout so stalled clients cannot hold server threads indefinitely.
+- Added legacy browser hardening headers for frame denial, DNS prefetch control, and cross-domain policy denial.
 
 ### Changed
 

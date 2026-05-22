@@ -257,6 +257,9 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn(("X-Link-API-Version", serve.API_VERSION), headers)
         self.assertIn(("X-Content-Type-Options", "nosniff"), headers)
+        self.assertIn(("X-Frame-Options", "DENY"), headers)
+        self.assertIn(("X-DNS-Prefetch-Control", "off"), headers)
+        self.assertIn(("X-Permitted-Cross-Domain-Policies", "none"), headers)
         self.assertIn(("Cross-Origin-Opener-Policy", "same-origin"), headers)
         self.assertIn(("Permissions-Policy", serve.PERMISSIONS_POLICY), headers)
         self.assertIn(("Content-Security-Policy", serve.CONTENT_SECURITY_POLICY), headers)

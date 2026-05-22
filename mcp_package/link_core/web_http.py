@@ -95,6 +95,9 @@ def local_security_headers(
     return (
         ("X-Link-API-Version", str(api_version)),
         ("X-Content-Type-Options", "nosniff"),
+        ("X-Frame-Options", "DENY"),
+        ("X-DNS-Prefetch-Control", "off"),
+        ("X-Permitted-Cross-Domain-Policies", "none"),
         ("Referrer-Policy", "no-referrer"),
         ("Cross-Origin-Resource-Policy", "same-origin"),
         ("Cross-Origin-Opener-Policy", "same-origin"),
