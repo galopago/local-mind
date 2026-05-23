@@ -6,6 +6,8 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-22
+
 ### Added
 
 - Added copyable agent prompts across page, search, ingest, brief, memory dashboard, profile, audit, capture, and inbox views so browser-first users do not need to memorize Link phrasing.
