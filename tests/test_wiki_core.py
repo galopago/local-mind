@@ -126,7 +126,7 @@ class WikiCoreTests(unittest.TestCase):
         self.assertEqual(cache["read_warnings"][0]["page"], "wiki/concepts/locked.md")
         self.assertIn("readable", cache["page_map"])
         self.assertNotIn("locked", cache["page_map"])
-        self.assertFalse((wiki.parent / ".link-cache/wiki-cache-v1.json").exists())
+        self.assertFalse((wiki.parent / ".link-cache/wiki-cache-v2.json").exists())
 
     def test_build_wiki_cache_uses_persistent_page_records_when_unchanged(self):
         wiki = self.make_wiki()
@@ -138,8 +138,9 @@ class WikiCoreTests(unittest.TestCase):
 
         first = build_wiki_cache(wiki)
         self.assertFalse(first["persistent_cache"]["hit"])
+        self.assertEqual(first["persistent_cache"]["reused_records"], 0)
         self.assertTrue(first["persistent_cache"]["written"])
-        self.assertTrue((wiki.parent / ".link-cache/wiki-cache-v1.json").exists())
+        self.assertTrue((wiki.parent / ".link-cache/wiki-cache-v2.json").exists())
 
         original_read_text = Path.read_text
 
@@ -152,15 +153,22 @@ class WikiCoreTests(unittest.TestCase):
             second = build_wiki_cache(wiki)
 
         self.assertTrue(second["persistent_cache"]["hit"])
+        self.assertFalse(second["persistent_cache"]["partial"])
+        self.assertEqual(second["persistent_cache"]["reused_records"], second["persistent_cache"]["total_records"])
         self.assertIn("agent-memory", second["page_map"])
         self.assertIn("durable", second["fulltext"]["agent-memory"])
 
-    def test_build_wiki_cache_invalidates_persistent_records_after_page_edit(self):
+    def test_build_wiki_cache_reuses_unchanged_persistent_records_after_page_edit(self):
         wiki = self.make_wiki()
         page = write_page(
             wiki,
             "concepts/agent-memory.md",
             "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n> **TLDR:** Old context.\n",
+        )
+        write_page(
+            wiki,
+            "concepts/stable.md",
+            "---\ntype: concept\ntitle: Stable\n---\n# Stable\n\nStable context.\n",
         )
         build_wiki_cache(wiki)
         time.sleep(0.01)
@@ -168,10 +176,22 @@ class WikiCoreTests(unittest.TestCase):
             "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n> **TLDR:** New context.\n",
             encoding="utf-8",
         )
+        read_pages: list[str] = []
+        original_read_text = Path.read_text
 
-        cache = build_wiki_cache(wiki)
+        def count_markdown_reads(path: Path, *args, **kwargs):
+            if path.suffix == ".md":
+                read_pages.append(path.name)
+            return original_read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", count_markdown_reads):
+            cache = build_wiki_cache(wiki)
 
         self.assertFalse(cache["persistent_cache"]["hit"])
+        self.assertTrue(cache["persistent_cache"]["partial"])
+        self.assertGreater(cache["persistent_cache"]["reused_records"], 0)
+        self.assertIn("agent-memory.md", read_pages)
+        self.assertNotIn("stable.md", read_pages)
         self.assertIn("new context", cache["fulltext"]["agent-memory"])
 
     def test_build_wiki_cache_does_not_create_persistent_cache_for_missing_wiki(self):

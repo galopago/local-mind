@@ -47,29 +47,32 @@
         <h2 id="demo">1. Run The Demo</h2>
         <p>The demo is the fastest proof of value. It already has raw sources, wiki pages, memories, backlinks, and graph data.</p>
         <p>macOS with Homebrew:</p>
-        <pre><code>brew install gowtham0992/link/link
+<pre><code>brew install gowtham0992/link/link
 link demo
+link next link-demo
 link serve link-demo</code></pre>
         <p>Or from source:</p>
         <pre><code>git clone https://github.com/gowtham0992/link.git
 cd link
 python3 link.py demo
+python3 link.py next link-demo
 python3 link.py serve link-demo</code></pre>
         <p>On Windows from source, use the Python launcher:</p>
         <pre><code>git clone https://github.com/gowtham0992/link.git
 cd link
 py link.py demo
+py link.py next link-demo
 py link.py serve link-demo</code></pre>
         <div class="callout">
           <strong>Judge the generated demo</strong>
           The repo's root <code>wiki/</code> is only a scaffold for local development and personal testing. Generated content in <code>wiki/</code>, <code>raw/</code>, and <code>link-demo/</code> is ignored by git so private memory is not published by accident.
         </div>
         <p>The demo includes one pending memory intentionally, so the review inbox and explain-memory workflow are visible. Run <code>link review-memory prefer-local-personal-memory link-demo</code> if you want memory audit to be fully clear.</p>
-        <p>Open <code>http://127.0.0.1:3000</code>, then inspect <code>/brief</code>, <code>/memory</code>, <code>/audit</code>, <code>/captures</code>, <code>/propose</code>, and <code>/graph</code>. Link accepts <code>localhost</code> too, but the numeric loopback address avoids slow IPv6 fallback in some Safari setups.</p>
+        <p>Open <code>http://127.0.0.1:3000</code>, then inspect <code>/brief</code>, <code>/memory</code>, <code>/ingest</code>, <code>/graph</code>, and <code>/health</code>. Open <strong>more</strong> for prompts, proposal review, audit, captures, profile, log, and all pages. Link accepts <code>localhost</code> too, but the numeric loopback address avoids slow IPv6 fallback in some Safari setups.</p>
         <pre><code>link query "why does Link help agents?" link-demo --budget small
 link brief "working on agent memory" link-demo
 link benchmark "agent memory" link-demo
-link status --validate link-demo</code></pre>
+link health link-demo</code></pre>
 
         <h2 id="install">2. Install Link For Your Agent</h2>
         <p>From the cloned checkout, run the installer for the agent you use. Re-running the same installer updates code and instructions without replacing existing wiki data.</p>
@@ -129,7 +132,7 @@ link memory-audit</code></pre>
 
         <h2 id="verify">6. Verify The Loop</h2>
         <pre><code>link doctor --fix
-link status --validate
+link health
 link ingest-status
 link validate
 link memory-audit

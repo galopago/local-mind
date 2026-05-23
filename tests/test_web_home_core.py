@@ -22,8 +22,20 @@ def test_plural_type_label_handles_irregular_labels():
 def test_render_home_page_shows_stats_sections_and_prompts():
     pages = [
         {"name": "index", "title": "Index", "type": "", "category": "root"},
-        {"name": "agent-memory", "title": "Agent Memory", "type": "concept", "category": "concepts"},
-        {"name": "local-memory", "title": "Local Memory", "type": "memory", "category": "memories"},
+        {
+            "name": "agent-memory",
+            "title": "Agent Memory",
+            "type": "concept",
+            "category": "concepts",
+            "date_updated": "2026-05-01",
+        },
+        {
+            "name": "local-memory",
+            "title": "Local Memory",
+            "type": "memory",
+            "category": "memories",
+            "date_updated": "2026-05-02",
+        },
     ]
     prompts = {"prompts": [{"prompt": "is Link ready?"}, {"prompt": "ingest raw/<file> into Link"}]}
 
@@ -41,7 +53,17 @@ def test_render_home_page_shows_stats_sections_and_prompts():
     assert "/page/agent-memory" in html
     assert "Try These Prompts" in html
     assert "is Link ready?" in html
+    assert 'data-copy-text="is Link ready?"' in html
     assert "ingest raw/&lt;file&gt; into Link" in html
+    assert 'data-copy-text="ingest raw/&lt;file&gt; into Link"' in html
+    assert "Next Steps" in html
+    assert "Recently Updated" in html
+    assert html.index("Local Memory") < html.index("Agent Memory")
+    assert "updated 2026-05-02" in html
+    assert 'href="/health"' in html
+    assert 'href="/ingest"' in html
+    assert 'href="/memory"' in html
+    assert 'href="/graph"' in html
     assert "Index" not in html
 
 
@@ -62,4 +84,6 @@ def test_render_home_page_handles_empty_wiki():
     html = render_home_page([], starter_prompts={"prompts": []}, page_href=lambda name: f"/page/{name}", layout=_layout)
 
     assert "Wiki is empty" in html
-    assert "<code>raw/</code>" in html
+    assert 'href="/ingest"' in html
+    assert 'data-copy-text="ingest the new raw Link files"' in html
+    assert "Copy ingest prompt" in html

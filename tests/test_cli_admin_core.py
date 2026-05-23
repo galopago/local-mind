@@ -73,6 +73,30 @@ class CliAdminCoreTests(unittest.TestCase):
         self.assertIn("Ready: no", text)
         self.assertIn("Missing: wiki/index.md", text)
         self.assertIn("migrate_wiki: migrate schema", text)
+        self.assertIn("Run: link migrate /tmp/link", text)
+
+    def test_render_status_ready_includes_human_query_command(self):
+        code, text = render_status_text({
+            "version": "1.1.0",
+            "ready": True,
+            "page_count": 3,
+            "content_page_count": 2,
+            "memory_count": 1,
+            "active_memory_count": 1,
+            "needs_review_count": 0,
+            "search_backend": "sqlite-fts",
+            "schema": {"status": "current", "version": 1},
+            "missing": [],
+            "validation": {"checked": True, "passed": True, "error_count": 0, "warning_count": 0},
+            "warnings": [],
+            "next_actions": [{"tool": "query_link", "label": "answer with compact local context", "arguments": {"query": "<user task>"}}],
+        }, wiki_dir="/tmp/link/wiki", version="1.1.0")
+
+        self.assertEqual(code, 0)
+        self.assertIn("query_link: answer with compact local context", text)
+        self.assertIn("Run: link query", text)
+        self.assertIn("what should I know before continuing?", text)
+        self.assertIn("/tmp/link", text)
 
     def test_render_backup_list(self):
         code, text = render_backup_list_text({
@@ -114,7 +138,7 @@ class CliAdminCoreTests(unittest.TestCase):
         self.assertEqual(backlinks_code, 0)
         self.assertIn("Edges: 3", backlinks_text)
         self.assertEqual(index_code, 0)
-        self.assertIn("Next: run python3 link.py rebuild-backlinks before validation", index_text)
+        self.assertIn("Next: run python3 /tmp/link/link.py rebuild-backlinks /tmp/link before validation", index_text)
 
 
 if __name__ == "__main__":

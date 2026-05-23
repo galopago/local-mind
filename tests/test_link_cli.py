@@ -53,7 +53,7 @@ class LinkCliTests(unittest.TestCase):
         backlinks = json.loads((target / "wiki/_backlinks.json").read_text(encoding="utf-8"))
         self.assertIn("backlinks", backlinks)
         self.assertIn("forward", backlinks)
-        self.assertIn("link status --validate", out.getvalue())
+        self.assertIn("link health", out.getvalue())
         self.assertIn("link serve", out.getvalue())
 
     def test_init_preserves_existing_pages(self):
@@ -100,7 +100,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("remember that I prefer local-first agent memory", out.getvalue())
         self.assertIn("query Link for what you know about me", out.getvalue())
         self.assertIn("propose memories from raw/<file>", out.getvalue())
-        self.assertIn("link status --validate", out.getvalue())
+        self.assertIn("link health", out.getvalue())
 
     def test_prompts_json_supports_project_examples(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-prompts-test-"))
@@ -115,6 +115,36 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["project"], "client-launch")
         self.assertIn("this project uses Link", payload["prompts"][2]["prompt"])
         self.assertIn("what this project remembers", payload["prompts"][3]["prompt"])
+
+    def test_welcome_prints_short_first_use_path(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-welcome-test-"))
+        target = tmp / "my-link"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.welcome(target)
+
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("Link welcome:", text)
+        self.assertIn("1. is Link ready?", text)
+        self.assertIn("Proves: Agent can find Link", text)
+        self.assertIn("link health", text)
+        self.assertIn("http://127.0.0.1:3000/health", text)
+
+    def test_welcome_json_supports_project_examples(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-welcome-test-"))
+        target = tmp / "my-link"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.welcome(target, project="Client Launch", json_output=True)
+        payload = json.loads(out.getvalue())
+
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["project"], "client-launch")
+        self.assertEqual(payload["steps"][0]["prompt"], "is Link ready?")
+        self.assertIn("Agent can save explicit memory", payload["steps"][2]["proves"])
 
     def test_serve_runs_target_viewer(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-serve-test-"))
@@ -196,6 +226,18 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("agent-memory", backlinks["backlinks"])
         self.assertIn("link", backlinks["backlinks"])
         self.assertIn("agent-memory", backlinks["forward"]["link"])
+
+    def test_demo_output_uses_copied_runtime_path(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-demo-test-"))
+        target = tmp / "demo"
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.create_demo(target)
+
+        self.assertEqual(code, 0)
+        self.assertIn(str(target.resolve() / "link.py"), out.getvalue())
+        self.assertIn(str(target.resolve()), out.getvalue())
 
     def test_demo_refuses_to_overwrite_non_demo_directory(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-demo-test-"))
@@ -301,7 +343,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Memory review: propose memories from raw/new-source.md", out.getvalue())
         self.assertIn("raw/new-source.md -> wiki/sources/new-source.md", out.getvalue())
         self.assertIn("Post-ingest checks:", out.getvalue())
-        self.assertIn("link status --validate", out.getvalue())
+        self.assertIn("link health", out.getvalue())
 
     def test_ingest_status_reports_represented_completion(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-ingest-test-"))
@@ -470,6 +512,7 @@ class LinkCliTests(unittest.TestCase):
         self.assertIn("Content pages:", out.getvalue())
         self.assertIn("Schema: current", out.getvalue())
         self.assertIn("Search backend:", out.getvalue())
+        self.assertIn("Persistent cache: enabled", out.getvalue())
         self.assertIn("Validation: passed", out.getvalue())
         self.assertIn("query_link", out.getvalue())
 
@@ -507,6 +550,31 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(payload["next_actions"][0]["tool"], "ingest_status")
         self.assertEqual(payload["next_actions"][1]["tool"], "starter_prompts")
 
+    def test_health_combines_status_and_operations(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-health-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.health(target)
+
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("Link health:", text)
+        self.assertIn("Ready: yes", text)
+        self.assertIn("Validation: passed", text)
+        self.assertIn("Operations: 0 total", text)
+
+        json_out = StringIO()
+        with redirect_stdout(json_out):
+            json_code = link_cli.health(target, json_output=True)
+        payload = json.loads(json_out.getvalue())
+        self.assertEqual(json_code, 0)
+        self.assertTrue(payload["ready"])
+        self.assertTrue(payload["status"]["validation"]["passed"])
+        self.assertEqual(payload["operations"]["operation_count"], 0)
+
     def test_operations_reports_interrupted_write_markers(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-operations-test-"))
         target = tmp / "demo"
@@ -535,6 +603,27 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(json_code, 1)
         self.assertEqual(payload["stale_count"], 1)
         self.assertEqual(payload["operations"][0]["operation"], "remember")
+
+    def test_health_reports_interrupted_write_markers(self):
+        tmp = Path(tempfile.mkdtemp(prefix="link-health-test-"))
+        target = tmp / "demo"
+        create_demo_quiet(target)
+        begin_operation(
+            target / "wiki",
+            "remember",
+            "Save memory",
+            timestamp="2026-05-17T00:00:00Z",
+            paths=["wiki/memories/prefer-local.md"],
+        )
+
+        out = StringIO()
+        with redirect_stdout(out):
+            code = link_cli.health(target)
+
+        self.assertEqual(code, 1)
+        self.assertIn("Ready: no", out.getvalue())
+        self.assertIn("Operations: 1 total", out.getvalue())
+        self.assertIn("link operations", out.getvalue())
 
     def test_status_prints_readiness_warnings(self):
         tmp = Path(tempfile.mkdtemp(prefix="link-status-test-"))
@@ -576,6 +665,15 @@ class LinkCliTests(unittest.TestCase):
             link_cli.main(["--version"])
 
         self.assertEqual(cm.exception.code, 0)
+        self.assertIn(f"Link {link_cli.LINK_VERSION}", out.getvalue())
+
+    def test_main_version_command_prints_version(self):
+        out = StringIO()
+
+        with redirect_stdout(out):
+            code = link_cli.main(["version"])
+
+        self.assertEqual(code, 0)
         self.assertIn(f"Link {link_cli.LINK_VERSION}", out.getvalue())
 
     def test_backup_creates_local_archive_without_raw_by_default(self):
@@ -2115,7 +2213,8 @@ class LinkCliTests(unittest.TestCase):
         self.assertEqual(backlinks_code, 0)
         self.assertEqual(doctor_code, 0)
         self.assertIn("Rebuilt", out.getvalue())
-        self.assertIn("rebuild-backlinks before validation", out.getvalue())
+        self.assertIn("rebuild-backlinks", out.getvalue())
+        self.assertIn(str(target.resolve()), out.getvalue())
         self.assertIn("[[agent-memory]]", index_text)
         self.assertIn("[[prefer-local-personal-memory]]", index_text)
 

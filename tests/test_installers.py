@@ -32,7 +32,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('LINK_CLI_BIN="$LINK_CLI_DIR/link"', scaffold)
         self.assertIn("Link command wrapper", scaffold)
         self.assertIn("not overwriting", scaffold)
-        self.assertIn("link status --validate", scaffold)
+        self.assertIn("link health", scaffold)
         self.assertIn('if [ "$MODE" = "--project" ]', scaffold)
 
     def test_scaffold_project_mode_uses_absolute_target(self):
@@ -55,6 +55,8 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('if [ "$mode" = "--project" ]; then', instructions)
         self.assertIn("View wiki: python3 link.py serve", instructions)
         self.assertIn("View wiki: link serve", instructions)
+        self.assertIn("Print starter prompts: python3 link.py next", instructions)
+        self.assertIn("Print starter prompts: link next", instructions)
         self.assertIn("Try in your agent:", instructions)
         self.assertIn("is Link ready?", instructions)
         self.assertIn("brief me from Link before we continue", instructions)

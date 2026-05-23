@@ -22,11 +22,13 @@ EXPECTED_CLI_COMMANDS = {
     "explain-memory",
     "forget-memory",
     "graph-summary",
+    "health",
     "ingest-status",
     "init",
     "memory-audit",
     "memory-inbox",
     "migrate",
+    "next",
     "operations",
     "profile",
     "prompts",
@@ -44,7 +46,9 @@ EXPECTED_CLI_COMMANDS = {
     "status",
     "update-memory",
     "validate",
+    "version",
     "verify-mcp",
+    "welcome",
 }
 
 EXPECTED_MCP_TOOLS = {
@@ -62,6 +66,7 @@ EXPECTED_MCP_TOOLS = {
     "get_graph_summary",
     "get_pages",
     "ingest_status",
+    "link_operations",
     "link_status",
     "memory_audit",
     "memory_brief",

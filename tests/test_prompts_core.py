@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.prompts import starter_prompt_payload  # noqa: E402
+from link_core.prompts import starter_prompt_payload, welcome_payload  # noqa: E402
 
 
 class PromptsCoreTests(unittest.TestCase):
@@ -28,7 +28,9 @@ class PromptsCoreTests(unittest.TestCase):
         self.assertIn("remember that I prefer local-first agent memory", prompts)
         self.assertIn("query Link for what you know about me", prompts)
         self.assertIn("propose memories from raw/<file>", prompts)
-        self.assertIn("link status --validate", payload["commands"])
+        self.assertTrue(str(payload["shortcut"]).startswith("link next "))
+        self.assertTrue(any(command.startswith("link health ") for command in payload["commands"]))
+        self.assertTrue(any(str(root) in command for command in payload["commands"]))
 
     def test_git_project_gets_project_memory_prompts(self):
         root = Path(tempfile.mkdtemp(prefix="link-prompts-core-"))
@@ -50,6 +52,20 @@ class PromptsCoreTests(unittest.TestCase):
         payload = starter_prompt_payload(wiki, project="Client Launch")
 
         self.assertEqual(payload["project"], "client-launch")
+
+    def test_welcome_payload_returns_short_proof_path(self):
+        root = Path(tempfile.mkdtemp(prefix="link-prompts-core-"))
+        wiki = self.make_wiki(root)
+
+        payload = welcome_payload(wiki, project="Client Launch")
+
+        self.assertEqual(payload["project"], "client-launch")
+        self.assertEqual(len(payload["steps"]), 3)
+        self.assertEqual(payload["steps"][0]["prompt"], "is Link ready?")
+        self.assertIn("Agent can find Link", payload["steps"][0]["proves"])
+        self.assertTrue(any(command.startswith("link serve ") for command in payload["commands"]))
+        self.assertTrue(any(str(root) in command for command in payload["commands"]))
+        self.assertIn("http://127.0.0.1:3000/health", payload["urls"])
 
 
 if __name__ == "__main__":

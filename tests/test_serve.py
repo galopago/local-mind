@@ -1,5 +1,6 @@
 import json
 import os
+import socketserver
 import tempfile
 import time
 import unittest
@@ -31,6 +32,7 @@ def reset_wiki(wiki_dir: Path) -> None:
     serve._token_index = {}
     serve._page_map = {}
     serve._meta_token_index = {}
+    serve._forward_links_index = {}
     serve._fts_index = None
     serve._search_backend = "token-index"
     serve._cache_read_warnings = []
@@ -180,13 +182,39 @@ class ServeTests(unittest.TestCase):
         self.assertIn('<a href="/audit">audit</a>', html)
         self.assertIn('<a href="/captures">captures</a>', html)
 
+    def test_local_server_uses_threaded_request_handling(self):
+        self.assertTrue(issubclass(serve.ThreadingLocalTCPServer, socketserver.ThreadingMixIn))
+        self.assertTrue(serve.ThreadingLocalTCPServer.daemon_threads)
+        self.assertTrue(serve.ThreadingLocalTCPServer.allow_reuse_address)
+
+    def test_http_handler_sets_request_timeout(self):
+        class FakeSocket:
+            def __init__(self):
+                self.timeouts = []
+
+            def makefile(self, *_args, **_kwargs):
+                return BytesIO()
+
+            def settimeout(self, value):
+                self.timeouts.append(value)
+
+        request = FakeSocket()
+        handler = object.__new__(serve.Handler)
+        handler.request = request
+
+        handler.setup()
+
+        self.assertEqual(request.timeouts, [serve.REQUEST_TIMEOUT_SECONDS])
+
     def test_css_has_mobile_overflow_guards(self):
         self.assertIn("* { box-sizing: border-box; margin: 0; padding: 0; }", serve.CSS)
         self.assertIn("html { overflow-x: hidden; background: var(--bg); }", serve.CSS)
         self.assertIn("overflow-x: hidden; overflow-wrap: anywhere", serve.CSS)
         self.assertIn("a, p, li, code { overflow-wrap: anywhere; }", serve.CSS)
         self.assertIn("header .header-top { display: flex;", serve.CSS)
-        self.assertIn("header nav { display: flex; gap: 10px 16px;", serve.CSS)
+        self.assertIn("header nav { display: flex; gap: 8px 14px;", serve.CSS)
+        self.assertIn("header .nav-more-menu { position: absolute;", serve.CSS)
+        self.assertIn(".wiki-page-shell { display: grid;", serve.CSS)
         self.assertIn("flex-wrap: wrap; min-width: 0", serve.CSS)
         self.assertIn(".raw-source-controls { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
         self.assertIn(".memory-grid { grid-template-columns: minmax(0, 1fr); }", serve.CSS)
@@ -206,10 +234,19 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn("All Pages (302)", html)
         self.assertIn("Showing 26-50 of 302", html)
-        self.assertIn("/all?limit=25&amp;offset=0", html)
+        self.assertIn('href="/all?limit=25">Previous</a>', html)
         self.assertIn("/all?limit=25&amp;offset=50", html)
         self.assertIn("Topic 023", html)
         self.assertNotIn("Topic 299", html)
+        self.assertIn("catalog-summary", html)
+        self.assertIn('<a class="catalog-chip" href="/all?limit=25&amp;type=concept"><strong>concept</strong>300</a>', html)
+        self.assertIn("<h2>concept <span>25</span></h2>", html)
+
+        filtered = serve._render_all({"limit": ["25"], "type": ["concept"]})
+
+        self.assertIn("All Pages / concept (300)", filtered)
+        self.assertIn('<a class="catalog-chip active" href="/all?limit=25&amp;type=concept"><strong>concept</strong>300</a>', filtered)
+        self.assertNotIn("Link Test Wiki Index", filtered)
 
     def test_security_headers_include_api_version(self):
         handler = object.__new__(serve.Handler)
@@ -220,6 +257,9 @@ class ServeTests(unittest.TestCase):
 
         self.assertIn(("X-Link-API-Version", serve.API_VERSION), headers)
         self.assertIn(("X-Content-Type-Options", "nosniff"), headers)
+        self.assertIn(("X-Frame-Options", "DENY"), headers)
+        self.assertIn(("X-DNS-Prefetch-Control", "off"), headers)
+        self.assertIn(("X-Permitted-Cross-Domain-Policies", "none"), headers)
         self.assertIn(("Cross-Origin-Opener-Policy", "same-origin"), headers)
         self.assertIn(("Permissions-Policy", serve.PERMISSIONS_POLICY), headers)
         self.assertIn(("Content-Security-Policy", serve.CONTENT_SECURITY_POLICY), headers)
@@ -264,6 +304,37 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["stale_count"], 1)
         self.assertEqual(payload["operations"][0]["operation"], "remember")
 
+    def test_health_api_combines_status_validation_and_operations(self):
+        wiki = self.make_wiki()
+        for dirname in ("sources", "concepts", "entities", "memories", "comparisons", "explorations"):
+            (wiki / dirname).mkdir(exist_ok=True)
+        (wiki / "_backlinks.json").write_text(json.dumps(serve._build_backlinks()), encoding="utf-8")
+        reset_wiki(wiki)
+
+        status, payload = run_handler("GET", "/api/health")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["api_version"], serve.API_VERSION)
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["status"]["api_version"], serve.API_VERSION)
+        self.assertEqual(payload["status"]["validation"]["checked"], True)
+        self.assertTrue(payload["status"]["validation"]["passed"])
+        self.assertEqual(payload["operations"]["api_version"], serve.API_VERSION)
+        self.assertEqual(payload["operations"]["operation_count"], 0)
+
+    def test_api_root_returns_discovery_payload(self):
+        self.make_wiki()
+
+        status, payload = run_handler("GET", "/api")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["api_version"], serve.API_VERSION)
+        self.assertTrue(payload["local_only"])
+        self.assertEqual(payload["recommended"]["readiness"], "/api/health")
+        self.assertIn("/api/query-link", payload["endpoints"]["read"])
+        self.assertIn("/api/remember-memory", payload["endpoints"]["write"])
+        self.assertEqual(payload["write_header"]["X-Link-Local-Action"], "true")
+
     def test_html_responses_are_not_browser_cached(self):
         self.make_wiki()
 
@@ -275,6 +346,18 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertEqual(headers["Pragma"], "no-cache")
         self.assertEqual(headers["Expires"], "0")
+
+    def test_more_page_lists_advanced_tools(self):
+        self.make_wiki()
+
+        status, body, _ = run_handler_raw("GET", "/more")
+
+        self.assertEqual(status, 200)
+        self.assertIn(b"More Tools", body)
+        self.assertIn(b"/prompts", body)
+        self.assertIn(b"/propose", body)
+        self.assertIn(b"/captures", body)
+        self.assertIn(b"/all", body)
 
     def test_head_status_sends_headers_without_body(self):
         self.make_wiki()
@@ -406,7 +489,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn("Ask Your Agent", html)
         self.assertIn("Local Checks", html)
         self.assertIn("Project examples are scoped to <code>client-launch</code>", html)
-        self.assertIn("link status --validate", html)
+        self.assertIn("link health", html)
 
     def test_css_has_explicit_black_dark_theme(self):
         self.assertIn(':root[data-theme="dark"]', serve.CSS)
@@ -485,6 +568,61 @@ class ServeTests(unittest.TestCase):
         self.assertIn("var labelWidth = ctx.measureText(label).width;", html)
         self.assertIn("var labelX = Math.max(labelWidth / 2 + 4", html)
         self.assertIn("ctx.fillText(label, labelX", html)
+
+    def test_wiki_page_links_to_local_graph(self):
+        wiki = self.make_wiki()
+        page = write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n",
+        )
+
+        html = serve._render_page(page)
+
+        self.assertIn("/graph?focus=agent-memory&amp;depth=2", html)
+        self.assertIn("Open local graph", html)
+        self.assertIn('data-copy-text="query Link for Agent Memory"', html)
+        self.assertIn("Copy query prompt", html)
+
+    def test_wiki_page_shows_related_pages_from_graph_links(self):
+        wiki = self.make_wiki()
+        page = write_page(
+            wiki,
+            "concepts/a.md",
+            "---\ntype: concept\ntitle: A\n---\n# A\n\n[[b]]\n",
+        )
+        write_page(
+            wiki,
+            "concepts/b.md",
+            "---\ntype: concept\ntitle: B\n---\n# B\n",
+        )
+        write_page(
+            wiki,
+            "sources/c.md",
+            "---\ntype: source\ntitle: C Source\n---\n# C\n\n[[a]]\n",
+        )
+        (wiki / "_backlinks.json").write_text(json.dumps(serve._build_backlinks()), encoding="utf-8")
+
+        html = serve._render_page(page)
+
+        self.assertIn("Related Pages", html)
+        self.assertIn('<span class="relationship">links here</span><a href="/page/c">C Source</a>', html)
+        self.assertIn('<span class="relationship">links out</span><a href="/page/b">B</a>', html)
+
+    def test_source_page_links_to_memory_proposals(self):
+        wiki = self.make_wiki()
+        page = write_page(
+            wiki,
+            "sources/release-notes.md",
+            "---\ntype: source\ntitle: Release Notes\n---\n"
+            "# Release Notes\n\n## Summary\n\nNotes.\n\n## Raw Source\n\n`raw/release-notes.md`\n",
+        )
+
+        html = serve._render_page(page)
+
+        self.assertIn("/propose?source=raw%2Frelease-notes.md", html)
+        self.assertIn("Propose memories", html)
+        self.assertIn('data-copy-text="propose memories from raw/release-notes.md"', html)
 
     def test_context_reads_current_backlinks_shape(self):
         wiki = self.make_wiki()
@@ -779,6 +917,8 @@ class ServeTests(unittest.TestCase):
         self.assertNotIn(fake_key, json.dumps(payload))
         self.assertIn("Memory Brief", html)
         self.assertIn("Agent Guidance", html)
+        self.assertIn('data-copy-text="brief me from Link about brief for project alpha"', html)
+        self.assertIn('data-copy-text="query Link for brief"', html)
         self.assertIn("Alpha brief", html)
         self.assertIn("Alpha brief capture", html)
         self.assertNotIn(fake_key, html)
@@ -1702,6 +1842,7 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(payload["guidance"]["state"], "pending_raw")
         self.assertEqual(payload["safety"]["status"], "clear")
         self.assertEqual(payload["plan"]["batch"][0]["suggested_source_page"], "wiki/sources/new-source.md")
+        self.assertIn(str(wiki.parent), "\n".join(payload["guidance"]["commands"]))
         self.assertIn("Add Raw Source", html)
         self.assertIn('data-raw-source-form', html)
         self.assertIn('data-raw-source-status', html)
@@ -1714,7 +1855,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn('data-copy-text="ingest raw/new-source.md into Link"', html)
         self.assertIn("Copy prompt", html)
         self.assertIn("Copy command", html)
-        self.assertIn('data-copy-text="link validate"', html)
+        self.assertIn('data-copy-text="link validate ', html)
+        self.assertIn(str(wiki.parent), html)
         self.assertIn("ingest raw/new-source.md into Link", html)
         self.assertIn("open memory proposals first", html)
         self.assertIn("Ingest path", html)
@@ -2128,21 +2270,29 @@ class ServeTests(unittest.TestCase):
         html = serve._render_graph()
 
         self.assertLess(html.index('id="graph-reset"'), html.index("var resetButton ="))
+        self.assertLess(html.index('id="graph-fit"'), html.index("var fitButton ="))
         self.assertLess(html.index('id="graph-labels"'), html.index("var labelsButton ="))
         self.assertLess(html.index('id="graph-motion"'), html.index("var motionButton ="))
         self.assertLess(html.index('id="graph-search"'), html.index("var searchInput ="))
         self.assertLess(html.index('id="graph-category"'), html.index("var categoryFilter ="))
         self.assertLess(html.index('id="graph-depth"'), html.index("var depthFilter ="))
+        self.assertLess(html.index('id="graph-copy-link"'), html.index("var copyLinkButton ="))
+        self.assertLess(html.index('id="graph-legend"'), html.index("var legend ="))
         self.assertLess(html.index('id="graph-inspector"'), html.index("var inspector ="))
         self.assertLess(html.index('id="graph-focus"'), html.index("var inspectorFocus ="))
+        self.assertLess(html.index('id="graph-local"'), html.index("var inspectorLocal ="))
         self.assertIn('id="graph-status"', html)
+        self.assertIn('data-graph-category="concepts"', html)
         self.assertIn("Focus neighborhood", html)
+        self.assertIn("Open local graph", html)
         self.assertIn('id="graph-open"', html)
         self.assertIn('tabindex="0"', html)
         self.assertIn('role="img"', html)
         self.assertIn('<option value="concepts">concepts</option>', html)
         self.assertIn("function visibleNodes()", html)
         self.assertIn("function visibleEdges()", html)
+        self.assertIn("function graphStateUrl()", html)
+        self.assertIn("copyLinkButton.addEventListener('click', copyGraphLink);", html)
         self.assertIn("function syncDepthControl()", html)
         self.assertIn("depthValue = '1'", html)
         self.assertIn("depthFilter.disabled = !selectedNode;", html)
@@ -2218,7 +2368,8 @@ class ServeTests(unittest.TestCase):
         self.assertIn("strokeEdgeBatch(currentEdges, 'rgba(88,166,255,0.07)', 0.45);", html)
         self.assertIn("Radial glow stays off in large overview mode except for focused nodes.", html)
         self.assertIn("function seedLargeGraphPosition(n, i, total)", html)
-        self.assertIn("Large graphs skip physics, so they use a stable spiral seed instead of rings.", html)
+        self.assertIn("function categoryClusterCenter(category, total)", html)
+        self.assertIn("Large graphs skip physics, so they use stable category clusters instead of global rings.", html)
         self.assertIn("seedMissingPositions();\n    invalidateSearchCache();", html)
         self.assertIn("ctx.fillStyle = fastRender ? color + '28' : color + '40';", html)
 
@@ -2235,22 +2386,69 @@ class ServeTests(unittest.TestCase):
 
         html = serve._render_graph()
 
-        self.assertIn("var OVERVIEW_NODE_LIMIT = 650;", html)
+        self.assertIn("var DEFAULT_OVERVIEW_NODE_LIMIT = 650;", html)
+        self.assertIn("var displayLimitFilter = document.getElementById('graph-display-limit');", html)
         self.assertIn("function capEligibleNodes(eligible)", html)
         self.assertIn("lockedOverviewIds[n.id] = true;", html)
         self.assertIn("fullGraphLoaded && lockedOverviewIds && !searchTerm", html)
         self.assertIn("function markKeep(n)", html)
-        self.assertIn("var highSignalLimit = Math.floor(OVERVIEW_NODE_LIMIT * 0.65);", html)
+        self.assertIn("var highSignalLimit = Math.floor(overviewNodeLimit * 0.65);", html)
+        self.assertIn("display capped", html)
         self.assertIn(".slice(0, highSignalLimit)", html)
         self.assertIn("var sampled = eligible[Math.floor((i + 0.5) * eligible.length / Math.max(sampleLimit, 1))];", html)
-        self.assertIn("while (keepCount < OVERVIEW_NODE_LIMIT && fillIndex < eligible.length)", html)
+        self.assertIn("while (keepCount < overviewNodeLimit && fillIndex < eligible.length)", html)
         self.assertIn("function reseedVisiblePositions()", html)
         self.assertIn("if (searchMatches(n)) markKeep(n);", html)
         self.assertIn("invalidateFilters();\n      if (searchTerm && !fullGraphLoaded) loadFullGraph();", html)
         self.assertIn("cachedSearchMatches = nodes.filter(searchMatches).length;", html)
         self.assertIn("matches > SEARCH_LABEL_LIMIT", html)
         self.assertIn("parts.push('data loaded');", html)
-        self.assertIn("parts.push('overview capped');", html)
+        self.assertIn("parts.push('display capped ' + overviewNodeLimit);", html)
+
+    def test_graph_route_can_focus_on_page_neighborhood(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n\n[[link]]\n",
+        )
+        write_page(
+            wiki,
+            "entities/link.md",
+            "---\ntype: entity\ntitle: Link\n---\n# Link\n",
+        )
+        reset_wiki(wiki)
+
+        status, body, headers = run_handler_raw("GET", "/graph?focus=agent-memory&depth=2")
+        html = body.decode("utf-8")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        self.assertIn("Focused on <strong>agent-memory</strong> · depth 2", html)
+        self.assertIn('var initialFocusId = "agent-memory";', html)
+        self.assertIn("var initialFocusDepth = 2;", html)
+
+    def test_graph_route_can_load_search_and_type_state(self):
+        wiki = self.make_wiki()
+        write_page(
+            wiki,
+            "concepts/agent-memory.md",
+            "---\ntype: concept\ntitle: Agent Memory\n---\n# Agent Memory\n",
+        )
+        reset_wiki(wiki)
+
+        status, body, _ = run_handler_raw("GET", "/graph?q=agent%20memory&type=concepts&size=degree&labels=neighbors")
+        html = body.decode("utf-8")
+
+        self.assertEqual(status, 200)
+        self.assertIn('var initialSearchTerm = "agent memory";', html)
+        self.assertIn('var initialCategoryValue = "concepts";', html)
+        self.assertIn('var initialSizeValue = "degree";', html)
+        self.assertIn('var initialLabelMode = "neighbors";', html)
+        self.assertIn("Search <strong>agent memory</strong>", html)
+        self.assertIn("Type <strong>concepts</strong>", html)
+        self.assertIn("Size <strong>degree</strong>", html)
+        self.assertIn("Labels <strong>neighbors</strong>", html)
 
     def test_graph_uses_bounded_initial_payload_for_large_wikis(self):
         wiki = self.make_wiki()
@@ -2269,11 +2467,11 @@ class ServeTests(unittest.TestCase):
         self.assertIn("var totalNodeCount = 920;", html)
         self.assertIn("250/920 nodes", html)
         self.assertIn("fast overview", html)
-        self.assertIn("Load graph data (920 nodes)", html)
+        self.assertIn("Load all data (920 nodes)", html)
         self.assertIn("var loadFullButton = document.getElementById('graph-load-full');", html)
         self.assertIn("function loadFullGraph()", html)
         self.assertIn("fetch('/api/graph')", html)
-        self.assertIn("Graph data loaded", html)
+        self.assertIn("All data ready; overview capped", html)
 
     def test_graph_labels_are_sparse_for_large_visible_sets(self):
         wiki = self.make_wiki()
@@ -2286,8 +2484,9 @@ class ServeTests(unittest.TestCase):
         html = serve._render_graph()
 
         self.assertIn("function graphTooLargeForDefaultLabels()", html)
-        self.assertIn("if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');", html)
-        self.assertIn("labelsButton.textContent = showAllLabels ? 'Hide labels'", html)
+        self.assertIn("if (graphTooLargeForDefaultLabels() && labelMode === 'sparse') parts.push('labels sparse');", html)
+        self.assertIn("function cycleLabelMode()", html)
+        self.assertIn("labelsButton.textContent = labelMode === 'all' ? 'Labels all'", html)
         self.assertIn("var largeLabelSet = currentNodes.length > LARGE_LABEL_LIMIT;", html)
         self.assertIn("var defaultSparseLabel = !largeLabelSet", html)
 

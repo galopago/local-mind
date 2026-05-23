@@ -204,9 +204,17 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
     require(packet.get("budget_report", {}).get("wiki_search", {}).get("has_more") is True, "query did not report additional matches")
     require(packet.get("follow_up", [{}])[0].get("tool") == "query_link", "query did not return follow-up guidance")
     require(graph_packet.get("returned_nodes", 0) <= 40, "graph_summary did not enforce node limit")
-    require(graph_packet.get("truncated") is True, "graph_summary did not report truncation for large wiki")
-    require(page_list.get("returned_count") == 100, "page list did not enforce default agent-safe limit")
-    require(page_list.get("truncated") is True, "page list did not report truncation for large wiki")
+    if expected_pages > 40:
+        require(graph_packet.get("truncated") is True, "graph_summary did not report truncation for large wiki")
+    expected_page_list_count = min(100, expected_pages)
+    require(
+        page_list.get("returned_count") == expected_page_list_count,
+        "page list did not enforce default agent-safe limit",
+    )
+    require(
+        page_list.get("truncated") is (expected_pages > 100),
+        "page list did not report truncation state correctly",
+    )
     require(len(graph["nodes"]) == expected_pages, f"expected {expected_pages} graph nodes, got {len(graph['nodes'])}")
     require(len(graph["edges"]) >= page_count * 2, "graph edge count is unexpectedly low")
     visible_graph_nodes = [
@@ -223,7 +231,14 @@ def run_smoke(work_dir: Path, page_count: int, max_seconds: dict[str, float] | N
     check_timing_thresholds(timings, max_seconds)
 
     payload = {
+        "work_dir": str(work_dir),
         "wiki": str(wiki),
+        "viewer": {
+            "serve_command": f"python3 link.py serve {work_dir}",
+            "home_url": "http://127.0.0.1:3000",
+            "graph_url": "http://127.0.0.1:3000/graph",
+            "health_url": "http://127.0.0.1:3000/health",
+        },
         "pages": len(cache["pages"]),
         "edges": len(graph["edges"]),
         "search_backend": str(cache.get("search_backend") or "token-index"),
@@ -289,6 +304,8 @@ def main() -> int:
 
     print(json.dumps(payload, indent=2))
     print(f"Large-wiki smoke passed for {payload['pages']} pages")
+    print(f"View it: {payload['viewer']['serve_command']}")
+    print(f"Graph: {payload['viewer']['graph_url']}")
     return 0
 
 

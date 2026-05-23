@@ -32,6 +32,9 @@ class WebHttpCoreTests(unittest.TestCase):
 
         self.assertEqual(headers["X-Link-API-Version"], "1")
         self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(headers["X-Frame-Options"], "DENY")
+        self.assertEqual(headers["X-DNS-Prefetch-Control"], "off")
+        self.assertEqual(headers["X-Permitted-Cross-Domain-Policies"], "none")
         self.assertEqual(headers["Cross-Origin-Opener-Policy"], "same-origin")
         self.assertEqual(headers["Permissions-Policy"], PERMISSIONS_POLICY)
         self.assertEqual(headers["Content-Security-Policy"], CONTENT_SECURITY_POLICY)

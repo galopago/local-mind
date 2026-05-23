@@ -40,9 +40,22 @@ class WebMemoryCoreTests(unittest.TestCase):
         html = render_memory_card(record, page_href=page_href)
 
         self.assertIn('<a href="/page/local-memory">&lt;Local Memory&gt;</a>', html)
+        self.assertIn('/explain-memory?memory=local-memory', html)
+        self.assertIn('/graph?focus=local-memory&amp;depth=2', html)
         self.assertIn("Use &lt;local&gt; memory.", html)
         self.assertIn('data-memory-action="review"', html)
+        self.assertIn('data-copy-text="link review-memory local-memory"', html)
         self.assertNotIn("<Local Memory>", html)
+
+    def test_memory_card_escapes_generated_trust_links(self):
+        html = render_memory_card(
+            {"name": 'memory <one>', "title": "Memory"},
+            page_href=lambda name: f'/page/{name}',
+        )
+
+        self.assertIn('/page/memory &lt;one&gt;', html)
+        self.assertIn('/explain-memory?memory=memory%20%3Cone%3E', html)
+        self.assertIn('/graph?focus=memory%20%3Cone%3E&amp;depth=2', html)
 
     def test_memory_section_uses_action_hints_when_record_has_no_actions(self):
         record = {"name": "agent-memory", "title": "Agent Memory"}
@@ -79,6 +92,8 @@ class WebMemoryCoreTests(unittest.TestCase):
         self.assertIn("Raw &lt;Capture&gt;", html)
         self.assertIn("OpenAI &lt;key&gt;", html)
         self.assertIn("accept-capture", html)
+        self.assertIn('data-copy-text="accept-capture"', html)
+        self.assertIn('data-copy-text="redact-capture"', html)
         self.assertNotIn("Raw <Capture>", html)
 
     def test_memory_action_button_requires_supported_kind_and_identifier(self):
@@ -100,6 +115,7 @@ class WebMemoryCoreTests(unittest.TestCase):
         self.assertIn('<a href="/inbox">Review</a>', html)
         self.assertIn("Open inbox.", html)
         self.assertIn("link memory-inbox", html)
+        self.assertIn('data-copy-text="link memory-inbox"', html)
 
     def test_memory_dashboard_next_actions_cover_empty_ready_and_review_states(self):
         empty_actions = memory_dashboard_next_actions(

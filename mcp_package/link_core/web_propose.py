@@ -4,6 +4,8 @@ from __future__ import annotations
 import html
 from collections.abc import Callable
 
+from .web_ingest import copy_button
+
 
 PageLayout = Callable[[str, str], str]
 
@@ -22,6 +24,7 @@ def render_propose_page(project: str = "", source: str = "", *, layout: PageLayo
         '<span>Use direct approval only when the proposal is clean; otherwise copy the approval prompt into your agent chat.</span>'
         '</div></section>'
         f'{_render_proposal_path()}'
+        f'{_render_after_approval()}'
         '<section><div class="section-heading"><h2>Local Raw Sources</h2><a href="/captures">captures</a></div>'
         '<div class="proposal-source-list" data-proposal-sources aria-live="polite"></div></section>'
         f'<form class="proposal-form" data-proposal-form data-initial-source="{html.escape(source, quote=True)}">'
@@ -57,4 +60,18 @@ def _render_proposal_path() -> str:
         '<h3>Review later</h3><p>Use the inbox and explain views to review, archive, update, or forget memories.</p>'
         '<code>link memory-inbox</code></article>'
         '</section>'
+    )
+
+
+def _render_after_approval() -> str:
+    return (
+        '<section><h2>After Approval</h2>'
+        '<div class="memory-next"><strong>Keep memory reviewable</strong>'
+        '<p>Saved memories stay pending until reviewed. Use the inbox to confirm, explain, archive, update, or forget them.</p>'
+        '<div class="page-actions">'
+        '<a class="button-link" href="/inbox">Open memory inbox</a>'
+        '<a class="button-link" href="/audit">Open memory audit</a>'
+        f'{copy_button("brief me from Link before we continue", "Copy brief prompt")}'
+        f'{copy_button("query Link for what you remember about this task", "Copy query prompt")}'
+        '</div></div></section>'
     )

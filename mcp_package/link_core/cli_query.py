@@ -4,13 +4,29 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 
+from .mcp_verify import display_command
 
-def render_query_text(payload: Mapping[str, object], *, query_text: str) -> tuple[int, str]:
+
+def render_query_text(
+    payload: Mapping[str, object],
+    *,
+    query_text: str,
+    command_target: object = "",
+) -> tuple[int, str]:
     if not payload.get("found"):
         lines = [f"No Link context found for: {query_text}"]
         if payload.get("error"):
             lines.append(f"Error: {payload['error']}")
             return 1, "\n".join(lines)
+        target = str(command_target or "").strip()
+        target_parts = [target] if target else []
+        lines.extend([
+            "",
+            "Next:",
+            "- Add source material under raw/ and ask your agent: ingest the new raw Link files",
+            f"- Run: {display_command(['link', 'ingest-status', *target_parts])}",
+            f"- Then rerun: {display_command(['link', 'query', query_text, *target_parts])}",
+        ])
         return 0, "\n".join(lines)
 
     lines = [f"Link context packet: {payload['query']}"]

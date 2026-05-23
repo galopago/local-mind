@@ -5,6 +5,7 @@ import html
 import urllib.parse
 from collections.abc import Callable, Mapping
 
+from .mcp_verify import display_command
 from .web_layout import render_stat_grid
 
 
@@ -36,6 +37,7 @@ def render_ingest_page(
     memory_prompt = str(plan.get("memory_prompt") or f"propose memories from {first_raw}")
     propose_href = "/propose?source=" + urllib.parse.quote(first_raw) if pending else "/propose"
     state = str(guidance.get("state") or plan.get("state") or "unknown")
+    command_target = str(status.get("target") or "").strip()
 
     stats = render_stat_grid([
         (int(status.get("raw_count") or 0), "raw"),
@@ -46,15 +48,23 @@ def render_ingest_page(
         (safety.get("status") or "unknown", "safety"),
     ])
     safety_html = _render_safety(safety)
+    progress_html = _render_progress(status, state)
     actions = _render_actions(agent_prompt, commands)
     next_html, ingest_prompt, optional_memory_html = _render_next_step(
         agent_prompt=agent_prompt,
+        commands=commands,
+        command_target=command_target,
         state=state,
         first_raw=first_raw,
         propose_href=propose_href,
         memory_prompt=memory_prompt,
     )
-    guide_html = _render_guide(first_raw, ingest_prompt, optional_memory_html)
+    guide_html = _render_guide(
+        first_raw,
+        ingest_prompt,
+        optional_memory_html,
+        validate_command=_link_command(command_target, "validate"),
+    )
     pending_html = _render_pending(pending, represented)
     notes_html = _render_notes(notes)
     source_warning_html = _render_source_warnings(_dict_list(status.get("source_read_warnings")))
@@ -66,6 +76,7 @@ def render_ingest_page(
         f'<p class="summary">{html.escape(str(guidance.get("summary") or "Check raw source ingest state."))}</p>'
         f'{_render_raw_source_form()}'
         f'{stats}'
+        f'{progress_html}'
         f'{safety_html}'
         f'{source_warning_html}'
         f'{next_html}'
@@ -101,6 +112,46 @@ def _render_safety(safety: Mapping[str, object]) -> str:
     )
 
 
+def _render_progress(status: Mapping[str, object], state: str) -> str:
+    raw_count = int(status.get("raw_count") or 0)
+    represented_count = int(status.get("represented_count") or 0)
+    pending_count = int(status.get("pending_count") or 0)
+    stale_count = int(status.get("stale_count") or 0)
+    backlinks_status = str(status.get("backlinks_status") or "unknown")
+    safety = _mapping(status.get("safety"))
+    safety_state = str(safety.get("status") or "unknown")
+
+    source_state = "done" if raw_count else "next"
+    ingest_state = "done" if represented_count and not pending_count and not stale_count else ("next" if raw_count else "wait")
+    validate_state = "done" if backlinks_status == "current" and state == "ready" else ("blocked" if backlinks_status != "current" else "wait")
+    memory_state = "next" if represented_count else "wait"
+    if safety_state == "blocked":
+        source_state = "blocked"
+        ingest_state = "blocked"
+        validate_state = "wait"
+        memory_state = "wait"
+    elif stale_count:
+        ingest_state = "next"
+        validate_state = "wait"
+
+    phases = [
+        ("Source", source_state, f"{raw_count} raw file{'s' if raw_count != 1 else ''}"),
+        ("Ingest", ingest_state, f"{represented_count} represented · {pending_count} pending"),
+        ("Validate", validate_state, f"graph {backlinks_status}"),
+        ("Memory", memory_state, "proposal review optional"),
+    ]
+    rows = "".join(
+        '<article class="ingest-progress-step" data-state="'
+        f'{html.escape(phase_state, quote=True)}">'
+        f'<strong>{html.escape(label)}</strong>'
+        f'<span>{html.escape(phase_state)}</span>'
+        f'<small>{html.escape(detail)}</small>'
+        "</article>"
+        for label, phase_state, detail in phases
+    )
+    return f'<section class="ingest-progress" aria-label="Ingest progress">{rows}</section>'
+
+
 def _render_actions(agent_prompt: str, commands: list[object]) -> str:
     action_rows = ""
     if agent_prompt:
@@ -119,6 +170,8 @@ def _render_actions(agent_prompt: str, commands: list[object]) -> str:
 def _render_next_step(
     *,
     agent_prompt: str,
+    commands: list[object],
+    command_target: str,
     state: str,
     first_raw: str,
     propose_href: str,
@@ -141,23 +194,23 @@ def _render_next_step(
         next_extra = ""
     elif state == "blocked_source_access":
         next_detail = "Fix source page access before relying on ingest state. Link could not inspect represented source pages."
-        next_code = "link ingest-status"
+        next_code = _first_command(commands, _link_command(command_target, "ingest-status"))
         next_extra = ""
     elif state == "stale_graph":
-        next_detail = "Repair the graph index before relying on search, context, or the graph view."
-        next_code = "link rebuild-backlinks && link validate"
+        next_detail = "Repair the graph index before relying on search, context, or the graph view. Run the remaining checks below after this step."
+        next_code = _first_command(commands, _link_command(command_target, "rebuild-backlinks"))
         next_extra = ""
     elif state == "empty":
         next_detail = "Add a note, article, transcript, or project file to raw/, then refresh this page."
-        next_code = "cp notes.md raw/ && link ingest-status"
+        next_code = _link_command(command_target, "ingest-status")
         next_extra = ""
     elif state == "ready":
         next_detail = "No ingest is pending. Ask Link for context, or add another source when there is new material."
-        next_code = 'link brief "current task"'
+        next_code = _link_command(command_target, "brief", "current task")
         next_extra = ""
     else:
         next_detail = "Initialize or repair the Link folder before ingesting sources."
-        next_code = "link init && link status --validate"
+        next_code = _first_command(commands, _link_command(command_target, "init"))
         next_extra = ""
 
     ingest_prompt = agent_prompt or f"ingest {first_raw} into Link"
@@ -184,7 +237,7 @@ def _render_next_step(
     return next_html, ingest_prompt, optional_memory_html
 
 
-def _render_guide(first_raw: str, ingest_prompt: str, optional_memory_html: str) -> str:
+def _render_guide(first_raw: str, ingest_prompt: str, optional_memory_html: str, *, validate_command: str) -> str:
     return (
         '<section class="ingest-path" aria-label="Ingest path">'
         '<article class="ingest-step"><span class="step-num">1</span>'
@@ -195,12 +248,27 @@ def _render_guide(first_raw: str, ingest_prompt: str, optional_memory_html: str)
         f'<code>{html.escape(ingest_prompt)}</code></article>'
         '<article class="ingest-step"><span class="step-num">3</span>'
         '<h3>Validate</h3><p>Check page shape, links, and graph freshness before relying on the result.</p>'
-        '<code>link validate</code></article>'
+        f'<code>{html.escape(validate_command)}</code></article>'
         '<article class="ingest-step"><span class="step-num">4</span>'
         '<h3>Optional memory</h3><p>Only save preferences, decisions, or project facts after approval.</p>'
         f'{optional_memory_html}</article>'
         '</section>'
     )
+
+
+def _first_command(commands: list[object], fallback: str) -> str:
+    for command in commands:
+        text = str(command or "").strip()
+        if text:
+            return text
+    return fallback
+
+
+def _link_command(command_target: str, *parts: str) -> str:
+    command = ["link", *parts]
+    if command_target:
+        command.append(command_target)
+    return display_command(command)
 
 
 def _render_pending(pending: list[dict[str, object]], represented: list[dict[str, object]]) -> str:
@@ -210,17 +278,21 @@ def _render_pending(pending: list[dict[str, object]], represented: list[dict[str
     for item in pending[:50]:
         raw_path = str(item.get("raw") or "")
         propose_href = "/propose?source=" + urllib.parse.quote(raw_path)
+        ingest_prompt = f"ingest {raw_path} into Link" if raw_path else "ingest raw/<file> into Link"
+        actions = ""
         secret_warnings = _list(status_value=item.get("secret_warnings"))
         if secret_warnings:
             meta = (
                 f'{int(item.get("size_bytes") or 0)} bytes · secret warning: '
                 f'{", ".join(html.escape(str(label)) for label in secret_warnings)} · redact before ingest'
             )
+            actions = copy_button(f"redact secret-looking values in {raw_path} before ingest", "Copy redaction prompt")
         elif item.get("scan_error"):
             meta = (
                 f'{int(item.get("size_bytes") or 0)} bytes · '
                 f'could not inspect: {html.escape(str(item.get("scan_error") or ""))} · fix access before ingest'
             )
+            actions = copy_button(f"fix raw source access for {raw_path} before ingest", "Copy access prompt")
         elif item.get("stale"):
             target_pages = _list(status_value=item.get("source_page_paths"))
             target_label = ", ".join(html.escape(str(page)) for page in target_pages if page)
@@ -230,12 +302,21 @@ def _render_pending(pending: list[dict[str, object]], represented: list[dict[str
                 f'{html.escape(str(item.get("stale_reason") or "raw changed after wiki source page"))}'
                 f'{target_text}'
             )
+            actions = copy_button(ingest_prompt, "Copy ingest prompt")
         else:
             meta = (
                 f'{int(item.get("size_bytes") or 0)} bytes · '
                 f'<a href="{html.escape(propose_href, quote=True)}">propose memories</a>'
             )
-        rows += f'<li><code>{html.escape(raw_path)}</code><span class="type">{meta}</span></li>'
+            actions = (
+                f'<a href="{html.escape(propose_href, quote=True)}">memory proposals</a>'
+                f'{copy_button(ingest_prompt, "Copy ingest prompt")}'
+            )
+        rows += (
+            '<li class="ingest-pending-item">'
+            f'<code>{html.escape(raw_path)}</code><span class="type">{meta}</span>'
+            f'<span class="ingest-pending-actions">{actions}</span></li>'
+        )
     if len(pending) > 50:
         rows += f'<li>... {len(pending) - 50} more</li>'
     return '<div class="section-heading"><h2>Pending Raw Files</h2><a href="/propose">propose memories</a></div><ul class="page-list">' + rows + "</ul>"

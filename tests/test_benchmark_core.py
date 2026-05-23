@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "mcp_package"))
 
-from link_core.benchmark import build_benchmark_payload, benchmark_health, render_benchmark_text  # noqa: E402
+from link_core.benchmark import build_benchmark_payload, benchmark_health, benchmark_scale_notes, render_benchmark_text  # noqa: E402
 from link_core.demo import create_demo_workspace  # noqa: E402
 
 
@@ -30,6 +30,9 @@ class BenchmarkCoreTests(unittest.TestCase):
         self.assertEqual(payload["pages"], 13)
         self.assertEqual(payload["memories"], 1)
         self.assertIn(payload["search_backend"], {"sqlite-fts", "token-index"})
+        self.assertIn("persistent_cache", payload)
+        self.assertTrue(payload["persistent_cache"]["enabled"])
+        self.assertEqual(payload["persistent_cache"]["total_records"], 13)
         self.assertTrue(payload["found"])
         self.assertIn("health", payload)
         self.assertIn("cache", payload["timings"])
@@ -124,6 +127,17 @@ class BenchmarkCoreTests(unittest.TestCase):
         self.assertTrue(any("graph took" in warning for warning in health["warnings"]))
         self.assertIn("focused neighborhoods", " ".join(health["recommendations"]))
 
+    def test_benchmark_scale_notes_explain_large_healthy_wikis(self):
+        notes = benchmark_scale_notes({
+            "pages": 10_000,
+            "search_backend": "sqlite-fts",
+            "graph_initial": {"mode": "summary", "nodes": 250, "total_nodes": 10_000},
+        })
+
+        self.assertTrue(any("10k+ page wiki" in note for note in notes))
+        self.assertTrue(any("Graph opens as a bounded overview" in note for note in notes))
+        self.assertTrue(any("SQLite FTS is active" in note for note in notes))
+
     def test_render_benchmark_text_includes_agent_safe_payloads_and_packet(self):
         payload = {
             "target": "/tmp/link",
@@ -133,12 +147,20 @@ class BenchmarkCoreTests(unittest.TestCase):
             "memories": 1,
             "edges": 58,
             "search_backend": "sqlite-fts",
+            "persistent_cache": {
+                "enabled": True,
+                "hit": False,
+                "partial": True,
+                "reused_records": 11,
+                "total_records": 12,
+            },
             "search_results": 4,
             "context_items": 3,
             "found": True,
             "graph_summary": {"returned_nodes": 5, "returned_edges": 6},
             "page_list": {"returned_count": 12},
             "graph_initial": {"mode": "full", "nodes": 12, "total_nodes": 12},
+            "scale_notes": ["SQLite FTS is active, so search has headroom for larger local wikis."],
             "health": {
                 "label": "interactive",
                 "summary": "Ready for interactive local agent memory.",
@@ -167,8 +189,11 @@ class BenchmarkCoreTests(unittest.TestCase):
 
         self.assertIn("Link benchmark: /tmp/link", text)
         self.assertIn("Project: link", text)
+        self.assertIn("Persistent cache: enabled · 11/12 pages reused · hit=False · partial=True", text)
         self.assertIn("Agent-safe payloads: graph summary 5 nodes/6 edges · page list 12 pages", text)
         self.assertIn("Graph page initial load: full · 12/12 nodes", text)
+        self.assertIn("Scale notes:", text)
+        self.assertIn("SQLite FTS is active", text)
         self.assertIn("Verdict: interactive", text)
         self.assertIn("Packet: 1200 chars · 300 tokens · has_more=False", text)
         self.assertIn("Result: found", text)

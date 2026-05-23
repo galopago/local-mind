@@ -4,6 +4,8 @@ from __future__ import annotations
 import html
 from typing import Any, Mapping
 
+from .web_ingest import copy_button
+
 
 GRAPH_INITIAL_FULL_NODE_LIMIT = 900
 GRAPH_INITIAL_SUMMARY_NODE_LIMIT = 250
@@ -97,7 +99,11 @@ def graph_category_options(nodes: list[Mapping[str, Any]]) -> str:
 
 def graph_legend_items(colors: Mapping[str, str] = GRAPH_CATEGORY_COLORS) -> str:
     return "".join(
-        f'<span style="background:{html.escape(str(color), quote=True)}"></span>{html.escape(str(category))} '
+        '<button type="button" class="graph-legend-item" aria-pressed="false" '
+        f'data-graph-category="{html.escape(str(category), quote=True)}" '
+        f'title="Filter graph to {html.escape(str(category), quote=True)}">'
+        f'<span style="background:{html.escape(str(color), quote=True)}"></span>'
+        f'{html.escape(str(category))}</button>'
         for category, color in colors.items()
         if category != "root"
     )
@@ -109,6 +115,12 @@ def render_graph_script(
     edges_json: str,
     cat_colors_json: str,
     graph_mode_json: str,
+    focus_id_json: str = "null",
+    focus_depth: int = 2,
+    search_json: str = '""',
+    category_json: str = '"all"',
+    size_json: str = '"category"',
+    label_json: str = '"sparse"',
     total_node_count: int,
     total_edge_count: int,
 ) -> str:
@@ -124,21 +136,28 @@ def render_graph_script(
   var ctx = canvas.getContext('2d');
   var tooltip = document.getElementById('graph-tooltip');
   var resetButton = document.getElementById('graph-reset');
+  var fitButton = document.getElementById('graph-fit');
   var labelsButton = document.getElementById('graph-labels');
   var motionButton = document.getElementById('graph-motion');
   var fullscreenButton = document.getElementById('graph-fullscreen');
   var loadFullButton = document.getElementById('graph-load-full');
+  var copyLinkButton = document.getElementById('graph-copy-link');
   var searchInput = document.getElementById('graph-search');
   var categoryFilter = document.getElementById('graph-category');
+  var sizeFilter = document.getElementById('graph-size');
+  var labelFilter = document.getElementById('graph-label-density');
+  var displayLimitFilter = document.getElementById('graph-display-limit');
   var depthFilter = document.getElementById('graph-depth');
   var frameEl = document.getElementById('graph-frame');
   var status = document.getElementById('graph-status');
+  var legend = document.getElementById('graph-legend');
   var inspector = document.getElementById('graph-inspector');
   var inspectorTitle = document.getElementById('graph-inspector-title');
   var inspectorMeta = document.getElementById('graph-inspector-meta');
   var inspectorLinks = document.getElementById('graph-inspector-links');
   var inspectorOpen = document.getElementById('graph-open');
   var inspectorFocus = document.getElementById('graph-focus');
+  var inspectorLocal = document.getElementById('graph-local');
   var W, H;
 
   // Compact neural-map sizing: concepts lead, sources recede.
@@ -148,14 +167,48 @@ def render_graph_script(
   var LARGE_LABEL_LIMIT = 160;
   var FAST_RENDER_NODE_LIMIT = 450;
   var FAST_RENDER_EDGE_LIMIT = 1200;
-  var OVERVIEW_NODE_LIMIT = 650;
+  var DEFAULT_OVERVIEW_NODE_LIMIT = 650;
+  var DISPLAY_LIMIT_OPTIONS = [250, 650, 1000];
   var SEARCH_LABEL_LIMIT = 60;
   var initialGraphMode = {graph_mode_json};
+  var initialFocusId = {focus_id_json};
+  var initialFocusDepth = {max(0, min(3, int(focus_depth)))};
+  var initialSearchTerm = {search_json};
+  var initialCategoryValue = {category_json};
+  var initialSizeValue = {size_json};
+  var initialLabelMode = {label_json};
   var totalNodeCount = {total_node_count};
   var totalEdgeCount = {total_edge_count};
   var fullGraphLoaded = initialGraphMode === 'full';
   var fullGraphLoading = false;
   var nodeById = {{}};
+  var GRAPH_STORAGE_KEY = 'link.graph.controls.v1';
+
+  function readGraphSettings() {{
+    try {{
+      return JSON.parse(window.localStorage.getItem(GRAPH_STORAGE_KEY) || '{{}}') || {{}};
+    }} catch (error) {{
+      return {{}};
+    }}
+  }}
+
+  function saveGraphSettings() {{
+    try {{
+      window.localStorage.setItem(GRAPH_STORAGE_KEY, JSON.stringify({{
+        showAllLabels: showAllLabels,
+        motionPaused: motionPaused,
+        searchTerm: searchTerm,
+        categoryValue: categoryValue,
+        sizeMode: sizeMode,
+        labelMode: labelMode,
+        displayLimit: overviewNodeLimit
+      }}));
+    }} catch (error) {{
+      // Local storage can be disabled; graph controls should still work.
+    }}
+  }}
+
+  var storedGraphSettings = readGraphSettings();
 
   function stableNoise(id, salt) {{
     var h = salt * 2166136261;
@@ -178,20 +231,35 @@ def render_graph_script(
     return angles[category] || 0;
   }}
 
+  function categoryClusterCenter(category, total) {{
+    var scale = total > 2500 ? 1.22 : 1;
+    var centers = {{
+      concepts: {{ x: -40, y: 0 }},
+      sources: {{ x: 210, y: 115 }},
+      memories: {{ x: 118, y: -145 }},
+      entities: {{ x: -230, y: -100 }},
+      comparisons: {{ x: -240, y: 135 }},
+      explorations: {{ x: 18, y: 188 }}
+    }};
+    var center = centers[category] || {{ x: 0, y: 0 }};
+    return {{ x: center.x * scale, y: center.y * scale }};
+  }}
+
   function seedLargeGraphPosition(n, i, total) {{
-    var angle = i * 2.399963 + categorySeedAngle(n.category) + stableNoise(n.id, 11) * 0.55;
-    var spread = total > 2500 ? 360 : 285;
-    var r = 30 + Math.sqrt((i + 1) / Math.max(total, 1)) * spread;
-    var categoryLift = n.category === 'sources' ? 62 : (n.category === 'memories' ? -50 : (n.category === 'entities' ? 26 : -4));
+    var center = categoryClusterCenter(n.category, total);
+    var angle = stableNoise(n.id, 11) * Math.PI * 2 + categorySeedAngle(n.category);
+    var clusterRadius = total > 2500 ? 260 : 195;
+    var centrality = Math.min(0.7, Math.log2((degree[n.id] || 0) + 1) / 8);
+    var r = 18 + Math.sqrt(stableNoise(n.id, 17)) * clusterRadius * (1 - centrality);
     pos[n.id] = {{
-      x: Math.cos(angle) * r * 1.04,
-      y: Math.sin(angle) * r * 0.82 + categoryLift
+      x: center.x + Math.cos(angle) * r * 1.04,
+      y: center.y + Math.sin(angle) * r * 0.82
     }};
     vel[n.id] = {{ x: 0, y: 0 }};
   }}
 
   // Small graphs start in a loose two-lobe silhouette and settle with physics.
-  // Large graphs skip physics, so they use a stable spiral seed instead of rings.
+  // Large graphs skip physics, so they use stable category clusters instead of global rings.
   var pos = {{}}, vel = {{}}, pinned = {{}};
   function seedNodePosition(n, i, total) {{
     if (total > LARGE_GRAPH_LIMIT) {{
@@ -253,13 +321,36 @@ def render_graph_script(
   var downX = 0, downY = 0, didDrag = false, suppressClick = false;
   var zoom = 1;
   var frame = 0;
-  var showAllLabels = false;
-  var motionPaused = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || nodes.length > LARGE_GRAPH_LIMIT;
+  var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var motionPaused = prefersReducedMotion || nodes.length > LARGE_GRAPH_LIMIT || storedGraphSettings.motionPaused === true;
   var SETTLE = 200; // frames of physics
-  var searchTerm = '';
+  var searchTerm = String(initialSearchTerm || storedGraphSettings.searchTerm || '').trim().toLowerCase();
   var cachedSearchTerm = '';
   var cachedSearchMatches = 0;
-  var categoryValue = 'all';
+  var categoryValue = String(
+    initialCategoryValue && initialCategoryValue !== 'all'
+      ? initialCategoryValue
+      : (storedGraphSettings.categoryValue || initialCategoryValue || 'all')
+  ).trim() || 'all';
+  var sizeMode = String(
+    initialSizeValue && initialSizeValue !== 'category'
+      ? initialSizeValue
+      : (storedGraphSettings.sizeMode || initialSizeValue || 'category')
+  ).trim() || 'category';
+  if (['category', 'degree'].indexOf(sizeMode) === -1) sizeMode = 'category';
+  var labelMode = String(
+    initialLabelMode && initialLabelMode !== 'sparse'
+      ? initialLabelMode
+      : (storedGraphSettings.labelMode || (storedGraphSettings.showAllLabels ? 'all' : initialLabelMode) || 'sparse')
+  ).trim() || 'sparse';
+  if (['sparse', 'neighbors', 'all'].indexOf(labelMode) === -1) labelMode = 'sparse';
+  function normalizeDisplayLimit(value) {{
+    var parsed = parseInt(value, 10);
+    if (DISPLAY_LIMIT_OPTIONS.indexOf(parsed) !== -1) return parsed;
+    return DEFAULT_OVERVIEW_NODE_LIMIT;
+  }}
+  var overviewNodeLimit = normalizeDisplayLimit(storedGraphSettings.displayLimit || DEFAULT_OVERVIEW_NODE_LIMIT);
+  var showAllLabels = labelMode === 'all';
   var depthValue = 'all';
   var visibleCache = null;
   var renderQueued = false;
@@ -273,6 +364,49 @@ def render_graph_script(
 
   function nodeColor(n) {{ return catColors[n.category] || '#8b949e'; }}
   function pageHref(id) {{ return '/page/' + encodeURIComponent(id); }}
+  function graphHref(id, depth) {{
+    var params = new URLSearchParams();
+    params.set('focus', id);
+    params.set('depth', String(depth || 2));
+    if (searchTerm) params.set('q', searchTerm);
+    if (categoryValue && categoryValue !== 'all') params.set('type', categoryValue);
+    if (sizeMode && sizeMode !== 'category') params.set('size', sizeMode);
+    if (labelMode && labelMode !== 'sparse') params.set('labels', labelMode);
+    return '/graph?' + params.toString();
+  }}
+  function graphStateUrl() {{
+    var params = new URLSearchParams();
+    if (selectedNode) params.set('focus', selectedNode.id);
+    if (searchTerm) params.set('q', searchTerm);
+    if (categoryValue && categoryValue !== 'all') params.set('type', categoryValue);
+    if (sizeMode && sizeMode !== 'category') params.set('size', sizeMode);
+    if (labelMode && labelMode !== 'sparse') params.set('labels', labelMode);
+    if (selectedNode && depthValue !== 'all') params.set('depth', depthValue);
+    return window.location.origin + window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+  }}
+  function fallbackCopy(text) {{
+    var area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    try {{ document.execCommand('copy'); }} finally {{ document.body.removeChild(area); }}
+  }}
+  async function copyGraphLink() {{
+    if (!copyLinkButton) return;
+    var previous = copyLinkButton.textContent;
+    var text = graphStateUrl();
+    try {{
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+      else fallbackCopy(text);
+      copyLinkButton.textContent = 'Copied link';
+    }} catch (error) {{
+      copyLinkButton.textContent = 'Copy failed';
+    }}
+    window.setTimeout(function() {{ copyLinkButton.textContent = previous || 'Copy link'; }}, 1400);
+  }}
   function invalidateFilters() {{ visibleCache = null; }}
   function invalidateSearchCache() {{ cachedSearchTerm = ''; cachedSearchMatches = 0; }}
   function escapeHtml(value) {{
@@ -327,7 +461,7 @@ def render_graph_script(
     return seen;
   }}
   function capEligibleNodes(eligible) {{
-    if (eligible.length <= OVERVIEW_NODE_LIMIT) return eligible;
+    if (eligible.length <= overviewNodeLimit) return eligible;
     if (fullGraphLoaded && lockedOverviewIds && !searchTerm && categoryValue === 'all' && depthValue === 'all' && !selectedNode) {{
       var locked = eligible.filter(function(n) {{ return lockedOverviewIds[n.id]; }});
       if (locked.length) return locked;
@@ -340,8 +474,8 @@ def render_graph_script(
         keepCount++;
       }}
     }}
-    var highSignalLimit = Math.floor(OVERVIEW_NODE_LIMIT * 0.65);
-    var sampleLimit = Math.max(0, OVERVIEW_NODE_LIMIT - highSignalLimit);
+    var highSignalLimit = Math.floor(overviewNodeLimit * 0.65);
+    var sampleLimit = Math.max(0, overviewNodeLimit - highSignalLimit);
     eligible
       .slice()
       .sort(function(a, b) {{
@@ -356,7 +490,7 @@ def render_graph_script(
       markKeep(sampled);
     }}
     var fillIndex = 0;
-    while (keepCount < OVERVIEW_NODE_LIMIT && fillIndex < eligible.length) {{
+    while (keepCount < overviewNodeLimit && fillIndex < eligible.length) {{
       markKeep(eligible[fillIndex]);
       fillIndex++;
     }}
@@ -402,10 +536,38 @@ def render_graph_script(
   }}
   function syncLabelsButton() {{
     if (!labelsButton) return;
-    labelsButton.setAttribute('aria-pressed', showAllLabels ? 'true' : 'false');
-    labelsButton.textContent = showAllLabels ? 'Hide labels' : (graphTooLargeForDefaultLabels() ? 'Show labels' : 'Labels');
+    showAllLabels = labelMode === 'all';
+    labelsButton.setAttribute('aria-pressed', labelMode === 'sparse' ? 'false' : 'true');
+    labelsButton.textContent = labelMode === 'all' ? 'Labels all' : (labelMode === 'neighbors' ? 'Labels local' : 'Labels sparse');
+    if (labelFilter && labelFilter.value !== labelMode) labelFilter.value = labelMode;
+  }}
+  function syncDisplayLimitControl() {{
+    if (!displayLimitFilter) return;
+    displayLimitFilter.value = String(overviewNodeLimit);
+    displayLimitFilter.disabled = nodes.length <= DEFAULT_OVERVIEW_NODE_LIMIT;
+    displayLimitFilter.title = displayLimitFilter.disabled
+      ? 'The full graph fits within the default overview.'
+      : 'Choose how many nodes the canvas may draw before you narrow the graph.';
+  }}
+  function syncLegendButtons() {{
+    if (!legend) return;
+    Array.from(legend.querySelectorAll('[data-graph-category]')).forEach(function(button) {{
+      var category = button.getAttribute('data-graph-category') || '';
+      button.setAttribute('aria-pressed', categoryValue === category ? 'true' : 'false');
+    }});
+  }}
+  function cycleLabelMode() {{
+    labelMode = labelMode === 'sparse' ? 'neighbors' : (labelMode === 'neighbors' ? 'all' : 'sparse');
+    showAllLabels = labelMode === 'all';
+    syncLabelsButton();
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
   }}
   function nodeRadius(n) {{
+    if (sizeMode === 'degree') {{
+      return Math.max(4.5, Math.min(12, 4.2 + Math.log2((degree[n.id] || 0) + 1) * 1.8));
+    }}
     if (n.category === 'sources') return 4.5;
     if (n.category === 'memories') return 6.4;
     if (n.category === 'entities') return 6.8;
@@ -434,14 +596,15 @@ def render_graph_script(
     ];
     if (!fullGraphLoaded) parts.push('fast overview');
     if (categoryValue !== 'all') parts.push(categoryValue);
+    if (sizeMode !== 'category') parts.push('size ' + sizeMode);
+    if (labelMode !== 'sparse') parts.push('labels ' + labelMode);
     if (depthValue !== 'all') parts.push('depth ' + depthValue);
     if (graphTooLargeForMotion()) parts.push('motion capped');
-    if (graphTooLargeForDefaultLabels() && !showAllLabels) parts.push('labels sparse');
+    if (graphTooLargeForDefaultLabels() && labelMode === 'sparse') parts.push('labels sparse');
     if (graphNeedsFastRender(currentNodes, currentEdges)) parts.push('fast render');
-    if (nodes.length > OVERVIEW_NODE_LIMIT && currentNodes.length < nodes.length) parts.push('overview capped');
+    if (nodes.length > overviewNodeLimit && currentNodes.length < nodes.length) parts.push('display capped ' + overviewNodeLimit);
     if (fullGraphLoaded && initialGraphMode !== 'full') parts.push('data loaded');
     if (fullGraphLoading) parts.push('loading graph data');
-    if (showAllLabels) parts.push('labels all');
     if (searchTerm) {{
       var matches = totalSearchMatches();
       parts.push(matches + ' match' + (matches === 1 ? '' : 'es'));
@@ -452,6 +615,8 @@ def render_graph_script(
     if (selectedNode) parts.push('selected ' + selectedNode.id);
     status.textContent = parts.join(' · ');
     syncLabelsButton();
+    syncDisplayLimitControl();
+    syncLegendButtons();
   }}
 
   function syncDepthControl() {{
@@ -466,13 +631,14 @@ def render_graph_script(
   }}
 
   function updateInspector() {{
-    if (!inspector || !inspectorTitle || !inspectorMeta || !inspectorLinks || !inspectorOpen || !inspectorFocus) return;
+    if (!inspector || !inspectorTitle || !inspectorMeta || !inspectorLinks || !inspectorOpen || !inspectorFocus || !inspectorLocal) return;
     inspectorLinks.textContent = '';
     if (!selectedNode) {{
       inspectorTitle.textContent = 'Select a node';
       inspectorMeta.textContent = 'Click a node to inspect it. Drag a node to place it. Double-click a node, or use Open page, to navigate.';
       inspectorOpen.disabled = true;
       inspectorFocus.disabled = true;
+      inspectorLocal.disabled = true;
       return;
     }}
     var neighbors = (adj[selectedNode.id] || []).slice().sort(function(a, b) {{
@@ -482,6 +648,7 @@ def render_graph_script(
     inspectorMeta.textContent = selectedNode.category + ' · ' + neighbors.length + ' linked page' + (neighbors.length === 1 ? '' : 's');
     inspectorOpen.disabled = false;
     inspectorFocus.disabled = false;
+    inspectorLocal.disabled = false;
     neighbors.slice(0, 10).forEach(function(id) {{
       var target = nodeById[id];
       var link = document.createElement('a');
@@ -508,6 +675,9 @@ def render_graph_script(
 
   function openNode(node) {{
     if (node) window.location.href = pageHref(node.id);
+  }}
+  function openLocalGraph(node, depth) {{
+    if (node) window.location.href = graphHref(node.id, depth || 2);
   }}
 
   function toScreen(x, y) {{
@@ -690,7 +860,8 @@ def render_graph_script(
       var label = n.title.length > 22 ? n.title.slice(0, 20) + '…' : n.title;
       var defaultSparseLabel = !largeLabelSet && n.category !== 'sources' && degree[n.id] >= 2;
       var showMatchLabel = matched && totalSearchMatches() <= SEARCH_LABEL_LIMIT;
-      var showLabel = showAllLabels || selected || showMatchLabel || (hoverNode ? activeNode : defaultSparseLabel);
+      var showNeighborLabel = labelMode === 'neighbors' && selectedNode && (selected || isNeighbor(selectedNode.id, n.id));
+      var showLabel = labelMode === 'all' || showNeighborLabel || selected || showMatchLabel || (hoverNode ? activeNode : defaultSparseLabel);
       if (showLabel) {{
         ctx.font = LABEL_FONT;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -765,15 +936,28 @@ def render_graph_script(
     searchTerm = '';
     invalidateSearchCache();
     categoryValue = 'all';
+    sizeMode = 'category';
+    labelMode = 'sparse';
+    showAllLabels = false;
     depthValue = 'all';
     if (searchInput) searchInput.value = '';
     if (categoryFilter) categoryFilter.value = 'all';
+    if (sizeFilter) sizeFilter.value = 'category';
+    if (labelFilter) labelFilter.value = 'sparse';
     if (depthFilter) depthFilter.value = 'all';
     invalidateFilters();
     reseedVisiblePositions();
     frame = SETTLE;
     autoFit();
     updateInspector();
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
+  }}
+
+  function fitCurrentView() {{
+    autoFit();
+    fitted = true;
     updateStatus();
     drawSoon();
   }}
@@ -803,6 +987,8 @@ def render_graph_script(
   }}
 
   function applyGraphPayload(payload) {{
+    var previousSelectedId = selectedNode ? selectedNode.id : null;
+    var previousDepthValue = depthValue;
     var nextNodes = (payload.nodes || []).filter(function(n) {{ return n.category !== 'root'; }});
     var ids = {{}};
     nextNodes.forEach(function(n) {{ ids[n.id] = true; }});
@@ -814,11 +1000,11 @@ def render_graph_script(
     fullGraphLoaded = true;
     fullGraphLoading = false;
     pinned = {{}};
-    selectedNode = null;
-    hoverNode = null;
-    depthValue = 'all';
-    if (depthFilter) depthFilter.value = 'all';
     rebuildGraphIndexes();
+    selectedNode = previousSelectedId && nodeById[previousSelectedId] ? nodeById[previousSelectedId] : null;
+    hoverNode = selectedNode;
+    depthValue = selectedNode ? previousDepthValue : 'all';
+    if (depthFilter) depthFilter.value = depthValue;
     syncCategoryOptions();
     seedMissingPositions();
     invalidateSearchCache();
@@ -830,8 +1016,22 @@ def render_graph_script(
     setMotionPaused(true);
     if (loadFullButton) {{
       loadFullButton.disabled = true;
-      loadFullButton.textContent = 'Graph data loaded';
+      loadFullButton.textContent = 'All data ready; overview capped';
     }}
+  }}
+
+  function applyInitialFocus() {{
+    if (!initialFocusId || !nodeById[initialFocusId]) return;
+    selectedNode = nodeById[initialFocusId];
+    hoverNode = selectedNode;
+    depthValue = String(initialFocusDepth || 2);
+    if (depthFilter) depthFilter.value = depthValue;
+    invalidateFilters();
+    reseedVisiblePositions();
+    frame = SETTLE;
+    fitted = true;
+    autoFit();
+    updateInspector();
   }}
 
   function loadFullGraph() {{
@@ -839,7 +1039,7 @@ def render_graph_script(
     fullGraphLoading = true;
     if (loadFullButton) {{
       loadFullButton.disabled = true;
-      loadFullButton.textContent = 'Loading graph data...';
+      loadFullButton.textContent = 'Loading all data...';
     }}
     updateStatus();
     fetch('/api/graph')
@@ -856,9 +1056,9 @@ def render_graph_script(
         fullGraphLoading = false;
         if (loadFullButton) {{
           loadFullButton.disabled = false;
-          loadFullButton.textContent = 'Retry graph data';
+          loadFullButton.textContent = 'Retry all data';
         }}
-        if (status) status.textContent = 'Full graph load failed; local API did not return graph data.';
+        if (status) status.textContent = 'Graph data load failed; local API did not return graph data.';
       }});
   }}
 
@@ -961,6 +1161,7 @@ def render_graph_script(
     if (e.key === '+' || e.key === '=') {{ zoom = Math.min(6, zoom * 1.12); updateStatus(); drawSoon(); e.preventDefault(); }}
     if (e.key === '-' || e.key === '_') {{ zoom = Math.max(0.15, zoom * 0.9); updateStatus(); drawSoon(); e.preventDefault(); }}
     if (e.key === '0') {{ resetView(); e.preventDefault(); }}
+    if (e.key === 'f' || e.key === 'F') {{ fitCurrentView(); e.preventDefault(); }}
     if (e.key === 'Enter' && hoverNode) {{ openNode(hoverNode); e.preventDefault(); }}
     if (e.key === 'Escape') {{
       if (frameEl && frameEl.classList.contains('is-fullscreen')) {{
@@ -971,29 +1172,27 @@ def render_graph_script(
       e.preventDefault();
     }}
     if (e.key === 'l' || e.key === 'L') {{
-      showAllLabels = !showAllLabels;
-      syncLabelsButton();
-      updateStatus();
-      drawSoon();
+      cycleLabelMode();
       e.preventDefault();
     }}
   }});
 
   if (resetButton) resetButton.addEventListener('click', resetView);
+  if (fitButton) fitButton.addEventListener('click', fitCurrentView);
   if (labelsButton) labelsButton.addEventListener('click', function() {{
-    showAllLabels = !showAllLabels;
-    syncLabelsButton();
-    updateStatus();
-    drawSoon();
+    cycleLabelMode();
   }});
   if (motionButton) motionButton.addEventListener('click', function() {{
     setMotionPaused(!motionPaused);
+    saveGraphSettings();
   }});
   if (fullscreenButton) fullscreenButton.addEventListener('click', function() {{
     setFullscreen(!frameEl.classList.contains('is-fullscreen'));
   }});
+  if (copyLinkButton) copyLinkButton.addEventListener('click', copyGraphLink);
   if (loadFullButton) loadFullButton.addEventListener('click', loadFullGraph);
   if (inspectorOpen) inspectorOpen.addEventListener('click', function() {{ openNode(selectedNode); }});
+  if (inspectorLocal) inspectorLocal.addEventListener('click', function() {{ openLocalGraph(selectedNode, 2); }});
   if (inspectorFocus) inspectorFocus.addEventListener('click', function() {{
     if (!selectedNode) return;
     depthValue = '1';
@@ -1014,6 +1213,7 @@ def render_graph_script(
       reseedVisiblePositions();
       autoFit();
       updateStatus();
+      saveGraphSettings();
       drawSoon();
     }});
     searchInput.addEventListener('keydown', function(e) {{
@@ -1030,6 +1230,45 @@ def render_graph_script(
     setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
+    saveGraphSettings();
+    drawSoon();
+  }});
+  if (legend) legend.addEventListener('click', function(e) {{
+    var button = e.target.closest ? e.target.closest('[data-graph-category]') : null;
+    if (!button) return;
+    var nextCategory = button.getAttribute('data-graph-category') || 'all';
+    categoryValue = categoryValue === nextCategory ? 'all' : nextCategory;
+    if (categoryFilter) categoryFilter.value = categoryValue;
+    invalidateFilters();
+    reseedVisiblePositions();
+    setMotionPaused(motionPaused);
+    autoFit();
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
+  }});
+  if (sizeFilter) sizeFilter.addEventListener('change', function() {{
+    sizeMode = sizeFilter.value || 'category';
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
+  }});
+  if (labelFilter) labelFilter.addEventListener('change', function() {{
+    labelMode = labelFilter.value || 'sparse';
+    showAllLabels = labelMode === 'all';
+    syncLabelsButton();
+    updateStatus();
+    saveGraphSettings();
+    drawSoon();
+  }});
+  if (displayLimitFilter) displayLimitFilter.addEventListener('change', function() {{
+    overviewNodeLimit = normalizeDisplayLimit(displayLimitFilter.value);
+    invalidateFilters();
+    reseedVisiblePositions();
+    setMotionPaused(motionPaused);
+    autoFit();
+    updateStatus();
+    saveGraphSettings();
     drawSoon();
   }});
   if (depthFilter) depthFilter.addEventListener('change', function() {{
@@ -1039,6 +1278,7 @@ def render_graph_script(
     setMotionPaused(motionPaused);
     autoFit();
     updateStatus();
+    saveGraphSettings();
     drawSoon();
   }});
 
@@ -1047,7 +1287,13 @@ def render_graph_script(
   if (motionPaused) {{ reseedVisiblePositions(); autoFit(); fitted = true; frame = SETTLE; }}
   setMotionPaused(motionPaused);
   syncCategoryOptions();
+  if (sizeFilter) sizeFilter.value = sizeMode;
+  if (labelFilter) labelFilter.value = labelMode;
+  if (searchInput) searchInput.value = searchTerm;
+  applyInitialFocus();
+  if (searchTerm && !fullGraphLoaded) loadFullGraph();
   syncLabelsButton();
+  syncLegendButtons();
   updateInspector();
   updateStatus();
   if (shouldRunContinuously()) startLoop();
@@ -1063,7 +1309,11 @@ def render_graph_empty_body() -> str:
         "<h1>Knowledge Graph</h1>"
         '<div class="graph-empty">'
         "<strong>No graph pages yet.</strong><br>"
-        "Add sources to <code>raw/</code>, ingest them, then rebuild backlinks."
+        "Add sources, ingest them, then rebuild backlinks."
+        '<div class="page-actions">'
+        '<a class="button-link" href="/ingest">Open ingest</a>'
+        f"{copy_button('ingest the new raw Link files', 'Copy ingest prompt')}"
+        "</div>"
         "</div>"
     )
 
@@ -1079,13 +1329,40 @@ def render_graph_page_body(
     graph_note: str,
     category_options: str,
     legend_items: str,
+    focus_label: str = "",
+    focus_depth: int = 2,
+    search_label: str = "",
+    category_label: str = "",
+    size_label: str = "",
+    label_label: str = "",
 ) -> str:
     """Render the graph page shell around the browser simulation script."""
     load_full_button = ""
     if graph_mode != "full":
         load_full_button = (
-            '<button id="graph-load-full" type="button">'
-            f"Load graph data ({total_node_count} nodes)</button>"
+            '<button id="graph-load-full" type="button" '
+            'title="Loads all graph data for search, filters, and focused neighborhoods; '
+            'the canvas remains capped until you narrow it.">'
+            f"Load all data ({total_node_count} nodes)</button>"
+        )
+    focus_html = ""
+    state_parts = []
+    if focus_label:
+        state_parts.append(f'Focused on <strong>{html.escape(focus_label)}</strong> · depth {html.escape(str(focus_depth))}')
+    if search_label:
+        state_parts.append(f'Search <strong>{html.escape(search_label)}</strong>')
+    if category_label and category_label != "all":
+        state_parts.append(f'Type <strong>{html.escape(category_label)}</strong>')
+    if size_label and size_label != "category":
+        state_parts.append(f'Size <strong>{html.escape(size_label)}</strong>')
+    if label_label and label_label != "sparse":
+        state_parts.append(f'Labels <strong>{html.escape(label_label)}</strong>')
+    if state_parts:
+        focus_html = (
+            '<p class="graph-focus-note">'
+            f'{". ".join(state_parts)}. '
+            '<a href="/graph">Clear filters</a>'
+            "</p>"
         )
 
     return (
@@ -1094,17 +1371,29 @@ def render_graph_page_body(
         '<p class="meta">For large wikis, use fullscreen, zoom, pan, and sparse labels. '
         "The graph is for exploring neighborhoods, not reading every label at once."
         f"{html.escape(graph_note)}</p>"
+        f"{focus_html}"
         '<section id="graph-frame" class="graph-frame">'
         '<div class="graph-toolbar" aria-label="Graph controls">'
         '<button id="graph-reset" type="button">Reset</button>'
+        '<button id="graph-fit" type="button">Fit view</button>'
         '<button id="graph-labels" type="button" aria-pressed="false">Labels</button>'
         '<button id="graph-motion" type="button" aria-pressed="false">Motion on</button>'
         '<button id="graph-fullscreen" type="button" aria-pressed="false">Fullscreen</button>'
+        '<button id="graph-copy-link" type="button">Copy link</button>'
         f"{load_full_button}"
         '<label class="graph-control">Find'
         '<input id="graph-search" type="search" placeholder="node title"></label>'
         '<label class="graph-control">Type'
         f'<select id="graph-category">{category_options}</select></label>'
+        '<label class="graph-control">Size'
+        '<select id="graph-size"><option value="category">category</option>'
+        '<option value="degree">degree</option></select></label>'
+        '<label class="graph-control">Labels'
+        '<select id="graph-label-density"><option value="sparse">sparse</option>'
+        '<option value="neighbors">neighbors</option><option value="all">all</option></select></label>'
+        '<label class="graph-control">Display'
+        '<select id="graph-display-limit"><option value="250">250 nodes</option>'
+        '<option value="650" selected>650 nodes</option><option value="1000">1000 nodes</option></select></label>'
         '<label class="graph-control">Neighborhood'
         '<select id="graph-depth"><option value="all">all</option><option value="1">1 hop</option>'
         '<option value="2">2 hops</option><option value="3">3 hops</option></select></label>'
@@ -1120,10 +1409,11 @@ def render_graph_page_body(
         "Double-click a node, or use Open page, to navigate.</p>"
         '<div id="graph-inspector-links" class="graph-inspector-links"></div>'
         '<button id="graph-focus" type="button" disabled>Focus neighborhood</button>'
+        '<button id="graph-local" type="button" disabled>Open local graph</button>'
         '<button id="graph-open" type="button" disabled>Open page</button>'
         "</aside>"
         "</div>"
-        f'<div class="graph-legend">{legend_items}</div>'
+        f'<div id="graph-legend" class="graph-legend">{legend_items}</div>'
         "</section>"
         f"{graph_js}"
     )

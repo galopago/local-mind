@@ -52,6 +52,9 @@
 
         <h2 id="daily">Daily Loop</h2>
         <pre><code>link serve
+link welcome
+link next
+link health
 link ingest-status
 link remember "User prefers feature branches for Link work." --type preference --scope project --project link
 link brief "working on Link release" --project link
@@ -79,6 +82,7 @@ link delete-capture raw/memory-captures/&lt;capture&gt;.md --confirm</code></pre
         <h2 id="maintenance">Maintenance</h2>
         <pre><code>link backup
 link doctor --fix
+link health
 link status --validate
 link memory-audit
 link operations
@@ -87,13 +91,19 @@ link rebuild-index
 link rebuild-backlinks
 link validate
 link verify-mcp</code></pre>
-        <p>Use <code>link backup</code> before broad repair work. Use <code>link benchmark</code> when a wiki starts to feel slow.</p>
+        <p>Use <code>link backup</code> before broad repair work. Use <code>link benchmark</code> when a wiki starts to feel slow. <code>link status --validate</code> and <code>link benchmark</code> both show persistent-cache reuse so you can tell whether Link is rereading every page or reusing unchanged records.</p>
+        <p>From a source checkout, use the synthetic large-wiki smoke when you want local scale evidence without touching your real wiki. The script prints the exact <code>link serve</code> command and graph URL for the generated fixture.</p>
+        <pre><code>python3 scripts/smoke_large_wiki.py --pages 10000</code></pre>
 
         <h2 id="all">All Commands</h2>
         <pre><code>link --version
+link version
 link init [dir]
 link serve [dir] [--port 3000]
+link welcome [dir] [--project slug]
 link prompts [dir] [--project slug]
+link next [dir] [--project slug]
+link health [dir] [--json]
 link status [--validate]
 link operations [--limit 20]
 link backup [--label name] [--include-raw]

@@ -20,6 +20,8 @@ def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.Argum
     parser.add_argument("--version", action="version", version=f"Link {LINK_VERSION}")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    sub.add_parser("version", help="print the Link CLI version")
+
     init_cmd = sub.add_parser("init", help="create or repair a normal Link wiki")
     init_cmd.add_argument("target", nargs="?", default=".")
 
@@ -31,7 +33,12 @@ def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.Argum
     demo.add_argument("target", nargs="?", default=default_demo_dir)
     demo.add_argument("--force", action="store_true", help="replace an existing Link demo directory")
 
-    prompts_cmd = sub.add_parser("prompts", help="print first-run agent prompts and local checks")
+    welcome_cmd = sub.add_parser("welcome", help="print the shortest first-use path for Link")
+    welcome_cmd.add_argument("target", nargs="?", default=".")
+    welcome_cmd.add_argument("--project", default=None, help="project slug for project-scoped prompt examples")
+    welcome_cmd.add_argument("--json", action="store_true", help="print machine-readable welcome data")
+
+    prompts_cmd = sub.add_parser("prompts", aliases=["next"], help="print first-run agent prompts and local checks")
     prompts_cmd.add_argument("target", nargs="?", default=".")
     prompts_cmd.add_argument("--project", default=None, help="project slug for project-scoped prompt examples")
     prompts_cmd.add_argument("--json", action="store_true", help="print machine-readable prompt data")
@@ -40,6 +47,10 @@ def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.Argum
     status_cmd.add_argument("target", nargs="?", default=".")
     status_cmd.add_argument("--validate", action="store_true", help="include the ingest validation gate summary")
     status_cmd.add_argument("--json", action="store_true", help="print machine-readable status")
+
+    health_cmd = sub.add_parser("health", help="show readiness, validation, and interrupted write state")
+    health_cmd.add_argument("target", nargs="?", default=".")
+    health_cmd.add_argument("--json", action="store_true", help="print machine-readable health status")
 
     operations_cmd = sub.add_parser("operations", help="inspect interrupted or active Link write operations")
     operations_cmd.add_argument("target", nargs="?", default=".")
@@ -239,16 +250,22 @@ def build_cli_parser(default_demo_dir: str = DEFAULT_DEMO_DIR) -> argparse.Argum
 def dispatch_cli_command(args: Any, handlers: Mapping[str, CliHandler]) -> int:
     """Dispatch parsed Link CLI arguments to runtime-provided handlers."""
     command = args.command
+    if command == "version":
+        return handlers["version"]()
     if command == "init":
         return handlers["init"](Path(args.target))
     if command == "serve":
         return handlers["serve"](Path(args.target), port=args.port)
     if command == "demo":
         return handlers["demo"](Path(args.target), force=args.force)
-    if command == "prompts":
+    if command == "welcome":
+        return handlers["welcome"](Path(args.target), project=args.project, json_output=args.json)
+    if command in {"prompts", "next"}:
         return handlers["prompts"](Path(args.target), project=args.project, json_output=args.json)
     if command == "status":
         return handlers["status"](Path(args.target), include_validation=args.validate, json_output=args.json)
+    if command == "health":
+        return handlers["health"](Path(args.target), json_output=args.json)
     if command == "operations":
         return handlers["operations"](Path(args.target), limit=args.limit, json_output=args.json)
     if command == "backup":

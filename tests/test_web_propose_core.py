@@ -24,6 +24,11 @@ def test_render_propose_page_shows_review_only_workflow():
     assert "Memory proposal path" in html
     assert "Approve explicitly" in html
     assert "This step never writes durable memory" in html
+    assert "After Approval" in html
+    assert "Open memory inbox" in html
+    assert "Open memory audit" in html
+    assert 'data-copy-text="brief me from Link before we continue"' in html
+    assert 'data-copy-text="query Link for what you remember about this task"' in html
     assert 'data-proposal-sources' in html
     assert 'data-proposal-form' in html
     assert 'data-initial-source="raw/first-memory.md"' in html

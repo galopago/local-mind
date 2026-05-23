@@ -19,7 +19,7 @@ from .search import (
 
 
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
-PERSISTENT_CACHE_SCHEMA_VERSION = 1
+PERSISTENT_CACHE_SCHEMA_VERSION = 2
 INDEX_CATEGORY_ORDER = (
     "memories",
     "concepts",
@@ -106,39 +106,57 @@ def _page_signatures(wiki_dir: Path, page_paths: list[Path]) -> list[dict[str, A
     return signatures
 
 
-def _load_persistent_records(
+def _signature_key(signature: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        signature.get("path"),
+        signature.get("size"),
+        signature.get("mtime_ns"),
+        signature.get("mode"),
+    )
+
+
+def _load_persistent_record_map(
     cache_path: Path,
     signatures: list[dict[str, Any]],
-) -> list[dict[str, str]] | None:
+) -> dict[str, dict[str, Any]]:
     try:
         payload = json.loads(cache_path.read_text(encoding="utf-8"))
     except Exception:
-        return None
+        return {}
     if not isinstance(payload, dict):
-        return None
+        return {}
     if payload.get("schema_version") != PERSISTENT_CACHE_SCHEMA_VERSION:
-        return None
+        return {}
     if payload.get("signatures") != signatures:
-        return None
+        # Schema v2 supports partial reuse when only some page signatures changed.
+        pass
     records = payload.get("records")
     if not isinstance(records, list):
-        return None
-    loaded: list[dict[str, str]] = []
+        return {}
+    current_by_path = {
+        str(signature.get("path")): signature
+        for signature in signatures
+        if isinstance(signature.get("path"), str)
+    }
+    loaded: dict[str, dict[str, Any]] = {}
     for item in records:
         if not isinstance(item, dict):
-            return None
+            continue
         rel = item.get("path")
         text = item.get("text")
-        if not isinstance(rel, str) or not isinstance(text, str):
-            return None
-        loaded.append({"path": rel, "text": text})
+        signature = item.get("signature")
+        if not isinstance(rel, str) or not isinstance(text, str) or not isinstance(signature, dict):
+            continue
+        current_signature = current_by_path.get(rel)
+        if current_signature and _signature_key(current_signature) == _signature_key(signature):
+            loaded[rel] = {"path": rel, "text": text, "signature": signature}
     return loaded
 
 
 def _write_persistent_records(
     cache_path: Path,
     signatures: list[dict[str, Any]],
-    records: list[dict[str, str]],
+    records: list[dict[str, Any]],
 ) -> bool:
     try:
         atomic_write_json(
@@ -159,31 +177,38 @@ def build_wiki_cache(wiki_dir: Path, *, use_persistent_cache: bool = True) -> di
     page_paths = _markdown_page_paths(wiki_dir)
     signatures = _page_signatures(wiki_dir, page_paths)
     persistent_cache_path = _persistent_cache_path(wiki_dir)
-    cache_records = (
-        _load_persistent_records(persistent_cache_path, signatures)
+    cached_by_path = (
+        _load_persistent_record_map(persistent_cache_path, signatures)
         if use_persistent_cache
-        else None
+        else {}
     )
-    cache_hit = cache_records is not None
+    reused_records = 0
 
-    records: list[dict[str, str]] = []
+    records: list[dict[str, Any]] = []
     read_warnings: list[dict[str, str]] = []
-    if cache_records is not None:
-        records = cache_records
-    else:
-        for md in page_paths:
-            rel = md.relative_to(wiki_dir)
-            try:
-                text = md.read_text(encoding="utf-8", errors="replace")
-            except OSError as exc:
-                read_warnings.append({
-                    "page": f"wiki/{rel.as_posix()}",
-                    "error": str(exc) or exc.__class__.__name__,
-                })
-                continue
-            records.append({"path": rel.as_posix(), "text": text})
+    signatures_by_path = {str(item.get("path")): item for item in signatures}
+    for md in page_paths:
+        rel = md.relative_to(wiki_dir)
+        rel_text = rel.as_posix()
+        cached = cached_by_path.get(rel_text)
+        if cached is not None:
+            records.append(cached)
+            reused_records += 1
+            continue
+        try:
+            text = md.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            read_warnings.append({
+                "page": f"wiki/{rel.as_posix()}",
+                "error": str(exc) or exc.__class__.__name__,
+            })
+            continue
+        signature = signatures_by_path.get(rel_text, {"path": rel_text})
+        records.append({"path": rel_text, "text": text, "signature": signature})
+    cache_hit = bool(signatures) and reused_records == len(signatures) and not read_warnings
+    cache_partial = bool(reused_records) and not cache_hit
     cache_written = False
-    if use_persistent_cache and not cache_hit and not read_warnings:
+    if use_persistent_cache and not read_warnings and reused_records < len(signatures):
         cache_written = _write_persistent_records(persistent_cache_path, signatures, records)
 
     pages: list[dict[str, Any]] = []
@@ -314,6 +339,9 @@ def build_wiki_cache(wiki_dir: Path, *, use_persistent_cache: bool = True) -> di
         "persistent_cache": {
             "enabled": use_persistent_cache,
             "hit": cache_hit,
+            "partial": cache_partial,
+            "reused_records": reused_records,
+            "total_records": len(signatures),
             "written": cache_written,
             "path": str(persistent_cache_path),
             "schema_version": PERSISTENT_CACHE_SCHEMA_VERSION,

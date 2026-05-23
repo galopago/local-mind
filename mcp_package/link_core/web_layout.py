@@ -51,6 +51,36 @@ document.addEventListener('keydown', function(e) {
 });
 """
 
+NAV_CURRENT_JS = """
+// Mark the active local navigation item.
+(function() {
+  function cleanPath(path) {
+    if (!path) return '/';
+    path = path.split('?')[0].split('#')[0];
+    if (path.length > 1) path = path.replace(/\\/+$/, '');
+    return path || '/';
+  }
+  var current = cleanPath(window.location.pathname);
+  var active = null;
+  document.querySelectorAll('header nav a[href]').forEach(function(link) {
+    var href = link.getAttribute('href') || '';
+    if (!href || href.indexOf('http') === 0) return;
+    var target = cleanPath(new URL(href, window.location.origin).pathname);
+    if (target === current) active = link;
+  });
+  if (!active && current.indexOf('/page/') === 0) {
+    active = document.querySelector('header nav a[href="/all"]');
+  }
+  if (!active) return;
+  active.setAttribute('aria-current', 'page');
+  var more = active.closest('.nav-more');
+  if (more) {
+    var summary = more.querySelector('summary');
+    if (summary) summary.setAttribute('aria-current', 'page');
+  }
+})();
+"""
+
 
 def render_header_html() -> str:
     return """<header>
@@ -61,25 +91,30 @@ def render_header_html() -> str:
         <span class="theme-icon" aria-hidden="true"></span><span class="theme-text" data-theme-text>system</span>
       </button>
       <form action="/search" method="get">
-        <input type="text" name="q" placeholder="search... (/)" autocomplete="off" id="search-input">
+        <input type="text" name="q" placeholder="search... (/)" autocomplete="off" id="search-input" aria-label="Search Link">
       </form>
     </div>
   </div>
-  <nav>
+  <nav aria-label="Link sections">
     <a href="/">home</a>
-    <a href="/health">health</a>
-    <a href="/prompts">prompts</a>
-    <a href="/ingest">ingest</a>
     <a href="/brief">brief</a>
-    <a href="/propose">propose</a>
     <a href="/memory">memory</a>
-    <a href="/audit">audit</a>
-    <a href="/inbox">inbox</a>
-    <a href="/captures">captures</a>
-    <a href="/profile">profile</a>
-    <a href="/page/log">log</a>
-    <a href="/all">all pages</a>
+    <a href="/ingest">ingest</a>
     <a href="/graph">graph</a>
+    <a href="/health">health</a>
+    <details class="nav-more">
+      <summary>more</summary>
+      <div class="nav-more-menu">
+        <a href="/prompts">prompts</a>
+        <a href="/propose">propose</a>
+        <a href="/audit">audit</a>
+        <a href="/inbox">inbox</a>
+        <a href="/captures">captures</a>
+        <a href="/profile">profile</a>
+        <a href="/page/log">log</a>
+        <a href="/all">all pages</a>
+      </div>
+    </details>
   </nav>
 </header>"""
 
@@ -116,6 +151,7 @@ def render_layout(title: str, body: str, page_class: str = "") -> str:
 {body}
 {render_footer_html()}
 <script>{KEYBOARD_NAV_JS}</script>
+<script>{NAV_CURRENT_JS}</script>
 <script>{THEME_CONTROL_JS}</script>
 <script>{MEMORY_ACTION_JS}</script>
 <script>{COPY_BUTTON_JS}</script>

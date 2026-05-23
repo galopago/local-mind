@@ -4,6 +4,7 @@ from mcp_package.link_core.cli_runtime import (
     render_demo_text,
     render_init_text,
     render_starter_prompts_text,
+    render_welcome_text,
 )
 
 
@@ -14,30 +15,56 @@ class CliRuntimeCoreTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Link wiki ready at /tmp/link", text)
         self.assertIn("Initialized:", text)
-        self.assertIn("link status --validate", text)
+        self.assertIn("link health /tmp/link", text)
+        self.assertIn("link serve /tmp/link", text)
 
     def test_render_starter_prompts_text(self):
         code, text = render_starter_prompts_text({
             "target": "/tmp/link",
             "project": "link",
+            "shortcut": "link next /tmp/link",
             "prompts": [{
                 "prompt": "is Link ready?",
                 "when": "first run",
             }],
-            "commands": ["link status --validate"],
+            "commands": ["link health"],
         })
 
         self.assertEqual(code, 0)
         self.assertIn("Link starter prompts: /tmp/link", text)
         self.assertIn("Project: link", text)
+        self.assertIn("Shortcut", text)
+        self.assertIn("- link next /tmp/link", text)
         self.assertIn("- is Link ready?", text)
-        self.assertIn("- link status --validate", text)
+        self.assertIn("- link health", text)
+
+    def test_render_welcome_text(self):
+        code, text = render_welcome_text({
+            "target": "/tmp/link",
+            "project": "link",
+            "steps": [{
+                "step": 1,
+                "prompt": "is Link ready?",
+                "proves": "Agent can find Link.",
+            }],
+            "commands": ["link health"],
+            "urls": ["http://127.0.0.1:3000/health"],
+        })
+
+        self.assertEqual(code, 0)
+        self.assertIn("Link welcome: /tmp/link", text)
+        self.assertIn("Project: link", text)
+        self.assertIn("1. is Link ready?", text)
+        self.assertIn("Proves: Agent can find Link.", text)
+        self.assertIn("- link health", text)
+        self.assertIn("- http://127.0.0.1:3000/health", text)
 
     def test_render_demo_text(self):
         code, text = render_demo_text(
             target="/tmp/link-demo",
             guide_path="/tmp/link-demo/START_HERE.md",
             serve_command="python3 link.py serve /tmp/link-demo",
+            next_command="python3 link.py next /tmp/link-demo",
             query_command="python3 link.py query 'why does Link help agents?' /tmp/link-demo --budget small",
             brief_command="python3 link.py brief 'working on agent memory' /tmp/link-demo",
             audit_command="python3 link.py memory-audit /tmp/link-demo",
@@ -45,6 +72,8 @@ class CliRuntimeCoreTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("Link demo created at /tmp/link-demo", text)
+        self.assertIn("Ask an agent what to try next:", text)
+        self.assertIn("python3 link.py next /tmp/link-demo", text)
         self.assertIn("Try the value loop:", text)
         self.assertIn("/tmp/link-demo/START_HERE.md", text)
         self.assertIn("http://127.0.0.1:3000/graph", text)

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from .frontmatter import parse_frontmatter
+from .mcp_verify import display_command
 from .security import secret_file_scan
 from .wiki import build_backlinks, load_backlinks_index
 
@@ -151,6 +152,23 @@ def _source_page_suggestion(raw_rel: str) -> str:
     return f"wiki/sources/{slug}.md"
 
 
+def _target_command(command: str, target: str) -> str:
+    if target and target in command:
+        return command
+    parts = command.split()
+    if not parts or parts[0] != "link" or not target:
+        return command
+    if target in parts[1:]:
+        return display_command(parts)
+    return display_command([*parts, target])
+
+
+def _target_commands(commands: object, target: str) -> list[str]:
+    if not isinstance(commands, list):
+        return []
+    return [_target_command(str(command), target) for command in commands if str(command).strip()]
+
+
 def _secret_blocked_items(items: list[dict[str, object]]) -> list[dict[str, object]]:
     return [item for item in items if item.get("secret_warnings")]
 
@@ -253,7 +271,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "link rebuild-index",
                 "link rebuild-backlinks",
                 "link validate",
-                "link status --validate",
+                "link health",
             ],
         }
 
@@ -279,7 +297,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "link rebuild-index",
                 "link rebuild-backlinks",
                 "link validate",
-                "link status --validate",
+                "link health",
             ],
         }
 
@@ -307,7 +325,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
             ],
             "agent_prompt": None,
             "memory_prompt": None,
-            "post_checks": ["link ingest-status", "link status --validate"],
+            "post_checks": ["link ingest-status", "link health"],
         }
 
     if state == "blocked_raw_access":
@@ -334,7 +352,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
             ],
             "agent_prompt": None,
             "memory_prompt": None,
-            "post_checks": ["link ingest-status", "link status --validate"],
+            "post_checks": ["link ingest-status", "link health"],
         }
 
     if state == "blocked_source_access":
@@ -360,7 +378,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
             ],
             "agent_prompt": None,
             "memory_prompt": None,
-            "post_checks": ["link ingest-status", "link validate", "link status --validate"],
+            "post_checks": ["link ingest-status", "link validate", "link health"],
         }
 
     if state == "stale_graph":
@@ -374,7 +392,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "Validate the wiki after rebuilding backlinks.",
             ],
             "agent_prompt": guidance.get("agent_prompt"),
-            "post_checks": ["link rebuild-backlinks", "link validate", "link status --validate"],
+            "post_checks": ["link rebuild-backlinks", "link validate", "link health"],
         }
 
     if state == "empty":
@@ -389,7 +407,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "Review generated pages before relying on them as memory.",
             ],
             "agent_prompt": None,
-            "post_checks": ["link ingest-status", "link status --validate"],
+            "post_checks": ["link ingest-status", "link health"],
         }
 
     if state == "ready":
@@ -403,7 +421,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
                 "Add new files to raw/ when Link should learn new source-backed context.",
             ],
             "agent_prompt": None,
-            "post_checks": ["link doctor", "link status --validate"],
+            "post_checks": ["link doctor", "link health"],
         }
 
     return {
@@ -416,7 +434,7 @@ def build_ingest_plan(status: dict[str, object], limit: int = 5) -> dict[str, ob
             "Check readiness before adding sources.",
         ],
         "agent_prompt": None,
-        "post_checks": ["link init", "link status --validate"],
+        "post_checks": ["link init", "link health"],
     }
 
 
@@ -479,7 +497,7 @@ def render_ingest_status_text(target: str, status: dict[str, object]) -> str:
     if not status["has_wiki_dir"]:
         lines.append("Missing wiki/ directory")
     if not status["has_raw_dir"] or not status["has_wiki_dir"]:
-        lines.extend(["", "Next:", "  Run an installer or initialize this directory: link init"])
+        lines.extend(["", "Next:", f"  Run an installer or initialize this directory: {_target_command('link init', target)}"])
         return "\n".join(lines)
 
     lines.append(f"Raw files: {status['raw_count']}")
@@ -528,7 +546,7 @@ def render_ingest_status_text(target: str, status: dict[str, object]) -> str:
         agent_prompt = guidance.get("agent_prompt")
         if agent_prompt:
             lines.append(f"  Ask your agent: {agent_prompt}")
-        for command in guidance.get("commands", []):
+        for command in _target_commands(guidance.get("commands", []), target):
             lines.append(f"  Run: {command}")
         notes = guidance.get("notes") or []
         for note in notes[:2]:
@@ -556,7 +574,7 @@ def render_ingest_status_text(target: str, status: dict[str, object]) -> str:
                 lines.append(f"  - {subject} -> {target_page}")
         if post_checks:
             lines.append("  Post-ingest checks:")
-            for check in post_checks[:6]:
+            for check in _target_commands(post_checks[:6], target):
                 lines.append(f"  - {check}")
 
     completion = status.get("completion") if isinstance(status.get("completion"), dict) else {}
@@ -608,7 +626,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "missing_structure",
             "summary": "Link is not initialized here yet.",
             "agent_prompt": None,
-            "commands": ["link init", "link status --validate"],
+            "commands": ["link init", "link health"],
             "notes": ["Run the installer or initialize this directory before ingesting sources."],
         }
 
@@ -617,7 +635,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "blocked_source_access",
             "summary": f"{source_read_warning_count} source page could not be inspected. Fix source page access before ingest.",
             "agent_prompt": None,
-            "commands": ["link ingest-status", "link validate", "link status --validate"],
+            "commands": ["link ingest-status", "link validate", "link health"],
             "notes": [
                 "Represented and pending raw counts may be incomplete while source pages cannot be read.",
                 "Fix permissions or repair the page, then refresh ingest status.",
@@ -634,7 +652,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "blocked_raw_access",
             "summary": summary + f" Fix access for {first} before ingest.",
             "agent_prompt": None,
-            "commands": ["link ingest-status", "link status --validate"],
+            "commands": ["link ingest-status", "link health"],
             "notes": [
                 "Do not ask an agent to ingest raw files that Link cannot read and scan for secret-looking values.",
                 "Fix permissions or replace the file, then refresh ingest status.",
@@ -651,7 +669,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "blocked_secrets",
             "summary": summary + f" Redact {first} before ingest.",
             "agent_prompt": None,
-            "commands": ["link ingest-status", "link status --validate"],
+            "commands": ["link ingest-status", "link health"],
             "notes": [
                 "Do not ask an agent to ingest flagged raw files until the secret-looking values are removed or redacted.",
                 "After redaction, refresh ingest status and continue with the normal ingest prompt.",
@@ -668,7 +686,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "stale_raw",
             "summary": summary,
             "agent_prompt": f"re-ingest {first} into Link",
-            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link status --validate"],
+            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link health"],
             "notes": [
                 "The raw file is represented, but it is newer than the linked source page.",
                 "Ask the agent to refresh the existing source page before relying on retrieval.",
@@ -687,7 +705,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "pending_raw",
             "summary": summary,
             "agent_prompt": f"ingest {first} into Link",
-            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link status --validate"],
+            "commands": ["link rebuild-index", "link rebuild-backlinks", "link validate", "link health"],
             "notes": [
                 "If the source contains user preferences, decisions, or project context, ask for memory proposals before saving durable memories.",
                 "After ingest, rebuild index/backlinks if your agent did not already do it.",
@@ -708,7 +726,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
             "state": "empty",
             "summary": "Link is ready, but raw/ has no source files yet.",
             "agent_prompt": None,
-            "commands": ["link status --validate", "link serve"],
+            "commands": ["link health", "link serve"],
             "notes": ["Drop notes, articles, transcripts, or project files into raw/, then ask your agent to ingest them into Link."],
         }
 
@@ -716,7 +734,7 @@ def build_ingest_guidance(status: dict[str, object]) -> dict[str, object]:
         "state": "ready",
         "summary": "All raw files are represented in wiki/sources and the graph index is current.",
         "agent_prompt": None,
-        "commands": ["link doctor", "link status --validate"],
+        "commands": ["link doctor", "link health"],
         "notes": ["Add new files to raw/ when you want Link to learn new source-backed knowledge."],
     }
 
@@ -814,6 +832,12 @@ def collect_ingest_status(target: Path, skip_dirs: set[str] | None = None) -> di
     payload["guidance"] = build_ingest_guidance(payload)
     payload["plan"] = build_ingest_plan(payload)
     payload["completion"] = build_ingest_completion(payload)
+    guidance = payload.get("guidance") if isinstance(payload.get("guidance"), dict) else {}
+    if guidance:
+        guidance["commands"] = _target_commands(guidance.get("commands"), str(target))
+    plan = payload.get("plan") if isinstance(payload.get("plan"), dict) else {}
+    if plan:
+        plan["post_checks"] = _target_commands(plan.get("post_checks"), str(target))
     return payload
 
 

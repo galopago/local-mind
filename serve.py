@@ -9,8 +9,10 @@ import json
 import re
 import socketserver
 import sys
+import threading
 import time
 import urllib.parse
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
@@ -65,6 +67,9 @@ from link_core.prompts import (
 )
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
+)
+from link_core.doctor import (
+    raw_source_refs as _core_raw_source_refs,
 )
 from link_core.version import (
     LINK_VERSION,
@@ -187,6 +192,7 @@ LOCAL_ACTION_HEADER = "X-Link-Local-Action"
 LOCAL_ACTION_VALUES = {"1", "true", "yes"}
 MUTATION_RATE_LIMIT = 180
 MUTATION_RATE_WINDOW_SECONDS = 60
+REQUEST_TIMEOUT_SECONDS = 15
 CONTENT_SECURITY_POLICY = _core_content_security_policy
 PERMISSIONS_POLICY = _core_permissions_policy
 SVG_CONTENT_SECURITY_POLICY = _core_svg_content_security_policy
@@ -232,21 +238,32 @@ _forward_links_index: dict[str, list[str]] = {}  # page name → canonical outbo
 _fts_index = None
 _search_backend = "token-index"
 _cache_read_warnings: list[dict[str, str]] = []
+_cache_lock = threading.RLock()
+_rate_limiter_lock = threading.Lock()
 _mutation_rate_limiter = _CoreLocalRateLimiter(
     max_events=MUTATION_RATE_LIMIT,
     window_seconds=MUTATION_RATE_WINDOW_SECONDS,
 )
 
+
+class ThreadingLocalTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    """Local-only server that keeps navigation responsive during slow requests."""
+
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 def _invalidate_pages_cache() -> None:
     global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _forward_links_index, _fts_index, _search_backend, _cache_read_warnings
-    _core_close_wiki_cache({"fts_index": _fts_index})
-    _pages_cache = None
-    _pages_cache_mtime = 0.0
-    _pages_cache_checked_at = 0.0
-    _forward_links_index = {}
-    _fts_index = None
-    _search_backend = "token-index"
-    _cache_read_warnings = []
+    with _cache_lock:
+        _core_close_wiki_cache({"fts_index": _fts_index})
+        _pages_cache = None
+        _pages_cache_mtime = 0.0
+        _pages_cache_checked_at = 0.0
+        _forward_links_index = {}
+        _fts_index = None
+        _search_backend = "token-index"
+        _cache_read_warnings = []
 
 
 def _wiki_mtime() -> float:
@@ -255,57 +272,59 @@ def _wiki_mtime() -> float:
 
 def _get_all_pages(force_check: bool = False) -> list:
     global _pages_cache, _pages_cache_mtime, _pages_cache_checked_at, _page_index, _fulltext_index, _normalized_fulltext_index, _text_words_index, _meta_words_index, _snippet_index, _token_index, _page_map, _meta_token_index, _forward_links_index, _fts_index, _search_backend, _cache_read_warnings
-    now = time.monotonic()
-    if (
-        _pages_cache is not None
-        and not force_check
-        and CACHE_MTIME_CHECK_INTERVAL_SECONDS > 0
-        and now - _pages_cache_checked_at < CACHE_MTIME_CHECK_INTERVAL_SECONDS
-    ):
+    with _cache_lock:
+        now = time.monotonic()
+        if (
+            _pages_cache is not None
+            and not force_check
+            and CACHE_MTIME_CHECK_INTERVAL_SECONDS > 0
+            and now - _pages_cache_checked_at < CACHE_MTIME_CHECK_INTERVAL_SECONDS
+        ):
+            return _pages_cache
+        mtime = _wiki_mtime()
+        _pages_cache_checked_at = now
+        if _pages_cache is not None and mtime == _pages_cache_mtime:
+            return _pages_cache
+        _core_close_wiki_cache({"fts_index": _fts_index})
+        cache = _core_build_wiki_cache(WIKI_DIR)
+        _pages_cache = cache["pages"]
+        _pages_cache_mtime = mtime
+        _page_index = cache["page_index"]
+        _fulltext_index = cache["fulltext"]
+        _normalized_fulltext_index = cache["normalized_fulltext"]
+        _text_words_index = cache["text_words_index"]
+        _meta_words_index = cache["meta_words_index"]
+        _snippet_index = cache["snippet_index"]
+        _token_index = cache["token_index"]
+        _meta_token_index = cache["meta_token_index"]
+        _page_map = cache["page_map"]
+        _forward_links_index = cache.get("forward_links_index", {})
+        _fts_index = cache.get("fts_index")
+        _search_backend = str(cache.get("search_backend") or "token-index")
+        _cache_read_warnings = cache.get("read_warnings") if isinstance(cache.get("read_warnings"), list) else []
         return _pages_cache
-    mtime = _wiki_mtime()
-    _pages_cache_checked_at = now
-    if _pages_cache is not None and mtime == _pages_cache_mtime:
-        return _pages_cache
-    _core_close_wiki_cache({"fts_index": _fts_index})
-    cache = _core_build_wiki_cache(WIKI_DIR)
-    _pages_cache = cache["pages"]
-    _pages_cache_mtime = mtime
-    _page_index = cache["page_index"]
-    _fulltext_index = cache["fulltext"]
-    _normalized_fulltext_index = cache["normalized_fulltext"]
-    _text_words_index = cache["text_words_index"]
-    _meta_words_index = cache["meta_words_index"]
-    _snippet_index = cache["snippet_index"]
-    _token_index = cache["token_index"]
-    _meta_token_index = cache["meta_token_index"]
-    _page_map = cache["page_map"]
-    _forward_links_index = cache.get("forward_links_index", {})
-    _fts_index = cache.get("fts_index")
-    _search_backend = str(cache.get("search_backend") or "token-index")
-    _cache_read_warnings = cache.get("read_warnings") if isinstance(cache.get("read_warnings"), list) else []
-    return _pages_cache
 
 
 def _current_wiki_cache() -> dict[str, object]:
-    _get_all_pages()
-    return {
-        "pages": _pages_cache or [],
-        "page_index": _page_index,
-        "fulltext": _fulltext_index,
-        "normalized_fulltext": _normalized_fulltext_index,
-        "text_words_index": _text_words_index,
-        "meta_words_index": _meta_words_index,
-        "snippet_index": _snippet_index,
-        "token_index": _token_index,
-        "meta_token_index": _meta_token_index,
-        "page_map": _page_map,
-        "forward_links_index": _forward_links_index,
-        "fts_index": _fts_index,
-        "search_backend": _search_backend,
-        "read_warning_count": len(_cache_read_warnings),
-        "read_warnings": _cache_read_warnings,
-    }
+    with _cache_lock:
+        _get_all_pages()
+        return {
+            "pages": _pages_cache or [],
+            "page_index": _page_index,
+            "fulltext": _fulltext_index,
+            "normalized_fulltext": _normalized_fulltext_index,
+            "text_words_index": _text_words_index,
+            "meta_words_index": _meta_words_index,
+            "snippet_index": _snippet_index,
+            "token_index": _token_index,
+            "meta_token_index": _meta_token_index,
+            "page_map": _page_map,
+            "forward_links_index": _forward_links_index,
+            "fts_index": _fts_index,
+            "search_backend": _search_backend,
+            "read_warning_count": len(_cache_read_warnings),
+            "read_warnings": _cache_read_warnings,
+        }
 
 
 def _find_page(name: str) -> Path | None:
@@ -386,6 +405,14 @@ def _append_log(timestamp: str, operation: str, description: str, lines: list[st
 
 def _page_href(name: str) -> str:
     return "/page/" + urllib.parse.quote(name.strip(), safe="")
+
+
+def _graph_href(name: str, *, depth: int = 2) -> str:
+    return f"/graph?focus={urllib.parse.quote(name.strip(), safe='')}&depth={depth}"
+
+
+def _proposal_href(raw_path: str) -> str:
+    return "/propose?source=" + urllib.parse.quote(raw_path.strip(), safe="")
 
 
 def _plural_type_label(page_type: str) -> str:
@@ -842,6 +869,33 @@ def _render_prompts(project: str | None = None):
     return _core_render_prompts_page(_starter_prompts_payload(project=project), layout=_layout)
 
 
+def _render_more():
+    links = [
+        ("/prompts", "Prompts", "Starter prompts and copyable next-step commands."),
+        ("/propose", "Propose", "Turn notes into review-only memory candidates."),
+        ("/audit", "Audit", "Review memory health, backlog, captures, and safe next actions."),
+        ("/inbox", "Inbox", "Confirm, update, archive, or explain memories needing review."),
+        ("/captures", "Captures", "Inspect saved raw session captures before accepting them."),
+        ("/profile", "Profile", "See what Link remembers by type, scope, status, and recency."),
+        ("/page/log", "Log", "Read the append-only wiki operation log."),
+        ("/all", "All Pages", "Browse grouped wiki pages with filters and pagination."),
+    ]
+    cards = "".join(
+        '<article class="memory-card">'
+        f'<h2><a href="{html.escape(href, quote=True)}">{html.escape(title)}</a></h2>'
+        f'<p>{html.escape(description)}</p>'
+        "</article>"
+        for href, title, description in links
+    )
+    return _layout(
+        "More",
+        '<div class="breadcrumb"><a href="/">Link</a> / more</div>'
+        "<h1>More Tools</h1>"
+        '<p class="summary">Advanced Link views for prompts, proposal review, audit, captures, and full wiki browsing.</p>'
+        f'<section class="memory-grid">{cards}</section>',
+    )
+
+
 def _render_page(page_path):
     text = page_path.read_text(encoding="utf-8", errors="replace")
     meta, body = _parse_frontmatter(text)
@@ -854,7 +908,48 @@ def _render_page(page_path):
 
     rel = page_path.relative_to(WIKI_DIR)
     cat = rel.parts[0] if len(rel.parts) > 1 else ""
-    return _core_render_wiki_page(str(title), category=cat, meta=meta, body_html=body_html, layout=_layout)
+    raw_refs = _core_raw_source_refs(body) if cat == "sources" else []
+    proposal_prompt = f"propose memories from {raw_refs[0]}" if raw_refs else ""
+    query_prompt = f"query Link for {title}"
+    return _core_render_wiki_page(
+        str(title),
+        category=cat,
+        meta=meta,
+        body_html=body_html,
+        layout=_layout,
+        graph_href=_graph_href(page_path.stem),
+        proposal_href=_proposal_href(raw_refs[0]) if raw_refs else "",
+        proposal_prompt=proposal_prompt,
+        query_prompt=query_prompt,
+        related_pages=_related_pages_for(page_path.stem),
+    )
+
+
+def _related_pages_for(page_name: str, max_items: int = 8) -> list[dict[str, str]]:
+    """Return a compact inbound/forward page list for the wiki page footer."""
+    with _cache_lock:
+        pages = _get_all_pages()
+        page_by_name = {str(page.get("name") or ""): page for page in pages}
+        backlinks, _ = _load_backlinks_index()
+        inbound = list(backlinks.get("backlinks", {}).get(page_name, []))
+        forward = list(_forward_links_index.get(page_name) or backlinks.get("forward", {}).get(page_name, []))
+    related: list[dict[str, str]] = []
+    seen = {page_name}
+    for relationship, names in (("links here", inbound), ("links out", forward)):
+        for name in names:
+            if name in seen or name not in page_by_name:
+                continue
+            seen.add(name)
+            page = page_by_name[name]
+            related.append({
+                "name": name,
+                "title": str(page.get("title") or name),
+                "href": _page_href(name),
+                "relationship": relationship,
+            })
+            if len(related) >= max_items:
+                return related
+    return related
 
 
 def _render_all(query: dict[str, list[str]] | None = None):
@@ -872,7 +967,14 @@ def _render_all(query: dict[str, list[str]] | None = None):
     assert limit is not None
     assert offset is not None
     sorted_pages = sorted(pages, key=lambda x: x["title"])
-    window = sorted_pages[offset:offset + limit]
+    type_counts = Counter(str(page.get("type") or page.get("category") or "root") for page in sorted_pages)
+    active_type = _query_text(query, "type", "page_type", max_len=80).lower()
+    visible_pages = [
+        page for page in sorted_pages
+        if not active_type or str(page.get("type") or page.get("category") or "root").lower() == active_type
+    ]
+    total = len(visible_pages)
+    window = visible_pages[offset:offset + limit]
     return _core_render_all_pages(
         window,
         total=total,
@@ -881,6 +983,8 @@ def _render_all(query: dict[str, list[str]] | None = None):
         page_href=_page_href,
         layout=_layout,
         error=error or "",
+        type_counts=type_counts,
+        active_type=active_type,
     )
 
 
@@ -969,10 +1073,36 @@ def _render_explain_memory(identifier: str):
     )
 
 
-def _render_graph():
+def _render_graph(query: dict[str, list[str]] | None = None):
+    query = query or {}
+    focus = _query_text(query, "focus", "page", "node", max_len=300)
+    graph_search = _query_text(query, "q", "search", max_len=200)
+    graph_category = _query_text(query, "type", "category", max_len=80) or "all"
+    graph_size = _query_text(query, "size", max_len=80) or "category"
+    if graph_size not in {"category", "degree"}:
+        graph_size = "category"
+    graph_labels = _query_text(query, "labels", "label", max_len=80) or "sparse"
+    if graph_labels not in {"sparse", "neighbors", "all"}:
+        graph_labels = "sparse"
+    focus_depth, focus_depth_error = _core_parse_bounded_int(query.get("depth", ["2"])[0], "depth", 2, 0, 3)
+    if focus_depth_error:
+        focus_depth = 2
+    assert focus_depth is not None
     full_graph = _get_graph_data()
     summary_graph = None
-    if _core_graph_needs_bounded_overview(full_graph):
+    summary_topic = focus or graph_search
+    if summary_topic:
+        summary = _get_graph_summary(
+            topic=summary_topic,
+            limit=_core_graph_initial_summary_node_limit,
+            depth=focus_depth if focus else 1,
+            max_edges=_core_graph_initial_summary_edge_limit,
+        )
+        summary_graph = {
+            "nodes": summary.get("nodes", []),
+            "edges": summary.get("edges", []),
+        }
+    elif _core_graph_needs_bounded_overview(full_graph):
         summary = _get_graph_summary(
             limit=_core_graph_initial_summary_node_limit,
             depth=1,
@@ -1006,6 +1136,12 @@ def _render_graph():
         edges_json=edges_json,
         cat_colors_json=_json_for_script(cat_colors),
         graph_mode_json=_json_for_script(graph_mode),
+        focus_id_json=_json_for_script(focus or None),
+        focus_depth=focus_depth,
+        search_json=_json_for_script(graph_search),
+        category_json=_json_for_script(graph_category),
+        size_json=_json_for_script(graph_size),
+        label_json=_json_for_script(graph_labels),
         total_node_count=total_node_count,
         total_edge_count=total_edge_count,
     )
@@ -1020,19 +1156,26 @@ def _render_graph():
         graph_note=graph_note,
         category_options=category_options,
         legend_items=_core_graph_legend_items(cat_colors),
+        focus_label=focus,
+        focus_depth=focus_depth,
+        search_label=graph_search,
+        category_label=graph_category,
+        size_label=graph_size,
+        label_label=graph_labels,
     )
     return _layout("Knowledge Graph", body, page_class="graph-page")
 
 
-def _render_search(query):
+def _render_search(query, page_type: str = ""):
     q = query.lower().strip()
-    results = _search_pages(q, limit=30) if q else []
+    results = _search_pages(q, limit=120) if q else []
     return _core_render_search_page(
         query,
         results,
         page_href=_page_href,
         layout=_layout,
         limit=30,
+        active_type=page_type.lower().strip(),
     )
 
 
@@ -1044,19 +1187,21 @@ def _search_pages(q: str, limit: int = 20) -> list:
     """Search pages by title, alias, tag, and full-text body.
     Uses token index to pre-filter candidates, snippet index for zero file I/O.
     """
-    return _core_search_pages(q, _current_wiki_cache(), limit=limit)
+    with _cache_lock:
+        return _core_search_pages(q, _current_wiki_cache(), limit=limit)
 
 
 def _query_link(query: str, budget: str = "medium", project: str | None = None) -> dict[str, object]:
-    return _core_query_link(
-        WIKI_DIR,
-        query,
-        _current_wiki_cache(),
-        _memory_records(),
-        budget=budget,
-        project=project,
-        review_command="review-memory",
-    )
+    with _cache_lock:
+        return _core_query_link(
+            WIKI_DIR,
+            query,
+            _current_wiki_cache(),
+            _memory_records(),
+            budget=budget,
+            project=project,
+            review_command="review-memory",
+        )
 
 
 def _get_context(topic: str) -> dict:
@@ -1067,7 +1212,8 @@ def _get_context(topic: str) -> dict:
     - Its forward links (pages it references)
     - Related pages (shared tags or backlink overlap)
     """
-    return _core_context_for_topic(WIKI_DIR, topic, _current_wiki_cache())
+    with _cache_lock:
+        return _core_context_for_topic(WIKI_DIR, topic, _current_wiki_cache())
 
 
 # ---------------------------------------------------------------------------
@@ -1085,18 +1231,20 @@ def _get_graph_data() -> dict:
     """Return graph nodes and edges for visualization.
     Uses in-memory fulltext index — no separate rglob scan.
     """
-    return _core_graph_data(_current_wiki_cache())
+    with _cache_lock:
+        return _core_graph_data(_current_wiki_cache())
 
 
 def _get_graph_summary(topic: str = "", limit: int = 40, depth: int = 1, max_edges: int = 120) -> dict:
     """Return bounded graph context for agents and large local wikis."""
-    return _core_graph_summary(
-        _current_wiki_cache(),
-        topic=topic,
-        limit=limit,
-        depth=depth,
-        max_edges=max_edges,
-    )
+    with _cache_lock:
+        return _core_graph_summary(
+            _current_wiki_cache(),
+            topic=topic,
+            limit=limit,
+            depth=depth,
+            max_edges=max_edges,
+        )
 
 
 def _rebuild_backlinks_payload() -> dict[str, object]:
@@ -1113,7 +1261,8 @@ def _rebuild_backlinks_payload() -> dict[str, object]:
 
 def _rebuild_index_payload() -> dict[str, object]:
     try:
-        result = _core_rebuild_index(WIKI_DIR, cache=_current_wiki_cache())
+        with _cache_lock:
+            result = _core_rebuild_index(WIKI_DIR, cache=_current_wiki_cache())
     except OSError as exc:
         return {"rebuilt": False, "error": f"Could not rebuild index: {exc}"}
     _invalidate_pages_cache()
@@ -1140,6 +1289,68 @@ def _operations_payload() -> dict[str, object]:
     return payload
 
 
+def _health_payload() -> dict[str, object]:
+    status = _link_status_payload(include_validation=True)
+    operations = _operations_payload()
+    return {
+        "api_version": API_VERSION,
+        "ready": bool(status.get("ready")),
+        "status": status,
+        "operations": operations,
+    }
+
+
+def _api_discovery_payload() -> dict[str, object]:
+    return {
+        "api_version": API_VERSION,
+        "name": "Link local HTTP API",
+        "description": "Loopback-only API for Link local agent memory.",
+        "local_only": True,
+        "recommended": {
+            "readiness": "/api/health",
+            "agent_context": "/api/query-link?q=<query>&budget=small",
+            "graph_overview": "/api/graph-summary?limit=40&depth=1",
+            "ingest_guidance": "/api/ingest-status",
+        },
+        "endpoints": {
+            "read": [
+                "/api/health",
+                "/api/status?validate=true",
+                "/api/prompts",
+                "/api/ingest-status",
+                "/api/page-list",
+                "/api/query-link",
+                "/api/memory-brief",
+                "/api/memory-dashboard",
+                "/api/memory-audit",
+                "/api/memory-profile",
+                "/api/memory-inbox",
+                "/api/capture-inbox",
+                "/api/explain-memory",
+                "/api/validate",
+                "/api/search",
+                "/api/context",
+                "/api/graph-summary",
+                "/api/graph",
+                "/api/page-links",
+                "/api/operations",
+            ],
+            "write": [
+                "/api/raw-source",
+                "/api/propose-memories",
+                "/api/remember-memory",
+                "/api/update-memory",
+                "/api/review-memory",
+                "/api/archive-memory",
+                "/api/restore-memory",
+                "/api/rebuild-backlinks",
+                "/api/rebuild-index",
+            ],
+        },
+        "write_header": {"X-Link-Local-Action": "true"},
+    }
+
+
 def _render_health():
     return _core_render_health_page(
         _link_status_payload(include_validation=True),
@@ -1153,6 +1364,10 @@ def _render_health():
 # ---------------------------------------------------------------------------
 
 class Handler(http.server.BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.request.settimeout(REQUEST_TIMEOUT_SECONDS)
+
     def do_HEAD(self):
         """HEAD requests: send headers only, no body."""
         self._head_only = True
@@ -1315,6 +1530,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             ))
         elif path == "/prompts":
             self._ok(_render_prompts(project=_query_text(query, "project", max_len=80)))
+        elif path == "/more":
+            self._ok(_render_more())
         elif path == "/memory":
             self._ok(_render_memory_dashboard(project=_query_text(query, "project", max_len=80)))
         elif path == "/audit":
@@ -1331,20 +1548,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/all":
             self._ok(_render_all(query))
         elif path == "/graph":
-            self._ok(_render_graph())
+            self._ok(_render_graph(query))
         elif path == "/search":
-            self._ok(_render_search(_query_text(query, "q")))
+            self._ok(_render_search(_query_text(query, "q"), page_type=_query_text(query, "type", "page_type", max_len=80)))
         elif path.startswith("/page/"):
             page = _find_page(urllib.parse.unquote(path[6:]))
             if page: self._ok(_render_page(page))
             else: self._err(urllib.parse.unquote(path[6:]))
-        elif path.startswith("/api/"):
+        elif path == "/api" or path.startswith("/api/"):
             self._handle_api_get(path, query)
         else:
             self._err("page")
 
     def _handle_api_get(self, path: str, query: dict[str, list[str]]) -> None:
-        if path == "/api/pages":
+        if path in {"/api", "/api/"}:
+            self._json(_api_discovery_payload())
+        elif path == "/api/pages":
             self._json(_all_pages())
         elif path == "/api/page-list":
             limit, limit_error = _core_parse_bounded_int(query.get("limit", ["100"])[0], "limit", 100, 1, 1000)
@@ -1366,6 +1585,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/status":
             include_validation = query.get("validate", ["false"])[0].lower() in {"1", "true", "yes"}
             self._json(_link_status_payload(include_validation=include_validation))
+        elif path == "/api/health":
+            self._json(_health_payload())
         elif path == "/api/operations":
             self._json(_operations_payload())
         elif path == "/api/prompts":
@@ -1589,7 +1810,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def _require_mutation_rate_limit(self) -> bool:
         client_host = self.client_address[0] if self.client_address else "local"
-        allowed, retry_after = _mutation_rate_limiter.check(client_host)
+        with _rate_limiter_lock:
+            allowed, retry_after = _mutation_rate_limiter.check(client_host)
         if allowed:
             return True
         self._json(
@@ -1746,9 +1968,8 @@ def main():
     PORT, root = _parse_serve_args(sys.argv[1:], default_port=PORT, default_root=ROOT)
     WIKI_DIR = root / "wiki"
     RAW_DIR = root / "raw"
-    socketserver.TCPServer.allow_reuse_address = True
     try:
-        with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as s:
+        with ThreadingLocalTCPServer(("127.0.0.1", PORT), Handler) as s:
             print(f"  Link → http://127.0.0.1:{PORT}")
             print("  Local-only: bound to 127.0.0.1; no public host mode.")
             print("  No auth: do not expose this server without your own authentication layer.")

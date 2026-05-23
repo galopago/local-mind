@@ -53,6 +53,7 @@ macOS with Homebrew:
 ```bash
 brew install gowtham0992/link/link
 link demo
+link next link-demo
 link serve link-demo
 ```
 
@@ -62,6 +63,7 @@ Windows or source checkout:
 git clone https://github.com/gowtham0992/link.git
 cd link
 py link.py demo
+py link.py next link-demo
 py link.py serve link-demo
 ```
 
@@ -71,6 +73,7 @@ Or from source:
 git clone https://github.com/gowtham0992/link.git
 cd link
 python3 link.py demo
+python3 link.py next link-demo
 python3 link.py serve link-demo
 ```
 
@@ -79,11 +82,14 @@ Open:
 ```text
 http://127.0.0.1:3000
 http://127.0.0.1:3000/graph
+http://127.0.0.1:3000/health
 ```
 
 The web viewer is for local use only. It binds to `127.0.0.1`, has no user
 accounts or authentication, and should not be exposed to the internet unless you
 add your own auth layer.
+
+For the shortest guided proof path, run `link welcome link-demo`.
 
 Try the value loop:
 
@@ -91,8 +97,16 @@ Try the value loop:
 link query "why does Link help agents?" link-demo --budget small
 link brief "working on agent memory" link-demo
 link benchmark "agent memory" link-demo
-link status --validate link-demo
+link health link-demo
 ```
+
+The `/health` page mirrors the readiness loop in the browser: validation state,
+interrupted writes, memory review status, and copyable repair commands.
+The viewer itself stays document-first: common paths are in the top nav, deeper
+tools live under `more`, and structured wiki pages get a local contents outline
+plus related-page links from the graph.
+Home shows recently updated pages, while `/all` and search group results by page
+type with chips for narrowing larger wikis.
 
 From a source checkout, use `python3 link.py ...`:
 
@@ -100,13 +114,23 @@ From a source checkout, use `python3 link.py ...`:
 python3 link.py query "why does Link help agents?" link-demo --budget small
 python3 link.py brief "working on agent memory" link-demo
 python3 link.py benchmark "agent memory" link-demo
-python3 link.py status --validate link-demo
+python3 link.py health link-demo
 ```
 
 The generated demo is the public proof wiki. The repo's root `wiki/` directory
 is only a scaffold for local development and personal testing. Generated content
 inside `wiki/`, `raw/`, and `link-demo/` is ignored by git so personal memory is
 not published by accident.
+
+For local scale checks from a source checkout, run:
+
+```bash
+python3 scripts/smoke_large_wiki.py --pages 10000
+```
+
+This generates a temporary synthetic wiki, verifies bounded graph/query payloads,
+and reports cache timing, persistent-cache reuse, search, query, graph, and
+health signals without touching your real Link wiki.
 
 ## Three Ways To Use Link
 
@@ -117,7 +141,7 @@ local Markdown wiki.
   <tr>
     <td width="33%">
       <strong>Web UI</strong><br>
-      Review memory, ingest, graph, audits, captures, and explanations in a local viewer.<br><br>
+      Read the local wiki, then review memory, ingest, graph, audits, captures, and explanations.<br><br>
       <a href="https://gowtham0992.github.io/link/ui.html"><img src="docs/assets/link-ui-tour.gif" alt="Link web UI walkthrough" width="270"></a>
     </td>
     <td width="33%">
@@ -296,7 +320,7 @@ Before opening a PR:
 
 ```bash
 python3 -m ruff check .
-python3 -m unittest discover -s tests
+python3 -m pytest tests
 python3 scripts/check_release_hygiene.py
 python3 scripts/check_runtime_duplication.py
 python3 scripts/check_tool_contract.py

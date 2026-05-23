@@ -5,6 +5,7 @@ import html
 import urllib.parse
 from collections.abc import Callable, Mapping
 
+from .web_ingest import copy_button
 from .web_layout import render_stat_grid
 from .web_memory import (
     MemoryActionHints,
@@ -45,6 +46,13 @@ def render_brief_page(
         f'<input type="hidden" name="project" value="{html.escape(project, quote=True)}">'
         if project else ""
     )
+    brief_prompt = _brief_prompt(query, project)
+    query_prompt = str(query or "").strip()
+    query_action = (
+        copy_button(f"query Link for {query_prompt}", "Copy query prompt")
+        if query_prompt else ""
+    )
+    relevant_memories = _dict_list(brief.get("relevant_memories"))
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / brief</div>'
         '<h1>Memory Brief</h1>'
@@ -53,15 +61,78 @@ def render_brief_page(
         '<form class="brief-form" action="/brief" method="get">'
         f'<input type="text" name="q" value="{html.escape(str(query), quote=True)}" placeholder="task or question">'
         f'{project_field}<button type="submit">Brief</button></form>'
+        f'<div class="page-actions">{copy_button(brief_prompt, "Copy brief prompt")}{query_action}</div>'
         f'{_project_line(project)}'
         f'{stats}'
         f'<h2>Agent Guidance</h2><ul>{guidance}</ul>'
-        f'{render_memory_section("Relevant memories", _dict_list(brief.get("relevant_memories")), "No relevant memories yet.", page_href=page_href, action_hints=action_hints)}'
+        f'{render_memory_section("Relevant memories", relevant_memories, "No relevant memories yet.", page_href=page_href, action_hints=action_hints)}'
+        f'{_render_empty_brief_actions(query_prompt) if not relevant_memories else ""}'
         f'{render_memory_section("Review queue", _dict_list(review.get("items")), "No memory review items.", page_href=page_href, action_hints=action_hints, href="/inbox", include_issues=True)}'
         f'{render_capture_section(_dict_list(captures.get("items")))}'
         '</div>'
     )
     return layout("Memory Brief", body)
+
+
+def _render_empty_brief_actions(query: str) -> str:
+    query_text = str(query or "").strip()
+    proposal_prompt = (
+        f"propose memories about {query_text} from Link raw sources"
+        if query_text else "propose memories from Link raw sources"
+    )
+    return (
+        '<div class="memory-next"><strong>Teach Link before the next brief</strong>'
+        "<ul>"
+        '<li><a href="/ingest">Add source material</a> if this context is in notes, docs, or transcripts.</li>'
+        '<li><a href="/propose">Review memory proposals</a> before saving durable memory.</li>'
+        f"<li>{copy_button(proposal_prompt, 'Copy memory proposal prompt')}</li>"
+        "</ul></div>"
+    )
+
+
+def _brief_prompt(query: str, project: str = "") -> str:
+    task = str(query or "").strip()
+    project_name = str(project or "").strip()
+    if task and project_name:
+        return f"brief me from Link about {task} for project {project_name}"
+    if task:
+        return f"brief me from Link about {task}"
+    if project_name:
+        return f"brief me from Link for project {project_name}"
+    return "brief me from Link before we continue"
+
+
+def _copy_actions(actions: list[tuple[str, str]]) -> str:
+    buttons = "".join(copy_button(prompt, label) for prompt, label in actions if prompt)
+    return f'<div class="page-actions">{buttons}</div>' if buttons else ""
+
+
+def _memory_overview_prompt(project: str = "") -> str:
+    project_name = str(project or "").strip()
+    if project_name:
+        return f"what does Link remember about project {project_name}?"
+    return "what does Link remember about me?"
+
+
+def _audit_prompt(project: str = "") -> str:
+    project_name = str(project or "").strip()
+    if project_name:
+        return f"audit Link memory for project {project_name}"
+    return "audit Link memory"
+
+
+def _inbox_prompt(project: str = "") -> str:
+    project_name = str(project or "").strip()
+    if project_name:
+        return f"review Link memory inbox for project {project_name}"
+    return "review Link memory inbox"
+
+
+def _capture_prompt(project: str = "") -> str:
+    project_name = str(project or "").strip()
+    if project_name:
+        return f"review Link raw captures for project {project_name}"
+    return "review Link raw captures"
 
 
 def render_memory_dashboard_page(
@@ -87,11 +158,17 @@ def render_memory_dashboard_page(
     if by_scope:
         counts += _counts_line("Scopes", by_scope)
     project = str(dashboard.get("project") or "")
+    dashboard_actions = _copy_actions([
+        (_memory_overview_prompt(project), "Copy profile prompt"),
+        (_brief_prompt("", project), "Copy brief prompt"),
+        (_audit_prompt(project), "Copy audit prompt"),
+    ])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / memory</div>'
         '<h1>Memory Dashboard</h1>'
         '<div class="memory-dashboard">'
         '<p class="summary">Read-only command center for what local agents can remember, what needs review, and what changed recently.</p>'
+        f'{dashboard_actions}'
         f'{_project_line(project)}'
         f'{stats}'
         f'{render_memory_next_actions(_dict_list(dashboard.get("next_actions")))}'
@@ -118,16 +195,23 @@ def render_profile_page(
         (profile.get("review_count", 0), "review"),
     ])
     archived = _dict_list(profile.get("archived"))
+    project = str(profile.get("project") or "")
+    profile_actions = _copy_actions([
+        (_memory_overview_prompt(project), "Copy profile prompt"),
+        (_brief_prompt("", project), "Copy brief prompt"),
+    ])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / profile</div>'
         '<h1>Memory Profile</h1>'
         '<div class="memory-profile">'
         '<p class="summary">What Link currently remembers about the user, projects, decisions, and preferences.</p>'
-        f'{_project_line(str(profile.get("project") or ""))}'
+        f'{profile_actions}'
+        f'{_project_line(project)}'
         f'{stats}'
         f'{_counts_line("Types", _mapping(profile.get("by_type")))}'
         f'{_counts_line("Scopes", _mapping(profile.get("by_scope")))}'
         f'{_counts_line("Status", _mapping(profile.get("by_status")))}'
+        f'{_render_empty_profile_actions(project) if not int(profile.get("memory_count") or 0) else ""}'
         f'{_profile_section("Recent memories", _dict_list(profile.get("recent")), page_href=page_href)}'
         f'{_profile_section("Preferences", _dict_list(profile.get("preferences")), page_href=page_href)}'
         f'{_profile_section("Decisions", _dict_list(profile.get("decisions")), page_href=page_href)}'
@@ -136,6 +220,22 @@ def render_profile_page(
         '</div>'
     )
     return layout("Memory Profile", body)
+
+
+def _render_empty_profile_actions(project: str) -> str:
+    project_name = str(project or "").strip()
+    remember_prompt = (
+        f"remember that <preference or decision> for project {project_name}"
+        if project_name else "remember that <preference or decision>"
+    )
+    return (
+        '<div class="memory-next"><strong>No durable memories yet</strong>'
+        "<ul>"
+        '<li><a href="/ingest">Add source material</a> when the context belongs in the wiki first.</li>'
+        '<li><a href="/propose">Review memory proposals</a> when raw notes contain preferences, decisions, or project facts.</li>'
+        f"<li>{copy_button(remember_prompt, 'Copy remember prompt')}</li>"
+        "</ul></div>"
+    )
 
 
 def render_memory_audit_page(
@@ -165,12 +265,18 @@ def render_memory_audit_page(
         ) + "</ul>"
     else:
         risk_html = "<h2>Needs attention</h2><p>No memory audit risks detected.</p>"
+    project = str(audit.get("project") or "")
+    audit_actions = _copy_actions([
+        (_audit_prompt(project), "Copy audit prompt"),
+        (_inbox_prompt(project), "Copy review prompt"),
+    ])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / audit</div>'
         '<h1>Memory Audit</h1>'
         '<div class="memory-profile">'
         '<p class="summary">Read-only health report for local agent memory, review backlog, raw captures, and safe next actions.</p>'
-        f'{_project_line(str(audit.get("project") or ""))}'
+        f'{audit_actions}'
+        f'{_project_line(project)}'
         f'<p><strong>Status:</strong> {html.escape(str(audit.get("status") or ""))}</p>'
         f'{stats}'
         f'{risk_html}'
@@ -210,12 +316,15 @@ def render_captures_page(inbox: Mapping[str, object], *, layout: PageLayout) -> 
             '<p>Some raw captures could not be read and are not listed for approval.</p>'
             f'<ul>{rows}</ul></div>'
         )
+    project = str(inbox.get("project") or "")
+    capture_actions = _copy_actions([(_capture_prompt(project), "Copy capture prompt")])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / captures</div>'
         '<h1>Raw Capture Inbox</h1>'
         '<div class="memory-profile">'
         '<p class="summary">Saved proposal-only session notes waiting for human review before they become durable memory.</p>'
-        f'{_project_line(str(inbox.get("project") or ""))}'
+        f'{capture_actions}'
+        f'{_project_line(project)}'
         f'{stats}'
         f'{warning_html}'
         f'{read_warning_html}'
@@ -239,12 +348,15 @@ def render_inbox_page(
     else:
         rows = "".join(_render_inbox_item(item, page_href=page_href) for item in items)
         content = f"<ul class='page-list'>{rows}</ul>"
+    project = str(inbox.get("project") or "")
+    inbox_actions = _copy_actions([(_inbox_prompt(project), "Copy review prompt")])
     body = (
         '<div class="breadcrumb"><a href="/">Link</a> / inbox</div>'
         '<h1>Memory Review Inbox</h1>'
         '<div class="memory-profile">'
         '<p class="summary">Memories that need confirmation, stronger metadata, or cleanup.</p>'
-        f'{_project_line(str(inbox.get("project") or ""))}'
+        f'{inbox_actions}'
+        f'{_project_line(project)}'
         f'{stats}'
         f'{severity_html}'
         f'{content}'
@@ -266,6 +378,8 @@ def render_memory_explanation_page(
     lifecycle = _mapping(explanation.get("lifecycle"))
     graph = _mapping(explanation.get("graph"))
     title = str(memory.get("title") or memory.get("name") or "Memory")
+    memory_name = str(memory.get("name") or "")
+    graph_href = f"/graph?focus={urllib.parse.quote(memory_name, safe='')}&depth=2" if memory_name else "/graph"
     summary = memory.get("tldr") or memory.get("snippet") or ""
     issues = "".join(
         f'<li><span class="severity">{html.escape(str(issue.get("severity") or ""))}</span> '
@@ -286,6 +400,7 @@ def render_memory_explanation_page(
     action_html = f'<h2>Actions</h2>{primary_html}{render_memory_action_commands(_dict_list(review.get("actions")))}'
     graph_html = (
         '<h2>Graph</h2>'
+        f'<p><a class="button-link" href="{html.escape(graph_href, quote=True)}">Open local graph</a></p>'
         f'<p><strong>Forward:</strong> {html.escape(", ".join(str(item) for item in _list(graph.get("forward"))) or "none")}</p>'
         f'<p><strong>Inbound:</strong> {html.escape(", ".join(str(item) for item in _list(graph.get("inbound"))) or "none")}</p>'
         f'<p><strong>Wikilinks:</strong> {html.escape(", ".join(str(item) for item in _list(graph.get("wikilinks"))) or "none")}</p>'

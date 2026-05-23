@@ -5,8 +5,10 @@ Usage:
   python link.py init [target]
   python link.py serve [target]
   python link.py demo [target]
+  python link.py welcome [target]
   python link.py prompts [target]
   python link.py status [target]
+  python link.py health [target]
   python link.py operations [target]
   python link.py backup [target]
   python link.py doctor [target]
@@ -220,9 +222,11 @@ from link_core.cli_runtime import (
     render_demo_text as _core_render_demo_text,
     render_init_text as _core_render_init_text,
     render_starter_prompts_text as _core_render_starter_prompts_text,
+    render_welcome_text as _core_render_welcome_text,
 )
 from link_core.prompts import (
     starter_prompt_payload as _core_starter_prompt_payload,
+    welcome_payload as _core_welcome_payload,
 )
 from link_core.validation import (
     validate_wiki as _core_validate_wiki,
@@ -605,6 +609,81 @@ def status(target: Path, include_validation: bool = False, json_output: bool = F
 
     code, text = _core_render_status_text(payload, wiki_dir=wiki_dir, version=LINK_VERSION)
     print(text)
+    return code
+
+
+def _health_exit_code(payload: dict[str, object]) -> int:
+    operations_payload = payload.get("operations")
+    operation_count = 0
+    if isinstance(operations_payload, dict):
+        operation_count = int(operations_payload.get("operation_count") or 0)
+    return 0 if payload.get("ready") and operation_count == 0 else 1
+
+
+def _render_health_text(payload: dict[str, object]) -> str:
+    status_payload = payload.get("status") if isinstance(payload.get("status"), dict) else {}
+    operations_payload = payload.get("operations") if isinstance(payload.get("operations"), dict) else {}
+    validation = status_payload.get("validation") if isinstance(status_payload.get("validation"), dict) else {}
+    warnings = status_payload.get("warnings") if isinstance(status_payload.get("warnings"), list) else []
+    operation_count = int(operations_payload.get("operation_count") or 0)
+    stale_count = int(operations_payload.get("stale_count") or 0)
+    failed_count = int(operations_payload.get("failed_count") or 0)
+    active_count = int(operations_payload.get("active_count") or 0)
+    validation_text = "not checked"
+    if validation.get("checked"):
+        validation_text = "passed" if validation.get("passed") else (
+            f"failed ({validation.get('error_count', 0)} errors, {validation.get('warning_count', 0)} warnings)"
+        )
+    lines = [
+        f"Link health: {status_payload.get('wiki')}",
+        "",
+        f"Version: {status_payload.get('version', LINK_VERSION)}",
+        f"Ready: {'yes' if payload.get('ready') else 'no'}",
+        f"Pages: {status_payload.get('page_count', 0)}",
+        f"Memories: {status_payload.get('memory_count', 0)} total · {status_payload.get('needs_review_count', 0)} need review",
+        f"Search backend: {status_payload.get('search_backend', 'unknown')}",
+        f"Validation: {validation_text}",
+        f"Operations: {operation_count} total · {stale_count} stale · {failed_count} failed · {active_count} active",
+    ]
+    if warnings:
+        lines.extend(["", "Warnings:"])
+        for warning in warnings[:8]:
+            if isinstance(warning, dict):
+                lines.append(f"- {warning.get('code', 'warning')}: {warning.get('message', '')}")
+                if warning.get("detail"):
+                    lines.append(f"  {warning.get('detail')}")
+    actions = operations_payload.get("next_actions") if operation_count else status_payload.get("next_actions")
+    if isinstance(actions, list) and actions:
+        lines.extend(["", "Next:"])
+        for action in actions[:5]:
+            if not isinstance(action, dict):
+                continue
+            command = action.get("command")
+            if command:
+                lines.append(f"- {command}")
+            else:
+                label = action.get("label") or action.get("tool") or "next action"
+                tool = action.get("tool")
+                lines.append(f"- {label}" + (f" ({tool})" if tool else ""))
+    return "\n".join(str(line) for line in lines)
+
+
+def health(target: Path, json_output: bool = False) -> int:
+    target = target.expanduser().resolve()
+    wiki_dir = _resolve_wiki_dir(target)
+    status_payload = _core_link_status(wiki_dir, version=LINK_VERSION, include_validation=True)
+    operations_payload = _core_operation_report(wiki_dir, limit=20)
+    payload = {
+        "version": LINK_VERSION,
+        "ready": bool(status_payload.get("ready")) and not operations_payload.get("operation_count"),
+        "status": status_payload,
+        "operations": operations_payload,
+    }
+    code = _health_exit_code(payload)
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return code
+    print(_render_health_text(payload))
     return code
 
 
@@ -1304,7 +1383,7 @@ def query(
     if json_output:
         print(json.dumps(payload, indent=2))
         return 0
-    code, text = _core_render_query_text(payload, query_text=query_text)
+    code, text = _core_render_query_text(payload, query_text=query_text, command_target=str(target))
     print(text)
     return code
 
@@ -1509,6 +1588,17 @@ def starter_prompts(target: Path, project: str | None = None, json_output: bool 
     return code
 
 
+def welcome(target: Path, project: str | None = None, json_output: bool = False) -> int:
+    payload = _core_welcome_payload(target, project=project)
+    if json_output:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    code, text = _core_render_welcome_text(payload)
+    print(text)
+    return code
+
+
 def serve_wiki(target: Path, port: int = 3000) -> int:
     target = target.expanduser().resolve()
     if port < 1 or port > 65535:
@@ -1548,18 +1638,25 @@ def create_demo(target: Path, force: bool = False) -> int:
     code, text = _core_render_demo_text(
         target=target,
         guide_path=target / "START_HERE.md",
-        serve_command=_display_command(["python3", "link.py", "serve", str(target)]),
+        serve_command=_display_command(["python3", str(target / "link.py"), "serve", str(target)]),
+        next_command=_display_command(["python3", str(target / "link.py"), "next", str(target)]),
         query_command=_display_command([
             "python3",
-            "link.py",
+            str(target / "link.py"),
             "query",
             "why does Link help agents?",
             str(target),
             "--budget",
             "small",
         ]),
-        brief_command=_display_command(["python3", "link.py", "brief", "working on agent memory", str(target)]),
-        audit_command=_display_command(["python3", "link.py", "memory-audit", str(target)]),
+        brief_command=_display_command([
+            "python3",
+            str(target / "link.py"),
+            "brief",
+            "working on agent memory",
+            str(target),
+        ]),
+        audit_command=_display_command(["python3", str(target / "link.py"), "memory-audit", str(target)]),
     )
     print(text)
     return code
@@ -1573,8 +1670,10 @@ def main(argv: list[str] | None = None) -> int:
             "init": init_wiki,
             "serve": serve_wiki,
             "demo": create_demo,
+            "welcome": welcome,
             "prompts": starter_prompts,
             "status": status,
+            "health": health,
             "operations": operations,
             "backup": backup,
             "doctor": doctor,
@@ -1605,6 +1704,7 @@ def main(argv: list[str] | None = None) -> int:
             "rebuild-index": rebuild_index,
             "rebuild-backlinks": rebuild_backlinks,
             "verify-mcp": verify_mcp,
+            "version": lambda: print(f"Link {LINK_VERSION}") or 0,
         })
     except ValueError as exc:
         parser.error(str(exc))

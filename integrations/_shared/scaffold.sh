@@ -38,7 +38,7 @@ install_link_cli_wrapper() {
 
     if [ -e "$LINK_CLI_BIN" ] && ! grep -q "$LINK_CLI_MARKER" "$LINK_CLI_BIN" 2>/dev/null; then
         echo "  · $LINK_CLI_BIN already exists and is not a Link wrapper; not overwriting."
-        echo "    Fallback: cd \"$TARGET_DIR\" && python3 link.py status --validate"
+        echo "    Fallback: cd \"$TARGET_DIR\" && python3 link.py health"
         return
     fi
 
@@ -56,7 +56,7 @@ EOF
 
     RESOLVED_LINK="$(command -v link 2>/dev/null || true)"
     if [ "$RESOLVED_LINK" != "$LINK_CLI_BIN" ]; then
-        echo "  · Add $LINK_CLI_DIR to the front of PATH to run: link status --validate"
+        echo "  · Add $LINK_CLI_DIR to the front of PATH to run: link health"
     fi
 }
 
@@ -215,9 +215,9 @@ if [ -f "$TARGET_DIR/link.py" ]; then
     echo ""
     if [ "$MODE" = "--project" ]; then
         echo "  Check Link readiness:"
-        echo "    python3 link.py status --validate"
+        echo "    python3 link.py health"
         echo "  Print starter prompts:"
-        echo "    python3 link.py prompts"
+        echo "    python3 link.py next"
         echo "  Check wiki health:"
         echo "    python3 link.py doctor"
         echo "  Create a local backup:"
@@ -230,9 +230,9 @@ if [ -f "$TARGET_DIR/link.py" ]; then
         echo "    python3 link.py rebuild-backlinks"
     else
         echo "  Check Link readiness:"
-        echo "    link status --validate"
+        echo "    link health"
         echo "  Print starter prompts:"
-        echo "    link prompts"
+        echo "    link next"
         echo "  Check wiki health:"
         echo "    link doctor"
         echo "  Create a local backup:"

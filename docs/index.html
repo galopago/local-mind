@@ -87,12 +87,14 @@
         <pre><code># macOS
 brew install gowtham0992/link/link
 link demo
+link next link-demo
 link serve link-demo
 
 # or from source
 git clone https://github.com/gowtham0992/link.git
 cd link
 python3 link.py demo
+python3 link.py next link-demo
 python3 link.py serve link-demo
 
 # then try
@@ -106,12 +108,12 @@ link benchmark "agent memory" link-demo</code></pre>
       <div class="section-inner">
         <p class="section-kicker">Three surfaces</p>
         <h2>Review it, script it, or let an agent call it.</h2>
-        <p class="lead">The web UI, CLI, and MCP server all operate on the same local Markdown wiki. Pick the surface for the job instead of learning three separate systems.</p>
+        <p class="lead">The web UI, CLI, and MCP server all operate on the same local Markdown wiki. Read it like a local document, script it from a terminal, or let an agent query the same memory through MCP.</p>
         <div class="media-grid">
           <article class="media-card">
             <a href="ui.html"><img src="assets/link-ui-tour.gif" alt="Animated Link web UI walkthrough"></a>
             <h3><a href="ui.html">Web UI</a></h3>
-            <p>Inspect memory, ingest sources, review captures, browse pages, explain recall, and explore the graph.</p>
+            <p>Read source-backed pages in a quiet local wiki, then jump to ingest, memory review, health, captures, and graph tools.</p>
           </article>
           <article class="media-card">
             <a href="cli.html"><img src="assets/link-cli-tour.gif" alt="Animated Link CLI walkthrough"></a>
@@ -173,7 +175,7 @@ link benchmark "agent memory" link-demo</code></pre>
         <div class="grid">
           <article class="feature"><h3><a href="getting-started.html">First 10 minutes</a></h3><p>Run the demo, add one source, save one direct memory, and verify the loop.</p></article>
           <article class="feature"><h3><a href="why-link.html">Why Link?</a></h3><p>Understand where Link fits versus notes apps, hosted memory APIs, agent runtimes, and graph memory systems.</p></article>
-          <article class="feature"><h3><a href="ui.html">Web UI</a></h3><p>Use the local viewer for ingest, memory review, graph exploration, and human-readable audits.</p></article>
+          <article class="feature"><h3><a href="ui.html">Web UI</a></h3><p>Use the local viewer as a readable wiki with grouped memory, ingest, health, graph, and audit tools.</p></article>
           <article class="feature"><h3><a href="concepts.html">Concepts</a></h3><p>Understand raw sources, wiki pages, memories, graph indexes, and budgeted query packets.</p></article>
           <article class="feature"><h3><a href="mcp.html">MCP setup</a></h3><p>Install the MCP server and teach local agents how to use Link reliably.</p></article>
           <article class="feature"><h3><a href="cli.html">CLI reference</a></h3><p>Every local command, grouped by daily workflow and maintenance jobs.</p></article>

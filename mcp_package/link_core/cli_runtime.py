@@ -3,8 +3,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from .mcp_verify import display_command
+
 
 def render_init_text(*, target: object, fixes: Sequence[str]) -> tuple[int, str]:
+    command_target = str(target)
     lines = [f"Link wiki ready at {target}"]
     if fixes:
         lines.extend(["", "Initialized:"])
@@ -12,8 +15,8 @@ def render_init_text(*, target: object, fixes: Sequence[str]) -> tuple[int, str]
     lines.extend([
         "",
         "Next:",
-        "  link status --validate",
-        "  link serve",
+        f"  {display_command(['link', 'health', command_target])}",
+        f"  {display_command(['link', 'serve', command_target])}",
         "  Drop sources into raw/ and ask your agent: ingest raw/<file> into Link",
     ])
     return 0, "\n".join(lines)
@@ -23,6 +26,8 @@ def render_starter_prompts_text(payload: Mapping[str, object]) -> tuple[int, str
     lines = [f"Link starter prompts: {payload['target']}"]
     if payload["project"]:
         lines.append(f"Project: {payload['project']}")
+    if payload.get("shortcut"):
+        lines.extend(["", "Shortcut", f"- {payload['shortcut']}"])
     lines.extend(["", "Ask your agent"])
     prompts = payload.get("prompts", [])
     if isinstance(prompts, Sequence) and not isinstance(prompts, (str, bytes)):
@@ -36,11 +41,36 @@ def render_starter_prompts_text(payload: Mapping[str, object]) -> tuple[int, str
     return 0, "\n".join(lines)
 
 
+def render_welcome_text(payload: Mapping[str, object]) -> tuple[int, str]:
+    """Render a short first-use guide for humans trying Link with an agent."""
+    lines = [f"Link welcome: {payload['target']}"]
+    if payload["project"]:
+        lines.append(f"Project: {payload['project']}")
+    lines.extend([
+        "",
+        "Try these with your agent",
+    ])
+    steps = payload.get("steps", [])
+    if isinstance(steps, Sequence) and not isinstance(steps, (str, bytes)):
+        for item in steps:
+            if isinstance(item, Mapping):
+                lines.append(f"{item.get('step', '-')}. {item.get('prompt', '')}")
+                lines.append(f"   Proves: {item.get('proves', '')}")
+    lines.extend(["", "Local checks"])
+    for command in payload.get("commands", []):
+        lines.append(f"- {command}")
+    lines.extend(["", "Open"])
+    for url in payload.get("urls", []):
+        lines.append(f"- {url}")
+    return 0, "\n".join(lines)
+
+
 def render_demo_text(
     *,
     target: object,
     guide_path: object,
     serve_command: str,
+    next_command: str,
     query_command: str,
     brief_command: str,
     audit_command: str,
@@ -50,6 +80,9 @@ def render_demo_text(
         "",
         "View it:",
         f"  {serve_command}",
+        "",
+        "Ask an agent what to try next:",
+        f"  {next_command}",
         "",
         "Try the value loop:",
         f"  {query_command}",

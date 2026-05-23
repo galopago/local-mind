@@ -18,7 +18,10 @@ class WebLayoutCoreTests(unittest.TestCase):
         self.assertIn('<a href="/brief">brief</a>', html)
         self.assertIn('<a href="/propose">propose</a>', html)
         self.assertIn('<a href="/graph">graph</a>', html)
+        self.assertIn('class="nav-more"', html)
+        self.assertIn('<summary>more</summary>', html)
         self.assertIn('id="search-input"', html)
+        self.assertIn('aria-label="Search Link"', html)
         self.assertIn("data-theme-toggle", html)
 
     def test_footer_points_to_github(self):
@@ -35,6 +38,8 @@ class WebLayoutCoreTests(unittest.TestCase):
         self.assertIn("<main>Body</main>", html)
         self.assertIn("document.activeElement.id === 'search-input'", html)
         self.assertIn("window.location.href = '/search?q=' + encodeURIComponent(q);", html)
+        self.assertIn("active.setAttribute('aria-current', 'page');", html)
+        self.assertIn("current.indexOf('/page/') === 0", html)
         self.assertIn("localStorage.getItem('link-theme')", html)
         self.assertIn("navigator.clipboard.writeText", html)
         self.assertIn("/api/raw-source", html)

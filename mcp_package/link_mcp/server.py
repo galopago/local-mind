@@ -40,7 +40,13 @@ else:
     WIKI_DIR = Path.home() / "link" / "wiki"
 
 if not WIKI_DIR.exists():
-    print(f"[link-mcp] Wiki not found at {WIKI_DIR}. Run install.sh first.", file=sys.stderr)
+    print(
+        f"[link-mcp] Wiki not found at {WIKI_DIR}. "
+        "Initialize Link first with `link init` or `python3 link.py init`, "
+        "run an integration installer under integrations/*/install.sh, "
+        "or pass --wiki /path/to/wiki.",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 # ── Import MCP SDK ────────────────────────────────────────────────────
@@ -63,7 +69,9 @@ mcp = FastMCP(
         "session start or before personalized/project work; pass the user's "
         "task as the query when available. Use recall_memory for focused user "
         "preferences, decisions, and project context, memory_profile to inspect "
-        "what Link remembers, memory_inbox to find memories needing review, and "
+        "what Link remembers, and memory_inbox to find memories needing review. "
+        "Use link_operations if link_status reports pending, failed, or "
+        "interrupted local write operations. "
         "explain_memory to audit why a memory exists. Use capture_session for "
         "long chat or session notes that should be stored locally before memory "
         "approval, and capture_inbox to review saved captures before accepting, "
@@ -143,6 +151,9 @@ from link_core.ingest import (
 from link_core.log import (
     append_log as _core_append_log,
     utc_timestamp as _core_utc_timestamp,
+)
+from link_core.operations import (
+    operation_report as _core_operation_report,
 )
 from link_core.security import (
     clean_text_input as _clean_text_input,
@@ -356,6 +367,10 @@ def _link_status(include_validation: bool = False) -> dict[str, object]:
         version=_package_version(),
         include_validation=include_validation,
     )
+
+
+def _link_operations(limit: int = 20) -> dict[str, object]:
+    return _core_operation_report(WIKI_DIR, limit=_parse_limit(limit, default=20, max_limit=100))
 
 
 def _starter_prompts(project: str = "") -> dict[str, object]:
@@ -750,6 +765,17 @@ def link_status(include_validation: bool = False) -> str:
     optional validation summary, and safe next actions.
     """
     return json.dumps(_link_status(include_validation=include_validation), ensure_ascii=False)
+
+
+@mcp.tool()
+def link_operations(limit: int = 20) -> str:
+    """Inspect interrupted or active local Link write operations.
+
+    Use this when link_status reports pending, failed, or stale operations.
+    It returns operation markers with timestamps, affected paths, status, and
+    safe next actions so agents can diagnose interrupted writes before repair.
+    """
+    return json.dumps(_link_operations(limit=limit), ensure_ascii=False)
 
 
 @mcp.tool()

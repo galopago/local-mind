@@ -76,8 +76,18 @@ def run_smoke(work_dir: Path, python: str = sys.executable) -> None:
         "prompts did not start with readiness guidance",
     )
     require(
-        "link status --validate" in init_prompts.get("commands", []),
+        any(str(command).startswith("link health ") for command in init_prompts.get("commands", [])),
         "prompts did not include readiness command",
+    )
+    init_welcome = run_json("welcome", str(init_target), "--json", python=python)
+    require(len(init_welcome.get("steps", [])) == 3, "welcome did not return the short proof path")
+    require(
+        init_welcome.get("steps", [{}])[0].get("prompt") == "is Link ready?",
+        "welcome did not start with readiness guidance",
+    )
+    require(
+        "http://127.0.0.1:3000/health" in init_welcome.get("urls", []),
+        "welcome did not include the local health URL",
     )
 
     demo_result = run_link("demo", str(demo_target), "--force", python=python)

@@ -102,6 +102,7 @@ bash integrations/antigravity/install.sh</code></pre>
         <h2 id="tools">MCP Tools</h2>
         <p>Full tool set:</p>
         <pre><code>link_status
+link_operations
 starter_prompts
 migrate_wiki
 ingest_status
@@ -137,10 +138,10 @@ rebuild_backlinks</code></pre>
         <p>Memory write tools return <code>duplicate_candidates</code> or <code>conflict_candidates</code> when review, update, or archive is safer than creating another memory page.</p>
         <p>Project-aware tools accept an optional <code>project</code> argument. When set, Link returns broad user/global memory plus memories for that project, while excluding memories from other explicit projects.</p>
 
-        <h2 id="verify">Verify Setup</h2>
+<h2 id="verify">Verify Setup</h2>
         <pre><code>link verify-mcp
-link status --validate
-link prompts</code></pre>
+link health
+link next</code></pre>
         <p><code>link verify-mcp --json</code> is useful when an agent or script should read structured issues and next actions.</p>
         <div class="callout">
           <strong>Natural prompts to try</strong>

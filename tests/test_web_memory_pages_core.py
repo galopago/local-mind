@@ -43,9 +43,34 @@ def test_render_brief_page_escapes_query_and_project():
 
     assert "<title>Memory Brief</title>" in html
     assert "value=\"&lt;task&gt;\"" in html
+    assert 'data-copy-text="brief me from Link about &lt;task&gt; for project &lt;alpha&gt;"' in html
+    assert "Copy brief prompt" in html
+    assert 'data-copy-text="query Link for &lt;task&gt;"' in html
+    assert "Copy query prompt" in html
     assert "Project:</strong> &lt;alpha&gt;" in html
     assert "Use &lt;Link&gt; first" in html
     assert "<task>" not in html
+
+
+def test_render_brief_page_guides_empty_memory_recovery():
+    payload = {
+        "project": "",
+        "profile": {"active_count": 0},
+        "captures": {"count": 0, "items": []},
+        "review": {"count": 0, "items": []},
+        "relevant_count": 0,
+        "agent_guidance": [],
+        "relevant_memories": [],
+    }
+
+    html = render_brief_page(payload, "release notes", page_href=_page_href, action_hints=_action_hints, layout=_layout)
+
+    assert "No relevant memories yet." in html
+    assert "Teach Link before the next brief" in html
+    assert 'href="/ingest"' in html
+    assert 'href="/propose"' in html
+    assert 'data-copy-text="propose memories about release notes from Link raw sources"' in html
+    assert "Copy memory proposal prompt" in html
 
 
 def test_render_memory_dashboard_page_shows_counts_next_actions_and_sections():
@@ -71,6 +96,9 @@ def test_render_memory_dashboard_page_shows_counts_next_actions_and_sections():
 
     assert "Memory Dashboard" in html
     assert '<span class="num">3</span><span class="label">memories</span>' in html
+    assert 'data-copy-text="what does Link remember about project alpha?"' in html
+    assert 'data-copy-text="brief me from Link for project alpha"' in html
+    assert 'data-copy-text="audit Link memory for project alpha"' in html
     assert "<strong>Types:</strong> preference: 2" in html
     assert "link memory-inbox" in html
     assert "No memories need review." in html
@@ -102,9 +130,36 @@ def test_render_profile_page_lists_memory_sections_and_explain_links():
     html = render_profile_page(payload, page_href=_page_href, layout=_layout)
 
     assert "Memory Profile" in html
+    assert 'data-copy-text="what does Link remember about me?"' in html
+    assert 'data-copy-text="brief me from Link before we continue"' in html
     assert "/page/prefer-short-notes" in html
     assert "/explain-memory?memory=prefer-short-notes" in html
     assert "Keep release notes short." in html
+
+
+def test_render_profile_page_guides_first_memory_recovery():
+    payload = {
+        "project": "alpha",
+        "memory_count": 0,
+        "active_count": 0,
+        "review_count": 0,
+        "by_type": {},
+        "by_scope": {},
+        "by_status": {},
+        "recent": [],
+        "preferences": [],
+        "decisions": [],
+        "projects": [],
+        "archived": [],
+    }
+
+    html = render_profile_page(payload, page_href=_page_href, layout=_layout)
+
+    assert "No durable memories yet" in html
+    assert 'href="/ingest"' in html
+    assert 'href="/propose"' in html
+    assert 'data-copy-text="remember that &lt;preference or decision&gt; for project alpha"' in html
+    assert "Copy remember prompt" in html
 
 
 def test_render_memory_audit_page_reports_risks():
@@ -121,6 +176,8 @@ def test_render_memory_audit_page_reports_risks():
     html = render_memory_audit_page(payload, page_href=_page_href, action_hints=_action_hints, layout=_layout)
 
     assert "Memory Audit" in html
+    assert 'data-copy-text="audit Link memory for project alpha"' in html
+    assert 'data-copy-text="review Link memory inbox for project alpha"' in html
     assert "needs_attention" in html
     assert "Review &lt;memory&gt;" in html
 
@@ -138,6 +195,7 @@ def test_render_captures_page_shows_redaction_and_read_warnings():
     html = render_captures_page(payload, layout=_layout)
 
     assert "Raw Capture Inbox" in html
+    assert 'data-copy-text="review Link raw captures for project alpha"' in html
     assert "1 raw capture contains secret-looking values" in html
     assert "raw/memory-captures/bad.md" in html
     assert "&lt;denied&gt;" in html
@@ -166,6 +224,7 @@ def test_render_inbox_page_lists_review_items_and_actions():
     html = render_inbox_page(payload, page_href=_page_href, layout=_layout)
 
     assert "Memory Review Inbox" in html
+    assert 'data-copy-text="review Link memory inbox"' in html
     assert "Memory &lt;One&gt;" in html
     assert "Needs &lt;review&gt;" in html
     assert "/explain-memory?memory=memory-one" in html
@@ -205,6 +264,8 @@ def test_render_memory_explanation_page_shows_trust_context_actions_and_body():
     assert "Needs &lt;review&gt;" in html
     assert "Next:</strong> Review" in html
     assert "link forget-memory prefer-reviewable-memory" in html
+    assert "/graph?focus=prefer-reviewable-memory&amp;depth=2" in html
+    assert "Open local graph" in html
     assert "agent-memory" in html
     assert "2026-05-05 remember &lt;memory&gt;" in html
     assert "<p>Trusted body</p>" in html

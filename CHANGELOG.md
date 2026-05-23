@@ -6,7 +6,72 @@ Release sections use `MAJOR.MINOR.PATCH` versions that match `link-mcp` on PyPI 
 
 ## [Unreleased]
 
-- Nothing yet.
+## [1.3.0] - 2026-05-22
+
+### Added
+
+- Added copyable agent prompts across page, search, ingest, brief, memory dashboard, profile, audit, capture, and inbox views so browser-first users do not need to memorize Link phrasing.
+- Added copy buttons to memory action commands, capture commands, and memory next actions in the local web UI.
+- Added empty-wiki home recovery actions that link to ingest and copy the first ingest prompt.
+- Added graph empty-state recovery actions that link to ingest and copy the first ingest prompt.
+- Added empty memory-brief recovery actions that link to ingest/proposal review and copy a proposal prompt.
+- Added empty memory-profile recovery actions that link to ingest/proposal review and copy a remember prompt.
+- Added search no-result recovery actions with source-ingest and memory-proposal prompts.
+- Added CLI query no-context recovery steps for ingest status, raw source ingest, and rerunning the query.
+- Added interactive graph legend chips that filter the graph by page type.
+- Added viewer commands and graph/health URLs to the synthetic large-wiki smoke output so local 10k-page checks are easier to inspect.
+- Added active navigation highlighting to the local web viewer.
+- Added an in-page search refinement form that preserves the current query and page-type filter.
+- Added related-page links to wiki page footers using inbound and forward graph context.
+- Added threaded local HTTP request handling with locks around shared cache and mutation rate state.
+- Added accessible labels to local search inputs.
+- Added page-level persistent cache reuse so edited wikis reread changed Markdown pages without rereading unchanged pages.
+- Added `link next` as a short alias for starter prompts so first-run users have one memorable next-step command.
+- Added the `link next` prompt command to demo output so the first terminal screen points to the agent-first workflow.
+- Added the `link next` shortcut to starter prompt payloads and the local prompts page.
+- Added persistent-cache reuse details to benchmark JSON and text output.
+- Clarified graph controls so large wikis say "load all data" for search/filtering instead of implying the canvas renders every node.
+- Added persistent-cache state to status payloads, CLI status output, and the local health page.
+- Updated docs to explain persistent-cache reuse in status, benchmark, health, and slow-wiki troubleshooting flows.
+- Updated installer and agent-instruction next steps to point at `link next`.
+- Simplified quick-start examples around `link next`, with `link welcome` kept as the optional guided proof path.
+- Added copy buttons to the home-page starter prompt strip.
+- Added a local HTTP request timeout so stalled clients cannot hold server threads indefinitely.
+- Added legacy browser hardening headers for frame denial, DNS prefetch control, and cross-domain policy denial.
+- Added `/api/health` for a machine-readable readiness packet with validation and interrupted-operation state.
+- Added `/api` discovery output with recommended local endpoints and write-action header requirements.
+- Added MCP `link_operations` so agents can inspect pending, failed, or interrupted local writes.
+- Added `link health` as a single CLI readiness command combining status validation with interrupted-write state.
+- Added a `/more` page so direct navigation to advanced local viewer tools no longer lands on Not found.
+- Added a graph display cap control so large wikis can trade canvas density for responsiveness without loading every visible node at once.
+- Added non-alarmist benchmark scale notes for 1k/10k-page wikis, bounded graph overviews, and SQLite FTS headroom.
+- Added `link version` as a discoverable command alias for `link --version`.
+
+### Changed
+
+- Improved the local All Pages view with page-type summary chips and grouped visible results so larger wikis are easier to scan.
+- Made All Pages summary chips filter by page type while preserving bounded pagination.
+- Grouped local search results by page type and added page-type chips for narrowing result sets.
+- Added a Recently Updated section to the local home page so users can resume from fresh wiki pages.
+- Refined the local web viewer toward a quieter wiki/document layout with grouped navigation, plainer page metadata, and automatic section outlines on structured wiki pages.
+- Changed large-graph canvas seeding to use deterministic category clusters, with higher-degree pages nearer cluster centers, instead of a single global spiral.
+- Updated CLI query no-context recovery commands to include the explicit Link root so they work from any terminal directory.
+- Updated starter prompt local-check commands to include the explicit Link root so CLI, web, and MCP prompt payloads are paste-safe outside the wiki directory.
+- Updated operation recovery commands to include the explicit Link root for interrupted-write repair flows.
+- Updated health page repair and next-action commands to include the explicit Link root where the page can infer it.
+- Updated starter prompts, installers, ingest post-checks, and quick-start docs to use `link health` as the primary readiness command.
+- Updated init and demo next-step commands so setup guidance remains paste-safe outside the current checkout directory.
+- Updated ingest guidance commands and post-checks to include the explicit Link root across CLI, JSON, web, and MCP payloads.
+- Updated rebuild-index follow-up guidance to include the concrete `link.py` runtime and Link root for the next backlinks repair step.
+- Updated ingest UI next-step and validation cards to reuse target-aware commands instead of generic or chained shell snippets.
+- Updated `link status` text output to pair MCP-style next actions with concrete local commands for terminal users.
+- Updated the health page memory-review fallback to copy a target-aware `link memory-inbox` command.
+- Updated `link-mcp` missing-wiki startup guidance to point at `link init`, source checkout init, integration installers, or `--wiki`.
+- Updated the CLI product docs with the local large-wiki smoke command and how to inspect the generated fixture.
+- Updated public docs to describe the wiki-style home, catalog, and search browsing flows.
+- Updated README and UI docs to describe related-page footers and search refinement.
+- Clarified large-graph load copy so users know full data enables search/filtering while the canvas remains capped.
+- Updated CI to run the full pytest suite rather than the narrower unittest discovery path.
 
 ## [1.2.0] - 2026-05-19
 
