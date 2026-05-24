@@ -33,9 +33,34 @@ class DocsSiteTests(unittest.TestCase):
         for page in self.docs_pages():
             html = page.read_text(encoding="utf-8")
 
-            self.assertNotIn("<script", html.lower())
+            self.assertIn('<script src="assets/site.js" defer></script>', html)
+            self.assertNotIn("<script>", html.lower())
             self.assertNotIn("fonts.googleapis.com", html)
             self.assertNotIn("../logo.svg", html)
+
+    def test_github_pages_analytics_is_docs_only_and_manual(self):
+        site_js = (ROOT / "docs/assets/site.js").read_text(encoding="utf-8")
+
+        self.assertIn("var POSTHOG_PROJECT_KEY =", site_js)
+        self.assertNotIn("go/adminOrg", site_js)
+        self.assertNotIn("/replay/", site_js)
+        self.assertIn('autocapture: false', site_js)
+        self.assertIn('capture_pageview: false', site_js)
+        self.assertIn('disable_session_recording: true', site_js)
+        self.assertIn('disable_persistence: true', site_js)
+        self.assertIn('docs_viewed', site_js)
+        self.assertIn('install_brew_copied', site_js)
+        self.assertIn('install_pypi_copied', site_js)
+        self.assertIn('demo_command_copied', site_js)
+        self.assertIn('mcp_setup_viewed', site_js)
+        self.assertIn('github_clicked', site_js)
+        self.assertIn('pypi_clicked', site_js)
+        self.assertIn('mcp_registry_clicked', site_js)
+
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        security = (ROOT / "docs/security.html").read_text(encoding="utf-8")
+        self.assertIn("No telemetry in the installed CLI, MCP server, local web UI, or wiki runtime.", readme)
+        self.assertIn("does not run inside Link, read local wiki data, or capture source/memory content", security)
 
 
 if __name__ == "__main__":

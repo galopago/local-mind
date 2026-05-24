@@ -274,9 +274,9 @@ Full MCP tool list: [MCP setup](https://gowtham0992.github.io/link/mcp.html).
 
 ## Privacy And Safety
 
-Link is local-first:
+Link itself is local-first:
 
-- No telemetry.
+- No telemetry in the installed CLI, MCP server, local web UI, or wiki runtime.
 - No hosted backend.
 - No external API calls from `serve.py` or `link-mcp`.
 - Raw sources and generated wiki pages are ignored by git by default.
