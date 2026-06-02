@@ -1,25 +1,9 @@
-# Personal data — never commit
+# Original source files may contain secrets — keep raw/ out of git
 raw/*
 !raw/.gitkeep
 
-wiki/sources/*
-!wiki/sources/.gitkeep
-
-wiki/concepts/*
-!wiki/concepts/.gitkeep
-
-wiki/entities/*
-!wiki/entities/.gitkeep
-
-wiki/comparisons/*
-!wiki/comparisons/.gitkeep
-
-wiki/explorations/*
-!wiki/explorations/.gitkeep
-
-# Keep index and log templates but ignore personal content
-# (we ship empty versions in the repo)
-wiki/_link_schema.json
+# Transient multi-file write markers (not wiki knowledge)
+wiki/.link-operations/
 
 # OS junk
 .DS_Store

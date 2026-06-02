@@ -56,7 +56,7 @@
           <li>No telemetry in the installed CLI, MCP server, local web UI, or wiki runtime.</li>
           <li>No hosted backend.</li>
           <li>No external API calls from <code>serve.py</code> or <code>link-mcp</code>.</li>
-          <li>Raw sources and generated wiki pages are ignored by git by default.</li>
+          <li><code>raw/</code> sources stay gitignored by default (they may contain secrets). The compiled <code>wiki/</code> in this repo is tracked in git for history and rollback.</li>
           <li>SQLite search, when available, is an in-memory derived index. Markdown remains the source of truth.</li>
         </ul>
         <p>The public GitHub Pages documentation may use lightweight analytics to understand install interest. It does not run inside Link, read local wiki data, or capture source/memory content.</p>

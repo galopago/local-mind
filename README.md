@@ -118,9 +118,9 @@ python3 link.py health link-demo
 ```
 
 The generated demo is the public proof wiki. The repo's root `wiki/` directory
-is only a scaffold for local development and personal testing. Generated content
-inside `wiki/`, `raw/`, and `link-demo/` is ignored by git so personal memory is
-not published by accident.
+is versioned in git so you can trace how memory evolves and roll back when
+needed. Original files in `raw/` and output in `link-demo/` stay gitignored
+(`raw/` may contain secrets; `link-demo/` is disposable generated output).
 
 For local scale checks from a source checkout, run:
 
@@ -279,7 +279,8 @@ Link itself is local-first:
 - No telemetry in the installed CLI, MCP server, local web UI, or wiki runtime.
 - No hosted backend.
 - No external API calls from `serve.py` or `link-mcp`.
-- Raw sources and generated wiki pages are ignored by git by default.
+- Original `raw/` sources stay gitignored by default (they may contain secrets).
+  The compiled `wiki/` in this repo is tracked in git for history and rollback.
 - `link backup` excludes `raw/` unless you explicitly pass `--include-raw`.
 - Secret-looking values are detected in raw sources, captures, and release
   hygiene checks.
@@ -329,8 +330,9 @@ git diff --check
 
 Full contributor guide: [Contributing](https://gowtham0992.github.io/link/contributing.html).
 
-Do not include personal wiki data, raw sources, registry tokens, `.env` files, or
-local MCP credentials in a PR.
+Do not include `raw/` sources, registry tokens, `.env` files, or local MCP
+credentials in a PR. Review `wiki/` diffs before pushing if they contain private
+memory you do not want on a remote.
 
 If Link helps your agents remember better, [star it on GitHub](https://github.com/gowtham0992/link)
 so more people can find it.

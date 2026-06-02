@@ -73,7 +73,7 @@ py link.py next link-demo
 py link.py serve link-demo</code></pre>
         <div class="callout">
           <strong>Judge the generated demo</strong>
-          The repo's root <code>wiki/</code> is only a scaffold for local development and personal testing. Generated content in <code>wiki/</code>, <code>raw/</code>, and <code>link-demo/</code> is ignored by git so private memory is not published by accident.
+          The repo's root <code>wiki/</code> is tracked in git for history and rollback. <code>raw/</code> and <code>link-demo/</code> stay gitignored (<code>raw/</code> may contain secrets; <code>link-demo/</code> is disposable output).
         </div>
         <p>The demo includes one pending memory intentionally, so the review inbox and explain-memory workflow are visible. Run <code>link review-memory prefer-local-personal-memory link-demo</code> if you want memory audit to be fully clear.</p>
         <p>Open <code>http://127.0.0.1:3000</code>, then inspect <code>/brief</code>, <code>/memory</code>, <code>/ingest</code>, <code>/graph</code>, and <code>/health</code>. Open <strong>more</strong> for prompts, proposal review, audit, captures, profile, log, and all pages. Link accepts <code>localhost</code> too, but the numeric loopback address avoids slow IPv6 fallback in some Safari setups.</p>
