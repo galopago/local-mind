@@ -91,7 +91,7 @@ bash integrations/cursor/install.sh
 bash integrations/copilot/install.sh
 bash integrations/vscode/install.sh
 bash integrations/antigravity/install.sh</code></pre>
-        <p>Use <code>--project</code> for a repo-local Link install. Project-scoped memory then stays separate from other project memory while still allowing broad user memory to be recalled.</p>
+        <p>Use <code>bash integrations/cursor/install.sh --project</code> for a repo-local Link install. Cursor MCP is written to <code>.cursor/mcp.json</code> in that repo only; global installs use <code>~/.cursor/mcp.json</code>. Project-scoped memory stays separate from other repos while broad user memory can still be recalled when configured.</p>
         <p>The shell installers target macOS/Linux-style agent config paths. On Windows, run Link from source and use the MCP-only setup in the MCP guide until a Windows-specific installer exists.</p>
 
         <h2 id="source">3. Add One Source</h2>

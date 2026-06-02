@@ -70,6 +70,21 @@ class InstallerTests(unittest.TestCase):
                 self.assertIn('. "$SCRIPT_DIR/../_shared/instructions.sh"', text)
                 self.assertIn('link_print_next_steps "$MODE"', text)
 
+    def test_cursor_project_mode_uses_local_mcp_config(self):
+        cursor = (ROOT / "integrations/cursor/install.sh").read_text(encoding="utf-8")
+
+        self.assertIn('MCP_CONFIG="$(pwd)/.cursor/mcp.json"', cursor)
+        self.assertIn('REMOVE_GLOBAL_LINK="true"', cursor)
+        self.assertIn("Removed Link MCP from ~/.cursor/mcp.json", cursor)
+        self.assertIn('MCP_CONFIG="$HOME/.cursor/mcp.json"', cursor)
+        self.assertIn('REMOVE_GLOBAL_LINK="false"', cursor)
+
+    def test_scaffold_skips_code_copies_for_source_checkout(self):
+        scaffold = (ROOT / "integrations/_shared/scaffold.sh").read_text(encoding="utf-8")
+
+        self.assertIn("SAME_CHECKOUT=false", scaffold)
+        self.assertIn("Skipped code file copies", scaffold)
+
     def test_codex_and_kiro_update_existing_mcp_registration(self):
         codex = (ROOT / "integrations/codex/install.sh").read_text(encoding="utf-8")
         kiro = (ROOT / "integrations/kiro/install.sh").read_text(encoding="utf-8")

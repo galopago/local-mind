@@ -173,7 +173,7 @@ bash integrations/antigravity/install.sh
 
 Installers create or update `~/link`, install or upgrade `link-mcp`, write
 lightweight agent instructions, and preserve existing wiki data on reinstall.
-Use `--project` when a repo needs separate project memory.
+Use `--project` when a repo needs separate project memory. For Cursor, that registers MCP in `.cursor/mcp.json` (workspace-only) instead of `~/.cursor/mcp.json`.
 
 The shell installers are intended for macOS/Linux-style agent config paths.
 On Windows, use the source commands above plus the MCP-only config below until

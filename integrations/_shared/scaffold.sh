@@ -75,32 +75,41 @@ fi
 
 # ── Code files: always update ─────────────────────────────────────────
 # These are developer-maintained and should always reflect the latest version.
-cp "$LINK_ROOT/serve.py" "$TARGET_DIR/serve.py"
-echo "  Updated serve.py"
-
-cp "$LINK_ROOT/LINK.md" "$TARGET_DIR/LINK.md"
-echo "  Updated LINK.md"
-
-if [ -f "$LINK_ROOT/link.py" ]; then
-    cp "$LINK_ROOT/link.py" "$TARGET_DIR/link.py"
-    echo "  Updated link.py"
+# Skip copies when installing --project into the Link source checkout itself.
+SAME_CHECKOUT=false
+if [ "$(cd "$LINK_ROOT" && pwd)" = "$(cd "$TARGET_DIR" && pwd)" ]; then
+    SAME_CHECKOUT=true
+    echo "  Skipped code file copies (target is the Link source checkout)."
 fi
 
-if [ -d "$LINK_ROOT/mcp_package/link_core" ]; then
-    mkdir -p "$TARGET_DIR/link_core"
-    cp "$LINK_ROOT/mcp_package/link_core/"*.py "$TARGET_DIR/link_core/"
-    echo "  Updated link_core"
-fi
+if [ "$SAME_CHECKOUT" = false ]; then
+    cp "$LINK_ROOT/serve.py" "$TARGET_DIR/serve.py"
+    echo "  Updated serve.py"
 
-if [ -f "$LINK_ROOT/logo.png" ]; then
-    cp "$LINK_ROOT/logo.png" "$TARGET_DIR/logo.png"
-fi
+    cp "$LINK_ROOT/LINK.md" "$TARGET_DIR/LINK.md"
+    echo "  Updated LINK.md"
 
-if [ -f "$LINK_ROOT/logo.svg" ]; then
-    cp "$LINK_ROOT/logo.svg" "$TARGET_DIR/logo.svg"
-fi
+    if [ -f "$LINK_ROOT/link.py" ]; then
+        cp "$LINK_ROOT/link.py" "$TARGET_DIR/link.py"
+        echo "  Updated link.py"
+    fi
 
-cp "$LINK_ROOT/.linkignore" "$TARGET_DIR/.linkignore"
+    if [ -d "$LINK_ROOT/mcp_package/link_core" ]; then
+        mkdir -p "$TARGET_DIR/link_core"
+        cp "$LINK_ROOT/mcp_package/link_core/"*.py "$TARGET_DIR/link_core/"
+        echo "  Updated link_core"
+    fi
+
+    if [ -f "$LINK_ROOT/logo.png" ]; then
+        cp "$LINK_ROOT/logo.png" "$TARGET_DIR/logo.png"
+    fi
+
+    if [ -f "$LINK_ROOT/logo.svg" ]; then
+        cp "$LINK_ROOT/logo.svg" "$TARGET_DIR/logo.svg"
+    fi
+
+    cp "$LINK_ROOT/.linkignore" "$TARGET_DIR/.linkignore"
+fi
 
 # ── Wiki structure: only on fresh install ────────────────────────────
 # Never overwrite wiki data (index.md, log.md, _backlinks.json, page files).

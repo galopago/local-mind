@@ -42,6 +42,7 @@ link_print_next_steps() {
     echo "Done."
     if [ "$mode" = "--project" ]; then
         echo "  Drop sources into raw/."
+        echo "  MCP config: .cursor/mcp.json (this project only)"
         echo "  View wiki: python3 link.py serve"
         echo "  Print starter prompts: python3 link.py next"
         echo "  Try in your agent:"

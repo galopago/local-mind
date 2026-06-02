@@ -67,7 +67,7 @@ bash integrations/cursor/install.sh
 bash integrations/copilot/install.sh
 bash integrations/vscode/install.sh
 bash integrations/antigravity/install.sh</code></pre>
-        <p>Use <code>--project</code> from a repo when memory should be project-scoped.</p>
+        <p>Use <code>bash integrations/cursor/install.sh --project</code> from a repo when memory should be project-scoped. That registers MCP in <code>.cursor/mcp.json</code> and removes <code>link</code> from <code>~/.cursor/mcp.json</code> so other workspaces are unaffected.</p>
 
         <h2 id="mcp-only">MCP Only</h2>
         <pre><code>python3 -m pip install --upgrade link-mcp</code></pre>
